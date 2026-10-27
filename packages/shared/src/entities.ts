@@ -12,6 +12,7 @@ import {
   roomKindSchema,
   roomStatusSchema,
 } from './enums';
+import { inquiryExtractionSchema } from './inquiry';
 import { czkSchema, quoteSchema } from './quote';
 
 export const roomTypeSchema = z.object({
@@ -66,8 +67,7 @@ export const inquirySchema = z.object({
   rawText: z.string(),
   channel: inquiryChannelSchema,
   receivedAt: z.iso.datetime(),
-  /** Structured extraction produced by the agent. Shape is defined with the extraction tool. */
-  parsed: z.record(z.string(), z.unknown()).nullable(),
+  parsed: inquiryExtractionSchema.nullable(),
   status: inquiryStatusSchema,
   bookingId: z.string().nullable(),
 });
