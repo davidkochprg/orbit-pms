@@ -12,7 +12,7 @@ import {
   roomKindSchema,
   roomStatusSchema,
 } from './enums';
-import { inquiryExtractionSchema } from './inquiry';
+import { inquiryExtractionSchema, inquirySuggestionSchema } from './inquiry';
 import { czkSchema, quoteAddonsSchema, quoteSchema } from './quote';
 
 export const roomTypeSchema = z.object({
@@ -67,10 +67,20 @@ export const inquirySchema = z.object({
   id: z.string(),
   rawText: z.string(),
   channel: inquiryChannelSchema,
+  /** OTA or partner the message came through, e.g. "Booking.com"; null for direct messages. */
+  partner: z.string().nullable(),
+  subject: z.string().nullable(),
+  senderName: z.string().nullable(),
+  senderAddress: z.string().nullable(),
   receivedAt: z.iso.datetime(),
   parsed: inquiryExtractionSchema.nullable(),
+  suggestion: inquirySuggestionSchema.nullable(),
+  /** The reply as sent, once marked sent. */
+  reply: z.string().nullable(),
   status: inquiryStatusSchema,
   bookingId: z.string().nullable(),
+  processedAt: z.iso.datetime().nullable(),
+  processingError: z.string().nullable(),
 });
 export type Inquiry = z.infer<typeof inquirySchema>;
 

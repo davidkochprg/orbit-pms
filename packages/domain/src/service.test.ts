@@ -144,7 +144,7 @@ describe('createHold', () => {
     addons: { wellness: true, dogs: 0, extraBeds: 0 },
     source: 'email' as const,
     notes: null,
-    inquiryId: 'inq_01',
+    inquiryId: null,
   };
 
   it('creates a priced hold and a new guest, expiring after the policy window', async () => {

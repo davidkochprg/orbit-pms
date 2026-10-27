@@ -9,17 +9,20 @@ import type {
   CreateHoldInput,
   DayOverview,
   Guest,
+  InquiryExtraction,
   IsoDate,
   Quote,
   QuoteInput,
   Room,
   RoomType,
+  StayOption,
 } from '@orbit/shared';
 import { checkAvailability } from './availability';
 import { allowedActions, applyAction, changeDates, createHold, moveBooking } from './bookings';
 import { addDays, type DateRange, hotelToday } from './dates';
 import { arrivalsOn, departuresOn, stayingOver } from './day';
 import { DomainError } from './errors';
+import { addonsForWishes, pickOptions, roomKindForWishes, stayRequest } from './inbox';
 import type { HotelPolicy } from './policy';
 import { type PricingConfig, quote } from './pricing';
 import type { NewAuditEntry, Repositories } from './repositories';
@@ -172,6 +175,10 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         newGuest = { id: newId('gst'), notes: null, ...input.guest };
         guestId = newGuest.id;
       }
+      const inquiry = input.inquiryId ? await tx.inquiries.getInquiry(input.inquiryId) : null;
+      if (input.inquiryId && !inquiry) {
+        throw new DomainError('not_found', `Inquiry ${input.inquiryId} not found`);
+      }
       const target = await loadRoom(tx, input.roomId);
       const booking = createHold(input, {
         ...target,
@@ -199,6 +206,8 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         apply: async (r) => {
           if (newGuest) await r.guests.createGuest(newGuest);
           await r.bookings.createBooking(booking);
+          // The inquiry points at its hold, in the same transaction.
+          if (inquiry) await r.inquiries.updateInquiry({ ...inquiry, bookingId: booking.id });
         },
       };
     };
@@ -298,12 +307,38 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     return quote({ ...input, roomType }, pricing);
   }
 
+  /** Up to three priced rooms (one per room type) for the stay a message asks for. */
+  async function inboxOptions(
+    analysis: InquiryExtraction,
+  ): Promise<{ options: StayOption[]; note: string | null }> {
+    const stay = stayRequest(analysis);
+    if (!stay) return { options: [], note: null };
+    const kind = roomKindForWishes(analysis.wishes, policy);
+    const available = await findAvailableRooms({ ...stay, ...(kind && { kind }) });
+    if (available.length === 0) {
+      return {
+        options: [],
+        note: `No ${kind ?? 'room'} is free for ${stay.checkIn} to ${stay.checkOut} for this party.`,
+      };
+    }
+    const addons = addonsForWishes(analysis.wishes);
+    const options = pickOptions(available).map((r) => ({
+      roomId: r.roomId,
+      roomName: r.roomName,
+      roomTypeName: r.roomType.name,
+      kind: r.kind,
+      quote: quote({ ...stay, roomType: r.roomType, addons }, pricing),
+    }));
+    return { options, note: null };
+  }
+
   return {
     getBookingDetail,
     getDayOverview,
     searchBookings,
     findAvailableRooms,
     quoteStay,
+    inboxOptions,
     applyBookingAction: (id: string, action: BookingAction, actor: AuditActor) =>
       commit(planAction(id, action), actor),
     moveBooking: (id: string, roomId: string, actor: AuditActor) =>

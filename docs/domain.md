@@ -55,6 +55,15 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 
 `searchBookings` matches guest names ignoring case and accents (`novak` finds `Novák`).
 
+## Inbox
+
+`createInboxService` (`inbox-service.ts`) keeps guest messages from every channel in one stream.
+
+- `inboxOptions(analysis)`: for a complete booking request, up to three free rooms, one per room type, cheapest first, each with an exact quote. An apartment is required if the guest asks for one, or brings a dog (`hotelPolicy.dogsAllowedIn`, placeholder: apartments only). Wellness and a dog become quote add-ons.
+- `saveProcessing(id, result)`: stores the agent's extraction and suggestion; a `new` message with options becomes `quoted`.
+- `createHold(id, roomId, actor)`: a hold for the requested stay in the chosen room. Reuses a guest whose email matches the sender (case-insensitive), otherwise creates one. The hold and the message's `bookingId` are saved in one transaction.
+- `markReplied(id, reply, actor)`: stores the sent reply and marks the message `replied`.
+
 ## Availability rules
 
 `checkAvailability(query, { rooms, roomTypes, bookings, now })` returns rooms that can take the whole stay, cheapest room type first.

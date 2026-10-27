@@ -4,6 +4,7 @@ import type {
   Booking,
   BookingStatus,
   Guest,
+  Inquiry,
   IsoDate,
   PendingAction,
   Room,
@@ -54,6 +55,14 @@ export interface AuditRepository {
   list(filter?: { subjectId?: string; limit?: number }): Promise<AuditLogEntry[]>;
 }
 
+export interface InquiryRepository {
+  /** Newest first. */
+  listInquiries(): Promise<Inquiry[]>;
+  getInquiry(id: string): Promise<Inquiry | null>;
+  createInquiry(inquiry: Inquiry): Promise<void>;
+  updateInquiry(inquiry: Inquiry): Promise<void>;
+}
+
 export interface PendingActionRepository {
   create(action: PendingAction): Promise<void>;
   get(id: string): Promise<PendingAction | null>;
@@ -65,6 +74,7 @@ export interface Repositories {
   bookings: BookingRepository;
   guests: GuestRepository;
   audit: AuditRepository;
+  inquiries: InquiryRepository;
   pendingActions: PendingActionRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;

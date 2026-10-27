@@ -1,4 +1,12 @@
-import type { AuditLogEntry, Booking, Guest, PendingAction, Room, RoomType } from '@orbit/shared';
+import type {
+  AuditLogEntry,
+  Booking,
+  Guest,
+  Inquiry,
+  PendingAction,
+  Room,
+  RoomType,
+} from '@orbit/shared';
 import { rangesOverlap } from './dates';
 import type { Repositories } from './repositories';
 
@@ -8,6 +16,7 @@ export interface MemoryState {
   guests: Guest[];
   bookings: Booking[];
   audit: AuditLogEntry[];
+  inquiries: Inquiry[];
   pendingActions: PendingAction[];
 }
 
@@ -27,6 +36,7 @@ export function createMemoryRepositories(
     guests: [],
     bookings: [],
     audit: [],
+    inquiries: [],
     pendingActions: [],
     ...clone(initial),
   };
@@ -90,6 +100,21 @@ export function createMemoryRepositories(
             .reverse()
             .slice(0, limit),
         ),
+    },
+    inquiries: {
+      listInquiries: () =>
+        Promise.resolve(
+          [...state.inquiries].sort((a, b) => b.receivedAt.localeCompare(a.receivedAt)),
+        ),
+      getInquiry: (id) => Promise.resolve(state.inquiries.find((i) => i.id === id) ?? null),
+      createInquiry: (inquiry) => {
+        state.inquiries.push(inquiry);
+        return Promise.resolve();
+      },
+      updateInquiry: (inquiry) => {
+        state.inquiries = state.inquiries.map((i) => (i.id === inquiry.id ? inquiry : i));
+        return Promise.resolve();
+      },
     },
     pendingActions: {
       create: (action) => {

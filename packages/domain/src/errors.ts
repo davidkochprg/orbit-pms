@@ -4,7 +4,8 @@ export type DomainErrorCode =
   | 'over_capacity'
   | 'not_found'
   | 'conflict'
-  | 'invalid_transition';
+  | 'invalid_transition'
+  | 'invalid_input';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;
