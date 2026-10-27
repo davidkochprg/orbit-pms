@@ -47,6 +47,7 @@ The two limits are parsed but not enforced yet.
 | `pnpm db:generate` | Drizzle migration from schema changes                         |
 | `pnpm db:migrate`  | Apply migrations                                              |
 | `pnpm db:seed`     | Replace all data with the demo seed                           |
+| `pnpm db:reset`    | Delete the local PGlite database, then migrate and seed       |
 | `pnpm eval`        | Extraction evals (only loads fixtures until the agent exists) |
 
 Internal packages are consumed as TypeScript source (`workspace:*`, `exports` pointing at `src/index.ts`), so there is no per-package build step.
@@ -64,7 +65,7 @@ Husky runs commitlint on every commit message, rejects AI attribution trailers, 
 
 After changing `schema.ts`, run `pnpm db:generate` and commit the new file in `packages/db/drizzle/`. `pnpm db:migrate` applies pending migrations and is safe to re-run.
 
-A PGlite directory can only be open in one process at a time, so stop `pnpm dev` before running `pnpm db:seed`. To start from scratch, delete `.data/`.
+A PGlite directory can only be open in one process at a time, so stop `pnpm dev` (Ctrl-C) before running `pnpm db:seed`. If the local database ever gets into a bad state, for example a migration fails with "already exists" or a script hangs, run `pnpm db:reset` to delete it and start fresh. It refuses to run against a `postgres://` URL.
 
 ## Seeding
 

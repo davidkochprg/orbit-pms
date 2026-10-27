@@ -17,6 +17,7 @@
     "db:generate": "pnpm --filter @orbit/db db:generate",
     "db:migrate": "pnpm --filter @orbit/db db:migrate",
     "db:seed": "pnpm --filter @orbit/db db:seed",
+    "db:reset": "pnpm --filter @orbit/db db:reset",
     "eval": "pnpm --filter @orbit/ai eval",
     "prepare": "husky"
   },
