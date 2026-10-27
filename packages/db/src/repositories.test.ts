@@ -300,6 +300,27 @@ describe('billing (PGlite)', () => {
   });
 });
 
+describe('audit log filters (PGlite)', () => {
+  it('filters by actor, newest first', async () => {
+    await repos.audit.append({
+      actor: 'agent',
+      action: 'test.agent',
+      subjectId: null,
+      payload: null,
+    });
+    await repos.audit.append({
+      actor: 'user',
+      action: 'test.user',
+      subjectId: null,
+      payload: null,
+    });
+    const agent = await repos.audit.list({ actor: 'agent', limit: 5 });
+    expect(agent.every((e) => e.actor === 'agent')).toBe(true);
+    expect(agent[0]?.action).toBe('test.agent');
+    expect((await repos.audit.list({ limit: 1 }))[0]?.action).toBe('test.user');
+  });
+});
+
 describe('registrations (PGlite)', () => {
   it('round-trips the guest book and replaces an entry on save', async () => {
     const entry = seed.registrations[0]!;

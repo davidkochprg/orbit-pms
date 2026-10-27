@@ -150,11 +150,16 @@ function auditRepository(db: Db): AuditRepository {
       if (!row) throw new Error('Audit insert returned no row');
       return toAuditEntry(row);
     },
-    async list({ subjectId, limit = 50 } = {}) {
+    async list({ subjectId, actor, limit = 50 } = {}) {
       const rows = await db
         .select()
         .from(auditLog)
-        .where(subjectId ? eq(auditLog.subjectId, subjectId) : undefined)
+        .where(
+          and(
+            subjectId ? eq(auditLog.subjectId, subjectId) : undefined,
+            actor ? eq(auditLog.actor, actor) : undefined,
+          ),
+        )
         .orderBy(desc(auditLog.seq))
         .limit(limit);
       return rows.map(toAuditEntry);

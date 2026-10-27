@@ -112,6 +112,10 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - `updateProfile(profile, by)` replaces the whole profile; only an active manager may (`forbidden`). Entry IDs must be unique and check-out must be earlier in the day than check-in, so rooms can be turned over (`invalid_input`). It writes `settings.profile` to the audit log with who saved it (`by`) and the names of the changed fields; a save that changes nothing writes nothing.
 - Rules the system enforces (hold length, which room kinds take dogs, prices) stay in `hotelPolicy` and the rates, not in the profile.
 
+## Activity
+
+`createActivityService` (`activity.ts`) lists the audit log hotel-wide, newest first, optionally only the agent's or only staff changes. `describeActivity` names each entry's subject from its action prefix (`booking.*` and `folio.*` → the booking as "guest, room"; `room.*` and `task.*` → the room; `room_type.*`, `guest.*`, `staff.*`, `inquiry.*`) and the staff member recorded as `by` in its payload. A subject that no longer exists is left unnamed.
+
 ## Registration
 
 `createRegistrationService` (`registration.ts`) keeps the guest book: one entry per stay for its main guest, with nationality, date of birth, ID document and, for guests from abroad, a home address.

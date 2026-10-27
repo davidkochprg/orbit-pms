@@ -1,3 +1,4 @@
+export * from './activity';
 export * from './availability';
 export * from './billing';
 export * from './bookings';

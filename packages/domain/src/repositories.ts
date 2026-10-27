@@ -68,7 +68,11 @@ export interface NewAuditEntry {
 export interface AuditRepository {
   append(entry: NewAuditEntry): Promise<AuditLogEntry>;
   /** Newest first. */
-  list(filter?: { subjectId?: string; limit?: number }): Promise<AuditLogEntry[]>;
+  list(filter?: {
+    subjectId?: string;
+    actor?: AuditActor;
+    limit?: number;
+  }): Promise<AuditLogEntry[]>;
 }
 
 export interface InquiryRepository {

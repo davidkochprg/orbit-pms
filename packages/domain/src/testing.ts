@@ -144,10 +144,12 @@ export function createMemoryRepositories(
         state.audit.push(saved);
         return Promise.resolve(saved);
       },
-      list: ({ subjectId, limit = 50 } = {}) =>
+      list: ({ subjectId, actor, limit = 50 } = {}) =>
         Promise.resolve(
           state.audit
-            .filter((e) => !subjectId || e.subjectId === subjectId)
+            .filter(
+              (e) => (!subjectId || e.subjectId === subjectId) && (!actor || e.actor === actor),
+            )
             .reverse()
             .slice(0, limit),
         ),
