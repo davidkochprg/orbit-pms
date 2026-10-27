@@ -1,4 +1,4 @@
-import { buildInquiryFixtures } from '@orbit/ai/evals';
+import { buildInquiryFixtures, evalRoomNames } from '@orbit/ai/evals';
 import { blocksRoom, checkAvailability, pricingConfig, rangesOverlap } from '@orbit/domain';
 import { bookingSchema, guestSchema, inquirySchema, roomSchema } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
@@ -9,14 +9,36 @@ const now = new Date('2026-10-27T08:00:00Z');
 const seed = buildSeed(today, now, pricingConfig);
 
 describe('buildSeed', () => {
-  it('has twelve rooms including two apartments', () => {
-    expect(seed.rooms).toHaveLength(12);
-    expect(seed.rooms.filter((r) => r.kind === 'apartment')).toHaveLength(2);
+  it('has fifty rooms of six types, including six apartments', () => {
+    expect(seed.rooms).toHaveLength(50);
+    expect(new Set(seed.rooms.map((r) => r.roomTypeId)).size).toBe(6);
+    expect(seed.rooms.filter((r) => r.kind === 'apartment')).toHaveLength(6);
+    expect(new Set(seed.rooms.map((r) => r.id)).size).toBe(50);
   });
 
-  it('has about sixty bookings in the past, present and future', () => {
-    expect(seed.bookings.length).toBeGreaterThanOrEqual(50);
-    expect(seed.bookings.length).toBeLessThanOrEqual(70);
+  it('fills about half the hotel on a typical night', () => {
+    const night = seed.bookings.filter(
+      (b) => b.status !== 'cancelled' && b.checkIn <= today && today < b.checkOut,
+    );
+    expect(night.length).toBeGreaterThanOrEqual(15);
+    expect(night.length).toBeLessThanOrEqual(40);
+  });
+
+  it('matches the room names the housekeeping evals use', () => {
+    expect(seed.rooms.map((r) => r.name).sort()).toEqual([...evalRoomNames].sort());
+  });
+
+  it('never puts children in a room type that takes none', () => {
+    const noChildren = new Set(seed.roomTypes.filter((t) => t.maxChildren === 0).map((t) => t.id));
+    for (const b of seed.bookings) {
+      const room = seed.rooms.find((r) => r.id === b.roomId);
+      if (room && noChildren.has(room.roomTypeId)) expect(b.childAges).toEqual([]);
+    }
+  });
+
+  it('has a few hundred bookings in the past, present and future', () => {
+    expect(seed.bookings.length).toBeGreaterThanOrEqual(300);
+    expect(seed.bookings.length).toBeLessThanOrEqual(600);
     expect(seed.bookings.some((b) => b.status === 'checked_out')).toBe(true);
     expect(seed.bookings.some((b) => b.status === 'checked_in')).toBe(true);
     expect(seed.bookings.some((b) => b.status === 'hold')).toBe(true);
@@ -67,6 +89,20 @@ describe('buildSeed', () => {
       );
       expect(available.length, f.id).toBeGreaterThan(0);
     }
+  });
+
+  it('never puts one guest in two rooms at once', () => {
+    for (const a of seed.bookings) {
+      for (const b of seed.bookings) {
+        if (a.id !== b.id && a.guestId === b.guestId) expect(rangesOverlap(a, b), a.id).toBe(false);
+      }
+    }
+  });
+
+  it('has a large pool of distinct synthetic guests', () => {
+    expect(seed.guests.length).toBeGreaterThanOrEqual(200);
+    expect(new Set(seed.guests.map((g) => g.name)).size).toBe(seed.guests.length);
+    expect(new Set(seed.guests.map((g) => g.email)).size).toBe(seed.guests.length);
   });
 
   it('stores a price snapshot that matches each booking', () => {

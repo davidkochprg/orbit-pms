@@ -81,7 +81,7 @@ function overlapsAny(draft: Draft, drafts: Draft[]): boolean {
 }
 
 /**
- * Builds the demo data set relative to `today`: rooms, synthetic guests, about 60 bookings across
+ * Builds the demo data set relative to `today`: rooms, synthetic guests, about 440 bookings across
  * past, present and future, and ten open inquiries that each have at least one free room.
  * Deterministic for a given `today`.
  */
@@ -99,7 +99,7 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
         checkOut: addDays(cursor, random.int(2, 5)),
       };
       if (!overlapsAny(draft, drafts)) drafts.push(draft);
-      cursor = addDays(draft.checkOut, random.chance(0.15) ? 0 : random.int(6, 18));
+      cursor = addDays(draft.checkOut, random.chance(0.2) ? 0 : random.int(1, 9));
     }
   }
 
@@ -109,6 +109,7 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
     (a, b) => a.checkIn.localeCompare(b.checkIn) || a.roomId.localeCompare(b.roomId),
   );
 
+  const stays = new Map<string, Draft[]>();
   for (const [i, draft] of sorted.entries()) {
     const room = seedRooms.find((r) => r.id === draft.roomId);
     const roomType = room && roomTypes.get(room.roomTypeId);
@@ -119,9 +120,10 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
       draft.childAges ??
       Array.from(
         {
-          length: random.chance(roomType.maxChildren > 1 ? 0.7 : 0.15)
-            ? random.int(1, roomType.maxChildren)
-            : 0,
+          length:
+            roomType.maxChildren > 0 && random.chance(roomType.maxChildren > 1 ? 0.7 : 0.15)
+              ? random.int(1, roomType.maxChildren)
+              : 0,
         },
         () => random.int(0, 15),
       );
@@ -130,14 +132,16 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
       dogs: room.kind === 'apartment' && random.chance(0.3) ? 1 : 0,
       extraBeds: 0,
     };
-    const guest = random.pick(seedGuests);
+    // One guest is never in two rooms at once.
+    const guest = pickFreeGuest(random, stays, draft);
+    stays.set(guest.id, [...(stays.get(guest.id) ?? []), draft]);
 
     let status: Booking['status'];
     let holdExpiresAt: string | null = null;
     if (draft.checkOut < today) status = random.chance(0.08) ? 'cancelled' : 'checked_out';
     else if (draft.checkIn < today) status = 'checked_in';
     else if (draft.anchor) status = 'confirmed';
-    else if (random.chance(0.15)) {
+    else if (random.chance(0.08)) {
       status = 'hold';
       holdExpiresAt = new Date(now.getTime() + 48 * 3600_000).toISOString();
     } else status = random.chance(0.06) ? 'cancelled' : 'confirmed';
@@ -217,6 +221,18 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
     inquiries,
     housekeepingTasks,
   };
+}
+
+function pickFreeGuest(
+  random: ReturnType<typeof createRandom>,
+  stays: Map<string, Draft[]>,
+  draft: Draft,
+): Guest {
+  for (let attempt = 0; attempt < 1000; attempt++) {
+    const guest = random.pick(seedGuests);
+    if (!(stays.get(guest.id) ?? []).some((s) => rangesOverlap(s, draft))) return guest;
+  }
+  throw new Error(`No free guest for ${draft.roomId} from ${draft.checkIn}`);
 }
 
 function makeInquiriesBookable(

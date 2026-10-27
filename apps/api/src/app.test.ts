@@ -71,8 +71,8 @@ describe('GET /health', () => {
 
 describe('rooms and guests', () => {
   it('lists rooms and room types', async () => {
-    expect((await get<Room[]>('/api/rooms')).body).toHaveLength(12);
-    expect((await get<unknown[]>('/api/room-types')).body).toHaveLength(3);
+    expect((await get<Room[]>('/api/rooms')).body).toHaveLength(50);
+    expect((await get<unknown[]>('/api/room-types')).body).toHaveLength(6);
     expect((await get<ApiError>('/api/rooms/nope')).status).toBe(404);
   });
 

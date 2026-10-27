@@ -21,8 +21,8 @@ afterAll(() => handle.close());
 
 describe('repositories (PGlite)', () => {
   it('round-trips rooms and room types', async () => {
-    expect(await repos.rooms.listRooms()).toHaveLength(12);
-    expect(await repos.rooms.listRoomTypes()).toHaveLength(3);
+    expect(await repos.rooms.listRooms()).toHaveLength(50);
+    expect(await repos.rooms.listRoomTypes()).toHaveLength(6);
     expect(await repos.rooms.getRoom('rm_a1')).toMatchObject({ name: 'A1', kind: 'apartment' });
     expect(await repos.rooms.getRoom('nope')).toBeNull();
   });

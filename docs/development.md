@@ -72,9 +72,9 @@ A PGlite directory can only be open in one process at a time; two processes writ
 
 `pnpm db:seed` replaces all data with a synthetic demo set built by `buildSeed(today, now, pricingConfig)`. Every date is relative to today in `Europe/Prague`, so the demo looks the same whenever it runs:
 
-- 12 rooms: 101–105 and 201–205 (double and family rooms), apartments A1 and A2.
-- 34 synthetic guests in Czech, German, English and Polish. Emails use `example.com`.
-- About 66 bookings from three weeks ago to six weeks ahead, priced with `quote()`. There are always arrivals and departures today, at least one family arrival, and a couple of open holds.
+- 50 rooms of six types: double, family, single, superior double and junior suite rooms on floors 1–4 (101–111, 201–211, 301–311, 401–411), and apartments A1–A6 on the ground floor.
+- 240 synthetic guests in Czech, German, Polish and English: a few hand-picked names plus first name and surname combinations. Emails use `example.com`. No guest has two stays at once.
+- About 440 bookings from three weeks ago to six weeks ahead, filling about half the hotel on a typical night, priced with `quote()`. There are always arrivals and departures today, at least one family arrival, and some open holds.
 - 10 open inquiries in mixed languages (from `packages/ai/src/evals/inquiries.ts`). The seed makes sure each one has at least one free room.
 - Housekeeping tasks: turnovers for today's departures, stayovers for in-house guests, one maintenance task.
 

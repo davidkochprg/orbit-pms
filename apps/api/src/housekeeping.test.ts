@@ -125,7 +125,7 @@ describe('housekeeping board', () => {
       '/api/housekeeping',
     );
     expect(body.date).toBe(today);
-    expect(body.rooms).toHaveLength(12);
+    expect(body.rooms).toHaveLength(50);
     const departed = body.rooms.find((r) => r.occupancy === 'departing');
     expect(departed?.room.status).toBe('dirty');
     expect(departed?.openTasks.map((t) => t.type)).toContain('turnover');
