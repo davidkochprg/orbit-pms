@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   burstWindows,
   dataWindow,
-  fade,
+  wipe,
   LENS,
   lensWindow,
   MAX_WINDOWS,
@@ -15,11 +15,13 @@ const times = Array.from({ length: 400 }, (_, i) => i * 0.137);
 describe('windowsAt', () => {
   it('keeps every window inside the grid and within the shader limit', () => {
     for (const t of times) {
-      const windows = windowsAt(t, grid, [24, 15], { col: 74, row: 0, alpha: 1 });
+      const windows = windowsAt(t, grid, [24, 15], { col: 74, row: 0, shown: 1 });
       expect(windows.length).toBeLessThanOrEqual(MAX_WINDOWS);
       for (const w of windows) {
-        expect(w.alpha).toBeGreaterThan(0);
-        expect(w.alpha).toBeLessThanOrEqual(1);
+        const [from, to] = w.reveal;
+        expect(from).toBeGreaterThanOrEqual(0);
+        expect(to).toBeLessThanOrEqual(1);
+        expect(to).toBeGreaterThan(from);
         expect(w.col).toBeGreaterThanOrEqual(0);
         expect(w.row).toBeGreaterThanOrEqual(0);
         expect(w.col + w.cols).toBeLessThanOrEqual(grid.cols);
@@ -34,7 +36,7 @@ describe('windowsAt', () => {
 
   it('puts the data line last, so it draws on top', () => {
     const t = times.find((x) => dataWindow(x, grid, [24]) !== null)!;
-    expect(windowsAt(t, grid, [24], { col: 10, row: 10, alpha: 1 }).at(-1)?.kind).toBe('data');
+    expect(windowsAt(t, grid, [24], { col: 10, row: 10, shown: 1 }).at(-1)?.kind).toBe('data');
   });
 
   it('glitches often: some window is showing most of the time', () => {
@@ -43,8 +45,8 @@ describe('windowsAt', () => {
   });
 
   it('leaves the lens out once it has faded', () => {
-    const lensed = (alpha: number) =>
-      windowsAt(1.0, grid, [], { col: 30, row: 30, alpha }).some(
+    const lensed = (shown: number) =>
+      windowsAt(1.0, grid, [], { col: 30, row: 30, shown }).some(
         (w) => w.cols === LENS.cols && w.rows === LENS.rows,
       );
     expect(lensed(0.5)).toBe(true);
@@ -52,14 +54,18 @@ describe('windowsAt', () => {
   });
 });
 
-describe('fade', () => {
-  it('eases in, holds and eases out', () => {
-    expect(fade(-0.1, 2)).toBe(0);
-    expect(fade(0.05, 2)).toBeGreaterThan(0);
-    expect(fade(0.05, 2)).toBeLessThan(0.5);
-    expect(fade(1, 2)).toBe(1);
-    expect(fade(1.95, 2)).toBeLessThan(0.5);
-    expect(fade(2.1, 2)).toBe(0);
+describe('wipe', () => {
+  it('wipes on from the left, holds whole, then wipes off to the right', () => {
+    expect(wipe(-0.1, 2)).toBeNull();
+    const entering = wipe(0.08, 2)!;
+    expect(entering[0]).toBe(0);
+    expect(entering[1]).toBeGreaterThan(0);
+    expect(entering[1]).toBeLessThan(1);
+    expect(wipe(1, 2)).toEqual([0, 1]);
+    const leaving = wipe(1.9, 2)!;
+    expect(leaving[0]).toBeGreaterThan(0);
+    expect(leaving[1]).toBe(1);
+    expect(wipe(2.1, 2)).toBeNull();
   });
 });
 

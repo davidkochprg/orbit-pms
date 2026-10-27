@@ -134,12 +134,11 @@ uniform float uTime;
 /** One glyph cell, in pixels. Cells count from the top left, like the text overlay. */
 uniform vec2 uCell;
 /**
- * Glitch windows in pixels, y up: x0, y0, x1, y1. Kind: 1 smear, 2 ASCII over the image,
- * 3 data backdrop, 4 ASCII over a smear. Alpha fades each in and out.
+ * Glitch windows in pixels, y up: x0, y0, x1, y1, already cut to the part wiped on. Kind:
+ * 1 smear, 2 ASCII over the image, 3 data backdrop, 4 ASCII over a smear. Opaque, hard-edged.
  */
 uniform vec4 uWin[12];
 uniform float uWinKind[12];
-uniform float uWinAlpha[12];
 /** 1 at load, easing to 0: the picture starts as ASCII and resolves from the top down. */
 uniform float uIntro;
 
@@ -177,20 +176,13 @@ void main() {
   vec2 uv = frag / uRes;
   float frame = mod(floor(uTime * 24.0), 97.0);
 
-  // The topmost window under this pixel, weighted by its fade and soft, feathered edges.
+  // The topmost window under this pixel, if any.
   float kind = 0.0;
-  float weight = 0.0;
   vec4 win = vec4(0.0);
   for (int i = 0; i < 12; i++) {
     vec4 r = uWin[i];
-    float k = uWinKind[i];
-    if (k > 0.5 && frag.x >= r.x && frag.x < r.z && frag.y >= r.y && frag.y < r.w) {
-      float dx = min(frag.x - r.x, r.z - frag.x);
-      float dy = min(frag.y - r.y, r.w - frag.y);
-      float soft = k > 2.5 && k < 3.5 ? 0.4 : 1.0;
-      float feather = smoothstep(0.0, uCell.x * 2.5 * soft, dx) * smoothstep(0.0, uCell.y * 0.6 * soft, dy);
-      kind = k;
-      weight = uWinAlpha[i] * feather;
+    if (uWinKind[i] > 0.5 && frag.x >= r.x && frag.x < r.z && frag.y >= r.y && frag.y < r.w) {
+      kind = uWinKind[i];
       win = r;
     }
   }
@@ -201,7 +193,6 @@ void main() {
   float sweep = floor(fromTop.y / uCell.y) / (uRes.y / uCell.y);
   if (uIntro > 0.0 && hash(floor(fromTop / uCell) * 0.73) * 0.5 + sweep * 0.5 < uIntro) {
     ascii = true;
-    weight = 1.0;
   }
 
   // Colour fringing towards the edges.
@@ -209,7 +200,7 @@ void main() {
   vec3 col = vec3(sceneAt(uv + dir).r, sceneAt(uv).g, sceneAt(uv - dir).b);
 
   // Pixel sort: stripes drag the brightest colour of their column through the window with a soft
-  // gradient, blended over the picture by the window's weight.
+  // gradient, replacing the picture there.
   if (smear || backdrop) {
     float s = frag.x / (uCell.x * 0.6);
     float a = sortedRow(floor(s), win.w, uv.x);
@@ -221,7 +212,7 @@ void main() {
     sorted = mix(vec3(luma(sorted)), sorted, 1.25);
     sorted *= 0.9 + 0.2 * hash(vec2(floor(s) * 1.7, win.w + 3.0));
     if (backdrop) sorted *= 0.3;
-    col = mix(col, sorted, weight * (backdrop ? 1.0 : 0.82));
+    col = sorted;
   }
 
   // Halation: bright lights bleed a warm glow into their surroundings.
@@ -244,9 +235,8 @@ void main() {
     float level = clamp(smoothstep(0.03, 0.8, luma(under)), 0.0, 0.999);
     float index = floor(level * uGlyphs);
     if (hash(cell + frame * 0.37) > 0.965) index = floor(hash(cell.yx + frame) * uGlyphs);
-    float ink = texture2D(uAtlas, vec2((index + inCell.x) / uGlyphs, inCell.y)).a * weight;
-    vec3 glyph = mix(vec3(0.95), under * 1.3 + 0.35, 0.3);
-    col = mix(col * (1.0 - weight * 0.1), glyph, ink * 0.88);
+    float ink = texture2D(uAtlas, vec2((index + inCell.x) / uGlyphs, inCell.y)).a;
+    col = mix(col, vec3(0.97), ink);
   }
 
   vec2 q = uv - 0.5;
