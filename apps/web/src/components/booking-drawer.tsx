@@ -2,6 +2,7 @@ import type { AuditLogEntry, BookingAction, BookingDetail } from '@orbit/shared'
 import { MoreHorizontal, Pencil, Sparkles } from 'lucide-react';
 import { useState } from 'react';
 import { Link } from 'react-router';
+import { BookingBill, PaymentForm } from '@/components/booking-bill';
 import { BookingDropdownMenu, CancelBookingDialog } from '@/components/booking-menu';
 import { BookingStatusBadge } from '@/components/booking-status-badge';
 import { ErrorNotice } from '@/components/error-notice';
@@ -10,6 +11,14 @@ import { GuestEditorDialog } from '@/components/guest-editor';
 import { Property, PropertyList } from '@/components/property-list';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Sheet,
   SheetContent,
@@ -21,7 +30,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
-import { useAuditLog, useBookingAction, useBookingDetail } from '@/lib/api';
+import { useAuditLog, useBookingAction, useBookingDetail, useFolio } from '@/lib/api';
 import {
   actionLabels,
   formatCzk,
@@ -71,7 +80,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
   const { openPalette } = useCommandPalette();
   const { openEdit } = useBookingEditor();
   const [editingGuest, setEditingGuest] = useState(false);
-  const snapshot = booking.priceSnapshot;
+  const nights = booking.priceSnapshot?.nights;
 
   return (
     <>
@@ -94,7 +103,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
         <Section title="Stay">
           <PropertyList>
             <Property label="Dates">{formatRange(booking.checkIn, booking.checkOut)}</Property>
-            <Property label="Nights">{snapshot?.nights ?? '–'}</Property>
+            <Property label="Nights">{nights ?? '–'}</Property>
             <Property label="Guests">{formatParty(booking.adults, booking.childAges)}</Property>
             <Property label="Source">{sourceLabels[booking.source]}</Property>
             {booking.holdExpiresAt && (
@@ -129,24 +138,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
         </Section>
         <GuestEditorDialog open={editingGuest} onOpenChange={setEditingGuest} guest={guest} />
 
-        <Section title="Price">
-          {snapshot ? (
-            <div className="flex flex-col rounded-lg border">
-              {snapshot.lines.map((line, i) => (
-                <div key={i} className="flex justify-between gap-4 border-b px-3 py-2">
-                  <span className="text-muted-foreground">{line.label}</span>
-                  <span className="shrink-0 tabular-nums">{formatCzk(line.amount)}</span>
-                </div>
-              ))}
-              <div className="flex justify-between gap-4 px-3 py-2 font-medium">
-                <span>Total</span>
-                <span className="tabular-nums">{formatCzk(snapshot.total)}</span>
-              </div>
-            </div>
-          ) : (
-            <p className="text-muted-foreground">No price recorded.</p>
-          )}
-        </Section>
+        <BookingBill booking={booking} />
 
         <Activity bookingId={booking.id} />
       </div>
@@ -181,6 +173,13 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
 
 function BookingActions({ bookingId, actions }: { bookingId: string; actions: BookingAction[] }) {
   const mutation = useBookingAction(bookingId);
+  const folio = useFolio(bookingId);
+  const [settling, setSettling] = useState(false);
+  // Checking out with money still due asks first, and offers to take the payment.
+  const run = (action: BookingAction) => {
+    if (action === 'check_out' && (folio.data?.balance ?? 0) > 0) setSettling(true);
+    else mutation.mutate(action);
+  };
   // The main next step gets the primary button; cancelling is always secondary.
   const [main, ...rest] = actions.filter((a) => a !== 'cancel');
   const canCancel = actions.includes('cancel');
@@ -188,7 +187,7 @@ function BookingActions({ bookingId, actions }: { bookingId: string; actions: Bo
   return (
     <>
       {main && (
-        <Button size="sm" disabled={mutation.isPending} onClick={() => mutation.mutate(main)}>
+        <Button size="sm" disabled={mutation.isPending} onClick={() => run(main)}>
           {actionLabels[main]}
         </Button>
       )}
@@ -198,7 +197,7 @@ function BookingActions({ bookingId, actions }: { bookingId: string; actions: Bo
           size="sm"
           variant="outline"
           disabled={mutation.isPending}
-          onClick={() => mutation.mutate(action)}
+          onClick={() => run(action)}
         >
           {actionLabels[action]}
         </Button>
@@ -215,8 +214,67 @@ function BookingActions({ bookingId, actions }: { bookingId: string; actions: Bo
         </Button>
       )}
       <CancelBookingDialog bookingId={bookingId} open={cancelling} onOpenChange={setCancelling} />
+      {folio.data && (
+        <CheckOutDialog
+          bookingId={bookingId}
+          balance={folio.data.balance}
+          open={settling}
+          onOpenChange={setSettling}
+          onCheckOut={() => {
+            setSettling(false);
+            mutation.mutate('check_out');
+          }}
+        />
+      )}
       {mutation.isError && <ErrorNotice message={mutation.error.message} className="w-full" />}
     </>
+  );
+}
+
+function CheckOutDialog({
+  bookingId,
+  balance,
+  open,
+  onOpenChange,
+  onCheckOut,
+}: {
+  bookingId: string;
+  balance: number;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCheckOut: () => void;
+}) {
+  const [paying, setPaying] = useState(false);
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!next) setPaying(false);
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent className="shadow-floating sm:max-w-sm" showCloseButton={paying}>
+        {paying ? (
+          <PaymentForm bookingId={bookingId} balance={balance} onDone={onCheckOut} />
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>{formatCzk(balance)} is still due</DialogTitle>
+              <DialogDescription>
+                Take the payment and check the guest out, or check out now and settle the bill
+                later.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="ghost" onClick={onCheckOut}>
+                Check out anyway
+              </Button>
+              <Button onClick={() => setPaying(true)}>Take payment</Button>
+            </DialogFooter>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -231,6 +289,10 @@ const auditActionLabels: Record<string, string> = {
   'booking.reschedule': 'Rescheduled',
   'booking.create': 'Created',
   'booking.update': 'Edited',
+  'folio.charge': 'Added a charge',
+  'folio.remove_charge': 'Removed a charge',
+  'folio.payment': 'Took a payment',
+  'folio.refund': 'Refunded',
 };
 
 function Activity({ bookingId }: { bookingId: string }) {

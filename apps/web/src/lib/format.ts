@@ -1,4 +1,4 @@
-import type { BookingAction, BookingStatus, Language } from '@orbit/shared';
+import type { BookingAction, BookingStatus, Language, PaymentMethod } from '@orbit/shared';
 import { format, parseISO } from 'date-fns';
 
 export function formatDate(date: string): string {
@@ -51,6 +51,12 @@ export const actionLabels: Record<BookingAction, string> = {
   check_in: 'Check in',
   check_out: 'Check out',
   cancel: 'Cancel booking',
+};
+
+export const paymentMethodLabels: Record<PaymentMethod, string> = {
+  cash: 'Cash',
+  card: 'Card',
+  bank_transfer: 'Bank transfer',
 };
 
 export const languageLabels: Record<Language, string> = {

@@ -288,6 +288,39 @@ export function RatesSettings({ pricing, onChange, readOnly }: Props) {
           </FormField>
         </div>
       </Section>
+
+      <Section title="City tax">
+        <Hint>
+          The local tourist tax, added to each bill per paying guest per night rather than to the
+          quoted price. Adults always pay it.
+        </Hint>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label="Per guest per night" htmlFor="city-tax-price">
+            <NumberInput
+              id="city-tax-price"
+              min={0}
+              suffix="CZK"
+              value={pricing.cityTax.perPersonPerNight}
+              onValue={(v) =>
+                set('cityTax', { ...pricing.cityTax, perPersonPerNight: Math.round(v) })
+              }
+            />
+          </FormField>
+          <FormField
+            label="Children pay from age"
+            htmlFor="city-tax-age"
+            hint="18 means children don't pay."
+          >
+            <NumberInput
+              id="city-tax-age"
+              min={0}
+              max={18}
+              value={pricing.cityTax.minAge}
+              onValue={(v) => set('cityTax', { ...pricing.cityTax, minAge: Math.round(v) })}
+            />
+          </FormField>
+        </div>
+      </Section>
     </div>
   );
 }

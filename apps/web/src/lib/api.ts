@@ -10,6 +10,7 @@ import {
   type CreateBookingInput,
   dailyBriefSchema,
   dayOverviewSchema,
+  folioSchema,
   type GuestPatch,
   guestSchema,
   housekeepingBoardSchema,
@@ -22,7 +23,9 @@ import {
   type HotelProfile,
   inquiryListSchema,
   inquirySchema,
+  type NewChargeBody,
   type NewGuestBody,
+  type NewPaymentBody,
   type NewMessageBody,
   pendingActionSchema,
   type PricingConfig,
@@ -188,6 +191,35 @@ export function useAuditLog(subjectId: string | null) {
       ),
     enabled: subjectId !== null,
   });
+}
+
+export function useFolio(bookingId: string) {
+  return useQuery({
+    queryKey: ['folio', bookingId],
+    queryFn: () => apiGet(`/api/bookings/${encodeURIComponent(bookingId)}/folio`, folioSchema),
+  });
+}
+
+export function useAddCharge(bookingId: string) {
+  return useRefreshingMutation((body: NewChargeBody) =>
+    apiPost(`/api/bookings/${encodeURIComponent(bookingId)}/charges`, body, folioSchema),
+  );
+}
+
+export function useRemoveCharge(bookingId: string) {
+  return useRefreshingMutation((chargeId: string) =>
+    request(
+      `/api/bookings/${encodeURIComponent(bookingId)}/charges/${encodeURIComponent(chargeId)}`,
+      folioSchema,
+      { method: 'DELETE' },
+    ),
+  );
+}
+
+export function useRecordPayment(bookingId: string) {
+  return useRefreshingMutation((body: NewPaymentBody) =>
+    apiPost(`/api/bookings/${encodeURIComponent(bookingId)}/payments`, body, folioSchema),
+  );
 }
 
 export function useBookingAction(id: string) {
