@@ -1,6 +1,7 @@
 import { DomainError, type DomainErrorCode } from '@orbit/domain';
 import type { ApiError } from '@orbit/shared';
 import type { Context } from 'hono';
+import { HTTPException } from 'hono/http-exception';
 import type { ContentfulStatusCode } from 'hono/utils/http-status';
 
 const statusFor: Record<DomainErrorCode, ContentfulStatusCode> = {
@@ -21,6 +22,9 @@ export function notFound(c: Context, what: string) {
 }
 
 export function handleError(err: Error, c: Context) {
+  if (err instanceof HTTPException) {
+    return c.json(errorBody('bad_request', err.message), err.status);
+  }
   if (err instanceof DomainError) {
     return c.json(errorBody(err.code, err.message), statusFor[err.code]);
   }

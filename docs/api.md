@@ -10,13 +10,13 @@ All responses are JSON. Dates are `YYYY-MM-DD`, timestamps are ISO 8601 UTC, mon
 { "error": { "code": "not_found", "message": "Booking not found" } }
 ```
 
-| Status | When                                                                            |
-| ------ | ------------------------------------------------------------------------------- |
-| 400    | Invalid query or body (`invalid_query`), invalid dates or party from the domain |
-| 404    | Unknown resource or route (`not_found`)                                         |
-| 409    | Domain conflict (`conflict`)                                                    |
-| 422    | Party does not fit the room (`over_capacity`)                                   |
-| 500    | Anything else (`internal`), logged server-side                                  |
+| Status | When                                                                                  |
+| ------ | ------------------------------------------------------------------------------------- |
+| 400    | Invalid query (`invalid_query`), body (`invalid_json`, `bad_request`), dates or party |
+| 404    | Unknown resource or route (`not_found`)                                               |
+| 409    | Room taken (`conflict`) or status change not allowed (`invalid_transition`)           |
+| 422    | Party does not fit the room (`over_capacity`)                                         |
+| 500    | Anything else (`internal`), logged server-side                                        |
 
 ## Endpoints
 
@@ -36,11 +36,11 @@ All responses are JSON. Dates are `YYYY-MM-DD`, timestamps are ISO 8601 UTC, mon
 
 `Room[]` ordered by floor and name, or one `Room`: `id`, `name`, `roomTypeId`, `kind`, `floor`, `status`.
 
-### `GET /api/bookings`, `GET /api/bookings/:id`
+### `GET /api/bookings`
 
-`Booking[]` ordered by check-in, or one `Booking`: `id`, `guestId`, `roomId`, `checkIn`, `checkOut`, `adults`, `childAges`, `status`, `holdExpiresAt`, `source`, `priceSnapshot` (the quote at booking time), `notes`.
+`Booking[]` ordered by check-in: `id`, `guestId`, `roomId`, `checkIn`, `checkOut`, `adults`, `childAges`, `status`, `holdExpiresAt`, `source`, `addons` (`wellness`, `dogs`, `extraBeds`), `priceSnapshot` (the quote), `notes`.
 
-Query parameters for the list, all optional:
+Query parameters, all optional:
 
 | Param        | Example                | Meaning                                          |
 | ------------ | ---------------------- | ------------------------------------------------ |
@@ -49,6 +49,40 @@ Query parameters for the list, all optional:
 | `guestId`    | `gst_cs_01`            | One guest's bookings                             |
 | `roomId`     | `rm_101`               | One room's bookings                              |
 
+### `GET /api/bookings/:id`
+
+`BookingDetail`, what the booking drawer shows:
+
+```json
+{
+  "booking": { "id": "bk_001", "status": "confirmed", "...": "..." },
+  "guest": { "id": "gst_cs_01", "name": "...", "...": "..." },
+  "room": { "id": "rm_104", "name": "104", "...": "..." },
+  "roomType": { "id": "rt_family", "...": "..." },
+  "allowedActions": ["check_in", "cancel"]
+}
+```
+
+### Booking mutations
+
+All take JSON, act as `user` in the audit log, and return the updated `BookingDetail`. Rules are in [domain.md](domain.md#booking-operations).
+
+| Endpoint                         | Body                                                               | Errors                                        |
+| -------------------------------- | ------------------------------------------------------------------ | --------------------------------------------- |
+| `POST /api/bookings/:id/actions` | `{ "action": "confirm" \| "check_in" \| "check_out" \| "cancel" }` | 409 `invalid_transition`, 409 `conflict`      |
+| `POST /api/bookings/:id/move`    | `{ "roomId": "rm_201" }`                                           | 409 `conflict`, 422 `over_capacity`, 404 room |
+| `POST /api/bookings/:id/dates`   | `{ "checkIn": "2026-10-27", "checkOut": "2026-10-30" }`            | 400 `invalid_date_range`, 409 `conflict`      |
+
+A body that fails validation returns 400 `invalid_json`; malformed JSON returns 400 `bad_request`.
+
 ### `GET /api/guests`, `GET /api/guests/:id`
 
 `Guest[]` ordered by name, or one `Guest`: `id`, `name`, `email`, `phone`, `language`, `notes`.
+
+### `GET /api/day?date=`
+
+`DayOverview` for `date` (default: today in `Europe/Prague`): `arrivals`, `departures` and `inHouse`, each a list of `{ booking, guestName, roomName }`.
+
+### `GET /api/audit-log?subjectId=&limit=`
+
+`AuditLogEntry[]`, newest first: `id`, `actor` (`user` | `agent`), `action` (e.g. `booking.check_in`), `subjectId`, `payload`, `createdAt`. `limit` defaults to 50, max 200.

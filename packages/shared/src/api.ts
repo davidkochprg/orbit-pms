@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { isoDateSchema } from './dates';
 import { auditLogEntrySchema } from './entities';
-import { bookingStatusSchema } from './enums';
+import { bookingActionSchema, bookingStatusSchema } from './enums';
 
 /** Query string for `GET /api/bookings`. `status` is comma-separated. */
 export const bookingListQuerySchema = z.object({
@@ -27,6 +27,9 @@ export const apiErrorSchema = z.object({
   error: z.object({ code: z.string(), message: z.string() }),
 });
 export type ApiError = z.infer<typeof apiErrorSchema>;
+
+export const bookingActionBodySchema = z.object({ action: bookingActionSchema });
+export type BookingActionBody = z.infer<typeof bookingActionBodySchema>;
 
 export const moveBookingBodySchema = z.object({ roomId: z.string().min(1) });
 export type MoveBookingBody = z.infer<typeof moveBookingBodySchema>;

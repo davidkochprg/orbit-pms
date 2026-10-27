@@ -1,33 +1,42 @@
-import { zValidator } from '@hono/zod-validator';
-import type { Repositories } from '@orbit/domain';
-import { bookingListQuerySchema } from '@orbit/shared';
+import type { HotelService, Repositories } from '@orbit/domain';
+import {
+  bookingActionBodySchema,
+  bookingListQuerySchema,
+  changeDatesBodySchema,
+  moveBookingBodySchema,
+} from '@orbit/shared';
 import { Hono } from 'hono';
-import { errorBody, notFound } from '../http';
+import { validate } from '../validate';
 
-export function bookingRoutes(repos: Repositories) {
+/** Booking reads and mutations. REST callers act as `user`; the agent goes through its own tools. */
+export function bookingRoutes(repos: Repositories, service: HotelService) {
   return new Hono()
-    .get(
-      '/bookings',
-      zValidator('query', bookingListQuerySchema, (result, c) =>
-        result.success
-          ? undefined
-          : c.json(errorBody('invalid_query', result.error.issues[0]?.message ?? ''), 400),
-      ),
-      async (c) => {
-        const { from, to, status, guestId, roomId } = c.req.valid('query');
-        return c.json(
-          await repos.bookings.listBookings({
-            ...(from && { from }),
-            ...(to && { to }),
-            ...(status && { status }),
-            ...(guestId && { guestId }),
-            ...(roomId && { roomId }),
-          }),
-        );
-      },
-    )
-    .get('/bookings/:id', async (c) => {
-      const booking = await repos.bookings.getBooking(c.req.param('id'));
-      return booking ? c.json(booking) : notFound(c, 'Booking');
+    .get('/bookings', validate('query', bookingListQuerySchema), async (c) => {
+      const { from, to, status, guestId, roomId } = c.req.valid('query');
+      return c.json(
+        await repos.bookings.listBookings({
+          ...(from && { from }),
+          ...(to && { to }),
+          ...(status && { status }),
+          ...(guestId && { guestId }),
+          ...(roomId && { roomId }),
+        }),
+      );
+    })
+    .get('/bookings/:id', async (c) => c.json(await service.getBookingDetail(c.req.param('id'))))
+    .post('/bookings/:id/actions', validate('json', bookingActionBodySchema), async (c) => {
+      const id = c.req.param('id');
+      await service.applyBookingAction(id, c.req.valid('json').action, 'user');
+      return c.json(await service.getBookingDetail(id));
+    })
+    .post('/bookings/:id/move', validate('json', moveBookingBodySchema), async (c) => {
+      const id = c.req.param('id');
+      await service.moveBooking(id, c.req.valid('json').roomId, 'user');
+      return c.json(await service.getBookingDetail(id));
+    })
+    .post('/bookings/:id/dates', validate('json', changeDatesBodySchema), async (c) => {
+      const id = c.req.param('id');
+      await service.changeBookingDates(id, c.req.valid('json'), 'user');
+      return c.json(await service.getBookingDetail(id));
     });
 }
