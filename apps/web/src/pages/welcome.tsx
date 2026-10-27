@@ -46,13 +46,14 @@ export function WelcomePage() {
   }
 
   const b = brief.data;
-  // Live numbers from the demo hotel, flickering through the scene's glyphs.
+  // Live readouts from the demo hotel, typed into the scene one at a time.
   const sceneData = b
     ? [
-        `OCC ${occupancyPercent(b.occupancy)}%`,
-        `ARR ${pad2(b.arrivals)}`,
-        `DEP ${pad2(b.departures)}`,
-        ...(day.data?.arrivals.slice(0, 4).map((s) => `RM ${s.roomName}`) ?? []),
+        `OCC ${occupancyPercent(b.occupancy)}% · ${b.occupancy.occupied} OF ${b.occupancy.total} ROOMS`,
+        `ARR ${pad2(b.arrivals)} · DEP ${pad2(b.departures)} · ${b.guestsTonight} GUESTS TONIGHT`,
+        ...(day.data?.arrivals
+          .slice(0, 3)
+          .map((s) => `RM ${s.roomName} · ${s.guestName.toUpperCase()} · ARRIVING`) ?? []),
       ]
     : [];
   const caption = b

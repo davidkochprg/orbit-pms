@@ -1,25 +1,19 @@
 /**
- * GLSL for the welcome scene: a blurred dusk over a mountain ridge, like a grainy night photo
- * taken from a moving car. The palette lives here because it is painted, not UI chrome.
+ * GLSL for the welcome scene, in two passes. The scene pass paints a blurred dusk over a mountain
+ * ridge, like a night photo from a moving car, at low resolution into a texture. The post pass
+ * runs at full resolution: halation, colour fringing, glitch windows (pixel-sort smears and ASCII
+ * made from the image itself), a vignette and fine film grain. The palette lives here because it
+ * is painted, not UI chrome.
  */
 
-export const DUSK_VERTEX = `
+export const FULLSCREEN_VERTEX = `
 attribute vec2 aPosition;
 void main() {
   gl_Position = vec4(aPosition, 0.0, 1.0);
 }
 `;
 
-export const DUSK_FRAGMENT = `
-precision highp float;
-
-uniform vec2 uRes;
-uniform float uTime;
-/** Pointer, -1..1 on each axis, for a little parallax. */
-uniform vec2 uPointer;
-/** Smear bands behind glyph clusters: x0, y0, x1, y1 in 0..1, y up; unused ones are zero. */
-uniform vec4 uSmear[6];
-
+const HASHES = `
 float hash(vec2 p) {
   p = fract(p * vec2(123.34, 456.21));
   p += dot(p, p + 45.32);
@@ -32,6 +26,18 @@ float grainHash(vec2 p) {
   p3 += dot(p3, p3.yzx + 33.33);
   return fract((p3.x + p3.y) * p3.z);
 }
+`;
+
+/** Stored at half brightness, so lights can glow past white for the halation in the post pass. */
+export const SCENE_FRAGMENT = `
+precision highp float;
+
+uniform vec2 uRes;
+uniform float uTime;
+/** Pointer, -1..1 on each axis, for a little parallax. */
+uniform vec2 uPointer;
+
+${HASHES}
 
 float noise(vec2 p) {
   vec2 i = floor(p);
@@ -55,108 +61,186 @@ float fbm(vec2 p) {
   return v;
 }
 
-/** A soft, out-of-focus light: a bright core and a wide halo. */
-vec3 bokeh(vec2 uv, vec2 pos, vec2 size, vec3 color) {
-  vec2 d = (uv - pos) / size;
-  float r = dot(d, d);
-  return color * (exp(-r * 2.2) * 0.9 + exp(-r * 0.3) * 0.16);
-}
-
-vec3 scene(vec2 uv) {
-  float t = uTime;
-  vec2 par = uPointer * 0.015;
-
-  // Sky: deep blue overhead, dusty blue and a violet haze towards the horizon.
-  vec3 col = mix(vec3(0.30, 0.44, 0.70), vec3(0.06, 0.15, 0.33), smoothstep(0.35, 1.05, uv.y));
-  col = mix(col, vec3(0.58, 0.52, 0.78), smoothstep(0.58, 0.3, uv.y) * 0.6);
-  col *= 0.85 + 0.3 * fbm(uv * vec2(1.6, 3.2) + vec2(t * 0.012, t * 0.004));
-
-  // A warm light leak sweeping across the sky.
-  float x = uv.x - par.x * 2.0;
-  float bandY = 0.62 + (x - 0.75) * 0.55 + 0.025 * sin(t * 0.17);
-  float band = exp(-pow((uv.y - bandY) * 7.0, 2.0)) * smoothstep(0.25, 0.95, x);
-  col = mix(col, vec3(0.86, 0.45, 0.55), band * 0.45);
-  col += vec3(1.0, 0.55, 0.28) * pow(band, 2.5) * 0.55 * (0.8 + 0.2 * sin(t * 0.5));
-  col += vec3(0.75, 1.0, 0.85) * pow(band, 7.0) * 0.35 * smoothstep(0.6, 0.95, x);
-
-  // Two red planets low in the sky.
-  col += bokeh(uv, vec2(0.18, 0.86) + par, vec2(0.012, 0.016), vec3(1.0, 0.38, 0.32));
-  col += bokeh(uv, vec2(0.27, 0.77) + par * 1.2, vec2(0.014, 0.018), vec3(1.0, 0.45, 0.35));
-
-  // A soft, out-of-focus mountain ridge.
-  float ridge = 0.33 + 0.16 * fbm(vec2((uv.x + par.x) * 2.1 + 3.0, 0.7)) - 0.06 * uv.x;
-  float hill = smoothstep(ridge + 0.035, ridge - 0.045, uv.y);
-  vec3 ground = mix(vec3(0.05, 0.03, 0.09), vec3(0.01, 0.01, 0.03), smoothstep(0.3, 0.0, uv.y));
-  col = mix(col, ground, hill);
-
-  // Road and window lights below the ridge, drifting past.
-  for (int i = 0; i < 9; i++) {
-    float fi = float(i);
-    float h1 = hash(vec2(fi, 1.3));
-    float h2 = hash(vec2(fi, 7.1));
-    float h3 = hash(vec2(fi, 3.9));
-    vec2 pos = vec2(fract(h1 + t * (0.004 + h3 * 0.01)), 0.05 + h2 * 0.22) + par * (1.5 + h3);
-    vec3 c = h3 > 0.66 ? vec3(0.45, 0.95, 0.85) : (h3 > 0.33 ? vec3(1.0, 0.85, 0.6) : vec3(1.0, 0.45, 0.18));
-    float flicker = 0.75 + 0.25 * sin(t * (0.6 + h1) + fi);
-    col += bokeh(uv, pos, vec2(0.05 + h2 * 0.04, 0.018 + h1 * 0.012), c) * flicker * 0.9;
-  }
-  return col;
+/** An out-of-focus light: a bright core and a wide, faint halo. */
+vec3 glow(vec2 p, vec2 centre, vec2 radius, vec3 color) {
+  vec2 d = (p - centre) / radius;
+  float q = dot(d, d);
+  return color * (exp(-q * 2.5) + 0.25 * exp(-q * 0.25));
 }
 
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
+  float aspect = uRes.x / uRes.y;
   float t = uTime;
+  vec2 par = uPointer * vec2(0.02, 0.012);
+  // The camera drifts slowly sideways, as if from a moving car.
+  float drift = t * 0.01;
 
-  // Pixel-sort glitches: in some blocks every thin column takes its colour from one row of the
-  // image above it and smears it down, so the scene streaks; whole bands also slide sideways.
-  vec2 grid = vec2(6.0, 22.0);
-  vec2 blk = floor(uv * grid);
-  float slot = floor(t * 1.4);
-  float cell = step(0.95, hash(blk + vec2(slot * 7.13, slot * 1.7)));
-  float band = step(0.975, hash(vec2(blk.y, slot + 3.0)))
-    * step(blk.x, 1.0 + floor(hash(vec2(slot, blk.y)) * 4.0));
-  float active = clamp(cell + band, 0.0, 1.0);
+  // Sky: night blue overhead, dusty blue, then a lavender haze towards the hills.
+  vec3 col = mix(vec3(0.16, 0.27, 0.52), vec3(0.03, 0.07, 0.18), smoothstep(0.45, 1.0, uv.y));
+  col = mix(col, vec3(0.5, 0.42, 0.66), smoothstep(0.62, 0.36, uv.y) * 0.75);
+  col *= 0.78 + 0.4 * fbm(vec2(uv.x * 1.8 + drift * 0.6, uv.y * 3.5) + par);
+
+  // Warm town glow behind the ridge, stronger to the right.
+  float horizon = exp(-pow((uv.y - 0.36) * 7.0, 2.0));
+  col += vec3(1.0, 0.48, 0.3) * horizon * (0.25 + 0.35 * smoothstep(0.2, 1.0, uv.x));
+
+  // A light leak sweeping down from the top right.
+  float x = uv.x + par.x;
+  float bandY = 0.64 + (x - 0.78) * 0.6 + 0.03 * sin(t * 0.13);
+  float band = exp(-pow((uv.y - bandY) * 6.0, 2.0)) * smoothstep(0.3, 1.0, x);
+  col = mix(col, vec3(0.92, 0.5, 0.58), band * 0.5);
+  col += vec3(1.0, 0.58, 0.3) * pow(band, 2.2) * 0.9 * (0.85 + 0.15 * sin(t * 0.4));
+  col += vec3(0.8, 1.0, 0.86) * pow(band, 8.0) * 0.8 * smoothstep(0.65, 1.0, x);
+
+  // Two red planets.
+  vec2 sq = uv * vec2(aspect, 1.0);
+  col += glow(sq, vec2(0.2 * aspect, 0.86) + par, vec2(0.012), vec3(1.0, 0.32, 0.26)) * 1.4;
+  col += glow(sq, vec2(0.3 * aspect, 0.78) + par * 1.3, vec2(0.015), vec3(1.0, 0.42, 0.3)) * 1.2;
+
+  // A far, hazy ridge and a near, dark one, both out of focus.
+  float far = 0.4 + 0.08 * fbm(vec2((uv.x + drift * 0.5 + par.x * 0.5) * 3.0, 2.0));
+  col = mix(col, vec3(0.16, 0.12, 0.26), smoothstep(far + 0.02, far - 0.03, uv.y) * 0.85);
+  float near = 0.3 + 0.15 * fbm(vec2((uv.x + drift + par.x) * 1.8 + 5.0, 0.4)) - 0.05 * uv.x;
+  vec3 ground = mix(vec3(0.04, 0.025, 0.06), vec3(0.008, 0.006, 0.016), smoothstep(0.28, 0.0, uv.y));
+  col = mix(col, ground, smoothstep(near + 0.03, near - 0.05, uv.y));
+
+  // Head and tail lights streaking past on the road below.
+  for (int i = 0; i < 12; i++) {
+    float fi = float(i);
+    float h1 = hash(vec2(fi, 1.3));
+    float h2 = hash(vec2(fi, 7.1));
+    float h3 = hash(vec2(fi, 3.9));
+    float speed = (0.01 + h3 * 0.03) * (h1 > 0.5 ? 1.0 : -1.0);
+    vec2 pos = vec2(fract(h1 + t * speed) * 1.3 - 0.15 + par.x * (1.5 + h3), 0.04 + h2 * 0.2);
+    vec3 c = h3 > 0.7 ? vec3(0.45, 1.0, 0.9) : (h3 > 0.4 ? vec3(1.0, 0.86, 0.62) : vec3(1.0, 0.38, 0.14));
+    vec2 size = vec2(0.04 + h2 * 0.07, 0.012 + h1 * 0.012);
+    col += glow(uv, pos, size, c) * (0.7 + 0.3 * sin(t * (0.5 + h1) + fi)) * 1.1;
+  }
+
+  gl_FragColor = vec4(min(col * 0.5, 1.0), 1.0);
+}
+`;
+
+export const POST_FRAGMENT = `
+precision highp float;
+
+uniform sampler2D uScene;
+/** One row of glyphs, darkest to brightest, white on transparent. */
+uniform sampler2D uAtlas;
+uniform float uGlyphs;
+uniform vec2 uRes;
+uniform float uTime;
+/** One glyph cell, in pixels. Cells count from the top left, like the text overlay. */
+uniform vec2 uCell;
+/**
+ * Glitch windows in pixels, y up: x0, y0, x1, y1. Kind: 1 smear, 2 ASCII over the image,
+ * 3 data backdrop, 4 ASCII over a smear.
+ */
+uniform vec4 uWin[8];
+uniform float uWinKind[8];
+/** 1 at load, easing to 0: the picture starts as ASCII and resolves from the top down. */
+uniform float uIntro;
+
+${HASHES}
+
+vec3 sceneAt(vec2 uv) {
+  return texture2D(uScene, clamp(uv, 0.001, 0.999)).rgb * 2.0;
+}
+
+float luma(vec3 c) {
+  return dot(c, vec3(0.299, 0.587, 0.114));
+}
+
+vec3 tone(vec3 c) {
+  return 1.0 - exp(-c * 1.25);
+}
+
+void main() {
+  vec2 frag = gl_FragCoord.xy;
+  vec2 uv = frag / uRes;
+  float frame = mod(floor(uTime * 24.0), 97.0);
+
+  // The topmost window under this pixel, if any.
+  float kind = 0.0;
+  vec4 win = vec4(0.0);
+  for (int i = 0; i < 8; i++) {
+    vec4 r = uWin[i];
+    if (uWinKind[i] > 0.5 && frag.x >= r.x && frag.x < r.z && frag.y >= r.y && frag.y < r.w) {
+      kind = uWinKind[i];
+      win = r;
+    }
+  }
+  bool smear = (kind > 0.5 && kind < 1.5) || kind > 3.5;
+  bool ascii = (kind > 1.5 && kind < 2.5) || kind > 3.5;
+  bool backdrop = kind > 2.5 && kind < 3.5;
+  vec2 fromTop = vec2(frag.x, uRes.y - frag.y);
+  float sweep = floor(fromTop.y / uCell.y) / (uRes.y / uCell.y);
+  if (uIntro > 0.0 && hash(floor(fromTop / uCell) * 0.73) * 0.5 + sweep * 0.5 < uIntro) {
+    ascii = true;
+  }
+
+  // Pixel sort: each thin stripe takes the brightest of a few samples down its column and drags
+  // it through the window with a slight gradient, so bars pull out the lights' colours.
   vec2 suv = uv;
   float streak = 1.0;
-  float smearTop = -1.0;
-  for (int i = 0; i < 6; i++) {
-    vec4 r = uSmear[i];
-    if (uv.x >= r.x && uv.x <= r.z && uv.y >= r.y && uv.y <= r.w) smearTop = r.w;
-  }
-  if (smearTop >= 0.0) {
-    // Behind a glyph cluster: like pixel sorting, each thin column drags a colour along, pulled
-    // towards the bright light leak, so the band streaks in warm and cool stripes.
-    float column = floor(gl_FragCoord.x / 2.0);
-    float pick = hash(vec2(column, floor(smearTop * 100.0)));
-    float pull = hash(vec2(column * 0.37, smearTop * 31.0));
-    suv = vec2(mix(uv.x, 0.82, pull * 0.7), mix(smearTop + 0.02, 0.62, pull * 0.8) + pick * 0.06);
-    streak = 0.55 + 1.05 * pick;
-    active = 1.0;
-  } else if (active > 0.5) {
-    float column = floor(gl_FragCoord.x / 2.0);
-    float pick = hash(vec2(column, blk.y + slot));
-    suv.y = (blk.y + 1.0 + pick * 1.6) / grid.y;
-    suv.x += (hash(vec2(blk.y, slot + 9.0)) - 0.5) * 0.12;
-    streak = 0.85 + 0.45 * pick;
+  if (smear || backdrop) {
+    float stripe = floor(frag.x / (uCell.x * 0.34));
+    float best = -1.0;
+    for (int k = 0; k < 4; k++) {
+      float y = 0.08 + 0.84 * hash(vec2(stripe + float(k) * 13.0, win.w));
+      float l = luma(sceneAt(vec2(uv.x, y)));
+      if (l > best) {
+        best = l;
+        suv.y = y;
+      }
+    }
+    suv.y += (frag.y - win.y) / uRes.y * 0.35;
+    suv.x += (hash(vec2(win.y, win.w)) - 0.5) * 0.04;
+    streak = 0.75 + 0.6 * hash(vec2(stripe * 1.7, win.w + 3.0));
   }
 
-  // Chromatic aberration, stronger towards the edges and inside a glitch.
-  vec2 dir = (suv - 0.5) * (0.012 + active * 0.01);
-  vec3 col = vec3(scene(suv + dir).r, scene(suv).g, scene(suv - dir).b) * streak;
+  // Colour fringing towards the edges, and sideways inside a smear.
+  vec2 dir = (uv - 0.5) * 0.004 + (smear ? vec2(0.006, 0.0) : vec2(0.0));
+  vec3 col = vec3(sceneAt(suv + dir).r, sceneAt(suv).g, sceneAt(suv - dir).b);
+  if (smear) col = mix(vec3(luma(col)), col, 1.35) * streak;
+  if (backdrop) col *= 0.28 * streak;
+
+  // Halation: bright lights bleed a warm glow into their surroundings.
+  vec3 halo = vec3(0.0);
+  for (int i = 0; i < 8; i++) {
+    float a = float(i) * 0.785398;
+    vec2 o = vec2(cos(a), sin(a));
+    halo += sceneAt(uv + o * vec2(0.012, 0.016)) + sceneAt(uv + o * vec2(0.03, 0.04));
+  }
+  col += max(halo / 16.0 - 0.35, 0.0) * vec3(1.0, 0.75, 0.6) * 0.9;
+  col = tone(col);
+
+  // ASCII made from the image: each cell's glyph follows the brightness beneath it.
+  if (ascii) {
+    vec2 cell = floor(fromTop / uCell);
+    vec2 inCell = fract(fromTop / uCell);
+    vec2 centre = vec2((cell.x + 0.5) * uCell.x, uRes.y - (cell.y + 0.5) * uCell.y) / uRes;
+    vec3 under = tone(sceneAt(centre));
+    // Dark areas get sparse dots; only the lights fill up with heavy glyphs.
+    float level = clamp(smoothstep(0.03, 0.8, luma(under)), 0.0, 0.999);
+    float index = floor(level * uGlyphs);
+    if (hash(cell + frame * 0.37) > 0.965) index = floor(hash(cell.yx + frame) * uGlyphs);
+    float ink = texture2D(uAtlas, vec2((index + inCell.x) / uGlyphs, inCell.y)).a;
+    vec3 glyph = mix(vec3(1.0), under * 1.3 + 0.35, 0.25);
+    col = mix(col * (kind > 3.5 ? 0.85 : 0.94), glyph, ink);
+  }
 
   vec2 q = uv - 0.5;
-  col *= 1.0 - dot(q, q) * 0.9;
+  col *= 1.0 - dot(q * vec2(0.9, 1.1), q) * 0.75;
+  col *= 1.0 - uIntro * 0.5;
 
-  // Coarse film grain at 24 frames a second, in brightness and colour.
-  float frame = mod(floor(t * 24.0), 97.0);
-  vec2 px = gl_FragCoord.xy + frame * vec2(17.13, 31.71);
-  float n = grainHash(px);
-  vec3 cn = vec3(grainHash(px + 11.7), grainHash(px + 23.3), grainHash(px + 41.9));
-  col += (n - 0.5) * 0.28 * (0.4 + col);
-  col += (cn - 0.5) * 0.1;
+  // Fine film grain at 24 frames a second, strongest in the shadows, with a touch of colour.
+  vec2 px = frag + frame * vec2(17.13, 31.71);
+  float n = grainHash(px) + grainHash(px * 1.37 + 5.1) - 1.0;
+  col += n * 0.065 * (1.0 - luma(col) * 0.6);
+  col += (vec3(grainHash(px + 11.7), grainHash(px + 23.3), grainHash(px + 41.9)) - 0.5) * 0.022;
 
-  // A gentle filmic shoulder.
-  col = col / (1.0 + col * 0.35);
-  gl_FragColor = vec4(max(col, 0.0), 1.0);
+  gl_FragColor = vec4(clamp(col, 0.0, 1.0), 1.0);
 }
 `;
