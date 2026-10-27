@@ -10,6 +10,7 @@ import { generateText, type LanguageModel, Output } from 'ai';
 import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from './cost';
 import type { HotelProfile } from './hotel';
 import { checkDraftPrices } from './price-guard';
+import { reasoningEffort, type ReasoningEffort } from './reasoning';
 import {
   draftPrompt,
   draftSystemPrompt,
@@ -30,13 +31,19 @@ export interface InboxPipelineDeps {
   today: () => IsoDate;
 }
 
-export async function extractMessage(model: LanguageModel, inquiry: Inquiry, today: IsoDate) {
+export async function extractMessage(
+  model: LanguageModel,
+  inquiry: Inquiry,
+  today: IsoDate,
+  reasoning: ReasoningEffort = reasoningEffort.extraction,
+) {
   const result = await generateText({
     model,
     system: extractionSystemPrompt,
     prompt: extractionPrompt(inquiry, today),
     output: Output.object({ schema: inquiryExtractionSchema }),
     temperature: 0,
+    reasoning,
     // Meta constrains output to the schema either way; strict mode only adds a server-side check
     // against a JSON Schema subset that may reject keywords zod emits (format, minimum, $schema).
     providerOptions: { meta: { strictJsonSchema: false } },
@@ -54,6 +61,7 @@ export async function draftReply(
     system: draftSystemPrompt(profile),
     prompt: draftPrompt(params),
     temperature: 0.3,
+    reasoning: reasoningEffort.draft,
   });
   return { draft: result.text.trim(), tokens: fromSdkUsage(result.usage) };
 }

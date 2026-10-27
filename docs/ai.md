@@ -90,7 +90,15 @@ The pipeline checks the monthly budget before calling the model and records `inb
 
 `packages/ai/src/evals/inquiries.ts` holds fourteen synthetic messages in Czech, German, English and Polish, dated relative to today: ten booking requests and four OTA (Booking.com) messages, three of which are questions about an existing stay. Each has its expected extraction. The demo seed uses the same messages.
 
-`pnpm eval` runs the real extraction on each and scores it with `scoreExtraction`: exact match on kind, language, dates, adults, child ages (any order) and wishes; guest name and question wording are not scored. It prints PASS/FAIL per message, the pass rate and what the run cost. It needs `META_API_KEY` and `META_MODEL_AGENT`.
+`pnpm eval` runs the real extraction on each and scores it with `scoreExtraction`: exact match on kind, language, dates, adults, child ages (any order) and wishes; guest name and question wording are not scored. It prints PASS/FAIL per message, the pass rate, the cost, and output tokens and seconds per message. It needs `META_API_KEY` and `META_MODEL_AGENT`. `EVAL_REASONING=<level>` overrides the reasoning effort to compare levels.
+
+Latest results with `muse-spark-1.3` (2026-10-27):
+
+| Reasoning effort   | Pass rate    | Cost per message | Output tokens | Time  |
+| ------------------ | ------------ | ---------------- | ------------- | ----- |
+| model default      | 14/14 (100%) | $0.0061          | 1,207         | 4.4 s |
+| `low`              | 14/14 (100%) | $0.0036          | 564           | 2.3 s |
+| `minimal` (in use) | 14/14 (100%) | $0.0021–0.0025   | ~300          | 1.4 s |
 
 ## Meta models
 
@@ -101,6 +109,8 @@ The Meta Model API is OpenAI-compatible, so `packages/ai/src/provider.ts` wraps 
 | `META_MODEL_AGENT`  | `muse-spark-1.3`                     | Agent loop and tool calling (Chat Completions)                                              |
 | `META_MODEL_VISION` | `muse-spark-1.3` (accepts images)    | Not wired yet                                                                               |
 | `META_MODEL_VOICE`  | `muse-voice-transcribe-1.0`          | Not wired yet; uses Meta's own `/v1/asr/transcribe` endpoint, not the OpenAI-compatible one |
+
+Muse Spark is a reasoning model: it always reasons before answering (`reasoning_effort: "none"` is rejected), and reasoning tokens are billed as output. `packages/ai/src/reasoning.ts` sets the effort per feature through the AI SDK's `reasoning` option: `minimal` for inbox extraction and drafts, `low` for the agent, which plans multi-step tool use. Each is the lowest level that keeps quality, measured with `pnpm eval` and live runs.
 
 Constraints from Meta's tool-calling docs that the agent respects: `tool_choice` only accepts `"auto"` (the SDK default), and tool arguments are not guaranteed to match the schema, so the SDK validates them with the zod schemas.
 
@@ -116,14 +126,16 @@ What keeps cost down:
 - Only the last 20 chat messages are sent; at most 8 model calls per turn.
 - Background work (inbox extraction and drafts) runs once per message and is stored.
 
-Estimate for a 30-room property per month: inbox ~1,000 messages at two small calls each ≈ $8, chat ~900 turns ≈ $25–35, ID scans, voice notes and daily briefs ≈ $2. Total ≈ $35–45.
+Measured with `muse-spark-1.3` (2026-10-27): an agent turn costs about $0.019 (about 17,700 input tokens, a third of them cached, since each tool step resends the conversation and tool definitions); an inbox message about $0.004 (extraction $0.002 plus draft at `minimal` effort).
+
+Estimate for a 30-room property per month, at 40 agent questions and 30 guest messages a day: agent ≈ $23, inbox ≈ $4, ID scans, voice notes and daily briefs ≈ $2. Total ≈ $30, well under the $100 cap.
 
 ## Rate limits
 
 The public demo is protected in `apps/api/src/limits.ts` (in memory, reset on restart):
 
 - `AI_RATE_LIMIT_PER_HOUR` agent requests per client IP per rolling hour (IP from `x-forwarded-for`).
-- `AI_DAILY_TOKEN_BUDGET` tokens per UTC day across all visitors, counted from model usage after each turn.
+- `AI_DAILY_TOKEN_BUDGET` tokens per UTC day across all visitors, counted from model usage after each turn. The default of 2,000,000 is about 100 agent turns, or roughly $2 a day.
 - `AI_MONTHLY_BUDGET_USD` real spend per UTC month, from the `ai_usage` table. Persisted, so it survives restarts.
 
 When a limit is hit, `POST /api/agent` returns 429 `demo_limit` with a message the command bar can show as is.

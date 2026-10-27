@@ -1,5 +1,6 @@
 import { isStepCount, type LanguageModel, type ModelMessage, streamText } from 'ai';
 import { fromSdkUsage, type TokenUsage } from './cost';
+import { reasoningEffort } from './reasoning';
 import type { AgentTools } from './tools';
 
 export interface AgentRunOptions {
@@ -46,6 +47,7 @@ export function runAgent({
     system,
     messages,
     tools,
+    reasoning: reasoningEffort.agent,
     stopWhen: isStepCount(maxSteps),
     ...(abortSignal && { abortSignal }),
     onFinish: async ({ totalUsage }) => {

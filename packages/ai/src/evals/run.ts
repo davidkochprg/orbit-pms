@@ -3,6 +3,7 @@ import type { Inquiry } from '@orbit/shared';
 import { tokenCostMicroUsd } from '../cost';
 import { extractMessage } from '../inbox';
 import { createMetaProvider } from '../provider';
+import { reasoningEffort, type ReasoningEffort } from '../reasoning';
 import { buildInquiryFixtures } from './inquiries';
 import { scoreExtraction } from './score';
 
@@ -23,11 +24,29 @@ const provider = createMetaProvider({
   baseURL: META_API_BASE_URL,
   models: { agent: META_MODEL_AGENT },
 });
+// EVAL_REASONING overrides the configured effort, to compare levels before changing the default.
+const levels: ReasoningEffort[] = [
+  'provider-default',
+  'minimal',
+  'low',
+  'medium',
+  'high',
+  'xhigh',
+  'max',
+];
+const override = process.env.EVAL_REASONING || undefined;
+if (override && !levels.includes(override as ReasoningEffort)) {
+  console.error(`EVAL_REASONING must be one of: ${levels.join(', ')}`);
+  process.exit(1);
+}
+const reasoning = (override as ReasoningEffort | undefined) ?? reasoningEffort.extraction;
 const today = hotelToday(new Date());
 const fixtures = buildInquiryFixtures(today);
 
 let passed = 0;
 let costMicroUsd = 0;
+let outputTokens = 0;
+const started = Date.now();
 for (const f of fixtures) {
   const inquiry: Inquiry = {
     id: f.id,
@@ -47,8 +66,9 @@ for (const f of fixtures) {
     processingError: null,
   };
   try {
-    const { analysis, tokens } = await extractMessage(provider.agent, inquiry, today);
+    const { analysis, tokens } = await extractMessage(provider.agent, inquiry, today, reasoning);
     costMicroUsd += tokenCostMicroUsd(tokens);
+    outputTokens += tokens.output;
     const score = scoreExtraction(f.expected, analysis);
     if (score.passed) passed++;
     console.log(
@@ -64,7 +84,11 @@ for (const f of fixtures) {
 }
 
 const rate = Math.round((passed / fixtures.length) * 100);
+const seconds = (Date.now() - started) / 1000;
 console.log(
-  `\n${passed}/${fixtures.length} passed (${rate}%) with ${META_MODEL_AGENT}, cost $${(costMicroUsd / 1e6).toFixed(4)}`,
+  `\n${passed}/${fixtures.length} passed (${rate}%) with ${META_MODEL_AGENT}, reasoning ${reasoning}`,
+);
+console.log(
+  `cost $${(costMicroUsd / 1e6).toFixed(4)}, ${Math.round(outputTokens / fixtures.length)} output tokens and ${(seconds / fixtures.length).toFixed(1)} s per message`,
 );
 process.exit(passed === fixtures.length ? 0 : 1);
