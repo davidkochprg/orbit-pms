@@ -12,6 +12,7 @@ const booking = {
   status: 'hold',
   holdExpiresAt: '2026-12-01T12:00:00.000Z',
   source: 'email',
+  addons: { wellness: false, dogs: 0, extraBeds: 0 },
   priceSnapshot: null,
   notes: null,
 };

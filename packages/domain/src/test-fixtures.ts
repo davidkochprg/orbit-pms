@@ -41,6 +41,7 @@ export function booking(overrides: Partial<Booking> & Pick<Booking, 'roomId'>): 
     status: 'confirmed',
     holdExpiresAt: null,
     source: 'email',
+    addons: { wellness: false, dogs: 0, extraBeds: 0 },
     priceSnapshot: null,
     notes: null,
     ...overrides,

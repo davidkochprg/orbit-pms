@@ -13,7 +13,7 @@ import {
   roomStatusSchema,
 } from './enums';
 import { inquiryExtractionSchema } from './inquiry';
-import { czkSchema, quoteSchema } from './quote';
+import { czkSchema, quoteAddonsSchema, quoteSchema } from './quote';
 
 export const roomTypeSchema = z.object({
   id: z.string(),
@@ -57,6 +57,7 @@ export const bookingSchema = z.object({
   status: bookingStatusSchema,
   holdExpiresAt: z.iso.datetime().nullable(),
   source: bookingSourceSchema,
+  addons: quoteAddonsSchema,
   priceSnapshot: quoteSchema.nullable(),
   notes: z.string().nullable(),
 });
@@ -87,6 +88,8 @@ export const auditLogEntrySchema = z.object({
   id: z.string(),
   actor: auditActorSchema,
   action: z.string(),
+  /** The entity the action was about, e.g. a booking ID, for per-record history. */
+  subjectId: z.string().nullable(),
   payload: z.unknown(),
   createdAt: z.iso.datetime(),
 });

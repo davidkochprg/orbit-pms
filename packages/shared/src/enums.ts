@@ -45,3 +45,7 @@ export type HousekeepingTaskStatus = z.infer<typeof housekeepingTaskStatusSchema
 export const auditActors = ['user', 'agent'] as const;
 export const auditActorSchema = z.enum(auditActors);
 export type AuditActor = z.infer<typeof auditActorSchema>;
+
+export const bookingActions = ['confirm', 'check_in', 'check_out', 'cancel'] as const;
+export const bookingActionSchema = z.enum(bookingActions);
+export type BookingAction = z.infer<typeof bookingActionSchema>;

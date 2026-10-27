@@ -11,6 +11,7 @@ import {
   roomStatuses,
   type InquiryExtraction,
   type Quote,
+  type QuoteAddons,
 } from '@orbit/shared';
 import { sql } from 'drizzle-orm';
 import {
@@ -86,6 +87,10 @@ export const bookings = pgTable(
     status: bookingStatus('status').notNull(),
     holdExpiresAt: timestamp('hold_expires_at', { withTimezone: true }),
     source: bookingSource('source').notNull(),
+    addons: jsonb('addons')
+      .$type<QuoteAddons>()
+      .notNull()
+      .default({ wellness: false, dogs: 0, extraBeds: 0 }),
     priceSnapshot: jsonb('price_snapshot').$type<Quote>(),
     notes: text('notes'),
     createdAt: createdAt(),
@@ -118,10 +123,15 @@ export const housekeepingTasks = pgTable('housekeeping_tasks', {
   createdAt: createdAt(),
 });
 
-export const auditLog = pgTable('audit_log', {
-  id: text('id').primaryKey(),
-  actor: auditActor('actor').notNull(),
-  action: text('action').notNull(),
-  payload: jsonb('payload').$type<unknown>().notNull(),
-  createdAt: createdAt(),
-});
+export const auditLog = pgTable(
+  'audit_log',
+  {
+    id: text('id').primaryKey(),
+    actor: auditActor('actor').notNull(),
+    action: text('action').notNull(),
+    subjectId: text('subject_id'),
+    payload: jsonb('payload').$type<unknown>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('audit_log_subject_idx').on(t.subjectId, t.createdAt)],
+);

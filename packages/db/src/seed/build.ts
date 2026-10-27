@@ -105,7 +105,6 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
 
   const inquiryFixtures = buildInquiryFixtures(today);
   const bookings: Booking[] = [];
-  const guestsUsed = new Set<string>();
   const sorted = drafts.sort(
     (a, b) => a.checkIn.localeCompare(b.checkIn) || a.roomId.localeCompare(b.roomId),
   );
@@ -129,9 +128,9 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
     const addons = {
       wellness: random.chance(0.4),
       dogs: room.kind === 'apartment' && random.chance(0.3) ? 1 : 0,
+      extraBeds: 0,
     };
     const guest = random.pick(seedGuests);
-    guestsUsed.add(guest.id);
 
     let status: Booking['status'];
     let holdExpiresAt: string | null = null;
@@ -154,6 +153,7 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
       status,
       holdExpiresAt,
       source: random.pick(sources),
+      addons,
       priceSnapshot: quote({ ...draft, roomType, adults, childAges, addons }, pricing),
       notes: addons.dogs > 0 ? 'Travelling with a dog.' : null,
     });
