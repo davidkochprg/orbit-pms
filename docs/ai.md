@@ -79,11 +79,26 @@ The Meta Model API is OpenAI-compatible, so `packages/ai/src/provider.ts` wraps 
 
 Constraints from Meta's tool-calling docs that the agent respects: `tool_choice` only accepts `"auto"` (the SDK default), and tool arguments are not guaranteed to match the schema, so the SDK validates them with the zod schemas.
 
+## Cost
+
+Rules in [ADR 0006](decisions/0006-agent-autonomy-and-cost-budget.md). Prices (Standard tier, `packages/ai/src/cost.ts`): $1.25 per 1M input tokens, $0.15 per 1M cached input tokens, $4.25 per 1M output tokens, $0.18 per hour of transcribed audio.
+
+Every model call is recorded in the `ai_usage` table (feature, model, tokens, cost in micro-dollars). This table is real spend, so `db:seed` and demo resets leave it alone. `GET /api/ai-usage` reports this month's spend by feature against `AI_MONTHLY_BUDGET_USD`. If a client disconnects mid-turn, the completed steps are still recorded; the step in flight is not reported by the provider.
+
+What keeps cost down:
+
+- Meta caches prompt prefixes automatically, so the system prompt and tool definitions come first and today's date comes last.
+- Only the last 20 chat messages are sent; at most 8 model calls per turn.
+- Background work (inbox extraction and drafts) runs once per message and is stored.
+
+Estimate for a 30-room property per month: inbox ~1,000 messages at two small calls each ≈ $8, chat ~900 turns ≈ $25–35, ID scans, voice notes and daily briefs ≈ $2. Total ≈ $35–45.
+
 ## Rate limits
 
 The public demo is protected in `apps/api/src/limits.ts` (in memory, reset on restart):
 
 - `AI_RATE_LIMIT_PER_HOUR` agent requests per client IP per rolling hour (IP from `x-forwarded-for`).
 - `AI_DAILY_TOKEN_BUDGET` tokens per UTC day across all visitors, counted from model usage after each turn.
+- `AI_MONTHLY_BUDGET_USD` real spend per UTC month, from the `ai_usage` table. Persisted, so it survives restarts.
 
 When a limit is hit, `POST /api/agent` returns 429 `demo_limit` with a message the agent panel can show as is.

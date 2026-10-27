@@ -6,7 +6,7 @@ import {
   pricingConfig,
   rangesOverlap,
 } from '@orbit/domain';
-import { applySeed, buildSeed, createDb, createRepositories } from '@orbit/db';
+import { applySeed, buildSeed, createDb, createRepositories, createUsageStore } from '@orbit/db';
 import type {
   ApiError,
   AuditLogEntry,
@@ -24,7 +24,12 @@ const today = '2026-10-27';
 const now = new Date('2026-10-27T08:00:00Z');
 const handle = createDb('memory://');
 const seed = buildSeed(today, now, pricingConfig);
-const app = createApp({ repos: createRepositories(handle.db), ai: null, clock: () => now });
+const app = createApp({
+  repos: createRepositories(handle.db),
+  ai: null,
+  usage: createUsageStore(handle.db),
+  clock: () => now,
+});
 
 beforeAll(() => handle.migrate());
 beforeEach(() => applySeed(handle.db, seed));

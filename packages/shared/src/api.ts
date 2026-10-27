@@ -46,6 +46,25 @@ export const auditLogQuerySchema = z.object({
 
 export const auditLogListSchema = z.array(auditLogEntrySchema);
 
+export const aiUsageSummarySchema = z.object({
+  /** UTC month, `YYYY-MM`. */
+  month: z.string(),
+  budgetMicroUsd: z.number().int(),
+  spentMicroUsd: z.number().int(),
+  byFeature: z.array(
+    z.object({
+      feature: z.string(),
+      calls: z.number().int(),
+      inputTokens: z.number().int(),
+      cachedInputTokens: z.number().int(),
+      outputTokens: z.number().int(),
+      audioSeconds: z.number().int(),
+      costMicroUsd: z.number().int(),
+    }),
+  ),
+});
+export type AiUsageSummary = z.infer<typeof aiUsageSummarySchema>;
+
 /** `POST /api/agent`: the chat so far as AI SDK UI messages, validated further by the SDK. */
 export const agentRequestSchema = z.object({
   messages: z.array(z.unknown()).min(1).max(100),

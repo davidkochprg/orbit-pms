@@ -1,5 +1,5 @@
 import { serve } from '@hono/node-server';
-import { createDb, createRepositories } from '@orbit/db';
+import { createDb, createRepositories, createUsageStore } from '@orbit/db';
 import { createAi } from './ai';
 import { createApp } from './app';
 import { parseEnv } from './env';
@@ -11,6 +11,8 @@ const app = createApp({
   repos: createRepositories(db.db),
   ai,
   limits: { perIpPerHour: env.AI_RATE_LIMIT_PER_HOUR, dailyTokenBudget: env.AI_DAILY_TOKEN_BUDGET },
+  usage: createUsageStore(db.db),
+  monthlyBudgetUsd: env.AI_MONTHLY_BUDGET_USD,
   log: true,
 });
 

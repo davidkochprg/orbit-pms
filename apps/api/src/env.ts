@@ -16,6 +16,8 @@ export const envSchema = z.object({
   META_MODEL_VISION: optional,
   AI_DAILY_TOKEN_BUDGET: z.coerce.number().int().positive().default(500_000),
   AI_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(20),
+  /** Hard cap on real Meta spend per UTC month, from recorded usage. */
+  AI_MONTHLY_BUDGET_USD: z.coerce.number().positive().default(100),
 });
 export type Env = z.infer<typeof envSchema>;
 

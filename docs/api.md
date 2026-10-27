@@ -110,3 +110,7 @@ Runs the stored action through the domain service as the `agent` actor and retur
 ### `POST /api/pending-actions/:id/reject`
 
 Marks the action `rejected` without running it.
+
+### `GET /api/ai-usage`
+
+This month's real Meta spend: `{ month: "2026-10", budgetMicroUsd, spentMicroUsd, byFeature: [{ feature, calls, inputTokens, cachedInputTokens, outputTokens, audioSeconds, costMicroUsd }] }`. Money is in micro-dollars (1e-6 USD) as integers.

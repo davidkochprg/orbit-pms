@@ -4,6 +4,8 @@ import {
   hotelProfile,
   type MetaProvider,
   runAgent,
+  tokenCostMicroUsd,
+  type UsageStore,
 } from '@orbit/ai';
 import {
   HOTEL_TIMEZONE,
@@ -32,20 +34,35 @@ export interface AgentRouteDeps {
   actions: PendingActionService;
   limiter: AiLimiter;
   clock: () => Date;
+  usage: UsageStore;
+  monthlyBudgetMicroUsd: number;
 }
 
 const limitMessages = {
   rate_limit:
     'Demo limit reached: too many agent requests from your address. Try again in an hour.',
   token_budget: 'Demo limit reached for today. Try again tomorrow.',
+  monthly_budget: 'The AI budget for this month is used up. The rest of Orbit keeps working.',
 };
+
+/** Only the most recent messages are sent, so long chats don't grow the cost of every turn. */
+const MAX_HISTORY = 20;
 
 function clientIp(header: string | undefined): string {
   return header?.split(',')[0]?.trim() || 'local';
 }
 
 /** `POST /api/agent`: streams one agent turn as an AI SDK UI message stream (SSE). */
-export function agentRoutes({ ai, repos, hotel, actions, limiter, clock }: AgentRouteDeps) {
+export function agentRoutes({
+  ai,
+  repos,
+  hotel,
+  actions,
+  limiter,
+  clock,
+  usage,
+  monthlyBudgetMicroUsd,
+}: AgentRouteDeps) {
   const tools = createAgentTools({ hotel, actions, listRooms: () => repos.rooms.listRooms() });
 
   return new Hono().post('/agent', validate('json', agentRequestSchema), async (c) => {
@@ -54,6 +71,9 @@ export function agentRoutes({ ai, repos, hotel, actions, limiter, clock }: Agent
         errorBody('ai_not_configured', 'The AI agent is not configured on this server.'),
         503,
       );
+    }
+    if ((await usage.monthToDateMicroUsd(clock())) >= monthlyBudgetMicroUsd) {
+      return c.json(errorBody('demo_limit', limitMessages.monthly_budget), 429);
     }
     const limit = limiter.check(clientIp(c.req.header('x-forwarded-for')));
     if (!limit.ok) return c.json(errorBody('demo_limit', limitMessages[limit.reason]), 429);
@@ -75,10 +95,19 @@ export function agentRoutes({ ai, repos, hotel, actions, limiter, clock }: Agent
         today: hotelToday(clock()),
         timezone: HOTEL_TIMEZONE,
       }),
-      messages: await convertToModelMessages(messages, { tools }),
+      messages: await convertToModelMessages(messages.slice(-MAX_HISTORY), { tools }),
       tools,
       abortSignal: c.req.raw.signal,
-      onFinish: ({ totalTokens }) => limiter.recordTokens(totalTokens),
+      onUsage: async (tokens) => {
+        limiter.recordTokens(tokens.input + tokens.output);
+        await usage.record({
+          feature: 'agent',
+          model: ai.agentModelId,
+          tokens,
+          audioSeconds: 0,
+          costMicroUsd: tokenCostMicroUsd(tokens),
+        });
+      },
     });
 
     return createUIMessageStreamResponse({

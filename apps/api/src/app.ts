@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import type { MetaProvider } from '@orbit/ai';
+import type { MetaProvider, UsageStore } from '@orbit/ai';
 import {
   createHotelService,
   createPendingActionService,
@@ -18,11 +18,14 @@ import { guestRoutes } from './routes/guests';
 import { overviewRoutes } from './routes/overview';
 import { pendingActionRoutes } from './routes/pending-actions';
 import { roomRoutes } from './routes/rooms';
+import { type UsageReport, usageRoutes } from './routes/usage';
 
 export interface AppDeps {
   repos: Repositories;
   ai: MetaProvider | null;
   limits?: AiLimitsConfig;
+  usage: UsageStore & { monthToDateByFeature?: UsageReport };
+  monthlyBudgetUsd?: number;
   clock?: () => Date;
   newId?: (prefix: string) => string;
   log?: boolean;
@@ -34,6 +37,8 @@ export function createApp({
   repos,
   ai,
   limits = { perIpPerHour: 20, dailyTokenBudget: 500_000 },
+  usage,
+  monthlyBudgetUsd = 100,
   clock = () => new Date(),
   newId = defaultNewId,
   log = false,
@@ -56,7 +61,9 @@ export function createApp({
   app.route('/api', guestRoutes(repos));
   app.route('/api', overviewRoutes(repos, hotel));
   app.route('/api', pendingActionRoutes(actions));
-  app.route('/api', agentRoutes({ ai, repos, hotel, actions, limiter, clock }));
+  const budget = { usage, monthlyBudgetMicroUsd: Math.round(monthlyBudgetUsd * 1_000_000) };
+  app.route('/api', agentRoutes({ ai, repos, hotel, actions, limiter, clock, ...budget }));
+  app.route('/api', usageRoutes({ ...budget, clock }));
 
   app.notFound((c) => c.json(errorBody('not_found', 'Route not found'), 404));
   app.onError(handleError);
