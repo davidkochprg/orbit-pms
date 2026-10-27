@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { type RefObject, useEffect, useRef } from 'react';
 import { FULLSCREEN_VERTEX, POST_FRAGMENT, SCENE_FRAGMENT } from '@/lib/dusk-shader';
 import { type Cell, type GlitchWindow, MAX_WINDOWS, windowsAt } from '@/lib/glitch-windows';
 
@@ -18,10 +18,13 @@ const KIND_CODE: Record<GlitchWindow['kind'], number> = {
 };
 
 interface WelcomeSceneProps {
-  /** Lines of live hotel data, shown one at a time, e.g. "OCC 50% · 25 OF 50 ROOMS". */
+  /** Lines of live hotel data, typed onto the scene, e.g. "OCC 50% · 25 OF 50 ROOMS". */
   data: string[];
-  /** One line in the corner, e.g. the property and today's numbers. */
-  caption: string;
+  /**
+   * An element floating over the scene, such as the page's panel. Glitches keep to the part of
+   * the scene left of it, and the picture is composed within that part.
+   */
+  cover?: RefObject<HTMLElement | null>;
 }
 
 function program(gl: WebGLRenderingContext, fragment: string): WebGLProgram | null {
@@ -112,6 +115,7 @@ function createRenderer(canvas: HTMLCanvasElement, scale: number) {
     draw(
       time: number,
       intro: number,
+      frame: number,
       pointer: [number, number],
       rects: Float32Array,
       kinds: Float32Array,
@@ -122,6 +126,7 @@ function createRenderer(canvas: HTMLCanvasElement, scale: number) {
       gl.uniform2f(at(scene, 'uRes'), sceneW, sceneH);
       gl.uniform1f(at(scene, 'uTime'), time);
       gl.uniform2f(at(scene, 'uPointer'), pointer[0], pointer[1]);
+      gl.uniform1f(at(scene, 'uFrame'), frame);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
 
       gl.bindFramebuffer(gl.FRAMEBUFFER, null);
@@ -151,7 +156,7 @@ function createRenderer(canvas: HTMLCanvasElement, scale: number) {
  * line of live hotel data scrolls in, and the pointer is a lens that turns the sky into
  * characters. One still frame with reduced motion; a plain gradient without WebGL.
  */
-export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
+export function WelcomeScene({ data, cover }: WelcomeSceneProps) {
   const container = useRef<HTMLDivElement>(null);
   const glCanvas = useRef<HTMLCanvasElement>(null);
   const textCanvas = useRef<HTMLCanvasElement>(null);
@@ -187,10 +192,19 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
     let lensCell: Cell | null = null;
     let lensShown = 0;
     let lensTarget = 0;
+    // The width left of the cover, where glitches go and the picture is composed.
+    let open = 0;
 
     function resize() {
       width = box!.clientWidth;
       height = box!.clientHeight;
+      open = width;
+      const covering = cover?.current?.getBoundingClientRect();
+      const own = box!.getBoundingClientRect();
+      if (covering && covering.top < own.bottom && covering.bottom > own.top) {
+        const left = covering.left - own.left;
+        if (left > 0 && left < width) open = Math.max(CELL_W * 12, left - CELL_W * 2);
+      }
       canvas!.width = Math.max(1, Math.round(width * glScale));
       canvas!.height = Math.max(1, Math.round(height * glScale));
       text!.width = Math.round(width * textScale);
@@ -201,14 +215,15 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
     function draw(t: number, elapsed = 99) {
       pointer[0] += (target[0] - pointer[0]) * 0.06;
       pointer[1] += (target[1] - pointer[1]) * 0.06;
-      const grid = { cols: Math.floor(width / CELL_W), rows: Math.floor(height / CELL_H) };
+      const grid = { cols: Math.floor(open / CELL_W), rows: Math.floor(height / CELL_H) };
       const data = lines.current;
       lensShown += (lensTarget - lensShown) * (still ? 1 : 0.35);
       const lens = lensCell ? { ...lensCell, shown: lensShown } : null;
       const windows = windowsAt(
         t,
         grid,
-        data.map((l) => l.length),
+        // Messages wait for the intro to resolve, so they never type into its ASCII.
+        elapsed < 1.8 ? [] : data.map((l) => l.length),
         lens,
       );
 
@@ -233,7 +248,7 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
       });
       // The intro resolves from ASCII into the picture over the first 1.8 seconds.
       const intro = Math.max(0, 1 - elapsed / 1.8) ** 1.6;
-      renderer?.draw(t, intro, pointer, rects, kinds);
+      renderer?.draw(t, intro, open / Math.max(width, 1), pointer, rects, kinds);
 
       // The data line, crisp on its dark smear, with a blinking cursor.
       ctx!.setTransform(textScale, 0, 0, textScale, 0, 0);
@@ -256,7 +271,7 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
         const line = data[w.data] ?? '';
         const y = w.row * CELL_H + CELL_H / 2 + 0.5;
         // Typed out over the first half second.
-        const shown = line.slice(0, Math.ceil(((t % 5.2) / 0.5) * line.length));
+        const shown = line.slice(0, Math.ceil(((w.age ?? 1) / 0.5) * line.length));
         for (let i = 0; i < shown.length; i++) {
           ctx!.fillText(shown[i]!, (w.col + 1 + i) * CELL_W + 1, y);
         }
@@ -296,6 +311,7 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
       if (still) draw(7);
     });
     observer.observe(box);
+    if (cover?.current) observer.observe(cover.current);
     box.addEventListener('pointermove', onPointer);
     box.addEventListener('pointerleave', onLeave);
     if (still) draw(7);
@@ -306,7 +322,7 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
       box.removeEventListener('pointermove', onPointer);
       box.removeEventListener('pointerleave', onLeave);
     };
-  }, []);
+  }, [cover]);
 
   return (
     <div
@@ -320,9 +336,6 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
     >
       <canvas ref={glCanvas} className="absolute inset-0 h-full w-full" />
       <canvas ref={textCanvas} className="absolute inset-0 h-full w-full" />
-      <p className="absolute bottom-6 left-6 font-mono text-[11px] tracking-wider text-scene-glyph/70 uppercase sm:bottom-8 sm:left-8">
-        {caption}
-      </p>
     </div>
   );
 }

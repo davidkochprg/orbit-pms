@@ -1,4 +1,5 @@
 import { ArrowRight, Inbox, type LucideIcon, Mic, Orbit, Sparkles } from 'lucide-react';
+import { useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { WelcomeScene } from '@/components/welcome-scene';
@@ -6,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
 import { useSession } from '@/hooks/use-session';
 import { useDailyBrief, useDayOverview } from '@/lib/api';
-import { occupancyPercent } from '@/lib/brief';
+import { sceneMessages } from '@/lib/scene-messages';
 import { demoManager, staffRoleLabels } from '@/lib/session';
 
 const features: { icon: LucideIcon; title: string; text: string }[] = [
@@ -27,8 +28,6 @@ const features: { icon: LucideIcon; title: string; text: string }[] = [
   },
 ];
 
-const pad2 = (n: number) => String(n).padStart(2, '0');
-
 /** The public landing page: one click signs a visitor into the demo as the manager. */
 export function WelcomePage() {
   const session = useSession();
@@ -38,6 +37,7 @@ export function WelcomePage() {
   const day = useDayOverview();
   const manager = demoManager(session.staff);
   const next = params.get('next')?.startsWith('/') ? params.get('next')! : '/';
+  const panel = useRef<HTMLElement>(null);
 
   function enter() {
     if (!manager) return;
@@ -46,27 +46,20 @@ export function WelcomePage() {
   }
 
   const b = brief.data;
-  // Live readouts from the demo hotel, typed into the scene one at a time.
-  const sceneData = b
-    ? [
-        `OCC ${occupancyPercent(b.occupancy)}% · ${b.occupancy.occupied} OF ${b.occupancy.total} ROOMS`,
-        `ARR ${pad2(b.arrivals)} · DEP ${pad2(b.departures)} · ${b.guestsTonight} GUESTS TONIGHT`,
-        ...(day.data?.arrivals
-          .slice(0, 3)
-          .map((s) => `RM ${s.roomName} · ${s.guestName.toUpperCase()} · ARRIVING`) ?? []),
-      ]
-    : [];
-  const caption = b
-    ? `Orbit / ${b.occupancy.total} rooms / ${occupancyPercent(b.occupancy)}% tonight`
-    : 'Orbit / demo property';
+  // What is happening at the demo hotel today, typed into the scene.
+  const sceneData = useMemo(() => (b ? sceneMessages(b, day.data) : []), [b, day.data]);
 
   return (
-    <div className="flex min-h-svh flex-col bg-scene-page lg:h-svh lg:flex-row">
-      <section className="h-72 shrink-0 sm:h-96 lg:h-auto lg:flex-[1.1]">
-        <WelcomeScene data={sceneData} caption={caption} />
+    <div className="relative flex min-h-svh flex-col bg-scene-page lg:h-svh lg:flex-row lg:justify-end lg:overflow-hidden">
+      {/* On wide screens the scene fills the page and the panel floats over it, inset. */}
+      <section className="h-72 shrink-0 sm:h-96 lg:absolute lg:inset-0 lg:h-auto">
+        <WelcomeScene data={sceneData} cover={panel} />
       </section>
 
-      <main className="relative flex flex-1 flex-col bg-background lg:my-3 lg:mr-3 lg:rounded-2xl lg:shadow-panel">
+      <main
+        ref={panel}
+        className="relative flex flex-1 flex-col bg-background lg:my-10 lg:mr-10 lg:w-[min(34rem,40vw)] lg:flex-none lg:rounded-2xl lg:shadow-floating"
+      >
         <header className="flex items-center justify-end gap-3 p-5 text-xs text-muted-foreground">
           <span>Fictional hotel · synthetic data</span>
         </header>

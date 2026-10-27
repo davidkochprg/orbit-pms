@@ -36,6 +36,11 @@ uniform vec2 uRes;
 uniform float uTime;
 /** Pointer, -1..1 on each axis, for a little parallax. */
 uniform vec2 uPointer;
+/**
+ * The share of the width not covered by the page's panel. The light leak, town glow and planets
+ * are composed within it, so the best of the picture stays in view.
+ */
+uniform float uFrame;
 
 ${HASHES}
 
@@ -72,6 +77,7 @@ void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
   float aspect = uRes.x / uRes.y;
   float t = uTime;
+  float fx = uv.x / uFrame;
   vec2 par = uPointer * vec2(0.02, 0.012);
   // The camera drifts slowly sideways, as if from a moving car.
   float drift = t * 0.01;
@@ -83,10 +89,10 @@ void main() {
 
   // Warm town glow behind the ridge, stronger to the right.
   float horizon = exp(-pow((uv.y - 0.36) * 7.0, 2.0));
-  col += vec3(1.0, 0.48, 0.3) * horizon * (0.25 + 0.35 * smoothstep(0.2, 1.0, uv.x));
+  col += vec3(1.0, 0.48, 0.3) * horizon * (0.25 + 0.35 * smoothstep(0.2, 1.0, fx));
 
   // A light leak sweeping down from the top right.
-  float x = uv.x + par.x;
+  float x = fx + par.x;
   float bandY = 0.64 + (x - 0.78) * 0.6 + 0.03 * sin(t * 0.13);
   float band = exp(-pow((uv.y - bandY) * 6.0, 2.0)) * smoothstep(0.3, 1.0, x);
   col = mix(col, vec3(0.92, 0.5, 0.58), band * 0.5);
@@ -95,8 +101,8 @@ void main() {
 
   // Two red planets.
   vec2 sq = uv * vec2(aspect, 1.0);
-  col += glow(sq, vec2(0.2 * aspect, 0.86) + par, vec2(0.012), vec3(1.0, 0.32, 0.26)) * 1.4;
-  col += glow(sq, vec2(0.3 * aspect, 0.78) + par * 1.3, vec2(0.015), vec3(1.0, 0.42, 0.3)) * 1.2;
+  col += glow(sq, vec2(0.2 * uFrame * aspect, 0.86) + par, vec2(0.012), vec3(1.0, 0.32, 0.26)) * 1.4;
+  col += glow(sq, vec2(0.3 * uFrame * aspect, 0.78) + par * 1.3, vec2(0.015), vec3(1.0, 0.42, 0.3)) * 1.2;
 
   // A far, hazy ridge and a near, dark one, both out of focus.
   float far = 0.4 + 0.08 * fbm(vec2((uv.x + drift * 0.5 + par.x * 0.5) * 3.0, 2.0));

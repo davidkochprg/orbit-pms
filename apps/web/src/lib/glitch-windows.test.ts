@@ -37,6 +37,12 @@ describe('windowsAt', () => {
   it('puts the data line last, so it draws on top', () => {
     const t = times.find((x) => dataWindow(x, grid, [24]) !== null)!;
     expect(windowsAt(t, grid, [24], { col: 10, row: 10, shown: 1 }).at(-1)?.kind).toBe('data');
+    // Taking a slot for the lens never pushes a message out.
+    const messages = (x: number, lens: { col: number; row: number; shown: number } | null) =>
+      windowsAt(x, grid, [24, 15], lens).filter((w) => w.kind === 'data').length;
+    for (const x of times) {
+      expect(messages(x, { col: 10, row: 10, shown: 1 })).toBe(messages(x, null));
+    }
   });
 
   it('glitches often: some window is showing most of the time', () => {
@@ -85,10 +91,26 @@ describe('burstWindows', () => {
 
 describe('dataWindow', () => {
   it('cycles through the data lines, sized to fit them', () => {
-    const shown = times.map((t) => dataWindow(t, grid, [24, 15])).filter((w) => w !== null);
-    expect(new Set(shown.map((w) => w.data))).toEqual(new Set([0, 1]));
-    expect(shown.every((w) => w.cols === [24, 15][w.data!]! + 2 && w.rows === 1)).toBe(true);
+    const shown = times.map((t) => dataWindow(t, grid, [24, 15, 30])).filter((w) => w !== null);
+    expect(new Set(shown.map((w) => w.data))).toEqual(new Set([0, 1, 2]));
+    expect(shown.every((w) => w.cols === [24, 15, 30][w.data!]! + 2 && w.rows === 1)).toBe(true);
     expect(dataWindow(1, grid, [])).toBeNull();
+  });
+
+  it('shows a message most of the time, sometimes two different ones at once', () => {
+    const lines = [24, 15, 30, 18];
+    const messages = times.map((t) =>
+      windowsAt(t, grid, lines, null).filter((w) => w.kind === 'data'),
+    );
+    expect(messages.filter((m) => m.length > 0).length / times.length).toBeGreaterThan(0.75);
+    const pairs = messages.filter((m) => m.length === 2);
+    expect(pairs.length).toBeGreaterThan(0);
+    expect(pairs.every(([a, b]) => a!.data !== b!.data && a!.row !== b!.row)).toBe(true);
+  });
+
+  it('knows how long its line has been up, for typing it out', () => {
+    const w = times.map((t) => dataWindow(t, grid, [24])).find((x) => x !== null)!;
+    expect(w.age).toBeGreaterThanOrEqual(0);
   });
 });
 

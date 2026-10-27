@@ -19,6 +19,8 @@ export interface GlitchWindow {
   reveal: [number, number];
   /** Which data line a `data` window shows. */
   data: number | null;
+  /** Seconds since a `data` window appeared, for typing its line out. */
+  age?: number;
 }
 
 export interface Grid {
@@ -136,23 +138,51 @@ export function columnWindow(t: number, grid: Grid, seed = 0): GlitchWindow | nu
   };
 }
 
-/** One line of live data at a time, in the lower half, cycling through the lines. */
-export function dataWindow(t: number, grid: Grid, lengths: number[]): GlitchWindow | null {
+interface DataStream {
+  seed: number;
+  period: number;
+  /** Seconds a line stays up. */
+  length: number;
+  /** The band of rows it appears in, as shares of the grid's height. */
+  top: number;
+  band: number;
+}
+
+/** Two streams, upper and lower, offset in time, so a message is showing most of the time. */
+const DATA_STREAMS: DataStream[] = [
+  { seed: 0, period: 3.1, length: 2.6, top: 0.56, band: 0.3 },
+  { seed: 1, period: 3.7, length: 2.8, top: 0.12, band: 0.3 },
+];
+
+/**
+ * A line of live hotel data from one stream, typed out on its bar. The streams take turns
+ * through the lines, so two showing at once say different things.
+ */
+export function dataWindow(
+  t: number,
+  grid: Grid,
+  lengths: number[],
+  stream: DataStream = DATA_STREAMS[0]!,
+): GlitchWindow | null {
   if (lengths.length === 0) return null;
-  const period = 5.2;
-  const k = Math.floor(t / period);
-  const reveal = wipe(t - k * period, 3.4, 0.15, 0.3);
+  const { seed, period, length, top, band } = stream;
+  const offset = seed * period * 0.5;
+  const k = Math.floor((t + offset) / period);
+  const age = t + offset - k * period;
+  const reveal = wipe(age, length, 0.15, 0.25);
   if (!reveal) return null;
-  const data = k % lengths.length;
+  const data = (k * DATA_STREAMS.length + seed) % lengths.length;
   const cols = Math.min(grid.cols, lengths[data]! + 2);
+  const s = k * 7 + seed * 31;
   return {
     kind: 'data',
-    col: clamp(Math.floor(hash(k, 81) * grid.cols * 0.45), 0, grid.cols - cols),
-    row: clamp(Math.floor(grid.rows * (0.55 + hash(k, 82) * 0.3)), 0, grid.rows - 1),
+    col: clamp(Math.floor(hash(s, 81) * (grid.cols - cols)), 0, grid.cols - cols),
+    row: clamp(Math.floor(grid.rows * (top + hash(s, 82) * band)), 0, grid.rows - 1),
     cols,
     rows: 1,
     reveal,
     data,
+    age,
   };
 }
 
@@ -172,8 +202,8 @@ export function lensWindow(cell: Cell, grid: Grid, shown = 1): GlitchWindow {
 }
 
 /**
- * All windows at time `t`, bottom to top: bursts, columns, the lens, then data, which must stay
- * readable. At most MAX_WINDOWS; the first burst bars give way first.
+ * All windows at time `t`, bottom to top: bursts, columns, the lens, then the data lines, which
+ * must stay readable. At most MAX_WINDOWS; the first burst bars give way first.
  */
 export function windowsAt(
   t: number,
@@ -187,7 +217,9 @@ export function windowsAt(
     if (column) windows.push(column);
   }
   if (lens && lens.shown > 0.01) windows.push(lensWindow(lens, grid, lens.shown));
-  const data = dataWindow(t, grid, dataLengths);
-  if (data) windows.push(data);
-  return windows.slice(-MAX_WINDOWS);
+  const data = DATA_STREAMS.map((stream) => dataWindow(t, grid, dataLengths, stream)).filter(
+    (w) => w !== null,
+  );
+  // Bursts and columns give way first, so messages always fit.
+  return [...windows.slice(-(MAX_WINDOWS - data.length)), ...data];
 }
