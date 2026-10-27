@@ -37,6 +37,8 @@ import {
   roomOptionSchema,
   type RoomOptionsQuery,
   roomTypeSchema,
+  type ReportQuery,
+  reportSchema,
   type NewStaffBody,
   STAFF_HEADER,
   staffMemberSchema,
@@ -190,6 +192,16 @@ export function useAuditLog(subjectId: string | null) {
         auditLogListSchema,
       ),
     enabled: subjectId !== null,
+  });
+}
+
+/** The report for a period of nights; waits until the period is known. */
+export function useReport(query: ReportQuery | null) {
+  return useQuery({
+    queryKey: ['report', query],
+    queryFn: () => apiGet(`/api/reports${toSearch({ ...query })}`, reportSchema),
+    enabled: query !== null,
+    placeholderData: (previous) => previous,
   });
 }
 

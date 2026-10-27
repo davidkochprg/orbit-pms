@@ -3,6 +3,7 @@ import { AppLayout } from '@/components/app-layout';
 import { AppError, PageError } from '@/components/route-error';
 import { DashboardPage } from '@/pages/dashboard';
 import { GuestDetailPage } from '@/pages/guest-detail';
+import { ReportsPage } from '@/pages/reports';
 import { GuestsPage } from '@/pages/guests';
 import { InboxPage } from '@/pages/inbox';
 import { HousekeepingPage } from '@/pages/housekeeping';
@@ -28,6 +29,7 @@ export const router = createBrowserRouter([
           { path: 'housekeeping', element: <HousekeepingPage /> },
           { path: 'guests', element: <GuestsPage /> },
           { path: 'guests/:id', element: <GuestDetailPage /> },
+          { path: 'reports', element: <ReportsPage /> },
           { path: 'settings/:section?', element: <SettingsPage /> },
           { path: '*', element: <NotFoundPage /> },
         ],
