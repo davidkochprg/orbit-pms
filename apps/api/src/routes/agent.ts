@@ -8,6 +8,7 @@ import {
   type UsageStore,
 } from '@orbit/ai';
 import {
+  type BillingService,
   HOTEL_TIMEZONE,
   hotelToday,
   type HotelService,
@@ -32,6 +33,7 @@ export interface AgentRouteDeps {
   ai: MetaProvider | null;
   repos: Repositories;
   hotel: HotelService;
+  billing: BillingService;
   actions: PendingActionService;
   /** Read for every turn, so edits in Settings apply to the next message. */
   hotelContext: () => Promise<HotelContext>;
@@ -49,6 +51,7 @@ export function agentRoutes({
   ai,
   repos,
   hotel,
+  billing,
   actions,
   hotelContext,
   limiter,
@@ -56,7 +59,12 @@ export function agentRoutes({
   usage,
   gate,
 }: AgentRouteDeps) {
-  const tools = createAgentTools({ hotel, actions, listRooms: () => repos.rooms.listRooms() });
+  const tools = createAgentTools({
+    hotel,
+    billing,
+    actions,
+    listRooms: () => repos.rooms.listRooms(),
+  });
 
   return new Hono().post('/agent', validate('json', agentRequestSchema), async (c) => {
     if (!ai) {

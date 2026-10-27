@@ -7,6 +7,7 @@ import {
   type UsageStore,
 } from '@orbit/ai';
 import {
+  createBillingService,
   createGuestService,
   createHotelService,
   createHousekeepingService,
@@ -27,6 +28,7 @@ import { createAiGate } from './ai-gate';
 import { errorBody, handleError } from './http';
 import { type AiLimitsConfig, createAiLimiter } from './limits';
 import { agentRoutes } from './routes/agent';
+import { billingRoutes } from './routes/billing';
 import { bookingRoutes } from './routes/bookings';
 import { guestRoutes } from './routes/guests';
 import { housekeepingRoutes } from './routes/housekeeping';
@@ -67,7 +69,8 @@ export function createApp({
     clock,
     newId,
   });
-  const actions = createPendingActionService({ repos, hotel, clock, newId });
+  const billing = createBillingService({ repos, pricing: pricingConfig, clock, newId });
+  const actions = createPendingActionService({ repos, hotel, billing, clock, newId });
   const settings = createSettingsService({ repos });
   const staff = createStaffService({ repos, newId });
   const rates = createRatesService({ repos, defaults: pricingConfig, newId });
@@ -113,6 +116,7 @@ export function createApp({
   );
   app.route('/api', roomRoutes(repos));
   app.route('/api', bookingRoutes(repos, hotel));
+  app.route('/api', billingRoutes(billing));
   app.route('/api', guestRoutes(repos, createGuestService({ repos, newId })));
   app.route('/api', overviewRoutes(repos, hotel));
   app.route('/api', pendingActionRoutes(actions));
@@ -120,7 +124,18 @@ export function createApp({
   app.route('/api', housekeepingRoutes({ housekeeping, notes, gate }));
   app.route(
     '/api',
-    agentRoutes({ ai, repos, hotel, actions, hotelContext, limiter, gate, clock, usage }),
+    agentRoutes({
+      ai,
+      repos,
+      hotel,
+      billing,
+      actions,
+      hotelContext,
+      limiter,
+      gate,
+      clock,
+      usage,
+    }),
   );
   app.route('/api', settingsRoutes({ settings, staff, rates }));
   app.route('/api', usageRoutes({ usage, monthlyBudgetMicroUsd, clock }));

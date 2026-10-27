@@ -92,6 +92,18 @@ A body that fails validation returns 400 `invalid_json`; malformed JSON returns 
 
 `POST /api/bookings/:id/preview` takes the same body as `PATCH` and returns `{ booking, room }` as they would be after the edit, including the new price, without saving.
 
+### `GET /api/bookings/:id/folio`
+
+The booking's bill (`Folio`): `lines` (`{ kind: 'stay' | 'city_tax' | 'extra', label, quantity, unitPrice, amount, chargeId }`), `payments`, `charged`, `paid`, `balance` and `currency`. See [domain.md](domain.md#billing).
+
+### `POST /api/bookings/:id/charges`, `DELETE /api/bookings/:id/charges/:chargeId`
+
+`POST` takes `{ label, quantity?, unitPrice }` (whole CZK, non-zero; negative for a discount) and returns `201` with the updated `Folio`. `DELETE` removes an extra and returns the `Folio`. Only on `confirmed` or `checked_in` bookings, otherwise `409 invalid_transition`.
+
+### `POST /api/bookings/:id/payments`
+
+Takes `{ kind?: 'payment' | 'refund', method: 'cash' | 'card' | 'bank_transfer', amount, note? }` (amount positive whole CZK) and returns `201` with the updated `Folio`. A cancelled booking takes refunds only (`409`); a refund larger than what was paid is `400 invalid_input`.
+
 ### `GET /api/guests`, `GET /api/guests/:id`
 
 `Guest[]` ordered by name, or one `Guest`: `id`, `name`, `email`, `phone`, `language`, `notes`.
@@ -147,7 +159,7 @@ Requests are signed in with the `x-staff-id` header: the ID of an active staff m
 
 ### `GET /api/settings/pricing`, `PUT /api/settings/pricing`
 
-`PricingConfig`: `seasons` (`{ name, from, to, multiplier }`, days as `MM-DD`), `childDiscounts` (`{ maxAge, discount }`, ascending age), `longStay` (`{ minNights, discount }`), `wellness` (`{ perPersonPerNight, minAge }`), `extraBed` (`{ perNight }`) and `dog` (`{ perNight }`). Discounts are fractions (0.5 = half); money is whole CZK. `PUT` replaces the rates and returns them; new quotes use them right away, existing bookings keep their price. An impossible day, a duplicate season or out-of-order child tiers are `400 invalid_input`. See [domain.md](domain.md#rates-and-rooms).
+`PricingConfig`: `seasons` (`{ name, from, to, multiplier }`, days as `MM-DD`), `childDiscounts` (`{ maxAge, discount }`, ascending age), `longStay` (`{ minNights, discount }`), `wellness` (`{ perPersonPerNight, minAge }`), `extraBed` (`{ perNight }`) and `dog` (`{ perNight }`) and `cityTax` (`{ perPersonPerNight, minAge }`). Discounts are fractions (0.5 = half); money is whole CZK. `PUT` replaces the rates and returns them; new quotes use them right away, existing bookings keep their price. An impossible day, a duplicate season or out-of-order child tiers are `400 invalid_input`. See [domain.md](domain.md#rates-and-rooms).
 
 ### `POST /api/room-types`, `PUT /api/room-types/:id`
 
