@@ -18,6 +18,7 @@ import type {
   Guest,
   Health,
   Quote,
+  RegistrationView,
   Room,
   RoomOption,
 } from '@orbit/shared';
@@ -129,7 +130,27 @@ describe('GET /api/bookings/:id', () => {
 });
 
 describe('POST /api/bookings/:id/actions', () => {
-  it('checks a guest in and logs it as a user action', async () => {
+  it('checks a guest in once registered, and logs both as user actions', async () => {
+    const unregistered = await post<ApiError>(`/api/bookings/${arrival.id}/actions`, {
+      action: 'check_in',
+    });
+    expect(unregistered.status).toBe(409);
+    expect(unregistered.body.error.message).toMatch(/Register the guest/);
+    const view = await get<RegistrationView>(`/api/bookings/${arrival.id}/registration`);
+    expect(view.body.registration).toBeNull();
+    const registered = await app.request(`/api/bookings/${arrival.id}/registration`, {
+      method: 'PUT',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        nationality: 'cz',
+        dateOfBirth: '1980-02-03',
+        documentType: 'id_card',
+        documentNumber: 'DEMO-123',
+        address: '',
+      }),
+    });
+    expect(registered.status).toBe(200);
+    expect(await registered.json()).toMatchObject({ nationality: 'CZ', address: null });
     const res = await post<BookingDetail>(`/api/bookings/${arrival.id}/actions`, {
       action: 'check_in',
     });
@@ -137,8 +158,9 @@ describe('POST /api/bookings/:id/actions', () => {
     expect(res.body.booking.status).toBe('checked_in');
     expect(res.body.allowedActions).toEqual(['check_out']);
     const log = await get<AuditLogEntry[]>(`/api/audit-log?subjectId=${arrival.id}`);
-    expect(log.body).toEqual([
-      expect.objectContaining({ actor: 'user', action: 'booking.check_in', subjectId: arrival.id }),
+    expect(log.body.map((e) => [e.actor, e.action])).toEqual([
+      ['user', 'booking.check_in'],
+      ['user', 'booking.register'],
     ]);
   });
 

@@ -15,6 +15,7 @@ import {
   createPendingActionService,
   createRatesService,
   createReportService,
+  createRegistrationService,
   createSettingsService,
   createStaffService,
   hotelPolicy,
@@ -36,6 +37,7 @@ import { housekeepingRoutes } from './routes/housekeeping';
 import { inboxRoutes } from './routes/inbox';
 import { overviewRoutes } from './routes/overview';
 import { pendingActionRoutes } from './routes/pending-actions';
+import { registrationRoutes } from './routes/registration';
 import { reportRoutes } from './routes/reports';
 import { roomRoutes } from './routes/rooms';
 import { settingsRoutes } from './routes/settings';
@@ -73,6 +75,7 @@ export function createApp({
   });
   const billing = createBillingService({ repos, pricing: pricingConfig, clock, newId });
   const reports = createReportService({ repos, pricing: pricingConfig });
+  const registrations = createRegistrationService({ repos, clock });
   const actions = createPendingActionService({ repos, hotel, billing, clock, newId });
   const settings = createSettingsService({ repos });
   const staff = createStaffService({ repos, newId });
@@ -121,6 +124,7 @@ export function createApp({
   app.route('/api', bookingRoutes(repos, hotel));
   app.route('/api', billingRoutes(billing));
   app.route('/api', reportRoutes(reports));
+  app.route('/api', registrationRoutes(registrations));
   app.route('/api', guestRoutes(repos, createGuestService({ repos, newId })));
   app.route('/api', overviewRoutes(repos, hotel));
   app.route('/api', pendingActionRoutes(actions));

@@ -60,7 +60,8 @@ Query parameters, all optional:
   "guest": { "id": "gst_cs_01", "name": "...", "...": "..." },
   "room": { "id": "rm_104", "name": "104", "...": "..." },
   "roomType": { "id": "rt_family", "...": "..." },
-  "allowedActions": ["check_in", "cancel"]
+  "allowedActions": ["check_in", "cancel"],
+  "registered": false
 }
 ```
 
@@ -91,6 +92,10 @@ All take JSON, act as `user` in the audit log, and return the updated `BookingDe
 A body that fails validation returns 400 `invalid_json`; malformed JSON returns 400 `bad_request`.
 
 `POST /api/bookings/:id/preview` takes the same body as `PATCH` and returns `{ booking, room }` as they would be after the edit, including the new price, without saving.
+
+### `GET /api/bookings/:id/registration`, `PUT /api/bookings/:id/registration`
+
+`GET` returns `{ registration, previous }`: the stay's guest-book entry (or `null`) and the guest's latest earlier one to prefill from. `PUT` takes `{ nationality, dateOfBirth, documentType: 'id_card' | 'passport', documentNumber, address? }` and returns the `Registration`; the nationality is upper-cased and an empty address becomes `null`. Check-in answers `409 invalid_transition` until the stay is registered. See [domain.md](domain.md#registration).
 
 ### `GET /api/bookings/:id/folio`
 
