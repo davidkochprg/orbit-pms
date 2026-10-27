@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   burstWindows,
   dataWindow,
+  fade,
   LENS,
   lensWindow,
   MAX_WINDOWS,
@@ -14,9 +15,11 @@ const times = Array.from({ length: 400 }, (_, i) => i * 0.137);
 describe('windowsAt', () => {
   it('keeps every window inside the grid and within the shader limit', () => {
     for (const t of times) {
-      const windows = windowsAt(t, grid, [24, 15], { col: 74, row: 0 });
+      const windows = windowsAt(t, grid, [24, 15], { col: 74, row: 0, alpha: 1 });
       expect(windows.length).toBeLessThanOrEqual(MAX_WINDOWS);
       for (const w of windows) {
+        expect(w.alpha).toBeGreaterThan(0);
+        expect(w.alpha).toBeLessThanOrEqual(1);
         expect(w.col).toBeGreaterThanOrEqual(0);
         expect(w.row).toBeGreaterThanOrEqual(0);
         expect(w.col + w.cols).toBeLessThanOrEqual(grid.cols);
@@ -31,7 +34,32 @@ describe('windowsAt', () => {
 
   it('puts the data line last, so it draws on top', () => {
     const t = times.find((x) => dataWindow(x, grid, [24]) !== null)!;
-    expect(windowsAt(t, grid, [24], { col: 10, row: 10 }).at(-1)?.kind).toBe('data');
+    expect(windowsAt(t, grid, [24], { col: 10, row: 10, alpha: 1 }).at(-1)?.kind).toBe('data');
+  });
+
+  it('glitches often: some window is showing most of the time', () => {
+    const busy = times.filter((t) => windowsAt(t, grid, [], null).length > 0).length;
+    expect(busy / times.length).toBeGreaterThan(0.6);
+  });
+
+  it('leaves the lens out once it has faded', () => {
+    const lensed = (alpha: number) =>
+      windowsAt(1.0, grid, [], { col: 30, row: 30, alpha }).some(
+        (w) => w.cols === LENS.cols && w.rows === LENS.rows,
+      );
+    expect(lensed(0.5)).toBe(true);
+    expect(lensed(0)).toBe(false);
+  });
+});
+
+describe('fade', () => {
+  it('eases in, holds and eases out', () => {
+    expect(fade(-0.1, 2)).toBe(0);
+    expect(fade(0.05, 2)).toBeGreaterThan(0);
+    expect(fade(0.05, 2)).toBeLessThan(0.5);
+    expect(fade(1, 2)).toBe(1);
+    expect(fade(1.95, 2)).toBeLessThan(0.5);
+    expect(fade(2.1, 2)).toBe(0);
   });
 });
 

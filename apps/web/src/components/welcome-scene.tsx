@@ -115,6 +115,7 @@ function createRenderer(canvas: HTMLCanvasElement, scale: number) {
       pointer: [number, number],
       rects: Float32Array,
       kinds: Float32Array,
+      alphas: Float32Array,
     ) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
       gl.viewport(0, 0, sceneW, sceneH);
@@ -139,6 +140,7 @@ function createRenderer(canvas: HTMLCanvasElement, scale: number) {
       gl.uniform2f(at(post, 'uCell'), CELL_W * scale, CELL_H * scale);
       gl.uniform4fv(at(post, 'uWin'), rects);
       gl.uniform1fv(at(post, 'uWinKind'), kinds);
+      gl.uniform1fv(at(post, 'uWinAlpha'), alphas);
       gl.uniform1f(at(post, 'uIntro'), intro);
       gl.drawArrays(gl.TRIANGLES, 0, 3);
     },
@@ -176,6 +178,7 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const rects = new Float32Array(MAX_WINDOWS * 4);
     const kinds = new Float32Array(MAX_WINDOWS);
+    const alphas = new Float32Array(MAX_WINDOWS);
     let width = 0;
     let height = 0;
     let raf = 0;
@@ -183,7 +186,10 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
     const start = performance.now();
     const pointer: [number, number] = [0, 0];
     let target: [number, number] = [0, 0];
-    let lens: Cell | null = null;
+    // The lens keeps its last cell while it fades out after the pointer leaves.
+    let lensCell: Cell | null = null;
+    let lensAlpha = 0;
+    let lensTarget = 0;
 
     function resize() {
       width = box!.clientWidth;
@@ -200,6 +206,8 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
       pointer[1] += (target[1] - pointer[1]) * 0.06;
       const grid = { cols: Math.floor(width / CELL_W), rows: Math.floor(height / CELL_H) };
       const data = lines.current;
+      lensAlpha += (lensTarget - lensAlpha) * (still ? 1 : 0.25);
+      const lens = lensCell && lensAlpha > 0.01 ? { ...lensCell, alpha: lensAlpha } : null;
       const windows = windowsAt(
         t,
         grid,
@@ -210,6 +218,7 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
       // Windows in the shader's pixels, y up.
       rects.fill(0);
       kinds.fill(0);
+      alphas.fill(0);
       windows.forEach((w, i) => {
         const top = canvas!.height - w.row * CELL_H * glScale;
         rects.set(
@@ -222,19 +231,22 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
           i * 4,
         );
         kinds[i] = KIND_CODE[w.kind];
+        alphas[i] = w.alpha;
       });
       // The intro resolves from ASCII into the picture over the first 1.8 seconds.
       const intro = Math.max(0, 1 - elapsed / 1.8) ** 1.6;
-      renderer?.draw(t, intro, pointer, rects, kinds);
+      renderer?.draw(t, intro, pointer, rects, kinds, alphas);
 
       // The data line, crisp on its dark smear, with a blinking cursor.
       ctx!.setTransform(textScale, 0, 0, textScale, 0, 0);
       ctx!.clearRect(0, 0, width, height);
+      ctx!.globalAlpha = 1;
       ctx!.font = `600 13px ${MONO}`;
       ctx!.textBaseline = 'middle';
       ctx!.fillStyle = glyphColor;
       for (const w of windows) {
         if (w.kind !== 'data' || w.data === null) continue;
+        ctx!.globalAlpha = w.alpha;
         const line = data[w.data] ?? '';
         const y = w.row * CELL_H + CELL_H / 2 + 0.5;
         // Typed out over the first half second.
@@ -261,12 +273,13 @@ export function WelcomeScene({ data, caption }: WelcomeSceneProps) {
       const x = e.clientX - rect.left;
       const y = e.clientY - rect.top;
       target = [(x / rect.width) * 2 - 1, 1 - (y / rect.height) * 2];
-      lens = { col: Math.floor(x / CELL_W), row: Math.floor(y / CELL_H) };
+      lensCell = { col: Math.floor(x / CELL_W), row: Math.floor(y / CELL_H) };
+      lensTarget = 1;
       if (still) draw(7);
     }
     function onLeave() {
       target = [0, 0];
-      lens = null;
+      lensTarget = 0;
       if (still) draw(7);
     }
 
