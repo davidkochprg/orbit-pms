@@ -8,15 +8,30 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import type { HousekeepingRoom, HousekeepingTask, RoomStatus } from '@orbit/shared';
-import { Keyboard, Mic } from 'lucide-react';
-import { useState } from 'react';
+import {
+  type HousekeepingRoom,
+  type HousekeepingTask,
+  type RoomStatus,
+  roomStatuses,
+} from '@orbit/shared';
+import { CalendarRange, Keyboard, Mic, Plus } from 'lucide-react';
+import { type ComponentProps, type ReactElement, type Ref, useState } from 'react';
+import { useNavigate } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { HousekeepingNoteDialog, type NoteMode } from '@/components/housekeeping-note-dialog';
 import { HousekeepingRoomCard } from '@/components/housekeeping-room-card';
 import { PageHeader } from '@/components/page-header';
 import { StatusDot } from '@/components/status-dot';
+import { TaskDialog } from '@/components/task-dialog';
 import { Button } from '@/components/ui/button';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useHealth, useHousekeeping, useSetRoomStatus, useSetTaskStatus } from '@/lib/api';
 import { formatLongDate } from '@/lib/format';
@@ -31,6 +46,8 @@ export function HousekeepingPage() {
   const setTask = useSetTaskStatus();
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteMode, setNoteMode] = useState<NoteMode>('voice');
+  // Undefined: closed. A room ID or null: open, with or without a room chosen.
+  const [taskRoom, setTaskRoom] = useState<string | null | undefined>(undefined);
   const aiOn = health.data?.ai.configured ?? false;
   const voiceOn = health.data?.ai.voice ?? false;
   const sensors = useSensors(
@@ -61,23 +78,33 @@ export function HousekeepingPage() {
         title="Housekeeping"
         meta={board.data && formatLongDate(board.data.date)}
         actions={
-          aiOn && (
-            <>
-              <Button
-                variant="ghost"
-                size="sm"
-                aria-label="Type a note"
-                onClick={() => openNote('text')}
-              >
-                <Keyboard /> <span className="hidden sm:inline">Type a note</span>
-              </Button>
-              {voiceOn && (
-                <Button size="sm" onClick={() => openNote('voice')}>
-                  <Mic /> Voice note
+          <>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="New task"
+              onClick={() => setTaskRoom(null)}
+            >
+              <Plus /> <span className="hidden sm:inline">New task</span>
+            </Button>
+            {aiOn && (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  aria-label="Type a note"
+                  onClick={() => openNote('text')}
+                >
+                  <Keyboard /> <span className="hidden sm:inline">Type a note</span>
                 </Button>
-              )}
-            </>
-          )
+                {voiceOn && (
+                  <Button size="sm" onClick={() => openNote('voice')}>
+                    <Mic /> Voice note
+                  </Button>
+                )}
+              </>
+            )}
+          </>
         }
       />
 
@@ -111,6 +138,8 @@ export function HousekeepingPage() {
                   rooms={board.data.rooms.filter((r) => r.room.status === status)}
                   busyRoomId={setStatus.isPending ? setStatus.variables.roomId : null}
                   onCompleteTask={completeTask}
+                  onSetStatus={(roomId, s) => setStatus.mutate({ roomId, status: s })}
+                  onAddTask={setTaskRoom}
                 />
               ))}
             </div>
@@ -125,6 +154,11 @@ export function HousekeepingPage() {
         onModeChange={setNoteMode}
         voiceAvailable={voiceOn}
       />
+      <TaskDialog
+        open={taskRoom !== undefined}
+        onOpenChange={(open) => !open && setTaskRoom(undefined)}
+        roomId={taskRoom ?? undefined}
+      />
     </>
   );
 }
@@ -134,11 +168,15 @@ function Column({
   rooms,
   busyRoomId,
   onCompleteTask,
+  onSetStatus,
+  onAddTask,
 }: {
   status: RoomStatus;
   rooms: HousekeepingRoom[];
   busyRoomId: string | null;
   onCompleteTask: (task: HousekeepingTask) => void;
+  onSetStatus: (roomId: string, status: RoomStatus) => void;
+  onAddTask: (roomId: string) => void;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
@@ -157,12 +195,18 @@ function Column({
       </h2>
       <div className="flex flex-col gap-2">
         {rooms.map((item) => (
-          <DraggableCard
+          <RoomContextMenu
             key={item.room.id}
             item={item}
-            busy={busyRoomId === item.room.id}
-            onCompleteTask={onCompleteTask}
-          />
+            onSetStatus={onSetStatus}
+            onAddTask={onAddTask}
+          >
+            <DraggableCard
+              item={item}
+              busy={busyRoomId === item.room.id}
+              onCompleteTask={onCompleteTask}
+            />
+          </RoomContextMenu>
         ))}
       </div>
     </section>
@@ -173,10 +217,14 @@ function DraggableCard({
   item,
   busy,
   onCompleteTask,
-}: {
+  ref,
+  ...rest
+}: Omit<ComponentProps<'div'>, 'ref'> & {
   item: HousekeepingRoom;
   busy: boolean;
   onCompleteTask: (task: HousekeepingTask) => void;
+  /** From a wrapping trigger, e.g. the room's context menu. */
+  ref?: Ref<HTMLDivElement>;
 }) {
   const { setNodeRef, listeners, attributes, transform, isDragging } = useDraggable({
     id: item.room.id,
@@ -184,7 +232,12 @@ function DraggableCard({
   });
   return (
     <HousekeepingRoomCard
-      ref={setNodeRef}
+      {...rest}
+      ref={(node) => {
+        setNodeRef(node);
+        if (typeof ref === 'function') ref(node);
+        else if (ref) ref.current = node;
+      }}
       {...listeners}
       {...attributes}
       item={item}
@@ -196,5 +249,44 @@ function DraggableCard({
         transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined
       }
     />
+  );
+}
+
+/** Right-click a room: set its status without dragging, or add a task. */
+function RoomContextMenu({
+  item,
+  onSetStatus,
+  onAddTask,
+  children,
+}: {
+  item: HousekeepingRoom;
+  onSetStatus: (roomId: string, status: RoomStatus) => void;
+  onAddTask: (roomId: string) => void;
+  children: ReactElement;
+}) {
+  const navigate = useNavigate();
+  const { room } = item;
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-52">
+        <ContextMenuLabel>Room {room.name}</ContextMenuLabel>
+        {roomStatuses
+          .filter((s) => s !== room.status)
+          .map((s) => (
+            <ContextMenuItem key={s} onSelect={() => onSetStatus(room.id, s)}>
+              <StatusDot className={roomStatusColor[s]} />
+              Mark {roomStatusLabels[s].toLowerCase()}
+            </ContextMenuItem>
+          ))}
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={() => onAddTask(room.id)}>
+          <Plus /> Add task…
+        </ContextMenuItem>
+        <ContextMenuItem onSelect={() => void navigate('/tape-chart')}>
+          <CalendarRange /> Open tape chart
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

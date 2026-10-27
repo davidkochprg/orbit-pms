@@ -1,8 +1,12 @@
 import type { AuditLogEntry, BookingAction, BookingDetail } from '@orbit/shared';
-import { Sparkles } from 'lucide-react';
+import { MoreHorizontal, Pencil, Sparkles } from 'lucide-react';
+import { useState } from 'react';
+import { Link } from 'react-router';
+import { BookingDropdownMenu, CancelBookingDialog } from '@/components/booking-menu';
 import { BookingStatusBadge } from '@/components/booking-status-badge';
 import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
+import { GuestEditorDialog } from '@/components/guest-editor';
 import { Property, PropertyList } from '@/components/property-list';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
@@ -15,6 +19,7 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import { useAuditLog, useBookingAction, useBookingDetail } from '@/lib/api';
 import {
@@ -64,6 +69,8 @@ export function BookingDrawer() {
 function BookingDetailView({ detail }: { detail: BookingDetail }) {
   const { booking, guest, room, roomType, allowedActions } = detail;
   const { openPalette } = useCommandPalette();
+  const { openEdit } = useBookingEditor();
+  const [editingGuest, setEditingGuest] = useState(false);
   const snapshot = booking.priceSnapshot;
 
   return (
@@ -100,13 +107,27 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
           </PropertyList>
         </Section>
 
-        <Section title="Guest">
+        <Section
+          title="Guest"
+          actions={
+            <>
+              <Button variant="ghost" size="xs" onClick={() => setEditingGuest(true)}>
+                Edit
+              </Button>
+              <Button variant="ghost" size="xs" asChild>
+                <Link to={`/guests/${guest.id}`}>Profile</Link>
+              </Button>
+            </>
+          }
+        >
           <PropertyList>
             <Property label="Language">{languageLabels[guest.language]}</Property>
             <Property label="Email">{guest.email ?? '–'}</Property>
             <Property label="Phone">{guest.phone ?? '–'}</Property>
+            {guest.notes && <Property label="Notes">{guest.notes}</Property>}
           </PropertyList>
         </Section>
+        <GuestEditorDialog open={editingGuest} onOpenChange={setEditingGuest} guest={guest} />
 
         <Section title="Price">
           {snapshot ? (
@@ -132,6 +153,14 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
 
       <footer className="flex flex-wrap items-center gap-2 border-t p-3">
         <BookingActions bookingId={booking.id} actions={allowedActions} />
+        <Button variant="outline" size="sm" onClick={() => openEdit(booking.id)}>
+          <Pencil /> Edit
+        </Button>
+        <BookingDropdownMenu bookingId={booking.id} inInspector>
+          <Button variant="ghost" size="icon-sm" aria-label="More actions">
+            <MoreHorizontal />
+          </Button>
+        </BookingDropdownMenu>
         <Button
           variant="ghost"
           size="sm"
@@ -155,6 +184,7 @@ function BookingActions({ bookingId, actions }: { bookingId: string; actions: Bo
   // The main next step gets the primary button; cancelling is always secondary.
   const [main, ...rest] = actions.filter((a) => a !== 'cancel');
   const canCancel = actions.includes('cancel');
+  const [cancelling, setCancelling] = useState(false);
   return (
     <>
       {main && (
@@ -179,11 +209,12 @@ function BookingActions({ bookingId, actions }: { bookingId: string; actions: Bo
           variant="ghost"
           className="text-destructive hover:bg-destructive/10 hover:text-destructive"
           disabled={mutation.isPending}
-          onClick={() => mutation.mutate('cancel')}
+          onClick={() => setCancelling(true)}
         >
           {actionLabels.cancel}
         </Button>
       )}
+      <CancelBookingDialog bookingId={bookingId} open={cancelling} onOpenChange={setCancelling} />
       {mutation.isError && <ErrorNotice message={mutation.error.message} className="w-full" />}
     </>
   );
@@ -198,6 +229,8 @@ const auditActionLabels: Record<string, string> = {
   'booking.move': 'Moved to another room',
   'booking.change_dates': 'Changed dates',
   'booking.reschedule': 'Rescheduled',
+  'booking.create': 'Created',
+  'booking.update': 'Edited',
 };
 
 function Activity({ bookingId }: { bookingId: string }) {

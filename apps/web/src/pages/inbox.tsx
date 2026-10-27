@@ -1,5 +1,14 @@
 import type { Inquiry, StayOption } from '@orbit/shared';
-import { Copy, Inbox, LoaderCircle, Plus, RotateCw, Sparkles } from 'lucide-react';
+import {
+  Ban,
+  CalendarPlus,
+  Copy,
+  Inbox,
+  LoaderCircle,
+  Plus,
+  RotateCw,
+  Sparkles,
+} from 'lucide-react';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
 import { EmptyState } from '@/components/empty-state';
@@ -19,8 +28,11 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { useBookingEditor } from '@/hooks/use-booking-editor';
 import {
   useCreateMessage,
+  useDeclineInquiry,
+  useGuests,
   useHealth,
   useInbox,
   useInboxHold,
@@ -31,6 +43,8 @@ import {
 import { formatCzk, formatDateTime } from '@/lib/format';
 import {
   analysisFacts,
+  bookingPrefillFor,
+  canDecline,
   channelLabel,
   inquiryStatusLabels,
   senderLabel,
@@ -226,6 +240,8 @@ function MessageDetail({ id }: { id: string }) {
 
       <p className="max-w-prose leading-relaxed whitespace-pre-wrap">{m.rawText}</p>
 
+      <MessageActions inquiry={m} />
+
       <section className="flex flex-col gap-5 rounded-xl border bg-surface-sunken p-5">
         <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-primary-text" />
@@ -287,25 +303,57 @@ function MessageDetail({ id }: { id: string }) {
         )}
         {m.suggestion?.draft && <Reply inquiry={m} draft={m.suggestion.draft} />}
       </section>
+
+      {!m.suggestion?.draft && m.status !== 'declined' && <Reply inquiry={m} draft="" />}
     </article>
+  );
+}
+
+/** What staff can do with any message, with or without the agent. */
+function MessageActions({ inquiry }: { inquiry: Inquiry }) {
+  const { openNew } = useBookingEditor();
+  const { open } = useBookingDrawer();
+  const guests = useGuests();
+  const decline = useDeclineInquiry(inquiry.id);
+  return (
+    <div className="flex flex-wrap items-center gap-2">
+      {inquiry.bookingId ? (
+        <Button variant="outline" size="sm" onClick={() => open(inquiry.bookingId!)}>
+          Open booking
+        </Button>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={!guests.data}
+          onClick={() => openNew(bookingPrefillFor(inquiry, guests.data ?? []))}
+        >
+          <CalendarPlus /> Create booking
+        </Button>
+      )}
+      {canDecline(inquiry) && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="text-muted-foreground"
+          disabled={decline.isPending}
+          onClick={() => decline.mutate()}
+        >
+          <Ban /> Decline
+        </Button>
+      )}
+      {inquiry.status === 'declined' && (
+        <span className="text-sm text-muted-foreground">Declined, no booking will be made.</span>
+      )}
+      {decline.error && <ErrorNotice message={decline.error.message} className="w-full" />}
+    </div>
   );
 }
 
 function Options({ inquiry, options }: { inquiry: Inquiry; options: StayOption[] }) {
   const hold = useInboxHold(inquiry.id);
-  const { open } = useBookingDrawer();
   return (
-    <Section
-      title="Available rooms"
-      count={options.length}
-      actions={
-        inquiry.bookingId && (
-          <Button variant="outline" size="sm" onClick={() => open(inquiry.bookingId!)}>
-            Open hold
-          </Button>
-        )
-      }
-    >
+    <Section title="Available rooms" count={options.length}>
       <ul className="flex flex-col overflow-hidden rounded-lg border bg-background">
         {options.map((o) => (
           <li key={o.roomId} className="flex items-center gap-3 border-b px-3 py-2 last:border-b-0">
@@ -334,14 +382,18 @@ function Options({ inquiry, options }: { inquiry: Inquiry; options: StayOption[]
 
 function Reply({ inquiry, draft }: { inquiry: Inquiry; draft: string }) {
   const [text, setText] = useState(inquiry.reply ?? draft);
+  const manual = draft === '';
   const replied = useMarkReplied(inquiry.id);
   const sent = inquiry.status === 'replied';
   return (
-    <Section title="Reply">
+    <Section title={manual ? 'Write a reply' : 'Reply'}>
       <Textarea
         value={text}
         onChange={(e) => setText(e.target.value)}
-        rows={10}
+        rows={manual ? 6 : 10}
+        placeholder={
+          manual ? 'Write the reply you send the guest, then mark it as sent.' : undefined
+        }
         disabled={sent}
         className="bg-background leading-relaxed"
       />

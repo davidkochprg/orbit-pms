@@ -11,12 +11,14 @@ import {
   tableFeatures,
   useTable,
 } from '@tanstack/react-table';
-import { ArrowDown, ArrowUp, Search, Users } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { ArrowDown, ArrowUp, Plus, Search, Users } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
+import { GuestEditorDialog } from '@/components/guest-editor';
 import { PageHeader } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGuests } from '@/lib/api';
 import { languageLabels } from '@/lib/format';
@@ -57,6 +59,18 @@ const noGuests: Guest[] = [];
 export function GuestsPage() {
   const guests = useGuests();
   const navigate = useNavigate();
+  // `?new=guest` opens the form, so the command bar can link to it.
+  const [params, setParams] = useSearchParams();
+  const creating = params.get('new') === 'guest';
+  const setCreating = (open: boolean) =>
+    setParams(
+      (p) => {
+        if (open) p.set('new', 'guest');
+        else p.delete('new');
+        return p;
+      },
+      { replace: true },
+    );
   const table = useTable({
     features,
     columns,
@@ -73,15 +87,20 @@ export function GuestsPage() {
         title="Guests"
         meta={guests.data && `${rows.length}`}
         actions={
-          <label className="flex h-7 w-56 items-center gap-2 rounded-md border bg-background px-2 text-muted-foreground shadow-raised focus-within:ring-2 focus-within:ring-ring">
-            <Search className="size-3.5 shrink-0" />
-            <input
-              placeholder="Filter by name or email"
-              value={String(table.state.globalFilter ?? '')}
-              onChange={(e) => table.setGlobalFilter(e.target.value)}
-              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-subtle-foreground"
-            />
-          </label>
+          <>
+            <label className="flex h-7 w-56 items-center gap-2 rounded-md border bg-background px-2 text-muted-foreground shadow-raised focus-within:ring-2 focus-within:ring-ring">
+              <Search className="size-3.5 shrink-0" />
+              <input
+                placeholder="Filter by name or email"
+                value={String(table.state.globalFilter ?? '')}
+                onChange={(e) => table.setGlobalFilter(e.target.value)}
+                className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-subtle-foreground"
+              />
+            </label>
+            <Button size="sm" onClick={() => setCreating(true)}>
+              <Plus /> <span className="hidden sm:inline">New guest</span>
+            </Button>
+          </>
         }
       />
       <div className="scrollbar-thin min-h-0 flex-1 overflow-auto">
@@ -139,6 +158,7 @@ export function GuestsPage() {
           </table>
         )}
       </div>
+      <GuestEditorDialog open={creating} onOpenChange={setCreating} />
     </>
   );
 }

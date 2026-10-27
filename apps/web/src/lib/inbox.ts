@@ -1,4 +1,5 @@
-import type { Inquiry, InquiryExtraction, InquiryStatus } from '@orbit/shared';
+import type { Guest, Inquiry, InquiryExtraction, InquiryStatus } from '@orbit/shared';
+import type { NewBookingPrefill } from './booking-editor';
 import { formatParty, formatRange, languageLabels } from './format';
 
 export const inquiryStatusLabels: Record<InquiryStatus, string> = {
@@ -34,4 +35,47 @@ export function analysisFacts(a: InquiryExtraction): string[] {
   if (a.wishes.dog) facts.push('Dog');
   if (a.wishes.wellness) facts.push('Wellness');
   return facts;
+}
+
+/**
+ * What a manual booking from this message starts with: the sender as guest (an existing record
+ * if their email is known) and whatever stay the agent read, linked back to the message.
+ */
+export function bookingPrefillFor(m: Inquiry, guests: Guest[]): NewBookingPrefill {
+  const a = m.parsed;
+  const email = m.senderAddress?.trim().toLowerCase();
+  const known = email ? guests.find((g) => g.email?.toLowerCase() === email) : undefined;
+  return {
+    inquiryId: m.id,
+    source:
+      m.channel === 'ota'
+        ? 'ota'
+        : m.channel === 'web'
+          ? 'web'
+          : m.channel === 'phone'
+            ? 'phone'
+            : 'email',
+    ...(known
+      ? { guestId: known.id }
+      : {
+          newGuest: {
+            name: m.senderName ?? a?.guestName ?? '',
+            email: m.senderAddress ?? '',
+            language: a?.language ?? 'en',
+          },
+        }),
+    ...(a?.checkIn && { checkIn: a.checkIn }),
+    ...(a?.checkOut && { checkOut: a.checkOut }),
+    ...(a?.adults && { adults: a.adults }),
+    ...(a && { childAges: a.childAges }),
+    ...(a && {
+      addons: { wellness: a.wishes.wellness, dogs: a.wishes.dog ? 1 : 0, extraBeds: 0 },
+    }),
+    ...(a?.question && { notes: a.question }),
+  };
+}
+
+/** Whether staff can still decline the message: not once it led to a booking. */
+export function canDecline(m: Inquiry): boolean {
+  return m.status !== 'declined' && m.status !== 'converted' && m.bookingId === null;
 }

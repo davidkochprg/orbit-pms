@@ -1,5 +1,6 @@
 import type { BookingSummary } from '@orbit/shared';
 import type { LucideIcon } from 'lucide-react';
+import { BookingContextMenu } from '@/components/booking-menu';
 import { EmptyState } from '@/components/empty-state';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { StatusDot } from '@/components/status-dot';
@@ -30,28 +31,30 @@ export function BookingList({
         const { booking, guestName, roomName } = row;
         return (
           <li key={booking.id}>
-            <button
-              type="button"
-              onClick={() => open(booking.id)}
-              className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left outline-none hover:bg-accent focus-visible:bg-accent"
-            >
-              <GuestAvatar name={guestName} size="md" />
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium">{guestName}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {detail ? detail(row) : formatParty(booking.adults, booking.childAges)}
-                </span>
-              </span>
-              <span
-                className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
-                title={statusLabels[booking.status]}
+            <BookingContextMenu bookingId={booking.id}>
+              <button
+                type="button"
+                onClick={() => open(booking.id)}
+                className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left outline-none hover:bg-accent focus-visible:bg-accent"
               >
-                <StatusDot className={bookingStatusColor[booking.status]} />
-                <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground tabular-nums">
-                  {roomName}
+                <GuestAvatar name={guestName} size="md" />
+                <span className="flex min-w-0 flex-1 flex-col">
+                  <span className="truncate font-medium">{guestName}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {detail ? detail(row) : formatParty(booking.adults, booking.childAges)}
+                  </span>
                 </span>
-              </span>
-            </button>
+                <span
+                  className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
+                  title={statusLabels[booking.status]}
+                >
+                  <StatusDot className={bookingStatusColor[booking.status]} />
+                  <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground tabular-nums">
+                    {roomName}
+                  </span>
+                </span>
+              </button>
+            </BookingContextMenu>
           </li>
         );
       })}

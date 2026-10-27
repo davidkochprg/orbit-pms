@@ -1,14 +1,19 @@
-import { CalendarX2, ChevronRight } from 'lucide-react';
+import { CalendarX2, ChevronRight, Pencil, Plus } from 'lucide-react';
+import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { BookingStatusBadge } from '@/components/booking-status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
+import { BookingContextMenu } from '@/components/booking-menu';
 import { GuestAvatar } from '@/components/guest-avatar';
+import { GuestEditorDialog } from '@/components/guest-editor';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Property, PropertyList } from '@/components/property-list';
 import { Section } from '@/components/section';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useBookings, useGuest, useRooms } from '@/lib/api';
 import { formatCzk, formatParty, formatRange, languageLabels } from '@/lib/format';
 
@@ -18,6 +23,8 @@ export function GuestDetailPage() {
   const bookings = useBookings({ guestId: id });
   const rooms = useRooms();
   const { open } = useBookingDrawer();
+  const { openNew } = useBookingEditor();
+  const [editing, setEditing] = useState(false);
   const roomName = (roomId: string) => rooms.data?.find((r) => r.id === roomId)?.name ?? roomId;
   const g = guest.data;
 
@@ -32,6 +39,18 @@ export function GuestDetailPage() {
             <ChevronRight className="size-3.5 text-subtle-foreground" />
             {g?.name ?? '…'}
           </span>
+        }
+        actions={
+          g && (
+            <>
+              <Button variant="outline" size="sm" onClick={() => setEditing(true)}>
+                <Pencil /> Edit
+              </Button>
+              <Button size="sm" onClick={() => openNew({ guestId: g.id })}>
+                <Plus /> New booking
+              </Button>
+            </>
+          )
         }
       />
       <PageBody>
@@ -60,20 +79,22 @@ export function GuestDetailPage() {
                 <ul className="-mx-2 flex flex-col">
                   {[...(bookings.data ?? [])].reverse().map((b) => (
                     <li key={b.id}>
-                      <button
-                        type="button"
-                        onClick={() => open(b.id)}
-                        className="grid w-full grid-cols-[1fr_auto] items-center gap-x-4 rounded-lg px-2 py-2 text-left hover:bg-accent sm:grid-cols-[14rem_1fr_auto_auto]"
-                      >
-                        <span className="font-medium">{formatRange(b.checkIn, b.checkOut)}</span>
-                        <span className="hidden truncate text-muted-foreground sm:inline">
-                          Room {roomName(b.roomId)}, {formatParty(b.adults, b.childAges)}
-                        </span>
-                        <span className="hidden tabular-nums sm:inline">
-                          {b.priceSnapshot ? formatCzk(b.priceSnapshot.total) : '–'}
-                        </span>
-                        <BookingStatusBadge status={b.status} />
-                      </button>
+                      <BookingContextMenu bookingId={b.id}>
+                        <button
+                          type="button"
+                          onClick={() => open(b.id)}
+                          className="grid w-full grid-cols-[1fr_auto] items-center gap-x-4 rounded-lg px-2 py-2 text-left hover:bg-accent sm:grid-cols-[14rem_1fr_auto_auto]"
+                        >
+                          <span className="font-medium">{formatRange(b.checkIn, b.checkOut)}</span>
+                          <span className="hidden truncate text-muted-foreground sm:inline">
+                            Room {roomName(b.roomId)}, {formatParty(b.adults, b.childAges)}
+                          </span>
+                          <span className="hidden tabular-nums sm:inline">
+                            {b.priceSnapshot ? formatCzk(b.priceSnapshot.total) : '–'}
+                          </span>
+                          <BookingStatusBadge status={b.status} />
+                        </button>
+                      </BookingContextMenu>
                     </li>
                   ))}
                 </ul>
@@ -82,6 +103,7 @@ export function GuestDetailPage() {
           </div>
         )}
       </PageBody>
+      {g && <GuestEditorDialog open={editing} onOpenChange={setEditing} guest={g} />}
     </>
   );
 }

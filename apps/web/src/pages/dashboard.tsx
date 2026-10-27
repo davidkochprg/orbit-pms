@@ -1,20 +1,31 @@
-import { BedDouble, LogIn, LogOut } from 'lucide-react';
+import { BedDouble, LogIn, LogOut, Plus } from 'lucide-react';
 import { BookingList } from '@/components/booking-list';
 import { DailyBriefPanel } from '@/components/daily-brief';
 import { ErrorNotice } from '@/components/error-notice';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Section } from '@/components/section';
+import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useDailyBrief, useDayOverview } from '@/lib/api';
 import { formatDate, formatLongDate, formatParty } from '@/lib/format';
 
 export function DashboardPage() {
   const day = useDayOverview();
   const brief = useDailyBrief();
+  const { openNew } = useBookingEditor();
 
   return (
     <>
-      <PageHeader title="Today" meta={day.data && formatLongDate(day.data.date)} />
+      <PageHeader
+        title="Today"
+        meta={day.data && formatLongDate(day.data.date)}
+        actions={
+          <Button size="sm" onClick={() => openNew()}>
+            <Plus /> New booking
+          </Button>
+        }
+      />
       <PageBody>
         <div className="flex flex-col gap-10">
           {brief.isError ? (

@@ -3,6 +3,7 @@ import { DefaultChatTransport } from 'ai';
 import { Command as CommandPrimitive, defaultFilter } from 'cmdk';
 import {
   ArrowLeft,
+  CalendarPlus,
   CornerDownLeft,
   LogIn,
   LogOut,
@@ -12,6 +13,7 @@ import {
   Sparkles,
   Sun,
   Sunrise,
+  UserPlus,
 } from 'lucide-react';
 import {
   type KeyboardEvent,
@@ -30,6 +32,7 @@ import { GuestAvatar } from '@/components/guest-avatar';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Kbd } from '@/components/ui/kbd';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { useBookingEditor } from '@/hooks/use-booking-editor';
 import {
   CommandPaletteContext,
   type OpenPaletteOptions,
@@ -143,6 +146,7 @@ function SearchView({
 }) {
   const navigate = useNavigate();
   const { open: openBooking } = useBookingDrawer();
+  const { openNew } = useBookingEditor();
   const { setTheme } = useTheme();
   const health = useHealth();
   const guests = useGuests();
@@ -214,6 +218,15 @@ function SearchView({
             ))}
           </CommandPrimitive.Group>
         )}
+
+        <CommandPrimitive.Group heading="Create">
+          <Item value="New booking reservation hold" onSelect={run(() => openNew())}>
+            <CalendarPlus /> New booking
+          </Item>
+          <Item value="New guest" onSelect={run(() => void navigate('/guests?new=guest'))}>
+            <UserPlus /> New guest
+          </Item>
+        </CommandPrimitive.Group>
 
         {today.length > 0 && (
           <CommandPrimitive.Group heading="Today">

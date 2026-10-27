@@ -11,6 +11,7 @@ import type { Booking, BookingStatus, Room } from '@orbit/shared';
 import {
   Baby,
   Bath,
+  CalendarPlus,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -18,18 +19,28 @@ import {
   Globe,
   LoaderCircle,
   type LucideIcon,
+  Plus,
   StickyNote,
 } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { BookingContextMenu } from '@/components/booking-menu';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
 import { PageHeader } from '@/components/page-header';
 import { RoomStatusDot } from '@/components/room-status-dot';
 import { StatusDot } from '@/components/status-dot';
 import { Button } from '@/components/ui/button';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useElementWidth } from '@/hooks/use-element-width';
 import {
   useBookings,
@@ -40,7 +51,7 @@ import {
   useRooms,
   useRoomTypes,
 } from '@/lib/api';
-import { formatDayHeader, formatRange, statusLabels } from '@/lib/format';
+import { formatDate, formatDayHeader, formatRange, statusLabels } from '@/lib/format';
 import { bookingStatusColor, groupRoomsByType, type RoomGroup } from '@/lib/status';
 import {
   addDaysIso,
@@ -112,6 +123,7 @@ function TapeChart({ today }: { today: string }) {
   const reschedule = useRescheduleBooking();
   const changeDates = useChangeBookingDates();
   const { open } = useBookingDrawer();
+  const { openNew } = useBookingEditor();
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   // A drag ends with a click on the bar; this keeps that click from opening the inspector.
   const dragged = useRef(false);
@@ -161,6 +173,9 @@ function TapeChart({ today }: { today: string }) {
         actions={
           <>
             {busy && <LoaderCircle className="size-4 animate-spin text-muted-foreground" />}
+            <Button size="sm" onClick={() => openNew({ checkIn: start < today ? today : start })}>
+              <Plus /> <span className="hidden sm:inline">New booking</span>
+            </Button>
             <input
               type="date"
               aria-label="Jump to date"
@@ -244,6 +259,7 @@ function TapeChart({ today }: { today: string }) {
                   byRoom={byRoom}
                   guestName={guestName}
                   onOpen={(id) => !dragged.current && open(id)}
+                  onNew={(roomId, checkIn) => openNew({ roomId, checkIn })}
                   disabled={busy}
                 />
               ))}
@@ -254,7 +270,8 @@ function TapeChart({ today }: { today: string }) {
 
       <footer className="flex h-9 shrink-0 items-center gap-4 border-t px-4 text-xs text-muted-foreground">
         <span className="hidden truncate md:inline">
-          Drag a booking to move it. Drag its right edge to change the departure.
+          Click an empty night to book it. Drag a booking to move it, or its right edge to change
+          the departure. Right-click for more.
         </span>
         <Legend />
       </footer>
@@ -327,6 +344,8 @@ interface RowProps {
   dayWidth: number;
   guestName: (id: string) => string;
   onOpen: (id: string) => void;
+  /** Starts a new booking in a room from a night. */
+  onNew: (roomId: string, checkIn: string) => void;
   disabled: boolean;
 }
 
@@ -388,42 +407,80 @@ function RoomLane({
   dayWidth,
   guestName,
   onOpen,
+  onNew,
   disabled,
 }: RowProps & { room: Room; bookings: Booking[] }) {
   const { setNodeRef, isOver } = useDroppable({ id: room.id });
+  // The night under the pointer when the context menu opened.
+  const [menuDay, setMenuDay] = useState<string | null>(null);
+  const bookable = (day: string) => day >= today && room.status !== 'out_of_order';
   return (
-    <div
-      ref={setNodeRef}
-      className="relative flex border-b border-grid-line last:border-b-0"
-      style={{ height: TAPE_ROW_HEIGHT }}
-    >
-      {days.map((day) => (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
         <div
-          key={day}
-          className={cn(
-            'h-full shrink-0 border-r border-grid-line last:border-r-0',
-            isWeekend(day) && 'bg-surface-sunken',
-            day === today && 'bg-primary-soft',
+          ref={setNodeRef}
+          className="relative flex border-b border-grid-line last:border-b-0"
+          style={{ height: TAPE_ROW_HEIGHT }}
+          onContextMenu={(e) =>
+            setMenuDay(
+              (e.target as HTMLElement).closest<HTMLElement>('[data-day]')?.dataset.day ?? null,
+            )
+          }
+        >
+          {days.map((day) => (
+            <div
+              key={day}
+              data-day={day}
+              title={
+                bookable(day)
+                  ? `New booking in room ${room.name} from ${formatDate(day)}`
+                  : undefined
+              }
+              onClick={() => !disabled && bookable(day) && onNew(room.id, day)}
+              className={cn(
+                'h-full shrink-0 border-r border-grid-line last:border-r-0',
+                isWeekend(day) && 'bg-surface-sunken',
+                day === today && 'bg-primary-soft',
+                bookable(day) && 'cursor-cell hover:bg-accent',
+              )}
+              style={{ width: dayWidth }}
+            />
+          ))}
+          {room.status === 'out_of_order' && (
+            <div className="bg-hatch pointer-events-none absolute inset-0" title="Out of order" />
           )}
-          style={{ width: dayWidth }}
-        />
-      ))}
-      {room.status === 'out_of_order' && (
-        <div className="bg-hatch pointer-events-none absolute inset-0" title="Out of order" />
-      )}
-      {isOver && <div className="pointer-events-none absolute inset-0 bg-primary-soft" />}
-      {bookings.map((booking) => (
-        <BookingBar
-          key={booking.id}
-          booking={booking}
-          start={start}
-          dayWidth={dayWidth}
-          name={guestName(booking.guestId)}
-          onOpen={onOpen}
-          disabled={disabled}
-        />
-      ))}
-    </div>
+          {isOver && <div className="pointer-events-none absolute inset-0 bg-primary-soft" />}
+          {bookings.map((booking) => (
+            <BookingBar
+              key={booking.id}
+              booking={booking}
+              start={start}
+              dayWidth={dayWidth}
+              name={guestName(booking.guestId)}
+              onOpen={onOpen}
+              disabled={disabled}
+            />
+          ))}
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent className="w-60">
+        <ContextMenuLabel>
+          Room {room.name}
+          {menuDay && `, ${formatDate(menuDay)}`}
+        </ContextMenuLabel>
+        <ContextMenuItem
+          disabled={!menuDay || !bookable(menuDay)}
+          onSelect={() => menuDay && onNew(room.id, menuDay)}
+        >
+          <CalendarPlus />
+          {room.status === 'out_of_order'
+            ? 'Out of order, not bookable'
+            : menuDay && menuDay < today
+              ? 'Past nights cannot be booked'
+              : 'New booking from this night…'}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 
@@ -480,47 +537,51 @@ function BookingBar({
 
   return (
     <>
-      <button
-        ref={moveRef}
-        type="button"
-        title={label}
-        aria-label={label}
-        onClick={() => onOpen(booking.id)}
-        {...moveListeners}
-        {...moveAttributes}
-        className={cn(
-          'absolute top-[5px] bottom-[5px] flex items-center gap-1.5 overflow-hidden rounded-md pr-2 pl-3 text-left text-sm outline-none',
-          'transition-shadow hover:shadow-floating focus-visible:ring-2 focus-visible:ring-ring',
-          barStyles[booking.status],
-          place.continuesBefore && 'rounded-l-none',
-          place.continuesAfter && 'rounded-r-none',
-          canDrag && 'cursor-grab active:cursor-grabbing',
-          dragging && 'z-30 shadow-floating',
-        )}
-        style={{
-          left,
-          width,
-          transform: moveTransform
-            ? `translate3d(${moveTransform.x}px, ${moveTransform.y}px, 0)`
-            : undefined,
-        }}
-      >
-        <span
-          aria-hidden
-          className={cn('absolute inset-y-0 left-0 w-[3px]', bookingStatusColor[booking.status])}
-        />
-        {place.continuesBefore && (
-          <ChevronLeft className="-ml-1 size-3.5 shrink-0 text-muted-foreground" />
-        )}
-        <span className="truncate font-medium">{name}</span>
-        {icons.length > 0 && (
-          <span className="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
-            {icons.map(({ icon: Icon, label: iconLabel }) => (
-              <Icon key={iconLabel} aria-label={iconLabel} className="size-3.5" />
-            ))}
-          </span>
-        )}
-      </button>
+      <BookingContextMenu bookingId={booking.id}>
+        <button
+          ref={moveRef}
+          type="button"
+          title={label}
+          aria-label={label}
+          onClick={() => onOpen(booking.id)}
+          // The bar has its own menu; keep the lane's "new booking" menu from opening too.
+          onContextMenu={(e) => e.stopPropagation()}
+          {...moveListeners}
+          {...moveAttributes}
+          className={cn(
+            'absolute top-[5px] bottom-[5px] flex items-center gap-1.5 overflow-hidden rounded-md pr-2 pl-3 text-left text-sm outline-none',
+            'transition-shadow hover:shadow-floating focus-visible:ring-2 focus-visible:ring-ring',
+            barStyles[booking.status],
+            place.continuesBefore && 'rounded-l-none',
+            place.continuesAfter && 'rounded-r-none',
+            canDrag && 'cursor-grab active:cursor-grabbing',
+            dragging && 'z-30 shadow-floating',
+          )}
+          style={{
+            left,
+            width,
+            transform: moveTransform
+              ? `translate3d(${moveTransform.x}px, ${moveTransform.y}px, 0)`
+              : undefined,
+          }}
+        >
+          <span
+            aria-hidden
+            className={cn('absolute inset-y-0 left-0 w-[3px]', bookingStatusColor[booking.status])}
+          />
+          {place.continuesBefore && (
+            <ChevronLeft className="-ml-1 size-3.5 shrink-0 text-muted-foreground" />
+          )}
+          <span className="truncate font-medium">{name}</span>
+          {icons.length > 0 && (
+            <span className="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
+              {icons.map(({ icon: Icon, label: iconLabel }) => (
+                <Icon key={iconLabel} aria-label={iconLabel} className="size-3.5" />
+              ))}
+            </span>
+          )}
+        </button>
+      </BookingContextMenu>
       {canDrag && !place.continuesAfter && !moving && (
         <span
           ref={resizeRef}

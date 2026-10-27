@@ -2,11 +2,15 @@ import {
   apiErrorSchema,
   auditLogListSchema,
   bookingDetailSchema,
+  type BookingPatch,
+  bookingPreviewSchema,
   bookingSchema,
   type BookingAction,
   type BookingListQuery,
+  type CreateBookingInput,
   dailyBriefSchema,
   dayOverviewSchema,
+  type GuestPatch,
   guestSchema,
   housekeepingBoardSchema,
   housekeepingNoteResultSchema,
@@ -18,10 +22,13 @@ import {
   type HotelProfile,
   inquiryListSchema,
   inquirySchema,
+  type NewGuestBody,
   type NewMessageBody,
   pendingActionSchema,
   roomSchema,
   type RoomStatus,
+  roomOptionSchema,
+  type RoomOptionsQuery,
   roomTypeSchema,
   type NewStaffBody,
   STAFF_HEADER,
@@ -363,5 +370,54 @@ export function useAddStaff() {
 export function useUpdateStaff() {
   return useRefreshingMutation(({ id, ...patch }: UpdateStaffBody & { id: string }) =>
     apiPost(`/api/staff/${encodeURIComponent(id)}`, patch, staffMemberSchema, 'PATCH'),
+  );
+}
+
+/** Free rooms for a stay with their prices. Runs only while `query` is complete. */
+export function useRoomOptions(query: RoomOptionsQuery | null) {
+  return useQuery({
+    queryKey: ['room-options', query],
+    queryFn: () => apiPost('/api/availability', query, z.array(roomOptionSchema)),
+    enabled: query !== null,
+    placeholderData: (previous) => previous,
+  });
+}
+
+/** What a booking would look like after `patch`, with its new price; nothing is saved. */
+export function useBookingPreview(id: string | null, patch: BookingPatch | null) {
+  return useQuery({
+    queryKey: ['booking-preview', id, patch],
+    queryFn: () =>
+      apiPost(`/api/bookings/${encodeURIComponent(id ?? '')}/preview`, patch, bookingPreviewSchema),
+    enabled: id !== null && patch !== null,
+    retry: false,
+  });
+}
+
+export function useCreateBooking() {
+  return useRefreshingMutation((input: CreateBookingInput) =>
+    apiPost('/api/bookings', input, bookingDetailSchema),
+  );
+}
+
+export function useUpdateBooking() {
+  return useRefreshingMutation(({ id, patch }: { id: string; patch: BookingPatch }) =>
+    apiPost(`/api/bookings/${encodeURIComponent(id)}`, patch, bookingDetailSchema, 'PATCH'),
+  );
+}
+
+export function useCreateGuest() {
+  return useRefreshingMutation((body: NewGuestBody) => apiPost('/api/guests', body, guestSchema));
+}
+
+export function useUpdateGuest() {
+  return useRefreshingMutation(({ id, patch }: { id: string; patch: GuestPatch }) =>
+    apiPost(`/api/guests/${encodeURIComponent(id)}`, patch, guestSchema, 'PATCH'),
+  );
+}
+
+export function useDeclineInquiry(id: string) {
+  return useRefreshingMutation(() =>
+    apiPost(`/api/inbox/${encodeURIComponent(id)}/decline`, {}, inquirySchema),
   );
 }
