@@ -14,6 +14,7 @@ export * from './pending-actions';
 export * from './policy';
 export * from './pricing';
 export * from './rates';
+export * from './reports';
 export type * from './repositories';
 export * from './service';
 export * from './settings';

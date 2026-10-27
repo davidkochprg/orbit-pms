@@ -126,6 +126,18 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - `previewCharge` / `previewPayment` run the same checks without saving and return the balance after, for agent proposals.
 - Audited on the booking as `folio.charge`, `folio.remove_charge`, `folio.payment` and `folio.refund`.
 
+## Reports
+
+`buildReport({ from, to }, data)` (`reports.ts`) measures the nights `[from, to)`, at most 366. `createReportService` loads the data for it.
+
+- **Sold** stays are `confirmed`, `checked_in` and `checked_out`; holds and cancellations don't count.
+- **Room nights**: available = rooms × nights; sold = nights of sold stays inside the period. Occupancy = sold / available, as a fraction.
+- **Revenue** comes from each booking's `priceSnapshot`, spread evenly over its nights in whole CZK so the nightly shares add up exactly (`nightlyShare`). A stay that crosses the period's edge counts only its nights inside. Room revenue is accommodation after child and long-stay discounts; add-on revenue is wellness, extra beds and dogs. Extras are the charges posted in the period. City tax is reported apart: it is collected for the town.
+- **ADR** = room revenue / room nights sold; **RevPAR** = room revenue / room nights available. Both rounded to whole CZK.
+- Guest nights, arrivals in the period and their average stay, and cancellations with a night in the period.
+- Room nights and room revenue by booking source and by room type (with each type's occupancy), payments minus refunds by method on days in the period, departed guests (check-out inside the period) who still owe, and a daily series of rooms sold, occupancy and room revenue.
+- `previousPeriod(query)` is the same length right before, for comparisons.
+
 ## Rates and rooms
 
 `createRatesService` (`rates.ts`) keeps the rates (the `PricingConfig` that `quote()` reads), room types and rooms. Anyone may read them; every change needs an active manager (`forbidden`) and is audited with `by` in the payload.
