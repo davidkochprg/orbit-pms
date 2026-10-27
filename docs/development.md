@@ -30,9 +30,10 @@ Read from `.env` at the repo root by the API and the db scripts, and validated w
 | `META_MODEL_VISION`      | –                        | Vision-capable model                      |
 | `AI_DAILY_TOKEN_BUDGET`  | `500000`                 | Global daily token budget                 |
 | `AI_RATE_LIMIT_PER_HOUR` | `20`                     | Agent calls per IP per hour               |
+| `AI_MONTHLY_BUDGET_USD`  | `100`                    | Monthly cap on real Meta spend            |
 | `PORT`                   | `3001`                   | API port                                  |
 
-The two limits are enforced in memory by the API; see [ai.md](ai.md#rate-limits).
+The hourly and daily limits are kept in memory; the monthly budget is computed from the `ai_usage` table. See [ai.md](ai.md#rate-limits).
 
 ## Scripts
 
@@ -65,7 +66,7 @@ Husky runs commitlint on every commit message, rejects AI attribution trailers, 
 
 After changing `schema.ts`, run `pnpm db:generate` and commit the new file in `packages/db/drizzle/`. `pnpm db:migrate` applies pending migrations and is safe to re-run.
 
-A PGlite directory can only be open in one process at a time, so stop `pnpm dev` (Ctrl-C) before running `pnpm db:seed`. If the local database ever gets into a bad state, for example a migration fails with "already exists" or a script hangs, run `pnpm db:reset` to delete it and start fresh. It refuses to run against a `postgres://` URL.
+A PGlite directory can only be open in one process at a time; two processes writing to it corrupt it. The database therefore takes a lock file (`.data/orbit.lock`, holding the process ID), and a second process fails with "The local database is in use by process …". Stop `pnpm dev` (Ctrl-C) before running `pnpm db:migrate` or `pnpm db:seed`. A lock left by a crashed process is taken over automatically. If the local database ever gets into a bad state, for example a migration fails with "already exists" or a script hangs, run `pnpm db:reset` to delete it and start fresh. It refuses to run against a `postgres://` URL.
 
 ## Seeding
 

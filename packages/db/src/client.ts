@@ -7,6 +7,7 @@ import { migrate as migratePglite } from 'drizzle-orm/pglite/migrator';
 import { drizzle as drizzlePostgres } from 'drizzle-orm/postgres-js';
 import { migrate as migratePostgres } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
+import { acquireLock } from './lock';
 import { migrationsFolder, repoRoot } from './paths';
 import * as schema from './schema';
 
@@ -39,13 +40,21 @@ export function createDb(url: string = DEFAULT_LOCAL_DATABASE_URL): DbHandle {
   }
 
   const dir = url === 'memory://' ? undefined : path.resolve(repoRoot, url.replace(/^file:/, ''));
-  if (dir) mkdirSync(dir, { recursive: true });
+  let release = () => {};
+  if (dir) {
+    mkdirSync(dir, { recursive: true });
+    release = acquireLock(`${dir}.lock`);
+    process.once('exit', release);
+  }
   const client = new PGlite(dir);
   const db = drizzlePglite(client, { schema });
   return {
     db,
     driver: 'pglite',
     migrate: () => migratePglite(db, { migrationsFolder }),
-    close: () => client.close(),
+    close: async () => {
+      await client.close();
+      release();
+    },
   };
 }

@@ -12,4 +12,4 @@ Production runs on Postgres (Neon via Vercel). Contributors and judges should be
 
 - `pnpm db:migrate && pnpm db:seed` works on a fresh clone with nothing but Node.
 - Local behavior matches production SQL, including enums, `jsonb` and check constraints.
-- A PGlite data directory can only be opened by one process. Stop `pnpm dev` before running `pnpm db:seed` from the CLI.
+- A PGlite data directory can only be opened by one process; concurrent writers corrupt it. `createDb` takes a PID lock file next to the directory, so a second process fails fast instead. Stop `pnpm dev` before running `pnpm db:migrate` or `pnpm db:seed`.
