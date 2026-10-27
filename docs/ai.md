@@ -57,15 +57,38 @@ See [ADR 0004](decisions/0004-human-approval-for-mutations.md). A proposal tool:
 
 The UI shows a confirm card. `POST /api/pending-actions/:id/confirm` runs the stored arguments (never ones sent by the browser) through the domain service with actor `agent`, writing the audit log. If the data changed in the meantime and the action is no longer valid, it is marked `failed` with the reason. Each action can be resolved once.
 
+## Inbox pipeline
+
+Every guest message, direct or relayed by an OTA, is prepared in the background when staff open it (`packages/ai/src/inbox.ts`). It runs once per message and the result is stored, so reopening costs nothing.
+
+```mermaid
+flowchart LR
+  M[Message] --> E["extract (1 model call, structured output)"]
+  E --> O["inboxOptions (domain: availability + quote, no model)"]
+  O --> D["draft reply (1 model call)"]
+  D --> G{price guard}
+  G -- ok --> S[stored suggestion]
+  G -- wrong amount --> D2["redraft once with feedback"] --> G2{guard}
+  G2 -- ok --> S
+  G2 -- still wrong --> N["no draft, options only"]
+```
+
+1. **Extract**: `generateText` with `Output.object(inquiryExtractionSchema)` (Meta `response_format: json_schema`, `strictJsonSchema: false` because strict mode only adds a server check that may reject keywords zod emits). Classifies the message (`booking_request`, `question`, `other`), its language, stay, party and wishes.
+2. **Options** (no model): for a complete booking request, `hotel.inboxOptions` finds free rooms (an apartment if asked for, or if a dog comes, per `hotelPolicy.dogsAllowedIn`) and quotes up to three, one per room type, with wished add-ons.
+3. **Draft**: the model writes a reply in the guest's language, given the exact totals as text (e.g. `12 500 CZK`).
+4. **Price guard** (`price-guard.ts`): every money amount in the draft must be one of the quoted totals, line amounts or unit prices, and every option's total must appear. Czech, German, Polish and English number formats are recognised. A failing draft is regenerated once; if it fails again, no draft is shown, so a wrong price never reaches a guest.
+
+The pipeline checks the monthly budget before calling the model and records `inbox_extract` and `inbox_draft` usage separately. Errors are stored on the message (`processingError`) and the next open retries.
+
 ## Prompts
 
 `packages/ai/src/prompts/system.ts` builds the system prompt from a `HotelProfile` (`packages/ai/src/hotel.ts`: name, location, check-in and check-out times, policies), today's date and the hotel timezone. The prompt tells the model to use tools for every fact, never to compute prices or availability, and that changes are proposals.
 
 ## Evals
 
-`packages/ai/src/evals/inquiries.ts` holds ten synthetic inquiries (Czech, German, English, Polish), dated relative to today, each with its expected extraction: language, dates, adults, child ages, and wishes (wellness, dog, apartment). The demo seed uses the same inquiries.
+`packages/ai/src/evals/inquiries.ts` holds fourteen synthetic messages in Czech, German, English and Polish, dated relative to today: ten booking requests and four OTA (Booking.com) messages, three of which are questions about an existing stay. Each has its expected extraction. The demo seed uses the same messages.
 
-`scoreExtraction(expected, actual)` scores an extraction by exact match on those fields; child age order and guest name are ignored. `pnpm eval` currently only loads the fixtures, because there is no extractor yet.
+`pnpm eval` runs the real extraction on each and scores it with `scoreExtraction`: exact match on kind, language, dates, adults, child ages (any order) and wishes; guest name and question wording are not scored. It prints PASS/FAIL per message, the pass rate and what the run cost. It needs `META_API_KEY` and `META_MODEL_AGENT`.
 
 ## Meta models
 

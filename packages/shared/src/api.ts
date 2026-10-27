@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { isoDateSchema } from './dates';
-import { auditLogEntrySchema } from './entities';
-import { bookingActionSchema, bookingStatusSchema } from './enums';
+import { auditLogEntrySchema, inquirySchema } from './entities';
+import { bookingActionSchema, bookingStatusSchema, inquiryChannelSchema } from './enums';
 
 /** Query string for `GET /api/bookings`. `status` is comma-separated. */
 export const bookingListQuerySchema = z.object({
@@ -69,3 +69,21 @@ export type AiUsageSummary = z.infer<typeof aiUsageSummarySchema>;
 export const agentRequestSchema = z.object({
   messages: z.array(z.unknown()).min(1).max(100),
 });
+
+export const newMessageBodySchema = z.object({
+  rawText: z.string().trim().min(1).max(10_000),
+  channel: inquiryChannelSchema.default('email'),
+  partner: z.string().max(100).nullable().default(null),
+  subject: z.string().max(300).nullable().default(null),
+  senderName: z.string().max(200).nullable().default(null),
+  senderAddress: z.string().max(200).nullable().default(null),
+});
+export type NewMessageBody = z.infer<typeof newMessageBodySchema>;
+
+export const processMessageBodySchema = z.object({ force: z.boolean().default(false) });
+
+export const inboxHoldBodySchema = z.object({ roomId: z.string().min(1) });
+
+export const markRepliedBodySchema = z.object({ reply: z.string().trim().min(1).max(20_000) });
+
+export const inquiryListSchema = z.array(inquirySchema);

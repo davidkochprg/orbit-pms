@@ -87,6 +87,19 @@ A body that fails validation returns 400 `invalid_json`; malformed JSON returns 
 
 `AuditLogEntry[]`, newest first: `id`, `actor` (`user` | `agent`), `action` (e.g. `booking.check_in`), `subjectId`, `payload`, `createdAt`. `limit` defaults to 50, max 200.
 
+## Inbox
+
+Direct emails, web and phone messages, and messages relayed by OTA partners in one stream. `Inquiry`: `id`, `rawText`, `channel` (`email`, `phone`, `web`, `ota`), `partner` (e.g. `Booking.com`), `subject`, `senderName`, `senderAddress`, `receivedAt`, `parsed` (the extraction), `suggestion` (`{ options: StayOption[], note, draft, draftLanguage }`), `reply`, `status` (`new`, `quoted`, `replied`, `converted`, `declined`), `bookingId`, `processedAt`, `processingError`.
+
+| Endpoint                      | Body                                                                     | Returns                                                                                                                                        |
+| ----------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/inbox`              |                                                                          | `Inquiry[]`, newest first                                                                                                                      |
+| `POST /api/inbox`             | `{ rawText, channel?, partner?, subject?, senderName?, senderAddress? }` | 201 `Inquiry`                                                                                                                                  |
+| `GET /api/inbox/:id`          |                                                                          | `Inquiry`                                                                                                                                      |
+| `POST /api/inbox/:id/process` | `{ force?: boolean }`                                                    | `Inquiry` with `parsed` and `suggestion`. Already processed messages return immediately at no cost. 503 `ai_not_configured`, 429 `demo_limit`. |
+| `POST /api/inbox/:id/hold`    | `{ roomId }`                                                             | 201 `BookingDetail` of a new hold for the requested stay. 409 if the message has no complete stay request or already has a hold.               |
+| `POST /api/inbox/:id/replied` | `{ reply }`                                                              | `Inquiry` with `status: "replied"` and the reply text (sending happens outside Orbit).                                                         |
+
 ## Agent
 
 ### `POST /api/agent`

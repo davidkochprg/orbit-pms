@@ -1,20 +1,24 @@
 import { randomUUID } from 'node:crypto';
-import type { MetaProvider, UsageStore } from '@orbit/ai';
+import { createInboxPipeline, hotelProfile, type MetaProvider, type UsageStore } from '@orbit/ai';
 import {
   createHotelService,
+  createInboxService,
   createPendingActionService,
   hotelPolicy,
+  hotelToday,
   pricingConfig,
   type Repositories,
 } from '@orbit/domain';
 import type { Health } from '@orbit/shared';
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
+import { createAiGate } from './ai-gate';
 import { errorBody, handleError } from './http';
 import { type AiLimitsConfig, createAiLimiter } from './limits';
 import { agentRoutes } from './routes/agent';
 import { bookingRoutes } from './routes/bookings';
 import { guestRoutes } from './routes/guests';
+import { inboxRoutes } from './routes/inbox';
 import { overviewRoutes } from './routes/overview';
 import { pendingActionRoutes } from './routes/pending-actions';
 import { roomRoutes } from './routes/rooms';
@@ -51,7 +55,22 @@ export function createApp({
     newId,
   });
   const actions = createPendingActionService({ repos, hotel, clock, newId });
+  const inbox = createInboxService({ repos, hotel, clock, newId });
   const limiter = createAiLimiter(limits, clock);
+  const monthlyBudgetMicroUsd = Math.round(monthlyBudgetUsd * 1_000_000);
+  const { gate, withinBudget } = createAiGate({ limiter, usage, monthlyBudgetMicroUsd, clock });
+  const pipeline =
+    ai &&
+    createInboxPipeline({
+      model: ai.agent,
+      modelId: ai.agentModelId,
+      hotel,
+      inbox,
+      profile: hotelProfile,
+      usage,
+      canSpend: withinBudget,
+      today: () => hotelToday(clock()),
+    });
   const app = new Hono();
   if (log) app.use(logger());
 
@@ -61,9 +80,9 @@ export function createApp({
   app.route('/api', guestRoutes(repos));
   app.route('/api', overviewRoutes(repos, hotel));
   app.route('/api', pendingActionRoutes(actions));
-  const budget = { usage, monthlyBudgetMicroUsd: Math.round(monthlyBudgetUsd * 1_000_000) };
-  app.route('/api', agentRoutes({ ai, repos, hotel, actions, limiter, clock, ...budget }));
-  app.route('/api', usageRoutes({ ...budget, clock }));
+  app.route('/api', inboxRoutes({ inbox, hotel, pipeline, gate }));
+  app.route('/api', agentRoutes({ ai, repos, hotel, actions, limiter, gate, clock, usage }));
+  app.route('/api', usageRoutes({ usage, monthlyBudgetMicroUsd, clock }));
 
   app.notFound((c) => c.json(errorBody('not_found', 'Route not found'), 404));
   app.onError(handleError);

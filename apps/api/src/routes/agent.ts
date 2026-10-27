@@ -24,6 +24,7 @@ import {
 } from 'ai';
 import { Hono } from 'hono';
 import { errorBody } from '../http';
+import type { AiGate } from '../ai-gate';
 import type { AiLimiter } from '../limits';
 import { validate } from '../validate';
 
@@ -33,24 +34,13 @@ export interface AgentRouteDeps {
   hotel: HotelService;
   actions: PendingActionService;
   limiter: AiLimiter;
+  gate: AiGate;
   clock: () => Date;
   usage: UsageStore;
-  monthlyBudgetMicroUsd: number;
 }
-
-const limitMessages = {
-  rate_limit:
-    'Demo limit reached: too many agent requests from your address. Try again in an hour.',
-  token_budget: 'Demo limit reached for today. Try again tomorrow.',
-  monthly_budget: 'The AI budget for this month is used up. The rest of Orbit keeps working.',
-};
 
 /** Only the most recent messages are sent, so long chats don't grow the cost of every turn. */
 const MAX_HISTORY = 20;
-
-function clientIp(header: string | undefined): string {
-  return header?.split(',')[0]?.trim() || 'local';
-}
 
 /** `POST /api/agent`: streams one agent turn as an AI SDK UI message stream (SSE). */
 export function agentRoutes({
@@ -61,7 +51,7 @@ export function agentRoutes({
   limiter,
   clock,
   usage,
-  monthlyBudgetMicroUsd,
+  gate,
 }: AgentRouteDeps) {
   const tools = createAgentTools({ hotel, actions, listRooms: () => repos.rooms.listRooms() });
 
@@ -72,11 +62,8 @@ export function agentRoutes({
         503,
       );
     }
-    if ((await usage.monthToDateMicroUsd(clock())) >= monthlyBudgetMicroUsd) {
-      return c.json(errorBody('demo_limit', limitMessages.monthly_budget), 429);
-    }
-    const limit = limiter.check(clientIp(c.req.header('x-forwarded-for')));
-    if (!limit.ok) return c.json(errorBody('demo_limit', limitMessages[limit.reason]), 429);
+    const blocked = await gate(c.req.header('x-forwarded-for'));
+    if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
 
     let messages: UIMessage[];
     try {
