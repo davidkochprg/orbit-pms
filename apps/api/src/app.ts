@@ -40,7 +40,7 @@ const defaultNewId = (prefix: string) => `${prefix}_${randomUUID().slice(0, 8)}`
 export function createApp({
   repos,
   ai,
-  limits = { perIpPerHour: 20, dailyTokenBudget: 500_000 },
+  limits = { perIpPerHour: 20, dailyTokenBudget: 2_000_000 },
   usage,
   monthlyBudgetUsd = 100,
   clock = () => new Date(),

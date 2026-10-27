@@ -28,7 +28,7 @@ Read from `.env` at the repo root by the API and the db scripts, and validated w
 | `META_MODEL_AGENT`       | –                        | Model for the agent loop and tool calling |
 | `META_MODEL_VOICE`       | –                        | Transcription model for voice notes       |
 | `META_MODEL_VISION`      | –                        | Vision-capable model                      |
-| `AI_DAILY_TOKEN_BUDGET`  | `500000`                 | Global daily token budget                 |
+| `AI_DAILY_TOKEN_BUDGET`  | `2000000`                | Global daily token budget                 |
 | `AI_RATE_LIMIT_PER_HOUR` | `20`                     | Agent calls per IP per hour               |
 | `AI_MONTHLY_BUDGET_USD`  | `100`                    | Monthly cap on real Meta spend            |
 | `PORT`                   | `3001`                   | API port                                  |
