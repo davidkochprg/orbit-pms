@@ -28,11 +28,17 @@ _Not built yet._
 
 ## Run it locally
 
-_To be written with the scaffold._
+Needs Node 24+ and pnpm. No database install: local dev uses an embedded Postgres ([PGlite](https://pglite.dev)).
+
+```bash
+pnpm i && pnpm db:migrate && pnpm db:seed && pnpm dev
+```
+
+Open http://localhost:5173. To turn on the AI features, copy `.env.example` to `.env` and fill in the Meta Model API variables. More in [docs/development.md](docs/development.md).
 
 ## How it was built
 
-_To be written._
+pnpm monorepo in strict TypeScript: Vite + React + Tailwind + shadcn/ui on the front end, Hono on Node for the API, Drizzle on Postgres, and the Vercel AI SDK pointed at the Meta Model API. Business rules live in a pure, unit-tested domain package shared by the UI and the agent.
 
 ## License
 

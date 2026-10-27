@@ -2,15 +2,58 @@
 
 ## Local setup
 
-_Filled in with the scaffold._
+Requirements: Node 24 or newer, pnpm 11 (`corepack enable` picks the version from `package.json`). No database install is needed.
+
+```bash
+pnpm i
+pnpm db:migrate
+pnpm db:seed
+pnpm dev
+```
+
+- Web: http://localhost:5173 (Vite, proxies `/api` and `/health` to the API)
+- API: http://localhost:3001
+
+To use the AI features, copy `.env.example` to `.env` at the repo root and fill in the Meta variables. Without them the app runs with AI off, and the sidebar shows "AI not configured".
 
 ## Environment variables
 
-_Filled in with the scaffold._
+Read from `.env` at the repo root by the API and the db scripts, and validated with zod at startup (`apps/api/src/env.ts`). All of them are server-side; the web bundle gets none.
+
+| Variable                 | Default                  | Purpose                                   |
+| ------------------------ | ------------------------ | ----------------------------------------- |
+| `DATABASE_URL`           | `file:./.data/orbit`     | PGlite path, or a `postgres://` URL       |
+| `META_API_KEY`           | –                        | Meta Model API key                        |
+| `META_API_BASE_URL`      | `https://api.meta.ai/v1` | OpenAI-compatible base URL                |
+| `META_MODEL_AGENT`       | –                        | Model for the agent loop and tool calling |
+| `META_MODEL_VOICE`       | –                        | Transcription model for voice notes       |
+| `META_MODEL_VISION`      | –                        | Vision-capable model                      |
+| `AI_DAILY_TOKEN_BUDGET`  | `500000`                 | Global daily token budget                 |
+| `AI_RATE_LIMIT_PER_HOUR` | `20`                     | Agent calls per IP per hour               |
+| `PORT`                   | `3001`                   | API port                                  |
+
+The two limits are parsed but not enforced yet.
 
 ## Scripts
 
-_Filled in with the scaffold._
+| Command            | What it does                                                  |
+| ------------------ | ------------------------------------------------------------- |
+| `pnpm dev`         | API (`tsx watch`) and web (Vite) in parallel                  |
+| `pnpm build`       | Production build of the web app                               |
+| `pnpm typecheck`   | `tsc --noEmit` in every package                               |
+| `pnpm lint`        | ESLint (type-aware) and Prettier check                        |
+| `pnpm format`      | Prettier write                                                |
+| `pnpm test`        | Vitest across all packages                                    |
+| `pnpm db:generate` | Drizzle migration from schema changes                         |
+| `pnpm db:migrate`  | Apply migrations                                              |
+| `pnpm db:seed`     | Replace all data with the demo seed                           |
+| `pnpm eval`        | Extraction evals (only loads fixtures until the agent exists) |
+
+Internal packages are consumed as TypeScript source (`workspace:*`, `exports` pointing at `src/index.ts`), so there is no per-package build step.
+
+## Git hooks
+
+Husky runs commitlint on every commit message, rejects AI attribution trailers, and runs `typecheck` and `lint` before each commit. See `AGENTS.md` for the commit conventions.
 
 ## Database
 

@@ -28,4 +28,20 @@ flowchart LR
 
 ## Data flow
 
-_Filled in as features land._
+```mermaid
+sequenceDiagram
+  participant W as Web (Vite)
+  participant A as API (Hono)
+  participant R as Repositories (packages/db)
+  participant P as Postgres / PGlite
+  W->>A: GET /api/bookings?from&to (via Vite proxy)
+  A->>A: validate query (zod, packages/shared)
+  A->>R: listBookings(filter)
+  R->>P: SQL (Drizzle)
+  P-->>R: rows
+  R-->>A: Booking[] (shared types)
+  A-->>W: JSON
+  W->>W: validate response (zod), cache (TanStack Query)
+```
+
+Repositories implement the interfaces declared in `packages/domain/src/repositories.ts`, so domain code never imports a database driver.
