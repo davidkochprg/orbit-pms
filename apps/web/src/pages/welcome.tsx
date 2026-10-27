@@ -1,7 +1,7 @@
 import { ArrowRight, Inbox, type LucideIcon, Mic, Orbit, Sparkles } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
-import { SpaceAscii } from '@/components/space-ascii';
+import { WelcomeScene } from '@/components/welcome-scene';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
 import { useSession } from '@/hooks/use-session';
@@ -46,15 +46,23 @@ export function WelcomePage() {
   }
 
   const b = brief.data;
-  const hudStatus = b
-    ? `OCC ${occupancyPercent(b.occupancy)}%  ARR ${pad2(b.arrivals)}  DEP ${pad2(b.departures)}`
-    : 'OCC --%  ARR --  DEP --';
-  const satellites = day.data?.arrivals.slice(0, 5).map((s) => s.roomName) ?? ['104', '201', 'A2'];
+  // Live numbers from the demo hotel, flickering through the scene's glyphs.
+  const sceneData = b
+    ? [
+        `OCC ${occupancyPercent(b.occupancy)}%`,
+        `ARR ${pad2(b.arrivals)}`,
+        `DEP ${pad2(b.departures)}`,
+        ...(day.data?.arrivals.slice(0, 4).map((s) => `RM ${s.roomName}`) ?? []),
+      ]
+    : [];
+  const caption = b
+    ? `Orbit / ${b.occupancy.total} rooms / ${occupancyPercent(b.occupancy)}% tonight`
+    : 'Orbit / demo property';
 
   return (
-    <div className="flex min-h-svh flex-col bg-space-deep lg:h-svh lg:flex-row">
+    <div className="flex min-h-svh flex-col bg-scene-page lg:h-svh lg:flex-row">
       <section className="h-72 shrink-0 sm:h-96 lg:h-auto lg:flex-[1.1]">
-        <SpaceAscii satellites={satellites} hud={{ status: hudStatus }} />
+        <WelcomeScene data={sceneData} caption={caption} />
       </section>
 
       <main className="relative flex flex-1 flex-col bg-background lg:my-3 lg:mr-3 lg:rounded-2xl lg:shadow-panel">
