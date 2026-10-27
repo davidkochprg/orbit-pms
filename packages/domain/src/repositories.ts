@@ -4,6 +4,8 @@ import type {
   Booking,
   BookingStatus,
   Guest,
+  HousekeepingTask,
+  HousekeepingTaskStatus,
   Inquiry,
   IsoDate,
   PendingAction,
@@ -69,6 +71,19 @@ export interface PendingActionRepository {
   update(action: PendingAction): Promise<void>;
 }
 
+export interface TaskFilter {
+  roomId?: string;
+  status?: HousekeepingTaskStatus[];
+}
+
+export interface HousekeepingRepository {
+  /** Oldest first. */
+  listTasks(filter?: TaskFilter): Promise<HousekeepingTask[]>;
+  getTask(id: string): Promise<HousekeepingTask | null>;
+  createTask(task: HousekeepingTask): Promise<void>;
+  updateTask(task: HousekeepingTask): Promise<void>;
+}
+
 export interface Repositories {
   rooms: RoomRepository;
   bookings: BookingRepository;
@@ -76,6 +91,7 @@ export interface Repositories {
   audit: AuditRepository;
   inquiries: InquiryRepository;
   pendingActions: PendingActionRepository;
+  housekeeping: HousekeepingRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

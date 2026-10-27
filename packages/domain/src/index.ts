@@ -3,6 +3,8 @@ export * from './bookings';
 export * from './dates';
 export * from './day';
 export * from './errors';
+export * from './housekeeping';
+export * from './housekeeping-service';
 export * from './inbox';
 export * from './inbox-service';
 export * from './pending-actions';

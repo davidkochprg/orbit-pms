@@ -168,3 +168,33 @@ describe('creating records (PGlite)', () => {
     expect(await repos.pendingActions.get('nope')).toBeNull();
   });
 });
+
+describe('housekeeping tasks (PGlite)', () => {
+  it('lists seeded tasks oldest first and filters by room and status', async () => {
+    const all = await repos.housekeeping.listTasks();
+    expect(all).toEqual(
+      [...seed.housekeepingTasks].sort(
+        (a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id),
+      ),
+    );
+    const maintenance = await repos.housekeeping.listTasks({ roomId: 'rm_203' });
+    expect(maintenance.map((t) => t.type)).toContain('maintenance');
+    expect(await repos.housekeeping.listTasks({ status: ['done'] })).toEqual([]);
+  });
+
+  it('creates, reads and updates a task', async () => {
+    const task = {
+      id: 'hk_test',
+      roomId: 'rm_101',
+      type: 'maintenance' as const,
+      status: 'open' as const,
+      notes: 'Lamp broken',
+      createdAt: '2026-10-27T09:00:00.000Z',
+    };
+    await repos.housekeeping.createTask(task);
+    expect(await repos.housekeeping.getTask('hk_test')).toEqual(task);
+    await repos.housekeeping.updateTask({ ...task, status: 'done' });
+    expect((await repos.housekeeping.getTask('hk_test'))?.status).toBe('done');
+    expect(await repos.housekeeping.getTask('nope')).toBeNull();
+  });
+});

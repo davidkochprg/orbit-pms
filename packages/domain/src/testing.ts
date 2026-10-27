@@ -2,6 +2,7 @@ import type {
   AuditLogEntry,
   Booking,
   Guest,
+  HousekeepingTask,
   Inquiry,
   PendingAction,
   Room,
@@ -18,6 +19,7 @@ export interface MemoryState {
   audit: AuditLogEntry[];
   inquiries: Inquiry[];
   pendingActions: PendingAction[];
+  tasks: HousekeepingTask[];
 }
 
 // State is plain JSON, so a JSON round-trip is a full deep copy.
@@ -38,6 +40,7 @@ export function createMemoryRepositories(
     audit: [],
     inquiries: [],
     pendingActions: [],
+    tasks: [],
     ...clone(initial),
   };
 
@@ -124,6 +127,27 @@ export function createMemoryRepositories(
       get: (id) => Promise.resolve(state.pendingActions.find((a) => a.id === id) ?? null),
       update: (action) => {
         state.pendingActions = state.pendingActions.map((a) => (a.id === action.id ? action : a));
+        return Promise.resolve();
+      },
+    },
+    housekeeping: {
+      listTasks: (filter = {}) =>
+        Promise.resolve(
+          state.tasks
+            .filter(
+              (t) =>
+                (!filter.roomId || t.roomId === filter.roomId) &&
+                (!filter.status || filter.status.includes(t.status)),
+            )
+            .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+        ),
+      getTask: (id) => Promise.resolve(state.tasks.find((t) => t.id === id) ?? null),
+      createTask: (task) => {
+        state.tasks.push(task);
+        return Promise.resolve();
+      },
+      updateTask: (task) => {
+        state.tasks = state.tasks.map((t) => (t.id === task.id ? task : t));
         return Promise.resolve();
       },
     },

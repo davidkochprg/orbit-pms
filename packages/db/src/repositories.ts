@@ -4,6 +4,7 @@ import type {
   BookingFilter,
   BookingRepository,
   GuestRepository,
+  HousekeepingRepository,
   InquiryRepository,
   PendingActionRepository,
   Repositories,
@@ -12,13 +13,23 @@ import type {
 import {
   type AuditLogEntry,
   type Booking,
+  type HousekeepingTask,
   type Inquiry,
   type PendingAction,
   pendingActionSchema,
 } from '@orbit/shared';
 import { and, asc, desc, eq, gt, inArray, lt, type SQL } from 'drizzle-orm';
 import type { Db } from './client';
-import { auditLog, bookings, guests, inquiries, pendingActions, rooms, roomTypes } from './schema';
+import {
+  auditLog,
+  bookings,
+  guests,
+  housekeepingTasks,
+  inquiries,
+  pendingActions,
+  rooms,
+  roomTypes,
+} from './schema';
 
 type BookingRow = typeof bookings.$inferSelect;
 type AuditRow = typeof auditLog.$inferSelect;
@@ -198,6 +209,41 @@ function pendingActionRepository(db: Db): PendingActionRepository {
   };
 }
 
+type TaskRow = typeof housekeepingTasks.$inferSelect;
+
+function toTask(row: TaskRow): HousekeepingTask {
+  return { ...row, createdAt: row.createdAt.toISOString() };
+}
+
+function housekeepingRepository(db: Db): HousekeepingRepository {
+  return {
+    async listTasks(filter = {}) {
+      const where: SQL[] = [];
+      if (filter.roomId) where.push(eq(housekeepingTasks.roomId, filter.roomId));
+      if (filter.status) where.push(inArray(housekeepingTasks.status, filter.status));
+      const rows = await db
+        .select()
+        .from(housekeepingTasks)
+        .where(and(...where))
+        .orderBy(asc(housekeepingTasks.createdAt), asc(housekeepingTasks.id));
+      return rows.map(toTask);
+    },
+    async getTask(id) {
+      const [row] = await db.select().from(housekeepingTasks).where(eq(housekeepingTasks.id, id));
+      return row ? toTask(row) : null;
+    },
+    async createTask(task) {
+      await db.insert(housekeepingTasks).values({ ...task, createdAt: new Date(task.createdAt) });
+    },
+    async updateTask({ id, ...task }) {
+      await db
+        .update(housekeepingTasks)
+        .set({ ...task, createdAt: new Date(task.createdAt) })
+        .where(eq(housekeepingTasks.id, id));
+    },
+  };
+}
+
 export function createRepositories(db: Db): Repositories {
   return {
     rooms: roomRepository(db),
@@ -206,6 +252,7 @@ export function createRepositories(db: Db): Repositories {
     audit: auditRepository(db),
     inquiries: inquiryRepository(db),
     pendingActions: pendingActionRepository(db),
+    housekeeping: housekeepingRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }
