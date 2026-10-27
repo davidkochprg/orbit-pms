@@ -198,3 +198,21 @@ describe('pricingConfig', () => {
     }
   });
 });
+
+describe('quote labels', () => {
+  it('says children, not childs', () => {
+    const q = quote(
+      {
+        roomType: apartment,
+        checkIn: '2026-06-01',
+        checkOut: '2026-06-03',
+        adults: 2,
+        childAges: [5, 7],
+      },
+      config,
+    );
+    expect(q.lines.find((l) => l.kind === 'child_discount')?.label).toBe(
+      'Child discount 50% (age ≤ 11), 2 children × 2 nights (standard)',
+    );
+  });
+});

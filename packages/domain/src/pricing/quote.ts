@@ -26,8 +26,8 @@ export function childTier(age: number, config: PricingConfig): ChildDiscountTier
   return config.childDiscounts.find((t) => age <= t.maxAge);
 }
 
-function plural(n: number, word: string): string {
-  return `${n} ${word}${n === 1 ? '' : 's'}`;
+function plural(n: number, word: string, many = `${word}s`): string {
+  return `${n} ${n === 1 ? word : many}`;
 }
 
 function percent(fraction: number): string {
@@ -100,7 +100,7 @@ export function quote(input: QuoteInput, config: PricingConfig): Quote {
       lines.push(
         line(
           'child_discount',
-          `Child discount ${percent(tier.discount)} (age ≤ ${tier.maxAge}), ${plural(children, 'child')} × ${plural(group.nights, 'night')} (${group.label})`,
+          `Child discount ${percent(tier.discount)} (age ≤ ${tier.maxAge}), ${plural(children, 'child', 'children')} × ${plural(group.nights, 'night')} (${group.label})`,
           children * group.nights,
           -Math.round(group.rate * tier.discount),
         ),
