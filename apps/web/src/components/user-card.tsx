@@ -1,5 +1,5 @@
-import { Check, ChevronsUpDown, Settings } from 'lucide-react';
-import { Link } from 'react-router';
+import { Check, ChevronsUpDown, LogOut, Settings } from 'lucide-react';
+import { Link, useNavigate } from 'react-router';
 import { GuestAvatar } from '@/components/guest-avatar';
 import {
   DropdownMenu,
@@ -16,7 +16,8 @@ import { staffRoleLabels } from '@/lib/session';
 
 /** The signed-in staff member at the bottom of the sidebar; opens a menu to switch user. */
 export function UserCard() {
-  const { current, staff, signInAs } = useSession();
+  const { current, staff, signInAs, signOut } = useSession();
+  const navigate = useNavigate();
   if (!current) {
     return <Skeleton className="h-9 min-w-0 flex-1 group-data-[collapsible=icon]:hidden" />;
   }
@@ -64,6 +65,14 @@ export function UserCard() {
           <Link to="/settings">
             <Settings /> Settings
           </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          onSelect={() => {
+            signOut();
+            void navigate('/welcome', { replace: true });
+          }}
+        >
+          <LogOut /> Sign out
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

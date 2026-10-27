@@ -8,8 +8,10 @@ import { HousekeepingPage } from '@/pages/housekeeping';
 import { NotFoundPage } from '@/pages/sections';
 import { SettingsPage } from '@/pages/settings';
 import { TapeChartPage } from '@/pages/tape-chart';
+import { WelcomePage } from '@/pages/welcome';
 
 export const router = createBrowserRouter([
+  { path: 'welcome', element: <WelcomePage /> },
   {
     element: <AppLayout />,
     children: [

@@ -287,6 +287,15 @@
 
   --radius: 0.5rem;
 
+  /* The welcome page's space panel. Always dark, in both themes; tinted by the accent hue. */
+  --space-deep: oklch(0.1 0.02 var(--accent-hue));
+  --space-mid: oklch(0.14 0.03 var(--accent-hue));
+  --space-horizon: oklch(0.27 0.05 var(--accent-hue));
+  --space-ink: oklch(0.78 0.05 var(--accent-hue));
+  --space-line: oklch(0.85 0.05 var(--accent-hue) / 70%);
+  --space-tag: oklch(0.9 0.03 var(--accent-hue));
+  --space-tag-ink: oklch(0.2 0.04 var(--accent-hue));
+
   --chart-1: var(--primary);
   --chart-2: var(--status-checked-in);
   --chart-3: var(--status-hold);
@@ -350,6 +359,11 @@
   --color-destructive: var(--destructive);
   --color-success: var(--success);
   --color-warning: var(--warning);
+  --color-space-deep: var(--space-deep);
+  --color-space-ink: var(--space-ink);
+  --color-space-line: var(--space-line);
+  --color-space-tag: var(--space-tag);
+  --color-space-tag-ink: var(--space-tag-ink);
 
   --color-status-hold: var(--status-hold);
   --color-status-confirmed: var(--status-confirmed);

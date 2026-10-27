@@ -1,11 +1,25 @@
-import { Outlet } from 'react-router';
+import { Navigate, Outlet, useLocation } from 'react-router';
 import { AppSidebar } from '@/components/app-sidebar';
 import { BookingDrawer } from '@/components/booking-drawer';
 import { BookingEditorProvider } from '@/components/booking-editor';
 import { CommandPaletteProvider } from '@/components/command-palette';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import { useSession } from '@/hooks/use-session';
 
 export function AppLayout() {
+  const { storedId, ready, current } = useSession();
+  const location = useLocation();
+  // Signed out, or signed in as someone who was deactivated: back to the welcome page.
+  if (!storedId || (ready && !current)) {
+    const next = location.pathname + location.search;
+    return (
+      <Navigate
+        to={next === '/' ? '/welcome' : `/welcome?next=${encodeURIComponent(next)}`}
+        replace
+      />
+    );
+  }
+
   return (
     <BookingEditorProvider>
       <CommandPaletteProvider>

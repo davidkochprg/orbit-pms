@@ -6,7 +6,7 @@ A hotel has managers, receptionists and housekeepers, and only some of them shou
 
 ## Decision
 
-Staff members are records with a role (`manager`, `receptionist`, `housekeeping`) and an `active` flag. Signing in means picking an active staff member: the web app stores the ID in the browser and sends it as `x-staff-id`. The domain checks permissions: only an active manager may change the hotel profile or the team, and the team always keeps at least one active manager. Settings and team changes record who made them in the audit payload.
+Staff members are records with a role (`manager`, `receptionist`, `housekeeping`) and an `active` flag. Signing in means picking an active staff member: the welcome page's "Enter demo" picks the first active manager, and the user menu switches to anyone else. The web app stores the ID in the browser and sends it as `x-staff-id`. The domain checks permissions: only an active manager may change the hotel profile or the team, and the team always keeps at least one active manager. Settings and team changes record who made them in the audit payload.
 
 ## Consequences
 

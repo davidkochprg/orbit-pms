@@ -1,0 +1,134 @@
+import { ArrowRight, Inbox, type LucideIcon, Mic, Orbit, Sparkles } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router';
+import { ErrorNotice } from '@/components/error-notice';
+import { SpaceAscii } from '@/components/space-ascii';
+import { Button } from '@/components/ui/button';
+import { Kbd } from '@/components/ui/kbd';
+import { useSession } from '@/hooks/use-session';
+import { useDailyBrief, useDayOverview } from '@/lib/api';
+import { occupancyPercent } from '@/lib/brief';
+import { demoManager, staffRoleLabels } from '@/lib/session';
+
+const features: { icon: LucideIcon; title: string; text: string }[] = [
+  {
+    icon: Sparkles,
+    title: 'Ask for anything',
+    text: 'The agent checks rooms, quotes prices and prepares changes for you to confirm.',
+  },
+  {
+    icon: Inbox,
+    title: 'Replies ready to send',
+    text: 'Guest emails arrive with a reply drafted in their language, priced from your rates.',
+  },
+  {
+    icon: Mic,
+    title: 'Housekeeping by voice',
+    text: 'A spoken note marks rooms clean and opens repair tasks.',
+  },
+];
+
+const pad2 = (n: number) => String(n).padStart(2, '0');
+
+/** The public landing page: one click signs a visitor into the demo as the manager. */
+export function WelcomePage() {
+  const session = useSession();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const brief = useDailyBrief();
+  const day = useDayOverview();
+  const manager = demoManager(session.staff);
+  const next = params.get('next')?.startsWith('/') ? params.get('next')! : '/';
+
+  function enter() {
+    if (!manager) return;
+    session.signInAs(manager.id);
+    void navigate(next, { replace: true });
+  }
+
+  const b = brief.data;
+  const hudStatus = b
+    ? `OCC ${occupancyPercent(b.occupancy)}%  ARR ${pad2(b.arrivals)}  DEP ${pad2(b.departures)}`
+    : 'OCC --%  ARR --  DEP --';
+  const satellites = day.data?.arrivals.slice(0, 5).map((s) => s.roomName) ?? ['104', '201', 'A2'];
+
+  return (
+    <div className="flex min-h-svh flex-col bg-space-deep lg:h-svh lg:flex-row">
+      <section className="h-72 shrink-0 sm:h-96 lg:h-auto lg:flex-[1.1]">
+        <SpaceAscii satellites={satellites} hud={{ status: hudStatus }} />
+      </section>
+
+      <main className="relative flex flex-1 flex-col bg-background lg:my-3 lg:mr-3 lg:rounded-2xl lg:shadow-panel">
+        <header className="flex items-center justify-end gap-3 p-5 text-xs text-muted-foreground">
+          <span>Fictional hotel · synthetic data</span>
+        </header>
+
+        <div className="flex flex-1 items-center justify-center px-6 pb-16">
+          <div className="flex w-full max-w-sm flex-col gap-8">
+            <div className="flex items-center gap-2.5">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-foreground text-background">
+                <Orbit className="size-4.5" strokeWidth={2.25} />
+              </span>
+              <span className="text-lg font-semibold tracking-tight">Orbit</span>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <h1 className="text-3xl font-semibold tracking-tight text-balance">
+                Run your hotel by asking
+              </h1>
+              <p className="text-base text-muted-foreground text-pretty">
+                A property management system for small hotels with an AI agent built in. Anything
+                you can click, you can also ask for.
+              </p>
+            </div>
+
+            <ul className="flex flex-col gap-4">
+              {features.map(({ icon: Icon, title, text }) => (
+                <li key={title} className="flex gap-3">
+                  <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary-text">
+                    <Icon className="size-4" />
+                  </span>
+                  <span className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium">{title}</span>
+                    <span className="text-sm text-muted-foreground">{text}</span>
+                  </span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="flex flex-col gap-3">
+              {session.staffError ? (
+                <ErrorNotice message="The demo server is not reachable right now. Please try again in a moment." />
+              ) : (
+                <Button
+                  size="lg"
+                  className="h-11 w-full text-base"
+                  disabled={!manager}
+                  onClick={enter}
+                >
+                  Enter demo <ArrowRight />
+                </Button>
+              )}
+              {session.current && session.current.id !== manager?.id && (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="h-11 w-full"
+                  onClick={() => void navigate(next, { replace: true })}
+                >
+                  Continue as {session.current.name}
+                </Button>
+              )}
+              <p className="text-xs text-muted-foreground text-pretty">
+                No sign-up.{' '}
+                {manager
+                  ? `You enter as ${manager.name}, ${staffRoleLabels[manager.role].toLowerCase()} of a fictional ${b?.occupancy.total ?? 50}-room guesthouse.`
+                  : 'You enter as the manager of a fictional guesthouse.'}{' '}
+                Press <Kbd>⌘K</Kbd> inside to talk to the agent.
+              </p>
+            </div>
+          </div>
+        </div>
+      </main>
+    </div>
+  );
+}
