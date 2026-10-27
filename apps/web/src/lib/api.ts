@@ -8,6 +8,9 @@ import {
   dayOverviewSchema,
   guestSchema,
   healthSchema,
+  inquiryListSchema,
+  inquirySchema,
+  type NewMessageBody,
   pendingActionSchema,
   roomSchema,
 } from '@orbit/shared';
@@ -169,4 +172,46 @@ export function useResolvePendingAction(id: string) {
     },
     onSuccess: () => queryClient.invalidateQueries(),
   });
+}
+
+export function useInbox() {
+  return useQuery({ queryKey: ['inbox'], queryFn: () => apiGet('/api/inbox', inquiryListSchema) });
+}
+
+export function useInquiry(id: string | undefined) {
+  return useQuery({
+    queryKey: ['inquiry', id],
+    queryFn: () => apiGet(`/api/inbox/${encodeURIComponent(id ?? '')}`, inquirySchema),
+    enabled: id !== undefined,
+  });
+}
+
+function useInboxMutation<T>(fn: (input: T) => Promise<unknown>) {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: fn, onSuccess: () => queryClient.invalidateQueries() });
+}
+
+export function useCreateMessage() {
+  return useInboxMutation((body: Partial<NewMessageBody> & { rawText: string }) =>
+    apiPost('/api/inbox', body, inquirySchema),
+  );
+}
+
+/** Lets the agent prepare the message. Already prepared messages come back without a model call. */
+export function useProcessInquiry(id: string) {
+  return useInboxMutation((force: boolean) =>
+    apiPost(`/api/inbox/${encodeURIComponent(id)}/process`, { force }, inquirySchema),
+  );
+}
+
+export function useInboxHold(id: string) {
+  return useInboxMutation((roomId: string) =>
+    apiPost(`/api/inbox/${encodeURIComponent(id)}/hold`, { roomId }, bookingDetailSchema),
+  );
+}
+
+export function useMarkReplied(id: string) {
+  return useInboxMutation((reply: string) =>
+    apiPost(`/api/inbox/${encodeURIComponent(id)}/replied`, { reply }, inquirySchema),
+  );
 }
