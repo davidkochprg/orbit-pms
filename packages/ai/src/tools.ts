@@ -3,6 +3,7 @@ import {
   DomainError,
   type HotelService,
   type PendingActionService,
+  type ReportService,
 } from '@orbit/domain';
 import {
   availabilityQuerySchema,
@@ -16,6 +17,7 @@ import {
   type PendingAction,
   type PendingActionInput,
   quoteInputSchema,
+  reportQuerySchema,
 } from '@orbit/shared';
 import { tool } from 'ai';
 import { z } from 'zod';
@@ -23,6 +25,7 @@ import { z } from 'zod';
 export interface ToolDeps {
   hotel: HotelService;
   billing: BillingService;
+  reports: ReportService;
   actions: PendingActionService;
   /** Lists rooms with their IDs, so names like "104" can be resolved. */
   listRooms: () => Promise<
@@ -92,7 +95,7 @@ export const proposalToolNames = [
  * Agent tools: thin wrappers over the same domain service the REST API uses. Read tools run
  * immediately; mutating tools return a pending action for the user to confirm.
  */
-export function createAgentTools({ hotel, billing, actions, listRooms }: ToolDeps) {
+export function createAgentTools({ hotel, billing, reports, actions, listRooms }: ToolDeps) {
   const propose = (input: PendingActionInput) =>
     safely(async () => toProposal(await actions.propose(input)));
 
@@ -176,6 +179,17 @@ export function createAgentTools({ hotel, billing, actions, listRooms }: ToolDep
         'Propose editing a booking: party (adults, childAges), add-ons (wellness, dogs, extraBeds; send all three), source or notes, and optionally room and dates in the same step. Only send the fields that change. Re-priced when the stay changes. The user must confirm.',
       inputSchema: bookingPatchSchema.extend(bookingIdSchema.shape),
       execute: (input) => propose({ kind: 'update_booking', input }),
+    }),
+    getReport: tool({
+      description:
+        'Performance for a period of nights [from, to): occupancy, ADR, RevPAR, room/add-on/extras revenue, city tax, guest nights, arrivals, average stay, cancellations, by booking source and room type, payments by method, departed guests who still owe, and a daily series. Occupancy is a fraction (0.5 = 50%). For "last month" use the first of that month to the first of this month. Compare periods by calling it twice. Repeat figures verbatim.',
+      inputSchema: reportQuerySchema,
+      execute: (query) =>
+        safely(async () => {
+          // The daily series is for charts; the model gets the totals and slices.
+          const { days: _, ...report } = await reports.getReport(query);
+          return report;
+        }),
     }),
     getBill: tool({
       description:

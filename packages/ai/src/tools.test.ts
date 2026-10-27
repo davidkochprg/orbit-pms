@@ -79,6 +79,16 @@ describe('agent tools', () => {
     expect(repos.state.bookings.find((b) => b.id === 'bk_1')?.notes).toBeNull();
   });
 
+  it('reports a period without the daily series', async () => {
+    const { tools } = setup();
+    const report = await tools.getReport.execute(
+      { from: '2026-05-10', to: '2026-05-12' },
+      callOptions,
+    );
+    expect(report).toMatchObject({ roomNightsSold: 2, roomNightsAvailable: 4, occupancy: 0.5 });
+    expect(report).not.toHaveProperty('days');
+  });
+
   it('reads a bill with city tax and the open balance', async () => {
     const { tools } = setup();
     const bill = await tools.getBill.execute({ bookingId: 'bk_1' }, callOptions);

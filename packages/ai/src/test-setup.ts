@@ -2,6 +2,7 @@ import {
   createHotelService,
   createBillingService,
   createPendingActionService,
+  createReportService,
   hotelPolicy,
   pricingConfig,
 } from '@orbit/domain';
@@ -76,9 +77,11 @@ export function setup() {
   });
   const billing = createBillingService({ repos, pricing: pricingConfig, clock, newId });
   const actions = createPendingActionService({ repos, hotel, billing, clock, newId });
+  const reports = createReportService({ repos, pricing: pricingConfig });
   const tools = createAgentTools({
     hotel,
     billing,
+    reports,
     actions,
     listRooms: () => repos.rooms.listRooms(),
   });

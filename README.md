@@ -44,7 +44,7 @@ Every AI feature runs on the Meta Model API through the Vercel AI SDK. The model
 
 | Feature            | Model                                          | What the model does                                                     | What it never does                                                     |
 | ------------------ | ---------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| ⌘K agent           | `muse-spark-1.3`                               | Plans multi-step tool use over 15 typed tools, writes the answer        | Computes a price or availability, or changes a booking without a click |
+| ⌘K agent           | `muse-spark-1.3`                               | Plans multi-step tool use over 16 typed tools, writes the answer        | Computes a price or availability, or changes a booking without a click |
 | Inbox extraction   | `muse-spark-1.3`                               | Structured output: kind, language, dates, party, child ages, wishes     | Picks rooms or prices                                                  |
 | Reply drafts       | `muse-spark-1.3`                               | Writes the reply in the guest's language around the exact quoted totals | Sends a reply itself; a draft with a wrong amount is redone or dropped |
 | Housekeeping notes | `muse-voice-transcribe-1.0` + `muse-spark-1.3` | Transcribes the recording, reads it into room/status/issue updates      | Changes bookings; unknown rooms and forbidden changes are skipped      |

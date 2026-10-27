@@ -46,6 +46,7 @@ const toolLabels: Record<string, [running: string, done: string]> = {
   moveBooking: ['Preparing the room move', 'Prepared the room move'],
   changeDates: ['Preparing the date change', 'Prepared the date change'],
   updateBooking: ['Preparing the booking change', 'Prepared the booking change'],
+  getReport: ['Running the numbers', 'Ran the numbers'],
   getBill: ['Opening the bill', 'Opened the bill'],
   addCharge: ['Preparing the charge', 'Prepared the charge'],
   recordPayment: ['Preparing the payment', 'Prepared the payment'],
