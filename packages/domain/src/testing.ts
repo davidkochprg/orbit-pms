@@ -1,4 +1,4 @@
-import type { AuditLogEntry, Booking, Guest, Room, RoomType } from '@orbit/shared';
+import type { AuditLogEntry, Booking, Guest, PendingAction, Room, RoomType } from '@orbit/shared';
 import { rangesOverlap } from './dates';
 import type { Repositories } from './repositories';
 
@@ -8,6 +8,7 @@ export interface MemoryState {
   guests: Guest[];
   bookings: Booking[];
   audit: AuditLogEntry[];
+  pendingActions: PendingAction[];
 }
 
 // State is plain JSON, so a JSON round-trip is a full deep copy.
@@ -26,6 +27,7 @@ export function createMemoryRepositories(
     guests: [],
     bookings: [],
     audit: [],
+    pendingActions: [],
     ...clone(initial),
   };
 
@@ -54,6 +56,10 @@ export function createMemoryRepositories(
           ),
         ),
       getBooking: (id) => Promise.resolve(state.bookings.find((b) => b.id === id) ?? null),
+      createBooking: (booking) => {
+        state.bookings.push(booking);
+        return Promise.resolve();
+      },
       updateBooking: (booking) => {
         state.bookings = state.bookings.map((b) => (b.id === booking.id ? booking : b));
         return Promise.resolve();
@@ -62,6 +68,10 @@ export function createMemoryRepositories(
     guests: {
       listGuests: () => Promise.resolve([...state.guests]),
       getGuest: (id) => Promise.resolve(state.guests.find((g) => g.id === id) ?? null),
+      createGuest: (guest) => {
+        state.guests.push(guest);
+        return Promise.resolve();
+      },
     },
     audit: {
       append: (entry) => {
@@ -80,6 +90,17 @@ export function createMemoryRepositories(
             .reverse()
             .slice(0, limit),
         ),
+    },
+    pendingActions: {
+      create: (action) => {
+        state.pendingActions.push(action);
+        return Promise.resolve();
+      },
+      get: (id) => Promise.resolve(state.pendingActions.find((a) => a.id === id) ?? null),
+      update: (action) => {
+        state.pendingActions = state.pendingActions.map((a) => (a.id === action.id ? action : a));
+        return Promise.resolve();
+      },
     },
     async transaction(fn) {
       const snapshot = clone({ ...state });

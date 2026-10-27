@@ -145,3 +145,55 @@ export function changeDates(booking: Booking, range: DateRange, ctx: DateChangeC
     ),
   };
 }
+
+export interface HoldContext {
+  id: string;
+  guestId: string;
+  room: Room;
+  roomType: RoomType;
+  roomBookings: Booking[];
+  now: Date;
+  today: IsoDate;
+  pricing: PricingConfig;
+  holdHours: number;
+}
+
+export interface HoldRequest extends DateRange {
+  adults: number;
+  childAges: number[];
+  addons: Booking['addons'];
+  source: Booking['source'];
+  notes: string | null;
+}
+
+/** A new hold that blocks the room for `holdHours`, priced with `quote()`. */
+export function createHold(request: HoldRequest, ctx: HoldContext): Booking {
+  assertValidRange(request);
+  if (request.checkIn < ctx.today) {
+    throw new DomainError(
+      'invalid_date_range',
+      `Cannot hold a stay starting in the past (${request.checkIn})`,
+    );
+  }
+  if (ctx.room.status === 'out_of_order') {
+    throw new DomainError('conflict', `Room ${ctx.room.name} is out of order`);
+  }
+  const priceSnapshot = quote({ ...request, roomType: ctx.roomType }, ctx.pricing);
+  const booking: Booking = {
+    id: ctx.id,
+    guestId: ctx.guestId,
+    roomId: ctx.room.id,
+    checkIn: request.checkIn,
+    checkOut: request.checkOut,
+    adults: request.adults,
+    childAges: [...request.childAges],
+    status: 'hold',
+    holdExpiresAt: new Date(ctx.now.getTime() + ctx.holdHours * 3_600_000).toISOString(),
+    source: request.source,
+    addons: request.addons,
+    priceSnapshot,
+    notes: request.notes,
+  };
+  assertNoConflicts(ctx.room.id, booking, booking, ctx.roomBookings, ctx.now, ctx.room.name);
+  return booking;
+}

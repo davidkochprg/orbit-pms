@@ -47,6 +47,14 @@ Pure functions in `packages/domain/src/bookings.ts`, wrapped by `createHotelServ
 | `getBookingDetail(id)`                  | Booking with guest, room, room type and `allowedActions`.                                                                                                                                                                                    |
 | `getDayOverview(date)`                  | `arrivals` (check-in that day: hold, confirmed or already checked in), `departures` (check-out that day: checked in or already checked out), `inHouse` (arrived earlier, leaving later). Defaults to today at the hotel.                     |
 
+## Holds and agent proposals
+
+`createHold(input, actor)` creates a `hold` for an existing guest (`guestId`) or a new guest record, priced with `quote()` and stored add-ons. Rules: valid dates, check-in not in the past, room not out of order, party fits, room free. The hold expires after `hotelPolicy.holdHours` (placeholder: 48).
+
+Every mutation also has a `preview*` variant that runs the same rules against current data without saving. `createPendingActionService` uses these to validate agent proposals, store them as pending actions, and execute them only on confirmation. See [ai.md](ai.md#approval-pattern).
+
+`searchBookings` matches guest names ignoring case and accents (`novak` finds `Novák`).
+
 ## Availability rules
 
 `checkAvailability(query, { rooms, roomTypes, bookings, now })` returns rooms that can take the whole stay, cheapest room type first.

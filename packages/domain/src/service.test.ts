@@ -1,6 +1,7 @@
 import type { Guest } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { DomainError } from './errors';
+import { hotelPolicy } from './policy';
 import { pricingConfig } from './pricing';
 import { createHotelService } from './service';
 import { booking, double, room } from './test-fixtures';
@@ -36,9 +37,17 @@ function setup() {
     },
     () => now,
   );
+  let n = 0;
+  const newId = (prefix: string) => `${prefix}_${++n}`;
   return {
     repos,
-    service: createHotelService({ repos, pricing: pricingConfig, clock: () => now }),
+    service: createHotelService({
+      repos,
+      pricing: pricingConfig,
+      policy: hotelPolicy,
+      clock: () => now,
+      newId,
+    }),
   };
 }
 
@@ -116,5 +125,105 @@ describe('createHotelService', () => {
     ]);
     expect(day.departures.map((s) => s.booking.id)).toEqual(['leaving']);
     expect(day.inHouse).toEqual([]);
+  });
+});
+
+describe('createHold', () => {
+  const request = {
+    guest: {
+      name: 'New Guest',
+      email: 'new.guest@example.com',
+      phone: null,
+      language: 'de' as const,
+    },
+    roomId: 'rm_1',
+    checkIn: '2026-05-12',
+    checkOut: '2026-05-14',
+    adults: 2,
+    childAges: [],
+    addons: { wellness: true, dogs: 0, extraBeds: 0 },
+    source: 'email' as const,
+    notes: null,
+    inquiryId: 'inq_01',
+  };
+
+  it('creates a priced hold and a new guest, expiring after the policy window', async () => {
+    const { repos, service } = setup();
+    const hold = await service.createHold(request, 'agent');
+    expect(hold).toMatchObject({ status: 'hold', roomId: 'rm_1', checkIn: '2026-05-12' });
+    expect(hold.holdExpiresAt).toBe(
+      new Date(now.getTime() + hotelPolicy.holdHours * 3_600_000).toISOString(),
+    );
+    expect(hold.priceSnapshot?.lines.some((l) => l.kind === 'wellness')).toBe(true);
+    expect(repos.state.guests.find((g) => g.id === hold.guestId)?.name).toBe('New Guest');
+    expect(repos.state.audit[0]).toMatchObject({ actor: 'agent', action: 'booking.create_hold' });
+  });
+
+  it('reuses an existing guest', async () => {
+    const { repos, service } = setup();
+    const hold = await service.createHold({ ...request, guest: { guestId: 'gst_test' } }, 'user');
+    expect(hold.guestId).toBe('gst_test');
+    expect(repos.state.guests).toHaveLength(1);
+  });
+
+  it('rejects an occupied room, a past date and an oversized party, saving nothing', async () => {
+    const { repos, service } = setup();
+    await expect(
+      service.createHold({ ...request, roomId: 'rm_2', checkIn: '2026-05-13' }, 'user'),
+    ).rejects.toMatchObject({ code: 'conflict' });
+    await expect(
+      service.createHold({ ...request, checkIn: '2026-05-09' }, 'user'),
+    ).rejects.toMatchObject({ code: 'invalid_date_range' });
+    await expect(service.createHold({ ...request, adults: 5 }, 'user')).rejects.toMatchObject({
+      code: 'over_capacity',
+    });
+    expect(repos.state.bookings).toHaveLength(3);
+    expect(repos.state.guests).toHaveLength(1);
+  });
+
+  it('previews without saving', async () => {
+    const { repos, service } = setup();
+    const { booking, room, newGuest } = await service.previewHold(request);
+    expect(booking.status).toBe('hold');
+    expect(room.name).toBe('1');
+    expect(newGuest?.name).toBe('New Guest');
+    expect(repos.state.bookings).toHaveLength(3);
+    expect(repos.state.audit).toEqual([]);
+  });
+});
+
+describe('queries', () => {
+  const stay = {
+    checkIn: '2026-05-12',
+    checkOut: '2026-05-14',
+    adults: 2,
+    childAges: [],
+    addons: { wellness: false, dogs: 0, extraBeds: 0 },
+  };
+
+  it('finds available rooms for a stay', async () => {
+    const { service } = setup();
+    const rooms = await service.findAvailableRooms(stay);
+    expect(rooms.map((r) => r.roomName)).toEqual(['1']);
+  });
+
+  it('quotes by room or room type', async () => {
+    const { service } = setup();
+    expect(await service.quoteStay({ ...stay, roomId: 'rm_1' })).toEqual(
+      await service.quoteStay({ ...stay, roomTypeId: double.id }),
+    );
+    await expect(service.quoteStay({ ...stay, roomTypeId: 'nope' })).rejects.toMatchObject({
+      code: 'not_found',
+    });
+  });
+
+  it('searches bookings by guest name without accents and by room', async () => {
+    const { service } = setup();
+    expect(await service.searchBookings({ guestName: 'test guest' })).toHaveLength(3);
+    expect(await service.searchBookings({ guestName: 'nobody' })).toHaveLength(0);
+    expect((await service.searchBookings({ roomName: '2' })).map((s) => s.booking.id)).toEqual([
+      'leaving',
+      'later',
+    ]);
   });
 });

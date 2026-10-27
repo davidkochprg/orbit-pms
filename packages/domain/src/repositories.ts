@@ -5,6 +5,7 @@ import type {
   BookingStatus,
   Guest,
   IsoDate,
+  PendingAction,
   Room,
   RoomStatus,
   RoomType,
@@ -29,6 +30,7 @@ export interface RoomRepository {
 export interface BookingRepository {
   listBookings(filter?: BookingFilter): Promise<Booking[]>;
   getBooking(id: string): Promise<Booking | null>;
+  createBooking(booking: Booking): Promise<void>;
   /** Replaces a stored booking. */
   updateBooking(booking: Booking): Promise<void>;
 }
@@ -36,6 +38,7 @@ export interface BookingRepository {
 export interface GuestRepository {
   listGuests(): Promise<Guest[]>;
   getGuest(id: string): Promise<Guest | null>;
+  createGuest(guest: Guest): Promise<void>;
 }
 
 export interface NewAuditEntry {
@@ -51,11 +54,18 @@ export interface AuditRepository {
   list(filter?: { subjectId?: string; limit?: number }): Promise<AuditLogEntry[]>;
 }
 
+export interface PendingActionRepository {
+  create(action: PendingAction): Promise<void>;
+  get(id: string): Promise<PendingAction | null>;
+  update(action: PendingAction): Promise<void>;
+}
+
 export interface Repositories {
   rooms: RoomRepository;
   bookings: BookingRepository;
   guests: GuestRepository;
   audit: AuditRepository;
+  pendingActions: PendingActionRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }
