@@ -1,1 +1,1 @@
-export const AI_PROVIDER_NAME = 'meta';
+export * from './provider';
