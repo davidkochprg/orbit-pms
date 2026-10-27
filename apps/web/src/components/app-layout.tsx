@@ -18,7 +18,8 @@ export function AppLayout() {
             <Outlet />
           </main>
         </div>
-        {agentOpen && <AgentPanel />}
+        {/* Kept mounted while hidden so the conversation survives toggling. */}
+        <AgentPanel open={agentOpen} />
         <BookingDrawer />
       </SidebarInset>
     </SidebarProvider>
