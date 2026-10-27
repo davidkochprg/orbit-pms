@@ -53,7 +53,7 @@ Internal packages are consumed as TypeScript source (`workspace:*`, `exports` po
 
 ## Git hooks
 
-Husky runs commitlint on every commit message, rejects AI attribution trailers, and runs `typecheck` and `lint` before each commit. See `AGENTS.md` for the commit conventions.
+Husky runs commitlint on every commit message, rejects AI attribution trailers, refuses to commit local agent config in `.claude/` (also gitignored), and runs `typecheck` and `lint` before each commit. See `AGENTS.md` for the commit conventions.
 
 ## Database
 
