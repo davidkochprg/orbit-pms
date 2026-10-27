@@ -10,6 +10,7 @@ import {
   pendingActionStatuses,
   roomKinds,
   roomStatuses,
+  staffRoles,
   type HotelProfile,
   type InquiryExtraction,
   type InquirySuggestion,
@@ -21,6 +22,7 @@ import type { AiFeature } from '@orbit/ai';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
+  boolean,
   check,
   date,
   index,
@@ -43,6 +45,7 @@ export const housekeepingTaskType = pgEnum('housekeeping_task_type', housekeepin
 export const housekeepingTaskStatus = pgEnum('housekeeping_task_status', housekeepingTaskStatuses);
 export const auditActor = pgEnum('audit_actor', auditActors);
 export const pendingActionStatus = pgEnum('pending_action_status', pendingActionStatuses);
+export const staffRole = pgEnum('staff_role', staffRoles);
 
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
@@ -164,6 +167,16 @@ export const pendingActions = pgTable('pending_actions', {
   error: text('error'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+});
+
+/** People who sign in to Orbit. Kept when they leave (inactive), so the audit log stays readable. */
+export const staff = pgTable('staff', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').unique(),
+  role: staffRole('role').notNull(),
+  active: boolean('active').notNull().default(true),
+  createdAt: createdAt(),
 });
 
 /** The hotel profile from Settings. One row, `id = 'hotel'`. */

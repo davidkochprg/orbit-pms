@@ -13,6 +13,7 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 | Inquiry          | raw text, channel, received at, parsed extraction, `status`, linked booking                                                                                           |
 | HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes                                                         |
 | HotelProfile     | name, location, description, contact, `checkInFrom`, `checkOutBy`, `entries` (`policy` \| `amenity` \| `info`, title, details)                                        |
+| StaffMember      | name, email, `role` (`manager` \| `receptionist` \| `housekeeping`), `active`                                                                                         |
 | AuditLog         | `actor` (`user` \| `agent`), action, `subjectId` (e.g. a booking), payload, timestamp                                                                                 |
 
 ## Booking lifecycle
@@ -97,8 +98,16 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 `createSettingsService` (`settings.ts`) keeps the hotel profile: the property's name, location, description, contact details, check-in and check-out times, and a list of entries, each a `policy`, `amenity` or `info` (anything else guests ask, such as directions or reception hours). The agent's prompts are built from it ([ai.md](ai.md#prompts)).
 
 - Until a profile is saved, `getProfile()` returns an empty one (`emptyHotelProfile`).
-- `updateProfile(profile, actor)` replaces the whole profile. Entry IDs must be unique and check-out must be earlier in the day than check-in, so rooms can be turned over (`invalid_input`). It writes `settings.profile` to the audit log with the names of the changed fields; a save that changes nothing writes nothing.
+- `updateProfile(profile, by)` replaces the whole profile; only an active manager may (`forbidden`). Entry IDs must be unique and check-out must be earlier in the day than check-in, so rooms can be turned over (`invalid_input`). It writes `settings.profile` to the audit log with who saved it (`by`) and the names of the changed fields; a save that changes nothing writes nothing.
 - Rules the system enforces (hold length, which room kinds take dogs, prices) stay in `hotelPolicy` and the pricing config, not in the profile.
+
+## Staff
+
+`createStaffService` (`staff.ts`) keeps the team. See [ADR 0009](decisions/0009-staff-roles-and-demo-sign-in.md).
+
+- `identify(id)` returns the active staff member with that ID, or null. It is how a request is signed in.
+- `create(input, by)` and `update(id, patch, by)` need `by` to be an active manager (`forbidden`). Emails are unique, ignoring case (`conflict`). No change may leave the team without an active manager (`invalid_input`). Members are deactivated, never deleted.
+- Changes are audited as `staff.create` and `staff.update`, with the member as subject and `by` in the payload.
 
 ## Availability rules
 

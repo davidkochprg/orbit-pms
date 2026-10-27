@@ -1,4 +1,4 @@
-import type { HotelProfile } from '@orbit/shared';
+import type { HotelProfile, StaffMember } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { DomainError } from './errors';
 import {
@@ -8,6 +8,14 @@ import {
   emptyHotelProfile,
 } from './settings';
 import { createMemoryRepositories } from './testing';
+
+const manager: StaffMember = {
+  id: 'stf_m',
+  name: 'Test Manager',
+  email: null,
+  role: 'manager',
+  active: true,
+};
 
 const profile: HotelProfile = {
   ...emptyHotelProfile,
@@ -55,27 +63,41 @@ describe('createSettingsService', () => {
   it('saves the profile and audits which fields changed', async () => {
     const repos = createMemoryRepositories();
     const service = createSettingsService({ repos });
-    await service.updateProfile(profile, 'user');
+    await service.updateProfile(profile, manager);
     expect(await service.getProfile()).toEqual(profile);
     expect(repos.state.audit).toEqual([
       expect.objectContaining({
         actor: 'user',
         action: 'settings.profile',
-        payload: { changed: ['name', 'location', 'entries'] },
+        payload: { by: 'stf_m', changed: ['name', 'location', 'entries'] },
       }),
     ]);
   });
 
+  it('lets only an active manager change the profile', async () => {
+    const repos = createMemoryRepositories();
+    const service = createSettingsService({ repos });
+    const receptionist = { ...manager, role: 'receptionist' as const };
+    await expect(service.updateProfile(profile, receptionist)).rejects.toMatchObject({
+      code: 'forbidden',
+    });
+    await expect(service.updateProfile(profile, { ...manager, active: false })).rejects.toThrow(
+      DomainError,
+    );
+    await expect(service.updateProfile(profile, null)).rejects.toThrow(DomainError);
+    expect(repos.state.profile).toBeNull();
+  });
+
   it('writes nothing when the profile did not change', async () => {
     const repos = createMemoryRepositories({ profile });
-    await createSettingsService({ repos }).updateProfile(profile, 'user');
+    await createSettingsService({ repos }).updateProfile(profile, manager);
     expect(repos.state.audit).toEqual([]);
   });
 
   it('saves nothing when the profile is invalid', async () => {
     const repos = createMemoryRepositories({ profile });
     await expect(
-      createSettingsService({ repos }).updateProfile({ ...profile, checkInFrom: '09:00' }, 'user'),
+      createSettingsService({ repos }).updateProfile({ ...profile, checkInFrom: '09:00' }, manager),
     ).rejects.toThrow(DomainError);
     expect(repos.state.profile).toEqual(profile);
   });

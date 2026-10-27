@@ -10,6 +10,7 @@ import type {
   Repositories,
   RoomRepository,
   SettingsRepository,
+  StaffRepository,
 } from '@orbit/domain';
 import {
   type AuditLogEntry,
@@ -32,6 +33,7 @@ import {
   pendingActions,
   rooms,
   roomTypes,
+  staff,
 } from './schema';
 
 type BookingRow = typeof bookings.$inferSelect;
@@ -247,6 +249,29 @@ function housekeepingRepository(db: Db): HousekeepingRepository {
   };
 }
 
+function staffRepository(db: Db): StaffRepository {
+  const columns = {
+    id: staff.id,
+    name: staff.name,
+    email: staff.email,
+    role: staff.role,
+    active: staff.active,
+  };
+  return {
+    list: () => db.select(columns).from(staff).orderBy(desc(staff.active), asc(staff.name)),
+    async get(id) {
+      const [row] = await db.select(columns).from(staff).where(eq(staff.id, id));
+      return row ?? null;
+    },
+    async create(member) {
+      await db.insert(staff).values(member);
+    },
+    async update({ id, ...member }) {
+      await db.update(staff).set(member).where(eq(staff.id, id));
+    },
+  };
+}
+
 const PROFILE_ID = 'hotel';
 
 function settingsRepository(db: Db): SettingsRepository {
@@ -278,6 +303,7 @@ export function createRepositories(db: Db): Repositories {
     pendingActions: pendingActionRepository(db),
     housekeeping: housekeepingRepository(db),
     settings: settingsRepository(db),
+    staff: staffRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

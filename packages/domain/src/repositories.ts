@@ -13,6 +13,7 @@ import type {
   Room,
   RoomStatus,
   RoomType,
+  StaffMember,
 } from '@orbit/shared';
 
 export interface BookingFilter {
@@ -91,6 +92,14 @@ export interface SettingsRepository {
   saveProfile(profile: HotelProfile): Promise<void>;
 }
 
+export interface StaffRepository {
+  /** Active members first, then by name. */
+  list(): Promise<StaffMember[]>;
+  get(id: string): Promise<StaffMember | null>;
+  create(member: StaffMember): Promise<void>;
+  update(member: StaffMember): Promise<void>;
+}
+
 export interface Repositories {
   rooms: RoomRepository;
   bookings: BookingRepository;
@@ -100,6 +109,7 @@ export interface Repositories {
   pendingActions: PendingActionRepository;
   housekeeping: HousekeepingRepository;
   settings: SettingsRepository;
+  staff: StaffRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

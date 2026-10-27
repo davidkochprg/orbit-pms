@@ -212,3 +212,35 @@ describe('hotel profile (PGlite)', () => {
     await repos.settings.saveProfile(seed.hotelProfile);
   });
 });
+
+describe('staff (PGlite)', () => {
+  it('lists active members first, then by name', async () => {
+    const staff = await repos.staff.list();
+    expect(staff).toHaveLength(seed.staff.length);
+    expect(staff.at(-1)?.active).toBe(false);
+    expect(staff.filter((s) => s.active).map((s) => s.name)).toEqual(
+      seed.staff
+        .filter((s) => s.active)
+        .map((s) => s.name)
+        .sort((a, b) => a.localeCompare(b)),
+    );
+  });
+
+  it('creates, reads and updates a member', async () => {
+    const member = {
+      id: 'stf_test',
+      name: 'Test Porter',
+      email: null,
+      role: 'receptionist' as const,
+      active: true,
+    };
+    await repos.staff.create(member);
+    expect(await repos.staff.get('stf_test')).toEqual(member);
+    await repos.staff.update({ ...member, role: 'housekeeping', active: false });
+    expect(await repos.staff.get('stf_test')).toMatchObject({
+      role: 'housekeeping',
+      active: false,
+    });
+    expect(await repos.staff.get('nope')).toBeNull();
+  });
+});

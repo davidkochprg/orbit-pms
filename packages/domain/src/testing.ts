@@ -8,6 +8,7 @@ import type {
   PendingAction,
   Room,
   RoomType,
+  StaffMember,
 } from '@orbit/shared';
 import { rangesOverlap } from './dates';
 import type { Repositories } from './repositories';
@@ -22,6 +23,7 @@ export interface MemoryState {
   pendingActions: PendingAction[];
   tasks: HousekeepingTask[];
   profile: HotelProfile | null;
+  staff: StaffMember[];
 }
 
 // State is plain JSON, so a JSON round-trip is a full deep copy.
@@ -44,6 +46,7 @@ export function createMemoryRepositories(
     pendingActions: [],
     tasks: [],
     profile: null,
+    staff: [],
     ...clone(initial),
   };
 
@@ -158,6 +161,23 @@ export function createMemoryRepositories(
       getProfile: () => Promise.resolve(state.profile && clone(state.profile)),
       saveProfile: (profile) => {
         state.profile = clone(profile);
+        return Promise.resolve();
+      },
+    },
+    staff: {
+      list: () =>
+        Promise.resolve(
+          [...state.staff].sort(
+            (a, b) => Number(b.active) - Number(a.active) || a.name.localeCompare(b.name),
+          ),
+        ),
+      get: (id) => Promise.resolve(state.staff.find((s) => s.id === id) ?? null),
+      create: (member) => {
+        state.staff.push(member);
+        return Promise.resolve();
+      },
+      update: (member) => {
+        state.staff = state.staff.map((s) => (s.id === member.id ? member : s));
         return Promise.resolve();
       },
     },

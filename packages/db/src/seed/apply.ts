@@ -9,6 +9,7 @@ import {
   pendingActions,
   rooms,
   roomTypes,
+  staff,
 } from '../schema';
 import type { SeedData } from './build';
 
@@ -24,6 +25,7 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
     await tx.delete(rooms);
     await tx.delete(roomTypes);
     await tx.delete(hotelProfile);
+    await tx.delete(staff);
 
     await tx.insert(roomTypes).values(seed.roomTypes);
     await tx.insert(rooms).values(seed.rooms);
@@ -45,5 +47,6 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
       .insert(housekeepingTasks)
       .values(seed.housekeepingTasks.map((t) => ({ ...t, createdAt: new Date(t.createdAt) })));
     await tx.insert(hotelProfile).values({ id: 'hotel', profile: seed.hotelProfile });
+    await tx.insert(staff).values(seed.staff);
   });
 }

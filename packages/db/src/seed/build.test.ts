@@ -39,6 +39,14 @@ describe('buildSeed', () => {
     expect(amountsInText(JSON.stringify(seed.hotelProfile))).toEqual([]);
   });
 
+  it('has a synthetic team with an active manager', () => {
+    expect(seed.staff.filter((s) => s.active && s.role === 'manager').length).toBeGreaterThan(0);
+    expect(seed.staff.every((s) => s.email === null || s.email.endsWith('@example.com'))).toBe(
+      true,
+    );
+    expect(new Set(seed.staff.map((s) => s.id)).size).toBe(seed.staff.length);
+  });
+
   it('fills about half the hotel on a typical night', () => {
     const night = seed.bookings.filter(
       (b) => b.status !== 'cancelled' && b.checkIn <= today && today < b.checkOut,

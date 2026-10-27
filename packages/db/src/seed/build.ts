@@ -17,9 +17,11 @@ import type {
   IsoDate,
   Room,
   RoomType,
+  StaffMember,
 } from '@orbit/shared';
 import { seedGuests, seedRooms, seedRoomTypes } from './catalog';
 import { seedHotelProfile } from './hotel';
+import { seedStaff } from './staff';
 import { createRandom } from './random';
 
 export interface SeedData {
@@ -30,6 +32,7 @@ export interface SeedData {
   inquiries: Inquiry[];
   housekeepingTasks: HousekeepingTask[];
   hotelProfile: HotelProfile;
+  staff: StaffMember[];
 }
 
 interface Draft {
@@ -224,6 +227,7 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
     inquiries,
     housekeepingTasks,
     hotelProfile: seedHotelProfile,
+    staff: seedStaff,
   };
 }
 

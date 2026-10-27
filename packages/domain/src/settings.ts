@@ -1,6 +1,7 @@
-import type { AuditActor, HotelProfile } from '@orbit/shared';
+import type { HotelProfile, StaffMember } from '@orbit/shared';
 import { DomainError } from './errors';
 import type { Repositories } from './repositories';
+import { assertManager } from './staff';
 
 /** What Settings shows before anyone has described the property. */
 export const emptyHotelProfile: HotelProfile = {
@@ -53,8 +54,9 @@ export function createSettingsService({ repos }: SettingsDeps) {
   return {
     getProfile,
 
-    /** Replaces the profile. A save that changes nothing writes no audit entry. */
-    async updateProfile(profile: HotelProfile, actor: AuditActor): Promise<HotelProfile> {
+    /** Replaces the profile; managers only. A save that changes nothing writes no audit entry. */
+    async updateProfile(profile: HotelProfile, by: StaffMember | null): Promise<HotelProfile> {
+      assertManager(by);
       assertValidProfile(profile);
       return repos.transaction(async (tx) => {
         const before = (await tx.settings.getProfile()) ?? emptyHotelProfile;
@@ -62,10 +64,10 @@ export function createSettingsService({ repos }: SettingsDeps) {
         if (changed.length === 0) return before;
         await tx.settings.saveProfile(profile);
         await tx.audit.append({
-          actor,
+          actor: 'user',
           action: 'settings.profile',
           subjectId: null,
-          payload: { changed },
+          payload: { by: by.id, changed },
         });
         return profile;
       });

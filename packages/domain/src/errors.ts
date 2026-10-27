@@ -5,7 +5,8 @@ export type DomainErrorCode =
   | 'not_found'
   | 'conflict'
   | 'invalid_transition'
-  | 'invalid_input';
+  | 'invalid_input'
+  | 'forbidden';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;
