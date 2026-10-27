@@ -4,9 +4,18 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./evals": "./src/evals/index.ts"
   },
   "scripts": {
+    "eval": "tsx src/evals/run.ts",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@orbit/domain": "workspace:*",
+    "@orbit/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.23.15"
   }
 }
