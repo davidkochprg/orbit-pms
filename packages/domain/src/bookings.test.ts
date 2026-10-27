@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { allowedActions, applyAction, changeDates, moveBooking } from './bookings';
+import { allowedActions, applyAction, changeDates, moveBooking, reschedule } from './bookings';
 import { DomainError } from './errors';
 import type { PricingConfig } from './pricing';
 import { apartment, booking, double, room } from './test-fixtures';
@@ -214,5 +214,69 @@ describe('changeDates', () => {
         ),
       'invalid_transition',
     );
+  });
+});
+
+describe('reschedule', () => {
+  const b = booking({ id: 'b', roomId: '1', checkIn: '2026-05-10', checkOut: '2026-05-12' });
+  const ctx = { room: room('2'), roomType: double, roomBookings: [], now, pricing };
+
+  it('moves room and dates together and re-prices', () => {
+    const moved = reschedule(b, { checkIn: '2026-05-11', checkOut: '2026-05-14' }, ctx);
+    expect(moved).toMatchObject({ roomId: '2', checkIn: '2026-05-11', checkOut: '2026-05-14' });
+    expect(moved.priceSnapshot?.nights).toBe(3);
+  });
+
+  it('keeps the agreed price when only the room changes', () => {
+    const priced = { ...b, priceSnapshot: null };
+    expect(reschedule(priced, b, ctx).priceSnapshot).toBeNull();
+  });
+
+  it('shifts dates in the same room, ignoring the booking itself', () => {
+    const moved = reschedule(
+      b,
+      { checkIn: '2026-05-11', checkOut: '2026-05-13' },
+      { ...ctx, room: room('1'), roomBookings: [b] },
+    );
+    expect(moved.checkIn).toBe('2026-05-11');
+  });
+
+  it('rejects conflicts, no-op drags and arrival changes for checked-in guests', () => {
+    const other = booking({ id: 'o', roomId: '2', checkIn: '2026-05-13', checkOut: '2026-05-15' });
+    expectCode(
+      () =>
+        reschedule(
+          b,
+          { checkIn: '2026-05-12', checkOut: '2026-05-14' },
+          { ...ctx, roomBookings: [other] },
+        ),
+      'conflict',
+    );
+    expectCode(() => reschedule(b, b, { ...ctx, room: room('1') }), 'invalid_input');
+    expectCode(
+      () =>
+        reschedule(
+          { ...b, status: 'checked_in' },
+          { checkIn: '2026-05-11', checkOut: '2026-05-12' },
+          ctx,
+        ),
+      'invalid_transition',
+    );
+    expect(
+      reschedule(
+        { ...b, status: 'checked_in' },
+        { checkIn: '2026-05-10', checkOut: '2026-05-12' },
+        ctx,
+      ).roomId,
+    ).toBe('2');
+  });
+
+  it('rejects an out-of-order or too small room and finished bookings', () => {
+    expectCode(
+      () => reschedule(b, b, { ...ctx, room: room('2', { status: 'out_of_order' }) }),
+      'conflict',
+    );
+    expectCode(() => reschedule({ ...b, adults: 4 }, b, ctx), 'over_capacity');
+    expectCode(() => reschedule({ ...b, status: 'checked_out' }, b, ctx), 'invalid_transition');
   });
 });

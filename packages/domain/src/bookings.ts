@@ -197,3 +197,57 @@ export function createHold(request: HoldRequest, ctx: HoldContext): Booking {
   assertNoConflicts(ctx.room.id, booking, booking, ctx.roomBookings, ctx.now, ctx.room.name);
   return booking;
 }
+
+export interface RescheduleContext {
+  room: Room;
+  roomType: RoomType;
+  /** Bookings in the target room. */
+  roomBookings: Booking[];
+  now: Date;
+  pricing: PricingConfig;
+}
+
+/**
+ * Moves a booking to another room and/or other dates in one step (a tape chart drag). Changing
+ * only the room keeps the agreed price; changing the dates re-prices in the target room's type.
+ */
+export function reschedule(booking: Booking, range: DateRange, ctx: RescheduleContext): Booking {
+  if (!CHANGEABLE.includes(booking.status)) {
+    throw new DomainError('invalid_transition', `Cannot change a ${booking.status} booking`);
+  }
+  assertValidRange(range);
+  const sameDates = range.checkIn === booking.checkIn && range.checkOut === booking.checkOut;
+  const sameRoom = ctx.room.id === booking.roomId;
+  if (sameDates && sameRoom) throw new DomainError('invalid_input', 'Nothing to change');
+  if (booking.status === 'checked_in' && range.checkIn !== booking.checkIn) {
+    throw new DomainError(
+      'invalid_transition',
+      'Cannot change the arrival date of a guest who has checked in',
+    );
+  }
+  if (!sameRoom && ctx.room.status === 'out_of_order') {
+    throw new DomainError('conflict', `Room ${ctx.room.name} is out of order`);
+  }
+  if (!fitsRoomType(ctx.roomType, booking, booking.addons.extraBeds)) {
+    throw new DomainError('over_capacity', `Party does not fit room ${ctx.room.name}`);
+  }
+  assertNoConflicts(ctx.room.id, range, booking, ctx.roomBookings, ctx.now, ctx.room.name);
+  return {
+    ...booking,
+    roomId: ctx.room.id,
+    checkIn: range.checkIn,
+    checkOut: range.checkOut,
+    priceSnapshot: sameDates
+      ? booking.priceSnapshot
+      : quote(
+          {
+            roomType: ctx.roomType,
+            ...range,
+            adults: booking.adults,
+            childAges: booking.childAges,
+            addons: booking.addons,
+          },
+          ctx.pricing,
+        ),
+  };
+}

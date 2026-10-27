@@ -227,3 +227,32 @@ describe('queries', () => {
     ]);
   });
 });
+
+describe('rescheduleBooking', () => {
+  it('moves room and dates in one audited step', async () => {
+    const { repos, service } = setup();
+    const updated = await service.rescheduleBooking(
+      'arrival',
+      { roomId: 'rm_2', checkIn: '2026-05-14', checkOut: '2026-05-16' },
+      'user',
+    );
+    expect(updated).toMatchObject({ roomId: 'rm_2', checkIn: '2026-05-14' });
+    expect(repos.state.audit[0]).toMatchObject({
+      action: 'booking.reschedule',
+      subjectId: 'arrival',
+    });
+  });
+
+  it('saves nothing when the target is taken', async () => {
+    const { repos, service } = setup();
+    await expect(
+      service.rescheduleBooking(
+        'arrival',
+        { roomId: 'rm_2', checkIn: '2026-05-12', checkOut: '2026-05-13' },
+        'user',
+      ),
+    ).rejects.toMatchObject({ code: 'conflict' });
+    expect(repos.state.bookings.find((b) => b.id === 'arrival')?.roomId).toBe('rm_1');
+    expect(repos.state.audit).toEqual([]);
+  });
+});

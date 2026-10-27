@@ -18,7 +18,14 @@ import type {
   StayOption,
 } from '@orbit/shared';
 import { checkAvailability } from './availability';
-import { allowedActions, applyAction, changeDates, createHold, moveBooking } from './bookings';
+import {
+  allowedActions,
+  applyAction,
+  changeDates,
+  createHold,
+  moveBooking,
+  reschedule,
+} from './bookings';
 import { addDays, type DateRange, hotelToday } from './dates';
 import { arrivalsOn, departuresOn, stayingOver } from './day';
 import { DomainError } from './errors';
@@ -151,6 +158,40 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
           payload: {
             from: { checkIn: booking.checkIn, checkOut: booking.checkOut },
             to: range,
+            total: {
+              from: booking.priceSnapshot?.total ?? null,
+              to: updated.priceSnapshot?.total ?? null,
+            },
+          },
+        },
+        apply: (r) => r.bookings.updateBooking(updated),
+      };
+    };
+  }
+
+  function planReschedule(id: string, target: DateRange & { roomId: string }) {
+    return async (tx: Repositories): Promise<Plan> => {
+      const booking = await loadBooking(tx, id);
+      const dest = await loadRoom(tx, target.roomId);
+      const updated = reschedule(
+        booking,
+        { checkIn: target.checkIn, checkOut: target.checkOut },
+        {
+          ...dest,
+          roomBookings: await tx.bookings.listBookings({ roomId: target.roomId }),
+          now: clock(),
+          pricing,
+        },
+      );
+      return {
+        booking: updated,
+        room: dest.room,
+        audit: {
+          action: 'booking.reschedule',
+          subjectId: id,
+          payload: {
+            from: { roomId: booking.roomId, checkIn: booking.checkIn, checkOut: booking.checkOut },
+            to: target,
             total: {
               from: booking.priceSnapshot?.total ?? null,
               to: updated.priceSnapshot?.total ?? null,
@@ -346,6 +387,8 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     changeBookingDates: (id: string, range: DateRange, actor: AuditActor) =>
       commit(planDates(id, range), actor),
     createHold: (input: CreateHoldInput, actor: AuditActor) => commit(planHold(input), actor),
+    rescheduleBooking: (id: string, target: DateRange & { roomId: string }, actor: AuditActor) =>
+      commit(planReschedule(id, target), actor),
     previewBookingAction: (id: string, action: BookingAction) => preview(planAction(id, action)),
     previewMove: (id: string, roomId: string) => preview(planMove(id, roomId)),
     previewDates: (id: string, range: DateRange) => preview(planDates(id, range)),
