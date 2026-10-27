@@ -6,6 +6,7 @@ import { GuestsPage } from '@/pages/guests';
 import { InboxPage } from '@/pages/inbox';
 import { HousekeepingPage } from '@/pages/housekeeping';
 import { NotFoundPage } from '@/pages/sections';
+import { SettingsPage } from '@/pages/settings';
 import { TapeChartPage } from '@/pages/tape-chart';
 
 export const router = createBrowserRouter([
@@ -19,6 +20,7 @@ export const router = createBrowserRouter([
       { path: 'housekeeping', element: <HousekeepingPage /> },
       { path: 'guests', element: <GuestsPage /> },
       { path: 'guests/:id', element: <GuestDetailPage /> },
+      { path: 'settings/:section?', element: <SettingsPage /> },
       { path: '*', element: <NotFoundPage /> },
     ],
   },

@@ -87,6 +87,7 @@ flowchart LR
 - **One domain, two callers.** UI actions and agent tools call the same pure, unit-tested domain functions ([ADR 0002](docs/decisions/0002-deterministic-domain-llm-orchestrates.md), [ADR 0003](docs/decisions/0003-shared-tools-for-ui-and-agent.md)).
 - **No business logic in the UI, the routes or the prompts.** The domain package has no network, database or env access.
 - **The agent lives in the command bar,** not in a chat panel bolted onto the side ([ADR 0007](docs/decisions/0007-command-bar-for-the-agent.md)).
+- **The agent knows the property from Settings,** where staff describe policies, amenities and guest information; rules the domain enforces are written into the prompt from code, never retyped ([ADR 0008](docs/decisions/0008-hotel-profile-in-settings.md)).
 
 | Package           | Role                                                     |
 | ----------------- | -------------------------------------------------------- |

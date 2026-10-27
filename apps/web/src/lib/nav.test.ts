@@ -16,5 +16,6 @@ describe('navItemFor', () => {
 
   it('matches nested paths to their section', () => {
     expect(navItemFor('/guests/gst_cs_01')?.label).toBe('Guests');
+    expect(navItemFor('/settings/team')?.label).toBe('Settings');
   });
 });

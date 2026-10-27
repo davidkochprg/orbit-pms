@@ -14,6 +14,8 @@ import {
   type HousekeepingTaskStatus,
   type NewTaskBody,
   healthSchema,
+  hotelProfileSchema,
+  type HotelProfile,
   inquiryListSchema,
   inquirySchema,
   type NewMessageBody,
@@ -21,9 +23,14 @@ import {
   roomSchema,
   type RoomStatus,
   roomTypeSchema,
+  type NewStaffBody,
+  STAFF_HEADER,
+  staffMemberSchema,
+  type UpdateStaffBody,
 } from '@orbit/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
+import { storedStaffId } from '@/lib/session';
 
 export class ApiRequestError extends Error {
   constructor(
@@ -40,9 +47,14 @@ async function request<S extends z.ZodType>(
   schema: S,
   init?: RequestInit,
 ): Promise<z.infer<S>> {
+  const staffId = storedStaffId();
   const res = await fetch(path, {
     ...init,
-    headers: { accept: 'application/json', ...init?.headers },
+    headers: {
+      accept: 'application/json',
+      ...(staffId && { [STAFF_HEADER]: staffId }),
+      ...init?.headers,
+    },
   });
   const body: unknown = await res.json().catch(() => null);
   if (!res.ok) {
@@ -61,9 +73,14 @@ export function apiGet<S extends z.ZodType>(path: string, schema: S) {
   return request(path, schema);
 }
 
-export function apiPost<S extends z.ZodType>(path: string, body: unknown, schema: S) {
+export function apiPost<S extends z.ZodType>(
+  path: string,
+  body: unknown,
+  schema: S,
+  method: 'POST' | 'PUT' | 'PATCH' = 'POST',
+) {
   return request(path, schema, {
-    method: 'POST',
+    method,
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
@@ -315,4 +332,36 @@ export function useHousekeepingNote() {
     form.append('audio', note.audio, 'note.wav');
     return apiPostForm('/api/housekeeping/voice', form, housekeepingNoteResultSchema);
   });
+}
+
+export function useHotelProfile() {
+  return useQuery({
+    queryKey: ['hotel-profile'],
+    queryFn: () => apiGet('/api/settings/profile', hotelProfileSchema),
+  });
+}
+
+export function useSaveHotelProfile() {
+  return useRefreshingMutation((profile: HotelProfile) =>
+    apiPost('/api/settings/profile', profile, hotelProfileSchema, 'PUT'),
+  );
+}
+
+export function useStaff() {
+  return useQuery({
+    queryKey: ['staff'],
+    queryFn: () => apiGet('/api/staff', z.array(staffMemberSchema)),
+  });
+}
+
+export function useAddStaff() {
+  return useRefreshingMutation((body: NewStaffBody) =>
+    apiPost('/api/staff', body, staffMemberSchema),
+  );
+}
+
+export function useUpdateStaff() {
+  return useRefreshingMutation(({ id, ...patch }: UpdateStaffBody & { id: string }) =>
+    apiPost(`/api/staff/${encodeURIComponent(id)}`, patch, staffMemberSchema, 'PATCH'),
+  );
 }
