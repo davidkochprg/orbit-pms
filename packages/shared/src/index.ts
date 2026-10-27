@@ -1,4 +1,5 @@
 export * from './api';
+export * from './billing';
 export * from './brief';
 export * from './dates';
 export * from './entities';

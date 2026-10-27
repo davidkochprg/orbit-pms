@@ -21,6 +21,7 @@ const pricing: PricingConfig = {
   wellness: { perPersonPerNight: 0, minAge: 0 },
   extraBed: { perNight: 0 },
   dog: { perNight: 0 },
+  cityTax: { perPersonPerNight: 0, minAge: 18 },
 };
 
 function expectCode(fn: () => unknown, code: DomainError['code']) {

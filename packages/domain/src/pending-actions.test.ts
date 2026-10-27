@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createBillingService } from './billing';
 import { createPendingActionService } from './pending-actions';
 import { hotelPolicy } from './policy';
 import { pricingConfig } from './pricing';
@@ -45,10 +46,11 @@ function setup() {
     clock: () => now,
     newId,
   });
+  const billing = createBillingService({ repos, pricing: pricingConfig, clock: () => now, newId });
   return {
     repos,
     hotel,
-    actions: createPendingActionService({ repos, hotel, clock: () => now, newId }),
+    actions: createPendingActionService({ repos, hotel, billing, clock: () => now, newId }),
   };
 }
 
@@ -157,6 +159,51 @@ describe('pending actions', () => {
     expect(result.status).toBe('failed');
     expect(result.error).toMatch(/Room 2 is taken/);
     expect(repos.state.bookings.find((b) => b.id === 'bk_a')?.roomId).toBe('rm_1');
+  });
+
+  it('proposes a charge with the balance after, and posts it on confirm', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'add_charge',
+      input: { bookingId: 'bk_a', label: 'Sauna', quantity: 2, unitPrice: 150 },
+    });
+    expect(proposed.summary).toBe(
+      'Add 2 × Sauna at 150 CZK (300 CZK) to the bill of Tomáš Novák, room 1; balance then 500 CZK',
+    );
+    expect(repos.state.charges).toEqual([]);
+    await actions.confirm(proposed.id);
+    expect(repos.state.charges).toHaveLength(1);
+    expect(repos.state.audit[0]).toMatchObject({ actor: 'agent', action: 'folio.charge' });
+  });
+
+  it('proposes a payment and records it on confirm', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'record_payment',
+      input: {
+        bookingId: 'bk_a',
+        kind: 'payment',
+        method: 'bank_transfer',
+        amount: 500,
+        note: null,
+      },
+    });
+    expect(proposed.summary).toBe(
+      'Record a bank transfer payment of 500 CZK from Tomáš Novák, room 1; balance then -300 CZK',
+    );
+    const confirmed = await actions.confirm(proposed.id);
+    expect(confirmed).toMatchObject({ status: 'confirmed', bookingId: 'bk_a' });
+    expect(repos.state.payments).toHaveLength(1);
+  });
+
+  it('refuses to propose a charge on a hold', async () => {
+    const { actions } = setup();
+    await expect(
+      actions.propose({
+        kind: 'add_charge',
+        input: { bookingId: 'bk_h', label: 'Sauna', quantity: 1, unitPrice: 150 },
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_transition' });
   });
 
   it('can be rejected, and cannot be resolved twice', async () => {

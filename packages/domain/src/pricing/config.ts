@@ -19,4 +19,5 @@ export const pricingConfig: PricingConfig = {
   wellness: { perPersonPerNight: 100, minAge: 0 }, // TODO(David)
   extraBed: { perNight: 100 }, // TODO(David)
   dog: { perNight: 100 }, // TODO(David)
+  cityTax: { perPersonPerNight: 50, minAge: 18 }, // TODO(David)
 };

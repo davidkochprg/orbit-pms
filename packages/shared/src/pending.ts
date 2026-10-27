@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { newChargeBodySchema, newPaymentBodySchema } from './billing';
 import { isoDateSchema } from './dates';
 import { bookingPatchSchema, createHoldInputSchema } from './operations';
 
@@ -18,6 +19,14 @@ export const pendingActionInputSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('update_booking'),
     input: bookingPatchSchema.extend({ bookingId: z.string() }),
+  }),
+  z.object({
+    kind: z.literal('add_charge'),
+    input: newChargeBodySchema.extend({ bookingId: z.string() }),
+  }),
+  z.object({
+    kind: z.literal('record_payment'),
+    input: newPaymentBodySchema.extend({ bookingId: z.string() }),
   }),
 ]);
 export type PendingActionInput = z.infer<typeof pendingActionInputSchema>;

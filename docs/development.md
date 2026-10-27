@@ -76,6 +76,7 @@ A PGlite directory can only be open in one process at a time; two processes writ
 - 240 synthetic guests in Czech, German, Polish and English: a few hand-picked names plus first name and surname combinations. Emails use `example.com`. No guest has two stays at once.
 - About 440 bookings from three weeks ago to six weeks ahead, filling about half the hotel on a typical night, priced with `quote()`. There are always arrivals and departures today, at least one family arrival, and some open holds.
 - 10 open inquiries in mixed languages (from `packages/ai/src/evals/inquiries.ts`). The seed makes sure each one has at least one free room.
+- Bills: extras on past and current stays, deposits by bank transfer on some bookings, and settled bills for guests who left. Guests leaving today still owe something. Extra prices are placeholders.
 - Housekeeping tasks: turnovers for today's departures, stayovers for in-house guests, one maintenance task.
 - The hotel profile of the fictional "Orbit Demo Penzion" (`packages/db/src/seed/hotel.ts`): policies, amenities and guest information, without prices. Seeding replaces any profile edited in Settings.
 - The rates from `packages/domain/src/pricing/config.ts` (placeholders). Seeding replaces any rates, room types and rooms edited in Settings.

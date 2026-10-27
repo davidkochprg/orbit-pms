@@ -20,6 +20,7 @@ const pricing: PricingConfig = {
   wellness: { perPersonPerNight: 250, minAge: 0 },
   extraBed: { perNight: 0 },
   dog: { perNight: 0 },
+  cityTax: { perPersonPerNight: 0, minAge: 18 },
 };
 const usageTokens = {
   inputTokens: { total: 800, noCache: 300, cacheRead: 500, cacheWrite: undefined },

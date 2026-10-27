@@ -1,4 +1,4 @@
-import { pricingConfig } from '@orbit/domain';
+import { addDays, pricingConfig } from '@orbit/domain';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from './client';
 import { createRepositories } from './repositories';
@@ -248,6 +248,55 @@ describe('room setup (PGlite)', () => {
     await repos.rooms.createRoom(room);
     await repos.rooms.updateRoom({ ...room, name: 'T2', status: 'dirty' });
     expect(await repos.rooms.getRoom('rm_test')).toEqual({ ...room, name: 'T2', status: 'dirty' });
+  });
+});
+
+describe('billing (PGlite)', () => {
+  it('round-trips the seeded charges and payments, filtered by booking and day', async () => {
+    const charge = seed.charges[0]!;
+    expect(await repos.billing.listCharges({ bookingId: charge.bookingId })).toEqual(
+      seed.charges
+        .filter((c) => c.bookingId === charge.bookingId)
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id)),
+    );
+    expect(await repos.billing.getCharge(charge.id)).toEqual(charge);
+    const payment = seed.payments[0]!;
+    const onDay = await repos.billing.listPayments({
+      from: payment.paidOn,
+      to: addDays(payment.paidOn, 1),
+    });
+    expect(onDay).toContainEqual(payment);
+    expect(onDay.every((p) => p.paidOn === payment.paidOn)).toBe(true);
+  });
+
+  it('creates and deletes charges and records payments', async () => {
+    const bookingId = seed.bookings[0]!.id;
+    const charge = {
+      id: 'chg_test',
+      bookingId,
+      label: 'Test extra',
+      quantity: 2,
+      unitPrice: -50,
+      amount: -100,
+      postedOn: '2026-10-27',
+      createdAt: '2026-10-27T09:00:00.000Z',
+    };
+    await repos.billing.createCharge(charge);
+    expect(await repos.billing.getCharge('chg_test')).toEqual(charge);
+    await repos.billing.deleteCharge('chg_test');
+    expect(await repos.billing.getCharge('chg_test')).toBeNull();
+    const payment = {
+      id: 'pay_test',
+      bookingId,
+      kind: 'refund' as const,
+      method: 'cash' as const,
+      amount: 100,
+      note: null,
+      paidOn: '2026-10-27',
+      createdAt: '2026-10-27T09:00:00.000Z',
+    };
+    await repos.billing.createPayment(payment);
+    expect(await repos.billing.listPayments({ bookingId })).toContainEqual(payment);
   });
 });
 

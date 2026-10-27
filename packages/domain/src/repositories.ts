@@ -3,6 +3,7 @@ import type {
   AuditLogEntry,
   Booking,
   BookingStatus,
+  Charge,
   Guest,
   HotelProfile,
   HousekeepingTask,
@@ -10,6 +11,7 @@ import type {
   Inquiry,
   IsoDate,
   PendingAction,
+  Payment,
   PricingConfig,
   Room,
   RoomStatus,
@@ -112,6 +114,24 @@ export interface StaffRepository {
   update(member: StaffMember): Promise<void>;
 }
 
+export interface BillingFilter {
+  bookingId?: string;
+  /** Posted or paid on a hotel day in `[from, to)`. */
+  from?: IsoDate;
+  to?: IsoDate;
+}
+
+export interface BillingRepository {
+  /** Oldest first. */
+  listCharges(filter?: BillingFilter): Promise<Charge[]>;
+  getCharge(id: string): Promise<Charge | null>;
+  createCharge(charge: Charge): Promise<void>;
+  deleteCharge(id: string): Promise<void>;
+  /** Oldest first. */
+  listPayments(filter?: BillingFilter): Promise<Payment[]>;
+  createPayment(payment: Payment): Promise<void>;
+}
+
 export interface Repositories {
   rooms: RoomRepository;
   bookings: BookingRepository;
@@ -122,6 +142,7 @@ export interface Repositories {
   housekeeping: HousekeepingRepository;
   settings: SettingsRepository;
   staff: StaffRepository;
+  billing: BillingRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

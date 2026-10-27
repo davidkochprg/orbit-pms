@@ -2,10 +2,12 @@ import type { Db } from '../client';
 import {
   auditLog,
   bookings,
+  charges,
   guests,
   hotelProfile,
   housekeepingTasks,
   inquiries,
+  payments,
   pendingActions,
   pricing,
   rooms,
@@ -18,6 +20,8 @@ import type { SeedData } from './build';
 export async function applySeed(db: Db, seed: SeedData): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.delete(pendingActions);
+    await tx.delete(charges);
+    await tx.delete(payments);
     await tx.delete(auditLog);
     await tx.delete(housekeepingTasks);
     await tx.delete(inquiries);
@@ -38,6 +42,12 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
         holdExpiresAt: b.holdExpiresAt ? new Date(b.holdExpiresAt) : null,
       })),
     );
+    await tx
+      .insert(charges)
+      .values(seed.charges.map((c) => ({ ...c, createdAt: new Date(c.createdAt) })));
+    await tx
+      .insert(payments)
+      .values(seed.payments.map((p) => ({ ...p, createdAt: new Date(p.createdAt) })));
     await tx.insert(inquiries).values(
       seed.inquiries.map((i) => ({
         ...i,

@@ -1,4 +1,5 @@
 import type { Booking, BookingPatch, PendingAction, PendingActionInput } from '@orbit/shared';
+import type { BillingService } from './billing';
 import { changedBookingFields } from './bookings';
 import { nightsBetween } from './dates';
 import { DomainError } from './errors';
@@ -8,6 +9,7 @@ import type { HotelService } from './service';
 export interface PendingActionDeps {
   repos: Repositories;
   hotel: HotelService;
+  billing: BillingService;
   clock: () => Date;
   newId: (prefix: string) => string;
 }
@@ -53,7 +55,13 @@ function changes(before: Booking, after: Booking, patch: BookingPatch): string {
  * Agent mutations are proposed, not executed. `propose` validates the change against current
  * data and stores it; only `confirm` (a user click) runs it, using the stored arguments.
  */
-export function createPendingActionService({ repos, hotel, clock, newId }: PendingActionDeps) {
+export function createPendingActionService({
+  repos,
+  hotel,
+  billing,
+  clock,
+  newId,
+}: PendingActionDeps) {
   async function guestName(guestId: string): Promise<string> {
     return (await repos.guests.getGuest(guestId))?.name ?? 'Unknown guest';
   }
@@ -89,24 +97,51 @@ export function createPendingActionService({ repos, hotel, clock, newId }: Pendi
         const details = changes(before.booking, booking, patch);
         return `Update ${before.guest.name} in room ${before.room.name}${details ? `: ${details}` : ''}${moved}, total ${czk(booking.priceSnapshot?.total)} (was ${czk(before.booking.priceSnapshot?.total)})`;
       }
+      case 'add_charge': {
+        const { bookingId, ...body } = action.input;
+        const before = await hotel.getBookingDetail(bookingId);
+        const { charge, balanceAfter } = await billing.previewCharge(bookingId, body);
+        return `Add ${charge.quantity} × ${charge.label} at ${czk(charge.unitPrice)} (${czk(charge.amount)}) to the bill of ${before.guest.name}, room ${before.room.name}; balance then ${czk(balanceAfter)}`;
+      }
+      case 'record_payment': {
+        const { bookingId, ...body } = action.input;
+        const before = await hotel.getBookingDetail(bookingId);
+        const { payment, balanceAfter } = await billing.previewPayment(bookingId, body);
+        const method = payment.method.replace('_', ' ');
+        const what =
+          payment.kind === 'refund'
+            ? `Refund ${czk(payment.amount)} by ${method} to`
+            : `Record a ${method} payment of ${czk(payment.amount)} from`;
+        return `${what} ${before.guest.name}, room ${before.room.name}; balance then ${czk(balanceAfter)}`;
+      }
     }
   }
 
-  async function execute(action: PendingActionInput): Promise<Booking> {
+  /** Runs the action and returns the ID of the booking it created or changed. */
+  async function execute(action: PendingActionInput): Promise<string> {
+    const id = (b: Booking) => b.id;
     switch (action.kind) {
       case 'create_hold':
-        return hotel.createHold(action.input, 'agent');
+        return id(await hotel.createHold(action.input, 'agent'));
       case 'confirm_booking':
-        return hotel.applyBookingAction(action.input.bookingId, 'confirm', 'agent');
+        return id(await hotel.applyBookingAction(action.input.bookingId, 'confirm', 'agent'));
       case 'cancel_booking':
-        return hotel.applyBookingAction(action.input.bookingId, 'cancel', 'agent');
+        return id(await hotel.applyBookingAction(action.input.bookingId, 'cancel', 'agent'));
       case 'move_booking':
-        return hotel.moveBooking(action.input.bookingId, action.input.roomId, 'agent');
+        return id(await hotel.moveBooking(action.input.bookingId, action.input.roomId, 'agent'));
       case 'change_dates':
-        return hotel.changeBookingDates(action.input.bookingId, action.input, 'agent');
+        return id(await hotel.changeBookingDates(action.input.bookingId, action.input, 'agent'));
       case 'update_booking': {
         const { bookingId, ...patch } = action.input;
-        return hotel.updateBooking(bookingId, patch, 'agent');
+        return id(await hotel.updateBooking(bookingId, patch, 'agent'));
+      }
+      case 'add_charge': {
+        const { bookingId, ...body } = action.input;
+        return (await billing.addCharge(bookingId, body, 'agent')).bookingId;
+      }
+      case 'record_payment': {
+        const { bookingId, ...body } = action.input;
+        return (await billing.recordPayment(bookingId, body, 'agent')).bookingId;
       }
     }
   }
@@ -157,8 +192,7 @@ export function createPendingActionService({ repos, hotel, clock, newId }: Pendi
     confirm: (id: string) =>
       resolve(id, async (action) => {
         try {
-          const booking = await execute(action);
-          return { status: 'confirmed', bookingId: booking.id };
+          return { status: 'confirmed', bookingId: await execute(action) };
         } catch (err) {
           if (!(err instanceof DomainError)) throw err;
           return { status: 'failed', error: err.message };

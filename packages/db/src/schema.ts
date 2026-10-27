@@ -7,6 +7,8 @@ import {
   inquiryChannels,
   inquiryStatuses,
   languages,
+  paymentKinds,
+  paymentMethods,
   pendingActionStatuses,
   roomKinds,
   roomStatuses,
@@ -47,6 +49,8 @@ export const housekeepingTaskStatus = pgEnum('housekeeping_task_status', houseke
 export const auditActor = pgEnum('audit_actor', auditActors);
 export const pendingActionStatus = pgEnum('pending_action_status', pendingActionStatuses);
 export const staffRole = pgEnum('staff_role', staffRoles);
+export const paymentKind = pgEnum('payment_kind', paymentKinds);
+export const paymentMethod = pgEnum('payment_method', paymentMethods);
 
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
@@ -186,6 +190,47 @@ export const hotelProfile = pgTable('hotel_profile', {
   profile: jsonb('profile').$type<HotelProfile>().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
+
+/** Extras posted to a booking's bill. The stay itself is billed from the booking's price snapshot. */
+export const charges = pgTable(
+  'charges',
+  {
+    id: text('id').primaryKey(),
+    bookingId: text('booking_id')
+      .notNull()
+      .references(() => bookings.id),
+    label: text('label').notNull(),
+    quantity: integer('quantity').notNull(),
+    /** Whole CZK; negative for a discount. */
+    unitPrice: integer('unit_price').notNull(),
+    amount: integer('amount').notNull(),
+    postedOn: date('posted_on', { mode: 'string' }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('charges_booking_idx').on(t.bookingId), index('charges_posted_idx').on(t.postedOn)],
+);
+
+/** Money received for a booking, or paid back (`refund`). Amounts are positive whole CZK. */
+export const payments = pgTable(
+  'payments',
+  {
+    id: text('id').primaryKey(),
+    bookingId: text('booking_id')
+      .notNull()
+      .references(() => bookings.id),
+    kind: paymentKind('kind').notNull(),
+    method: paymentMethod('method').notNull(),
+    amount: integer('amount').notNull(),
+    note: text('note'),
+    paidOn: date('paid_on', { mode: 'string' }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [
+    index('payments_booking_idx').on(t.bookingId),
+    index('payments_paid_idx').on(t.paidOn),
+    check('payments_amount_check', sql`${t.amount} > 0`),
+  ],
+);
 
 /** Rates from Settings: seasons, discounts and add-on prices. One row, `id = 'hotel'`. */
 export const pricing = pgTable('pricing', {

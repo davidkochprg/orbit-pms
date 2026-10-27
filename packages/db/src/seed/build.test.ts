@@ -2,6 +2,7 @@ import { amountsInText } from '@orbit/ai';
 import { buildInquiryFixtures, evalRoomNames } from '@orbit/ai/evals';
 import {
   assertValidPricing,
+  buildFolio,
   assertValidProfile,
   blocksRoom,
   checkAvailability,
@@ -43,6 +44,38 @@ describe('buildSeed', () => {
   it('stores the valid rates its bookings were priced with', () => {
     expect(seed.pricing).toEqual(pricingConfig);
     expect(() => assertValidPricing(seed.pricing)).not.toThrow();
+  });
+
+  it("settles every past stay and leaves today's departures something to pay", () => {
+    const folio = (id: string) => {
+      const b = seed.bookings.find((x) => x.id === id)!;
+      return buildFolio(
+        b,
+        seed.charges.filter((c) => c.bookingId === id),
+        seed.payments.filter((p) => p.bookingId === id),
+        seed.pricing,
+      );
+    };
+    for (const b of seed.bookings.filter((x) => x.status === 'checked_out')) {
+      expect(folio(b.id).balance, b.id).toBe(0);
+    }
+    const leaving = seed.bookings.filter((b) => b.checkOut === today && b.status === 'checked_in');
+    for (const b of leaving) expect(folio(b.id).balance, b.id).toBeGreaterThan(0);
+    expect(seed.charges.length).toBeGreaterThan(50);
+    expect(seed.payments.some((p) => p.note === 'Deposit' && p.paidOn <= today)).toBe(true);
+  });
+
+  it('bills only stays that have started, and never a hold or a cancellation', () => {
+    const byId = new Map(seed.bookings.map((b) => [b.id, b]));
+    for (const c of seed.charges) {
+      const b = byId.get(c.bookingId)!;
+      expect(['checked_in', 'checked_out']).toContain(b.status);
+      expect(c.postedOn >= b.checkIn && c.postedOn < b.checkOut && c.postedOn <= today).toBe(true);
+    }
+    for (const p of seed.payments) {
+      expect(p.amount).toBeGreaterThan(0);
+      expect(['hold', 'cancelled']).not.toContain(byId.get(p.bookingId)!.status);
+    }
   });
 
   it('has a synthetic team with an active manager', () => {

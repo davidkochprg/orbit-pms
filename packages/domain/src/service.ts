@@ -40,6 +40,7 @@ import { DomainError } from './errors';
 import { addonsForWishes, pickOptions, roomKindForWishes, stayRequest } from './inbox';
 import type { HotelPolicy } from './policy';
 import { type PricingConfig, quote } from './pricing';
+import { currentPricing } from './rates';
 import type { NewAuditEntry, Repositories } from './repositories';
 import { containsText } from './text';
 
@@ -91,9 +92,7 @@ async function loadRoom(repos: Repositories, id: string) {
  */
 export function createHotelService({ repos, pricing, policy, clock, newId }: ServiceDeps) {
   /** The saved rates, read in the caller's transaction so a price matches what is committed. */
-  async function loadPricing(r: Repositories): Promise<PricingConfig> {
-    return (await r.settings.getPricing()) ?? pricing;
-  }
+  const loadPricing = (r: Repositories) => currentPricing(r, pricing);
 
   async function commit(plan: (tx: Repositories) => Promise<Plan>, actor: AuditActor) {
     return repos.transaction(async (tx) => {

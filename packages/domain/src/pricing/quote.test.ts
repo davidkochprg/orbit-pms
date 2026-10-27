@@ -21,6 +21,7 @@ const config: PricingConfig = {
   wellness: { perPersonPerNight: 300, minAge: 6 },
   extraBed: { perNight: 400 },
   dog: { perNight: 250 },
+  cityTax: { perPersonPerNight: 50, minAge: 18 },
 };
 
 const base = {

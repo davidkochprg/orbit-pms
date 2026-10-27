@@ -13,6 +13,8 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 | Inquiry          | raw text, channel, received at, parsed extraction, `status`, linked booking                                                                                           |
 | HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes                                                         |
 | HotelProfile     | name, location, description, contact, `checkInFrom`, `checkOutBy`, `entries` (`policy` \| `amenity` \| `info`, title, details)                                        |
+| Charge           | booking, label, quantity, `unitPrice` (CZK, negative for a discount), amount, `postedOn`                                                                              |
+| Payment          | booking, `kind` (`payment` \| `refund`), `method` (`cash` \| `card` \| `bank_transfer`), amount (positive CZK), note, `paidOn`                                        |
 | StaffMember      | name, email, `role` (`manager` \| `receptionist` \| `housekeeping`), `active`                                                                                         |
 | AuditLog         | `actor` (`user` \| `agent`), action, `subjectId` (e.g. a booking), payload, timestamp                                                                                 |
 
@@ -109,10 +111,26 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - `updateProfile(profile, by)` replaces the whole profile; only an active manager may (`forbidden`). Entry IDs must be unique and check-out must be earlier in the day than check-in, so rooms can be turned over (`invalid_input`). It writes `settings.profile` to the audit log with who saved it (`by`) and the names of the changed fields; a save that changes nothing writes nothing.
 - Rules the system enforces (hold length, which room kinds take dogs, prices) stay in `hotelPolicy` and the rates, not in the profile.
 
+## Billing
+
+`createBillingService` (`billing.ts`) keeps each booking's bill (folio). `buildFolio(booking, charges, payments, pricing)` builds it:
+
+1. **Stay**: the booking's `priceSnapshot` lines, verbatim. A cancelled booking has no stay lines.
+2. **City tax**: `cityTax.perPersonPerNight` × paying guests × nights, at the current rate. Every adult pays; children pay from `cityTax.minAge` (default 18, so children don't). No line when the rate is 0. It is billed on the folio, not in `quote()`.
+3. **Extras**: charges staff or the agent posted, e.g. sauna or minibar.
+
+`charged` is the sum of the lines, `paid` is payments minus refunds, and `balance = charged - paid` (negative: the guest is owed money).
+
+- `addCharge` / `removeCharge` need a `confirmed` or `checked_in` booking (`invalid_transition`): a hold isn't a sale yet, and a checked-out bill is closed. A charge is posted on the hotel's today.
+- `recordPayment` takes payments in any status except `cancelled`, where only refunds are possible. A refund can't exceed what was paid (`invalid_input`).
+- `previewCharge` / `previewPayment` run the same checks without saving and return the balance after, for agent proposals.
+- Audited on the booking as `folio.charge`, `folio.remove_charge`, `folio.payment` and `folio.refund`.
+
 ## Rates and rooms
 
 `createRatesService` (`rates.ts`) keeps the rates (the `PricingConfig` that `quote()` reads), room types and rooms. Anyone may read them; every change needs an active manager (`forbidden`) and is audited with `by` in the payload.
 
+- The rates include `cityTax` (`perPersonPerNight`, `minAge`), billed on the folio. Rates saved before it existed read it as 0.
 - Until rates are saved, `getPricing()` returns the defaults from `pricing/config.ts` (placeholders). The demo seed saves those defaults.
 - `updatePricing(config, by)` replaces the rates. Season days must be real `MM-DD` days (29 February counts) and season names unique, child tiers must go up in age, and there is one long-stay tier per length (`invalid_input`). Audited as `settings.pricing` with the changed fields; a save that changes nothing writes nothing.
 - `createRoomType` / `updateRoomType` set the name, capacity, base price and description (`room_type.create`, `room_type.update`; a price change logs the old and new base price).

@@ -54,6 +54,16 @@ export const pricingConfigSchema = z.object({
   }),
   extraBed: z.object({ perNight: czkSchema.nonnegative() }),
   dog: z.object({ perNight: czkSchema.nonnegative() }),
+  /**
+   * Local tourist tax, billed on the folio rather than in the quote. Guests from `minAge` pay it
+   * (adults always). Rates saved before it existed read as none.
+   */
+  cityTax: z
+    .object({
+      perPersonPerNight: czkSchema.nonnegative(),
+      minAge: z.number().int().min(0).max(18),
+    })
+    .default({ perPersonPerNight: 0, minAge: 18 }),
 });
 export type PricingConfig = z.infer<typeof pricingConfigSchema>;
 

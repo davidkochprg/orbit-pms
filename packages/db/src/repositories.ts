@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 import type {
   AuditRepository,
+  BillingFilter,
+  BillingRepository,
   BookingFilter,
   BookingRepository,
   GuestRepository,
@@ -15,22 +17,27 @@ import type {
 import {
   type AuditLogEntry,
   type Booking,
+  type Charge,
   hotelProfileSchema,
   type HousekeepingTask,
   type Inquiry,
   type PendingAction,
+  type Payment,
   pendingActionSchema,
   pricingConfigSchema,
 } from '@orbit/shared';
-import { and, asc, desc, eq, gt, inArray, lt, type SQL } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, lt, type SQL } from 'drizzle-orm';
+import type { PgColumn } from 'drizzle-orm/pg-core';
 import type { Db } from './client';
 import {
   auditLog,
   bookings,
+  charges,
   guests,
   hotelProfile,
   housekeepingTasks,
   inquiries,
+  payments,
   pendingActions,
   pricing,
   rooms,
@@ -322,6 +329,56 @@ function settingsRepository(db: Db): SettingsRepository {
   };
 }
 
+function toCharge({ createdAt, ...row }: typeof charges.$inferSelect): Charge {
+  return { ...row, createdAt: createdAt.toISOString() };
+}
+
+function toPayment({ createdAt, ...row }: typeof payments.$inferSelect): Payment {
+  return { ...row, createdAt: createdAt.toISOString() };
+}
+
+function billingRepository(db: Db): BillingRepository {
+  function where(filter: BillingFilter, columns: { bookingId: PgColumn; day: PgColumn }) {
+    const parts: SQL[] = [];
+    if (filter.bookingId) parts.push(eq(columns.bookingId, filter.bookingId));
+    if (filter.from) parts.push(gte(columns.day, filter.from));
+    if (filter.to) parts.push(lt(columns.day, filter.to));
+    return and(...parts);
+  }
+
+  return {
+    async listCharges(filter = {}) {
+      const rows = await db
+        .select()
+        .from(charges)
+        .where(where(filter, { bookingId: charges.bookingId, day: charges.postedOn }))
+        .orderBy(asc(charges.createdAt), asc(charges.id));
+      return rows.map(toCharge);
+    },
+    async getCharge(id) {
+      const [row] = await db.select().from(charges).where(eq(charges.id, id));
+      return row ? toCharge(row) : null;
+    },
+    async createCharge(charge) {
+      await db.insert(charges).values({ ...charge, createdAt: new Date(charge.createdAt) });
+    },
+    async deleteCharge(id) {
+      await db.delete(charges).where(eq(charges.id, id));
+    },
+    async listPayments(filter = {}) {
+      const rows = await db
+        .select()
+        .from(payments)
+        .where(where(filter, { bookingId: payments.bookingId, day: payments.paidOn }))
+        .orderBy(asc(payments.createdAt), asc(payments.id));
+      return rows.map(toPayment);
+    },
+    async createPayment(payment) {
+      await db.insert(payments).values({ ...payment, createdAt: new Date(payment.createdAt) });
+    },
+  };
+}
+
 export function createRepositories(db: Db): Repositories {
   return {
     rooms: roomRepository(db),
@@ -333,6 +390,7 @@ export function createRepositories(db: Db): Repositories {
     housekeeping: housekeepingRepository(db),
     settings: settingsRepository(db),
     staff: staffRepository(db),
+    billing: billingRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

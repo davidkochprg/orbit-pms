@@ -10,15 +10,18 @@ import {
 import type {
   Booking,
   BookingSource,
+  Charge,
   Guest,
   HotelProfile,
   HousekeepingTask,
   Inquiry,
   IsoDate,
+  Payment,
   Room,
   RoomType,
   StaffMember,
 } from '@orbit/shared';
+import { buildBilling } from './billing';
 import { seedGuests, seedRooms, seedRoomTypes } from './catalog';
 import { seedHotelProfile } from './hotel';
 import { seedStaff } from './staff';
@@ -35,6 +38,8 @@ export interface SeedData {
   /** The rates the seed's bookings were priced with. */
   pricing: PricingConfig;
   staff: StaffMember[];
+  charges: Charge[];
+  payments: Payment[];
 }
 
 interface Draft {
@@ -231,6 +236,7 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
     hotelProfile: seedHotelProfile,
     pricing,
     staff: seedStaff,
+    ...buildBilling(kept, today, pricing),
   };
 }
 

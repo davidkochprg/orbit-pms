@@ -1,18 +1,20 @@
 import type {
   AuditLogEntry,
   Booking,
+  Charge,
   Guest,
   HotelProfile,
   HousekeepingTask,
   Inquiry,
   PendingAction,
+  Payment,
   PricingConfig,
   Room,
   RoomType,
   StaffMember,
 } from '@orbit/shared';
 import { rangesOverlap } from './dates';
-import type { Repositories } from './repositories';
+import type { BillingFilter, Repositories } from './repositories';
 
 export interface MemoryState {
   roomTypes: RoomType[];
@@ -26,6 +28,18 @@ export interface MemoryState {
   profile: HotelProfile | null;
   pricing: PricingConfig | null;
   staff: StaffMember[];
+  charges: Charge[];
+  payments: Payment[];
+}
+
+function inBilling<T extends { bookingId: string }>(
+  item: T,
+  day: string,
+  { bookingId, from, to }: BillingFilter,
+): boolean {
+  return (
+    (!bookingId || item.bookingId === bookingId) && (!from || day >= from) && (!to || day < to)
+  );
 }
 
 // State is plain JSON, so a JSON round-trip is a full deep copy.
@@ -50,6 +64,8 @@ export function createMemoryRepositories(
     profile: null,
     pricing: null,
     staff: [],
+    charges: [],
+    payments: [],
     ...clone(initial),
   };
 
@@ -206,6 +222,25 @@ export function createMemoryRepositories(
       },
       update: (member) => {
         state.staff = state.staff.map((s) => (s.id === member.id ? member : s));
+        return Promise.resolve();
+      },
+    },
+    billing: {
+      listCharges: (filter = {}) =>
+        Promise.resolve(state.charges.filter((c) => inBilling(c, c.postedOn, filter))),
+      getCharge: (id) => Promise.resolve(state.charges.find((c) => c.id === id) ?? null),
+      createCharge: (charge) => {
+        state.charges.push(charge);
+        return Promise.resolve();
+      },
+      deleteCharge: (id) => {
+        state.charges = state.charges.filter((c) => c.id !== id);
+        return Promise.resolve();
+      },
+      listPayments: (filter = {}) =>
+        Promise.resolve(state.payments.filter((p) => inBilling(p, p.paidOn, filter))),
+      createPayment: (payment) => {
+        state.payments.push(payment);
         return Promise.resolve();
       },
     },

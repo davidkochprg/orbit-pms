@@ -66,6 +66,14 @@ export function changedPricingFields(before: PricingConfig, after: PricingConfig
   );
 }
 
+/** The saved rates, or `defaults` until a manager has saved some. */
+export async function currentPricing(
+  repos: Repositories,
+  defaults: PricingConfig,
+): Promise<PricingConfig> {
+  return (await repos.settings.getPricing()) ?? defaults;
+}
+
 /** Throws if another room already has this name, ignoring case and surrounding spaces. */
 export function assertUniqueRoomName(rooms: Room[], name: string, exceptId?: string): void {
   const key = name.trim().toLowerCase();
@@ -93,16 +101,14 @@ export function createRatesService({ repos, defaults, newId }: RatesDeps) {
   }
 
   return {
-    async getPricing(): Promise<PricingConfig> {
-      return (await repos.settings.getPricing()) ?? defaults;
-    },
+    getPricing: () => currentPricing(repos, defaults),
 
     /** Replaces the rates. A save that changes nothing writes no audit entry. */
     async updatePricing(pricing: PricingConfig, by: StaffMember | null): Promise<PricingConfig> {
       assertManager(by);
       assertValidPricing(pricing);
       return repos.transaction(async (tx) => {
-        const before = (await tx.settings.getPricing()) ?? defaults;
+        const before = await currentPricing(tx, defaults);
         const changed = changedPricingFields(before, pricing);
         if (changed.length === 0) return before;
         await tx.settings.savePricing(pricing);
