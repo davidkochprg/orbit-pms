@@ -37,6 +37,12 @@ describe('amountsInText', () => {
   it('ignores numbers that are not money', () => {
     expect(amountsInText('Check-in from 15:00, 2 adults, room 104, 6 November')).toEqual([]);
   });
+
+  it('does not join a currency with a list number on the next line', () => {
+    const list =
+      '1. Dvoulůžkový pokoj: celkem 6 600 CZK\n2. Rodinný pokoj: celkem 6 600 CZK\n3. Apartmán';
+    expect(amountsInText(list)).toEqual([6600, 6600]);
+  });
 });
 
 describe('checkDraftPrices', () => {
