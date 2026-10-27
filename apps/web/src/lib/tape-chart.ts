@@ -4,6 +4,16 @@ import { addDays, differenceInCalendarDays, format, getDay, parseISO } from 'dat
 /** Days shown at once on the tape chart. */
 export const TAPE_DAYS = 14;
 
+/** Tape chart geometry in px. Drag math depends on these, so they live in code, not CSS. */
+export const TAPE_ROOM_COLUMN = 156;
+export const TAPE_ROW_HEIGHT = 44;
+export const TAPE_MIN_DAY_WIDTH = 72;
+
+/** Day column width that fills the available width, but never narrower than the minimum. */
+export function dayWidthFor(containerWidth: number, days = TAPE_DAYS): number {
+  return Math.max(TAPE_MIN_DAY_WIDTH, Math.floor((containerWidth - TAPE_ROOM_COLUMN) / days));
+}
+
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 export function isIsoDate(value: string | null): value is IsoDate {

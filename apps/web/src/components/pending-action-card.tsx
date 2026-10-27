@@ -1,12 +1,13 @@
+import { Check, CircleAlert, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { usePendingAction, useResolvePendingAction } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
-const statusText = {
-  confirmed: 'Done',
-  rejected: 'Rejected',
-  failed: 'Could not be applied',
+const outcome = {
+  confirmed: { icon: Check, text: 'Done', className: 'text-success' },
+  rejected: { icon: X, text: 'Rejected', className: 'text-muted-foreground' },
+  failed: { icon: CircleAlert, text: 'Could not be applied', className: 'text-destructive' },
 } as const;
 
 /** Confirm card for a change the agent proposed. Nothing happens until the user confirms. */
@@ -15,12 +16,13 @@ export function PendingActionCard({ id, summary }: { id: string; summary: string
   const resolve = useResolvePendingAction(id);
   const { open } = useBookingDrawer();
   const current = resolve.data ?? action.data;
+  const result = current && current.status !== 'pending' ? outcome[current.status] : null;
 
   return (
-    <Card className="gap-2 py-3">
-      <CardContent className="px-3 text-sm">{current?.summary ?? summary}</CardContent>
-      <CardFooter className="flex flex-wrap items-center gap-2 px-3">
-        {current?.status === 'pending' ? (
+    <div className="flex flex-col gap-2.5 rounded-lg border bg-surface-raised p-3 shadow-raised">
+      <p className="text-sm">{current?.summary ?? summary}</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        {current?.status === 'pending' && (
           <>
             <Button
               size="sm"
@@ -31,28 +33,34 @@ export function PendingActionCard({ id, summary }: { id: string; summary: string
             </Button>
             <Button
               size="sm"
-              variant="outline"
+              variant="ghost"
               disabled={resolve.isPending}
               onClick={() => resolve.mutate('reject')}
             >
               Reject
             </Button>
           </>
-        ) : current ? (
-          <span className="text-xs text-muted-foreground">
-            {statusText[current.status]}
+        )}
+        {result && current && (
+          <span className={cn('flex items-center gap-1 text-xs font-medium', result.className)}>
+            <result.icon className="size-3.5" />
+            {result.text}
             {current.error && `: ${current.error}`}
           </span>
-        ) : (
-          <span className="text-xs text-muted-foreground">Loading…</span>
         )}
+        {!current && <span className="text-xs text-muted-foreground">Loading…</span>}
         {current?.bookingId && current.status === 'confirmed' && (
-          <Button size="sm" variant="ghost" onClick={() => open(current.bookingId!)}>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="ml-auto"
+            onClick={() => open(current.bookingId!)}
+          >
             Open booking
           </Button>
         )}
-      </CardFooter>
-      {resolve.isError && <p className="px-3 text-xs text-destructive">{resolve.error.message}</p>}
-    </Card>
+      </div>
+      {resolve.isError && <p className="text-xs text-destructive">{resolve.error.message}</p>}
+    </div>
   );
 }

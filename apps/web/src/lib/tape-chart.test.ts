@@ -2,11 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   addDaysIso,
   buildWindow,
+  dayWidthFor,
   isIsoDate,
   moveTarget,
   nightsFromDelta,
   placeBooking,
   resizeTarget,
+  TAPE_MIN_DAY_WIDTH,
+  TAPE_ROOM_COLUMN,
 } from './tape-chart';
 
 const start = '2026-10-27'; // Tuesday
@@ -101,5 +104,17 @@ describe('drag targets', () => {
     expect(resizeTarget(b, -72, 72)).toBe('2026-10-31');
     expect(resizeTarget(b, -1000, 72)).toBe('2026-10-30');
     expect(resizeTarget(b, 10, 72)).toBeNull();
+  });
+});
+
+describe('dayWidthFor', () => {
+  it('fills the width after the room column', () => {
+    expect(dayWidthFor(TAPE_ROOM_COLUMN + 14 * 100)).toBe(100);
+    expect(dayWidthFor(TAPE_ROOM_COLUMN + 14 * 100 + 13)).toBe(100);
+  });
+
+  it('never goes below the minimum, even before the container is measured', () => {
+    expect(dayWidthFor(0)).toBe(TAPE_MIN_DAY_WIDTH);
+    expect(dayWidthFor(500)).toBe(TAPE_MIN_DAY_WIDTH);
   });
 });

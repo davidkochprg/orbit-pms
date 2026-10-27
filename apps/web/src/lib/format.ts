@@ -5,6 +5,17 @@ export function formatDate(date: string): string {
   return format(parseISO(date), 'EEE d MMM');
 }
 
+/** "Wed" and "3 Oct" for a tape chart column header. */
+export function formatDayHeader(date: string): { weekday: string; day: string } {
+  const d = parseISO(date);
+  return { weekday: format(d, 'EEE'), day: format(d, 'd MMM') };
+}
+
+/** "Tuesday, 27 October" for page titles. */
+export function formatLongDate(date: string): string {
+  return format(parseISO(date), 'EEEE, d MMMM');
+}
+
 export function formatDateTime(iso: string): string {
   return format(new Date(iso), 'd MMM, HH:mm');
 }
@@ -48,3 +59,13 @@ export const languageLabels: Record<Language, string> = {
   en: 'English',
   pl: 'Polish',
 };
+
+/** Up to two initials for an avatar: "Jana Nováková" → "JN". */
+export function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const letters = words.length > 1 ? [words[0], words.at(-1)] : words;
+  return letters
+    .map((w) => w?.[0] ?? '')
+    .join('')
+    .toUpperCase();
+}

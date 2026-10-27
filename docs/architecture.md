@@ -45,3 +45,12 @@ sequenceDiagram
 ```
 
 Repositories implement the interfaces declared in `packages/domain/src/repositories.ts`, so domain code never imports a database driver.
+
+## Web UI
+
+The app shell is a sidebar (navigation, the ⌘K button, agent status, appearance) and one content panel per page. Each page renders its own `PageHeader` and body. Two overlays are shared by every page:
+
+- **Command bar** (`components/command-palette.tsx`, ⌘K): search guests and today's arrivals and departures, jump to a page, switch appearance, and talk to the agent. The agent lives here rather than in a chat side panel, see [ADR 0007](decisions/0007-command-bar-for-the-agent.md). `useCommandPalette().openPalette({ mode, text })` opens it from anywhere with context, for example from a booking.
+- **Booking inspector** (`components/booking-drawer.tsx`): opened by `?booking=<id>`, so any page, link or agent result can open a booking.
+
+Styling comes from design tokens in `apps/web/src/index.css`: surfaces, text, borders, status colors for bookings and rooms, shadows and a 13 px type scale, each defined for light and dark mode. The accent is one hue (`--accent-hue`, `--accent-chroma`), so changing it re-colors every accent. Components use the tokens through Tailwind utilities (`bg-status-hold`, `text-primary-text`, `shadow-raised`) and never raw colors. Reusable pieces (`PageHeader`, `Section`, `PropertyList`, `BookingList`, `StatusDot`, `GuestAvatar`, `EmptyState`, `ErrorNotice`) live in `apps/web/src/components/`; shadcn primitives are in `components/ui/`.

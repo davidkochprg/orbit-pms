@@ -28,6 +28,8 @@ sequenceDiagram
   A->>D: moveBooking (actor: agent) + audit log
 ```
 
+Staff talk to the agent in the ⌘K command bar. Each step the agent takes is listed in plain words ("Checked arrivals"), with the raw tool input and output one click away, and proposed changes appear as confirm cards in the same thread. The booking inspector's "Ask Orbit" button opens the bar with the booking as context. The conversation stays in memory until the page reloads or the user starts a new one.
+
 `runAgent` (`packages/ai/src/agent.ts`) calls the AI SDK's `streamText` with the tools, stopping after at most 8 model calls per user message. `POST /api/agent` validates the incoming UI messages, converts them for the model and streams the result back as an AI SDK UI message stream (server-sent events).
 
 ## Tools
@@ -124,4 +126,4 @@ The public demo is protected in `apps/api/src/limits.ts` (in memory, reset on re
 - `AI_DAILY_TOKEN_BUDGET` tokens per UTC day across all visitors, counted from model usage after each turn.
 - `AI_MONTHLY_BUDGET_USD` real spend per UTC month, from the `ai_usage` table. Persisted, so it survives restarts.
 
-When a limit is hit, `POST /api/agent` returns 429 `demo_limit` with a message the agent panel can show as is.
+When a limit is hit, `POST /api/agent` returns 429 `demo_limit` with a message the command bar can show as is.

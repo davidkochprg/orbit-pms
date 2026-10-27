@@ -1,22 +1,42 @@
 import { BedDouble, Compass } from 'lucide-react';
-import { PlaceholderPage } from './placeholder-page';
+import { Link } from 'react-router';
+import { EmptyState } from '@/components/empty-state';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { Button } from '@/components/ui/button';
 
 export function HousekeepingPage() {
   return (
-    <PlaceholderPage
-      icon={BedDouble}
-      title="Housekeeping"
-      description="Room status board and maintenance tasks."
-    />
+    <>
+      <PageHeader title="Housekeeping" />
+      <PageBody>
+        <EmptyState
+          icon={BedDouble}
+          title="Housekeeping is on its way"
+          description="Room status and maintenance tasks will be managed here."
+          className="mt-16"
+        />
+      </PageBody>
+    </>
   );
 }
 
 export function NotFoundPage() {
   return (
-    <PlaceholderPage
-      icon={Compass}
-      title="Page not found"
-      description="Pick a section from the sidebar."
-    />
+    <>
+      <PageHeader title="Not found" />
+      <PageBody>
+        <EmptyState
+          icon={Compass}
+          title="This page doesn’t exist"
+          description="Check the address, or pick a section from the sidebar."
+          action={
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/">Go to Today</Link>
+            </Button>
+          }
+          className="mt-16"
+        />
+      </PageBody>
+    </>
   );
 }

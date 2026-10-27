@@ -1,45 +1,52 @@
-import { BookingSummaryTable } from '@/components/booking-summary-table';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { BedDouble, LogIn, LogOut } from 'lucide-react';
+import { BookingList } from '@/components/booking-list';
+import { ErrorNotice } from '@/components/error-notice';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { Section } from '@/components/section';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDayOverview } from '@/lib/api';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatLongDate, formatParty } from '@/lib/format';
 
 export function DashboardPage() {
   const day = useDayOverview();
 
-  if (day.isError) return <p className="text-destructive">{day.error.message}</p>;
-  if (!day.data) return <Skeleton className="h-64 w-full" />;
-
-  const { date, arrivals, departures, inHouse } = day.data;
   return (
-    <div className="flex flex-col gap-6">
-      <p className="text-sm text-muted-foreground">{formatDate(date)}</p>
-      <div className="grid gap-6 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>Arrivals ({arrivals.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BookingSummaryTable rows={arrivals} empty="No arrivals today." />
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Departures ({departures.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BookingSummaryTable rows={departures} empty="No departures today." />
-          </CardContent>
-        </Card>
-        <Card className="xl:col-span-2">
-          <CardHeader>
-            <CardTitle>In house ({inHouse.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <BookingSummaryTable rows={inHouse} empty="Nobody is staying over." />
-          </CardContent>
-        </Card>
-      </div>
-    </div>
+    <>
+      <PageHeader title="Today" meta={day.data && formatLongDate(day.data.date)} />
+      <PageBody>
+        {day.isError ? (
+          <ErrorNotice message={day.error.message} />
+        ) : !day.data ? (
+          <div className="grid gap-8 xl:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <Skeleton key={i} className="h-64 w-full" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2 2xl:grid-cols-3">
+            <Section title="Arrivals" count={day.data.arrivals.length}>
+              <BookingList rows={day.data.arrivals} empty="No arrivals today" emptyIcon={LogIn} />
+            </Section>
+            <Section title="Departures" count={day.data.departures.length}>
+              <BookingList
+                rows={day.data.departures}
+                empty="No departures today"
+                emptyIcon={LogOut}
+              />
+            </Section>
+            <Section title="In house" count={day.data.inHouse.length}>
+              <BookingList
+                rows={day.data.inHouse}
+                empty="Nobody is staying tonight"
+                emptyIcon={BedDouble}
+                detail={({ booking }) =>
+                  `${formatParty(booking.adults, booking.childAges)}, leaves ${formatDate(booking.checkOut)}`
+                }
+              />
+            </Section>
+          </div>
+        )}
+      </PageBody>
+    </>
   );
 }

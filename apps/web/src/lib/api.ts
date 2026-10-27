@@ -13,6 +13,7 @@ import {
   type NewMessageBody,
   pendingActionSchema,
   roomSchema,
+  roomTypeSchema,
 } from '@orbit/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -90,6 +91,14 @@ export function useRooms() {
   return useQuery({
     queryKey: ['rooms'],
     queryFn: () => apiGet('/api/rooms', z.array(roomSchema)),
+  });
+}
+
+export function useRoomTypes() {
+  return useQuery({
+    queryKey: ['room-types'],
+    queryFn: () => apiGet('/api/room-types', z.array(roomTypeSchema)),
+    staleTime: Infinity,
   });
 }
 

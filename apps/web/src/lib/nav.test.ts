@@ -9,8 +9,8 @@ describe('navItems', () => {
 });
 
 describe('navItemFor', () => {
-  it('matches the dashboard only at the root', () => {
-    expect(navItemFor('/')?.label).toBe('Dashboard');
+  it('matches Today only at the root', () => {
+    expect(navItemFor('/')?.label).toBe('Today');
     expect(navItemFor('/unknown')).toBeUndefined();
   });
 

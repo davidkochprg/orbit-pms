@@ -1,11 +1,4 @@
-import {
-  BedDouble,
-  CalendarRange,
-  Inbox,
-  LayoutDashboard,
-  type LucideIcon,
-  Users,
-} from 'lucide-react';
+import { BedDouble, CalendarRange, Inbox, type LucideIcon, Sun, Users } from 'lucide-react';
 
 export interface NavItem {
   label: string;
@@ -14,7 +7,7 @@ export interface NavItem {
 }
 
 export const navItems: NavItem[] = [
-  { label: 'Dashboard', path: '/', icon: LayoutDashboard },
+  { label: 'Today', path: '/', icon: Sun },
   { label: 'Tape chart', path: '/tape-chart', icon: CalendarRange },
   { label: 'Inbox', path: '/inbox', icon: Inbox },
   { label: 'Housekeeping', path: '/housekeeping', icon: BedDouble },

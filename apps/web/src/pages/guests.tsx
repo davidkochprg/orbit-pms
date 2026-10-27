@@ -11,17 +11,13 @@ import {
   tableFeatures,
   useTable,
 } from '@tanstack/react-table';
+import { ArrowDown, ArrowUp, Search, Users } from 'lucide-react';
 import { useNavigate } from 'react-router';
-import { Input } from '@/components/ui/input';
+import { EmptyState } from '@/components/empty-state';
+import { ErrorNotice } from '@/components/error-notice';
+import { GuestAvatar } from '@/components/guest-avatar';
+import { PageHeader } from '@/components/page-header';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { useGuests } from '@/lib/api';
 import { languageLabels } from '@/lib/format';
 
@@ -37,7 +33,16 @@ const features = tableFeatures({
 
 const helper = createColumnHelper<typeof features, Guest>();
 const columns = helper.columns([
-  helper.accessor('name', { header: 'Name', sortFn: 'text' }),
+  helper.accessor('name', {
+    header: 'Name',
+    sortFn: 'text',
+    cell: (info) => (
+      <span className="flex items-center gap-2.5 font-medium">
+        <GuestAvatar name={info.getValue()} />
+        {info.getValue()}
+      </span>
+    ),
+  }),
   helper.accessor('language', {
     header: 'Language',
     cell: (info) => languageLabels[info.getValue()],
@@ -60,51 +65,80 @@ export function GuestsPage() {
     getColumnCanGlobalFilter: (column) => searchable.has(column.id),
     initialState: { sorting: [{ id: 'name', desc: false }] },
   });
-
-  if (guests.isError) return <p className="text-destructive">{guests.error.message}</p>;
-  if (!guests.data) return <Skeleton className="h-64 w-full" />;
+  const rows = table.getRowModel().rows;
 
   return (
-    <div className="flex flex-col gap-4">
-      <Input
-        placeholder="Search by name or email…"
-        value={String(table.state.globalFilter ?? '')}
-        onChange={(e) => table.setGlobalFilter(e.target.value)}
-        className="max-w-xs"
+    <>
+      <PageHeader
+        title="Guests"
+        meta={guests.data && `${rows.length}`}
+        actions={
+          <label className="flex h-7 w-56 items-center gap-2 rounded-md border bg-background px-2 text-muted-foreground shadow-raised focus-within:ring-2 focus-within:ring-ring">
+            <Search className="size-3.5 shrink-0" />
+            <input
+              placeholder="Filter by name or email"
+              value={String(table.state.globalFilter ?? '')}
+              onChange={(e) => table.setGlobalFilter(e.target.value)}
+              className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-subtle-foreground"
+            />
+          </label>
+        }
       />
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((group) => (
-            <TableRow key={group.id}>
-              {group.headers.map((header) => (
-                <TableHead
-                  key={header.id}
-                  className="cursor-pointer select-none"
-                  onClick={header.column.getToggleSortingHandler()}
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-auto">
+        {guests.isError ? (
+          <ErrorNotice message={guests.error.message} className="m-6" />
+        ) : !guests.data ? (
+          <Skeleton className="m-6 h-64" />
+        ) : rows.length === 0 ? (
+          <EmptyState icon={Users} title="No guests match this filter" className="mt-16" />
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-background">
+              {table.getHeaderGroups().map((group) => (
+                <tr key={group.id} className="border-b">
+                  {group.headers.map((header) => {
+                    const sorted = header.column.getIsSorted();
+                    return (
+                      <th
+                        key={header.id}
+                        className="h-9 px-4 text-left text-xs font-medium text-muted-foreground first:pl-6"
+                      >
+                        <button
+                          type="button"
+                          className="inline-flex items-center gap-1 hover:text-foreground"
+                          onClick={header.column.getToggleSortingHandler()}
+                        >
+                          <table.FlexRender header={header} />
+                          {sorted === 'asc' && <ArrowUp className="size-3" />}
+                          {sorted === 'desc' && <ArrowDown className="size-3" />}
+                        </button>
+                      </th>
+                    );
+                  })}
+                </tr>
+              ))}
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="cursor-pointer border-b border-grid-line hover:bg-accent"
+                  onClick={() => void navigate(`/guests/${row.original.id}`)}
                 >
-                  <table.FlexRender header={header} />
-                  {{ asc: ' ↑', desc: ' ↓' }[String(header.column.getIsSorted())] ?? ''}
-                </TableHead>
+                  {row.getAllCells().map((cell) => (
+                    <td
+                      key={cell.id}
+                      className="h-11 px-4 text-muted-foreground first:pl-6 first:text-foreground"
+                    >
+                      <table.FlexRender cell={cell} />
+                    </td>
+                  ))}
+                </tr>
               ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.map((row) => (
-            <TableRow
-              key={row.id}
-              className="cursor-pointer"
-              onClick={() => void navigate(`/guests/${row.original.id}`)}
-            >
-              {row.getAllCells().map((cell) => (
-                <TableCell key={cell.id}>
-                  <table.FlexRender cell={cell} />
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+            </tbody>
+          </table>
+        )}
+      </div>
+    </>
   );
 }

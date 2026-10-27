@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { agentErrorMessage, asProposal, asToolError } from './agent';
+import { agentErrorMessage, asProposal, asToolError, toolLabel } from './agent';
 
 describe('agent helpers', () => {
   it('recognises proposal tool output', () => {
@@ -21,5 +21,11 @@ describe('agent helpers', () => {
     });
     expect(agentErrorMessage(new Error(body))).toBe('Demo limit reached for today.');
     expect(agentErrorMessage(new Error('socket hang up'))).toMatch(/unavailable/);
+  });
+
+  it('describes tool steps in plain language', () => {
+    expect(toolLabel('checkAvailability', false)).toBe('Checking availability');
+    expect(toolLabel('checkAvailability', true)).toBe('Checked availability');
+    expect(toolLabel('somethingNew', true)).toBe('Ran somethingNew');
   });
 });

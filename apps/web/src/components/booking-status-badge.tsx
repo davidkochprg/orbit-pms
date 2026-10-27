@@ -1,15 +1,25 @@
 import type { BookingStatus } from '@orbit/shared';
-import { Badge } from '@/components/ui/badge';
+import { StatusDot } from '@/components/status-dot';
 import { statusLabels } from '@/lib/format';
+import { bookingStatusColor } from '@/lib/status';
+import { cn } from '@/lib/utils';
 
-const variants: Record<BookingStatus, 'default' | 'secondary' | 'outline' | 'destructive'> = {
-  hold: 'outline',
-  confirmed: 'secondary',
-  checked_in: 'default',
-  checked_out: 'outline',
-  cancelled: 'destructive',
-};
-
-export function BookingStatusBadge({ status }: { status: BookingStatus }) {
-  return <Badge variant={variants[status]}>{statusLabels[status]}</Badge>;
+export function BookingStatusBadge({
+  status,
+  className,
+}: {
+  status: BookingStatus;
+  className?: string;
+}) {
+  return (
+    <span
+      className={cn(
+        'inline-flex h-5 shrink-0 items-center gap-1.5 rounded-full border px-2 text-xs font-medium text-muted-foreground',
+        className,
+      )}
+    >
+      <StatusDot className={cn('size-1.5', bookingStatusColor[status])} />
+      {statusLabels[status]}
+    </span>
+  );
 }

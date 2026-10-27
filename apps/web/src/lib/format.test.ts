@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { formatCzk, formatDate, formatParty, formatRange } from './format';
+import {
+  formatCzk,
+  formatDate,
+  formatDayHeader,
+  formatLongDate,
+  formatParty,
+  formatRange,
+  initials,
+} from './format';
 
 describe('format', () => {
   it('formats dates without timezone shifts', () => {
@@ -16,5 +24,17 @@ describe('format', () => {
     expect(formatParty(1, [])).toBe('1 adult');
     expect(formatParty(2, [4])).toBe('2 adults, 1 child (4)');
     expect(formatParty(2, [4, 9])).toBe('2 adults, 2 children (4, 9)');
+  });
+
+  it('formats headers and long dates', () => {
+    expect(formatDayHeader('2026-10-27')).toEqual({ weekday: 'Tue', day: '27 Oct' });
+    expect(formatLongDate('2026-10-27')).toBe('Tuesday, 27 October');
+  });
+
+  it('builds avatar initials', () => {
+    expect(initials('Jana Nováková')).toBe('JN');
+    expect(initials('Anna Maria von Berg')).toBe('AB');
+    expect(initials('  cher ')).toBe('C');
+    expect(initials('')).toBe('');
   });
 });

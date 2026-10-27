@@ -14,7 +14,7 @@ pnpm dev
 - Web: http://localhost:5173 (Vite, proxies `/api` and `/health` to the API)
 - API: http://localhost:3001
 
-To use the AI features, copy `.env.example` to `.env` at the repo root and fill in the Meta variables. Without them the app runs with AI off, and the sidebar shows "AI not configured".
+To use the AI features, copy `.env.example` to `.env` at the repo root and fill in the Meta variables. Without them the app runs with AI off, and the sidebar shows "Agent not configured".
 
 ## Environment variables
 

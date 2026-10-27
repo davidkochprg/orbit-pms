@@ -30,3 +30,32 @@ export function agentErrorMessage(error: Error): string {
   }
   return 'The agent is unavailable right now. Please try again.';
 }
+
+const toolLabels: Record<string, [running: string, done: string]> = {
+  listRooms: ['Looking up rooms', 'Looked up rooms'],
+  searchBookings: ['Searching bookings', 'Searched bookings'],
+  getBooking: ['Opening the booking', 'Opened the booking'],
+  checkAvailability: ['Checking availability', 'Checked availability'],
+  quote: ['Calculating the price', 'Calculated the price'],
+  getArrivals: ['Checking arrivals', 'Checked arrivals'],
+  getDepartures: ['Checking departures', 'Checked departures'],
+  createHold: ['Preparing a hold', 'Prepared a hold'],
+  confirmBooking: ['Preparing the confirmation', 'Prepared the confirmation'],
+  cancelBooking: ['Preparing the cancellation', 'Prepared the cancellation'],
+  moveBooking: ['Preparing the room move', 'Prepared the room move'],
+  changeDates: ['Preparing the date change', 'Prepared the date change'],
+};
+
+/** A plain-language line for a tool step, so staff see what the agent looked at. */
+export function toolLabel(name: string, done: boolean): string {
+  const labels = toolLabels[name];
+  if (labels) return labels[done ? 1 : 0];
+  return done ? `Ran ${name}` : `Running ${name}`;
+}
+
+/** Starting points shown in the command bar before anything is typed. */
+export const suggestedQuestions = [
+  'Who arrives today, and do any of them bring children?',
+  'Which rooms are free this weekend for two adults?',
+  'What does a week in the apartment cost for a family of four in August?',
+];

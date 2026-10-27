@@ -1,19 +1,22 @@
 import type { Inquiry, StayOption } from '@orbit/shared';
-import { Sparkles } from 'lucide-react';
+import { Copy, Inbox, LoaderCircle, Plus, RotateCw, Sparkles } from 'lucide-react';
 import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router';
-import { Badge } from '@/components/ui/badge';
+import { EmptyState } from '@/components/empty-state';
+import { ErrorNotice } from '@/components/error-notice';
+import { GuestAvatar } from '@/components/guest-avatar';
+import { PageHeader } from '@/components/page-header';
+import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Skeleton } from '@/components/ui/skeleton';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import {
@@ -38,61 +41,97 @@ import { cn } from '@/lib/utils';
 export function InboxPage() {
   const { id } = useParams();
   const inbox = useInbox();
+  const unread = inbox.data?.filter((m) => m.status === 'new').length ?? 0;
 
   return (
-    <div className="grid h-full gap-4 lg:grid-cols-[minmax(18rem,24rem)_1fr]">
-      <div className="flex min-h-0 flex-col gap-3">
-        <PasteMessage />
-        {inbox.isError && <p className="text-destructive">{inbox.error.message}</p>}
-        {!inbox.data && !inbox.isError && <Skeleton className="h-64 w-full" />}
-        <ul className="flex flex-col gap-1 overflow-y-auto">
-          {inbox.data?.map((m) => (
-            <MessageRow key={m.id} message={m} active={m.id === id} />
-          ))}
-        </ul>
+    <>
+      <PageHeader
+        title="Inbox"
+        meta={unread > 0 ? `${unread} new` : undefined}
+        actions={<NewMessage />}
+      />
+      <div className="flex min-h-0 flex-1">
+        <aside
+          className={cn(
+            'scrollbar-thin w-full shrink-0 overflow-y-auto border-r md:w-[22rem]',
+            id && 'hidden md:block',
+          )}
+        >
+          {inbox.isError && <ErrorNotice message={inbox.error.message} className="m-3" />}
+          {!inbox.data && !inbox.isError && <Skeleton className="m-3 h-64" />}
+          {inbox.data?.length === 0 && <EmptyState icon={Inbox} title="No messages" />}
+          <ul className="flex flex-col p-1.5">
+            {inbox.data?.map((m) => (
+              <MessageRow key={m.id} message={m} active={m.id === id} />
+            ))}
+          </ul>
+        </aside>
+        <section
+          className={cn('scrollbar-thin min-w-0 flex-1 overflow-y-auto', !id && 'hidden md:block')}
+        >
+          {id ? (
+            <MessageDetail id={id} />
+          ) : (
+            <EmptyState
+              icon={Inbox}
+              title="No message selected"
+              description="Pick a message to read it with Orbit’s prepared reply."
+              className="h-full"
+            />
+          )}
+        </section>
       </div>
-      <div className="min-w-0">
-        {id ? (
-          <MessageDetail id={id} />
-        ) : (
-          <p className="text-sm text-muted-foreground">Select a message.</p>
-        )}
-      </div>
-    </div>
+    </>
   );
 }
 
 function MessageRow({ message: m, active }: { message: Inquiry; active: boolean }) {
+  const unread = m.status === 'new';
   return (
     <li>
       <Link
         to={`/inbox/${m.id}`}
         className={cn(
-          'flex flex-col gap-1 rounded-md border p-3 text-sm hover:bg-accent',
-          active && 'border-primary bg-accent',
+          'relative flex flex-col gap-0.5 rounded-lg py-2.5 pr-3 pl-6 outline-none hover:bg-accent focus-visible:bg-accent',
+          active && 'bg-accent',
         )}
       >
-        <div className="flex items-center gap-2">
-          <span className="truncate font-medium">{senderLabel(m)}</span>
-          <Badge variant="outline">{channelLabel(m)}</Badge>
-          <span className="ml-auto shrink-0 text-xs text-muted-foreground">
-            {formatDateTime(m.receivedAt)}
+        {unread && (
+          <span
+            aria-label="New"
+            className="absolute top-[15px] left-2.5 size-1.5 rounded-full bg-primary"
+          />
+        )}
+        <span className="flex items-baseline gap-2">
+          <span className={cn('truncate', unread ? 'font-semibold' : 'font-medium')}>
+            {senderLabel(m)}
           </span>
-        </div>
-        {m.subject && <span className="truncate">{m.subject}</span>}
-        <span className="truncate text-muted-foreground">{snippet(m.rawText)}</span>
-        <div className="flex gap-2">
-          <Badge variant={m.status === 'new' ? 'default' : 'secondary'}>
-            {inquiryStatusLabels[m.status]}
-          </Badge>
-          {m.parsed && <Badge variant="outline">Prepared</Badge>}
-        </div>
+          <time className="ml-auto shrink-0 text-xs text-muted-foreground tabular-nums">
+            {formatDateTime(m.receivedAt)}
+          </time>
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="truncate">{m.subject ?? '(no subject)'}</span>
+          {m.parsed && (
+            <Sparkles
+              aria-label="Prepared by Orbit"
+              className="size-3 shrink-0 text-primary-text"
+            />
+          )}
+        </span>
+        <span className="line-clamp-2 text-muted-foreground">{snippet(m.rawText, 140)}</span>
+        <span className="mt-1 flex gap-1.5 text-xs text-muted-foreground">
+          <span className="rounded border px-1.5">{channelLabel(m)}</span>
+          {!unread && (
+            <span className="rounded border px-1.5">{inquiryStatusLabels[m.status]}</span>
+          )}
+        </span>
       </Link>
     </li>
   );
 }
 
-function PasteMessage() {
+function NewMessage() {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const create = useCreateMessage();
@@ -112,32 +151,40 @@ function PasteMessage() {
     );
   }
 
-  if (!open) {
-    return (
-      <Button variant="outline" onClick={() => setOpen(true)}>
-        Paste a message
-      </Button>
-    );
-  }
   return (
-    <form onSubmit={onSubmit} className="flex flex-col gap-2">
-      <Textarea
-        value={text}
-        onChange={(e) => setText(e.target.value)}
-        placeholder="Paste a guest email here…"
-        rows={6}
-        autoFocus
-      />
-      <div className="flex gap-2">
-        <Button type="submit" disabled={!text.trim() || create.isPending}>
-          Add to inbox
-        </Button>
-        <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
-          Cancel
-        </Button>
-      </div>
-      {create.isError && <p className="text-sm text-destructive">{create.error.message}</p>}
-    </form>
+    <>
+      <Button variant="outline" size="sm" className="shadow-raised" onClick={() => setOpen(true)}>
+        <Plus /> Paste a message
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="shadow-floating sm:max-w-lg">
+          <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <DialogHeader>
+              <DialogTitle>Paste a message</DialogTitle>
+              <DialogDescription>
+                Add a guest email to the inbox. Orbit reads it and prepares a reply.
+              </DialogDescription>
+            </DialogHeader>
+            <Textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Paste the email text here"
+              rows={8}
+              autoFocus
+            />
+            {create.isError && <ErrorNotice message={create.error.message} />}
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={!text.trim() || create.isPending}>
+                Add to inbox
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -156,77 +203,91 @@ function MessageDetail({ id }: { id: string }) {
     process.mutate(false);
   }, [m, aiOn, id, process]);
 
-  if (inquiry.isError) return <p className="text-destructive">{inquiry.error.message}</p>;
-  if (!m) return <Skeleton className="h-96 w-full" />;
+  if (inquiry.isError) return <ErrorNotice message={inquiry.error.message} className="m-6" />;
+  if (!m) return <Skeleton className="m-6 h-96" />;
 
   return (
-    <div className="flex flex-col gap-4">
-      <Card>
-        <CardHeader>
-          <CardTitle>{m.subject ?? '(no subject)'}</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {senderLabel(m)}
-            {m.senderAddress && m.senderName && ` <${m.senderAddress}>`} · {channelLabel(m)} ·{' '}
+    <article className="mx-auto flex max-w-3xl flex-col gap-8 px-6 py-6">
+      <header className="flex flex-col gap-4">
+        <h2 className="text-xl font-semibold tracking-tight">{m.subject ?? '(no subject)'}</h2>
+        <div className="flex items-center gap-3">
+          <GuestAvatar name={senderLabel(m)} size="md" />
+          <div className="flex min-w-0 flex-col">
+            <span className="truncate font-medium">{senderLabel(m)}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {m.senderAddress && m.senderName ? `${m.senderAddress}, ` : ''}via {channelLabel(m)}
+            </span>
+          </div>
+          <time className="ml-auto shrink-0 text-xs text-muted-foreground">
             {formatDateTime(m.receivedAt)}
-          </p>
-        </CardHeader>
-        <CardContent>
-          <p className="whitespace-pre-wrap text-sm">{m.rawText}</p>
-        </CardContent>
-      </Card>
+          </time>
+        </div>
+      </header>
 
-      <Card>
-        <CardHeader className="flex flex-row items-center gap-2">
-          <Sparkles className="size-4 text-primary" />
-          <CardTitle>Prepared by the agent</CardTitle>
+      <p className="max-w-prose leading-relaxed whitespace-pre-wrap">{m.rawText}</p>
+
+      <section className="flex flex-col gap-5 rounded-xl border bg-surface-sunken p-5">
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-4 text-primary-text" />
+          <h3 className="font-medium">Prepared by Orbit</h3>
           {m.processedAt && aiOn && (
             <Button
               size="sm"
               variant="ghost"
-              className="ml-auto"
+              className="ml-auto text-muted-foreground"
               disabled={process.isPending}
               onClick={() => process.mutate(true)}
             >
-              Prepare again
+              <RotateCw /> Prepare again
             </Button>
           )}
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4 text-sm">
-          {!aiOn && (
-            <p className="text-muted-foreground">The agent is not configured on this server.</p>
-          )}
-          {process.isPending && (
-            <p className="text-muted-foreground">Reading the message and checking rooms…</p>
-          )}
-          {process.isError && <p className="text-destructive">{process.error.message}</p>}
-          {m.processingError && (
-            <div className="flex items-center gap-2">
-              <p className="text-destructive">{m.processingError}</p>
-              {aiOn && (
-                <Button size="sm" variant="outline" onClick={() => process.mutate(false)}>
-                  Try again
-                </Button>
-              )}
-            </div>
-          )}
-          {m.parsed && (
-            <div className="flex flex-wrap gap-1">
-              {analysisFacts(m.parsed).map((f) => (
-                <Badge key={f} variant="secondary">
-                  {f}
-                </Badge>
-              ))}
-            </div>
-          )}
-          {m.parsed?.question && <p>Asks: {m.parsed.question}</p>}
-          {m.suggestion?.note && <p className="text-muted-foreground">{m.suggestion.note}</p>}
-          {m.suggestion && m.suggestion.options.length > 0 && (
-            <Options inquiry={m} options={m.suggestion.options} />
-          )}
-          {m.suggestion?.draft && <Reply inquiry={m} draft={m.suggestion.draft} />}
-        </CardContent>
-      </Card>
-    </div>
+        </div>
+
+        {!aiOn && (
+          <p className="text-muted-foreground">The agent is not configured on this server.</p>
+        )}
+        {process.isPending && (
+          <p className="flex items-center gap-2 text-muted-foreground">
+            <LoaderCircle className="size-4 animate-spin" /> Reading the message and checking rooms…
+          </p>
+        )}
+        {process.isError && <ErrorNotice message={process.error.message} />}
+        {m.processingError && (
+          <div className="flex items-center gap-2">
+            <ErrorNotice message={m.processingError} className="flex-1" />
+            {aiOn && (
+              <Button size="sm" variant="outline" onClick={() => process.mutate(false)}>
+                Try again
+              </Button>
+            )}
+          </div>
+        )}
+
+        {m.parsed && (
+          <ul className="flex flex-wrap gap-1.5">
+            {analysisFacts(m.parsed).map((f) => (
+              <li
+                key={f}
+                className="rounded-md border bg-background px-2 py-0.5 text-xs text-muted-foreground"
+              >
+                {f}
+              </li>
+            ))}
+          </ul>
+        )}
+        {m.parsed?.question && (
+          <p>
+            <span className="text-muted-foreground">Asks: </span>
+            {m.parsed.question}
+          </p>
+        )}
+        {m.suggestion?.note && <p className="text-muted-foreground">{m.suggestion.note}</p>}
+        {m.suggestion && m.suggestion.options.length > 0 && (
+          <Options inquiry={m} options={m.suggestion.options} />
+        )}
+        {m.suggestion?.draft && <Reply inquiry={m} draft={m.suggestion.draft} />}
+      </section>
+    </article>
   );
 }
 
@@ -234,45 +295,40 @@ function Options({ inquiry, options }: { inquiry: Inquiry; options: StayOption[]
   const hold = useInboxHold(inquiry.id);
   const { open } = useBookingDrawer();
   return (
-    <div className="flex flex-col gap-2">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Room</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead className="text-right">Total</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {options.map((o) => (
-            <TableRow key={o.roomId}>
-              <TableCell>{o.roomName}</TableCell>
-              <TableCell>{o.roomTypeName}</TableCell>
-              <TableCell className="text-right tabular-nums">{formatCzk(o.quote.total)}</TableCell>
-              <TableCell className="text-right">
-                {!inquiry.bookingId && (
-                  <Button size="sm" disabled={hold.isPending} onClick={() => hold.mutate(o.roomId)}>
-                    Hold
-                  </Button>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-      {inquiry.bookingId && (
-        <Button
-          variant="outline"
-          size="sm"
-          className="self-start"
-          onClick={() => open(inquiry.bookingId!)}
-        >
-          Open hold
-        </Button>
-      )}
-      {hold.isError && <p className="text-destructive">{hold.error.message}</p>}
-    </div>
+    <Section
+      title="Available rooms"
+      count={options.length}
+      actions={
+        inquiry.bookingId && (
+          <Button variant="outline" size="sm" onClick={() => open(inquiry.bookingId!)}>
+            Open hold
+          </Button>
+        )
+      }
+    >
+      <ul className="flex flex-col overflow-hidden rounded-lg border bg-background">
+        {options.map((o) => (
+          <li key={o.roomId} className="flex items-center gap-3 border-b px-3 py-2 last:border-b-0">
+            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums">
+              {o.roomName}
+            </span>
+            <span className="min-w-0 flex-1 truncate text-muted-foreground">{o.roomTypeName}</span>
+            <span className="font-medium tabular-nums">{formatCzk(o.quote.total)}</span>
+            {!inquiry.bookingId && (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={hold.isPending}
+                onClick={() => hold.mutate(o.roomId)}
+              >
+                Hold
+              </Button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {hold.isError && <ErrorNotice message={hold.error.message} />}
+    </Section>
   );
 }
 
@@ -281,21 +337,27 @@ function Reply({ inquiry, draft }: { inquiry: Inquiry; draft: string }) {
   const replied = useMarkReplied(inquiry.id);
   const sent = inquiry.status === 'replied';
   return (
-    <div className="flex flex-col gap-2">
-      <h3 className="font-medium">Reply draft</h3>
-      <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={10} disabled={sent} />
+    <Section title="Reply">
+      <Textarea
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        rows={10}
+        disabled={sent}
+        className="bg-background leading-relaxed"
+      />
       <div className="flex items-center gap-2">
         <Button
+          size="sm"
           disabled={sent || !text.trim() || replied.isPending}
           onClick={() => replied.mutate(text)}
         >
           {sent ? 'Marked as sent' : 'Mark as sent'}
         </Button>
-        <Button variant="ghost" onClick={() => void navigator.clipboard.writeText(text)}>
-          Copy
+        <Button size="sm" variant="ghost" onClick={() => void navigator.clipboard.writeText(text)}>
+          <Copy /> Copy
         </Button>
       </div>
-      {replied.isError && <p className="text-destructive">{replied.error.message}</p>}
-    </div>
+      {replied.isError && <ErrorNotice message={replied.error.message} />}
+    </Section>
   );
 }
