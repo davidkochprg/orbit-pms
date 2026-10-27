@@ -1,4 +1,9 @@
-import { DomainError, type HotelService, type PendingActionService } from '@orbit/domain';
+import {
+  type BillingService,
+  DomainError,
+  type HotelService,
+  type PendingActionService,
+} from '@orbit/domain';
 import {
   availabilityQuerySchema,
   type BookingSummary,
@@ -6,6 +11,8 @@ import {
   bookingSearchSchema,
   createHoldInputSchema,
   isoDateSchema,
+  newChargeBodySchema,
+  newPaymentBodySchema,
   type PendingAction,
   type PendingActionInput,
   quoteInputSchema,
@@ -15,6 +22,7 @@ import { z } from 'zod';
 
 export interface ToolDeps {
   hotel: HotelService;
+  billing: BillingService;
   actions: PendingActionService;
   /** Lists rooms with their IDs, so names like "104" can be resolved. */
   listRooms: () => Promise<
@@ -76,13 +84,15 @@ export const proposalToolNames = [
   'moveBooking',
   'changeDates',
   'updateBooking',
+  'addCharge',
+  'recordPayment',
 ] as const;
 
 /**
  * Agent tools: thin wrappers over the same domain service the REST API uses. Read tools run
  * immediately; mutating tools return a pending action for the user to confirm.
  */
-export function createAgentTools({ hotel, actions, listRooms }: ToolDeps) {
+export function createAgentTools({ hotel, billing, actions, listRooms }: ToolDeps) {
   const propose = (input: PendingActionInput) =>
     safely(async () => toProposal(await actions.propose(input)));
 
@@ -166,6 +176,24 @@ export function createAgentTools({ hotel, actions, listRooms }: ToolDeps) {
         'Propose editing a booking: party (adults, childAges), add-ons (wellness, dogs, extraBeds; send all three), source or notes, and optionally room and dates in the same step. Only send the fields that change. Re-priced when the stay changes. The user must confirm.',
       inputSchema: bookingPatchSchema.extend(bookingIdSchema.shape),
       execute: (input) => propose({ kind: 'update_booking', input }),
+    }),
+    getBill: tool({
+      description:
+        "A booking's bill: stay lines, city tax and extras, payments and refunds, and the balance still owed (negative: owed to the guest). Repeat amounts verbatim.",
+      inputSchema: bookingIdSchema,
+      execute: ({ bookingId }) => safely(() => billing.getFolio(bookingId)),
+    }),
+    addCharge: tool({
+      description:
+        "Propose posting an extra to a confirmed or in-house booking's bill, e.g. sauna, minibar or dinner, at the unit price the staff member gives. Never invent a price: ask if none was given. The user must confirm.",
+      inputSchema: newChargeBodySchema.extend(bookingIdSchema.shape),
+      execute: (input) => propose({ kind: 'add_charge', input }),
+    }),
+    recordPayment: tool({
+      description:
+        'Propose recording money received for a booking (kind "payment") or paid back (kind "refund"), by cash, card or bank transfer. Use getBill first when the staff member says "the balance" or "the rest". The user must confirm.',
+      inputSchema: newPaymentBodySchema.extend(bookingIdSchema.shape),
+      execute: (input) => propose({ kind: 'record_payment', input }),
     }),
   };
 }

@@ -1,5 +1,6 @@
 import {
   createHotelService,
+  createBillingService,
   createPendingActionService,
   hotelPolicy,
   pricingConfig,
@@ -73,9 +74,15 @@ export function setup() {
     clock,
     newId,
   });
-  const actions = createPendingActionService({ repos, hotel, clock, newId });
-  const tools = createAgentTools({ hotel, actions, listRooms: () => repos.rooms.listRooms() });
-  return { repos, hotel, actions, tools };
+  const billing = createBillingService({ repos, pricing: pricingConfig, clock, newId });
+  const actions = createPendingActionService({ repos, hotel, billing, clock, newId });
+  const tools = createAgentTools({
+    hotel,
+    billing,
+    actions,
+    listRooms: () => repos.rooms.listRooms(),
+  });
+  return { repos, hotel, billing, actions, tools };
 }
 
 export const callOptions = { toolCallId: 'call_1', messages: [], context: {} };

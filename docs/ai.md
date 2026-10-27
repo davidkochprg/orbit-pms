@@ -50,6 +50,9 @@ Defined in `packages/ai/src/tools.ts` with zod input schemas from `packages/shar
 | `moveBooking`                     | Same dates, another room                                                                        | proposal    |
 | `changeDates`                     | New dates, same room, re-priced                                                                 | proposal    |
 | `updateBooking`                   | Party, add-ons, source, notes, and room and dates, in one step; re-priced when the stay changes | proposal    |
+| `getBill`                         | A booking's bill: stay lines, city tax, extras, payments, balance                               | none        |
+| `addCharge`                       | Post an extra at the price the staff member gives; the summary shows the balance after          | proposal    |
+| `recordPayment`                   | Payment or refund by cash, card or bank transfer; the summary shows the balance after           | proposal    |
 
 ## Approval pattern
 

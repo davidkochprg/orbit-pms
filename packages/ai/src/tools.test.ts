@@ -79,6 +79,37 @@ describe('agent tools', () => {
     expect(repos.state.bookings.find((b) => b.id === 'bk_1')?.notes).toBeNull();
   });
 
+  it('reads a bill with city tax and the open balance', async () => {
+    const { tools } = setup();
+    const bill = await tools.getBill.execute({ bookingId: 'bk_1' }, callOptions);
+    expect(bill).toMatchObject({
+      bookingId: 'bk_1',
+      lines: [expect.objectContaining({ kind: 'city_tax', amount: 200 })],
+      balance: 200,
+    });
+  });
+
+  it('proposes a charge and a payment instead of posting them', async () => {
+    const { tools, repos } = setup();
+    const charge = await tools.addCharge.execute(
+      { bookingId: 'bk_1', label: 'Sauna', quantity: 2, unitPrice: 150 },
+      callOptions,
+    );
+    expect(charge).toMatchObject({
+      status: 'awaiting_confirmation',
+      summary:
+        'Add 2 × Sauna at 150 CZK (300 CZK) to the bill of Tomáš Novák, room 104; balance then 500 CZK',
+    });
+    const payment = await tools.recordPayment.execute(
+      { bookingId: 'bk_1', kind: 'payment', method: 'cash', amount: 200, note: null },
+      callOptions,
+    );
+    expect(payment).toMatchObject({ status: 'awaiting_confirmation' });
+    expect(repos.state.charges).toEqual([]);
+    expect(repos.state.payments).toEqual([]);
+    expect(repos.state.pendingActions.map((a) => a.kind)).toEqual(['add_charge', 'record_payment']);
+  });
+
   it('returns domain errors to the model as data', async () => {
     const { tools, repos } = setup();
     const result = await tools.moveBooking.execute(
