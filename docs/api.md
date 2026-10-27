@@ -10,13 +10,14 @@ All responses are JSON. Dates are `YYYY-MM-DD`, timestamps are ISO 8601 UTC, mon
 { "error": { "code": "not_found", "message": "Booking not found" } }
 ```
 
-| Status | When                                                                                  |
-| ------ | ------------------------------------------------------------------------------------- |
-| 400    | Invalid query (`invalid_query`), body (`invalid_json`, `bad_request`), dates or party |
-| 404    | Unknown resource or route (`not_found`)                                               |
-| 409    | Room taken (`conflict`) or status change not allowed (`invalid_transition`)           |
-| 422    | Party does not fit the room (`over_capacity`)                                         |
-| 500    | Anything else (`internal`), logged server-side                                        |
+| Status | When                                                                                         |
+| ------ | -------------------------------------------------------------------------------------------- |
+| 400    | Invalid query (`invalid_query`), body (`invalid_json`, `bad_request`), dates or party        |
+| 403    | The signed-in staff member may not do this (`forbidden`)                                     |
+| 404    | Unknown resource or route (`not_found`)                                                      |
+| 409    | Room taken or email in use (`conflict`), or status change not allowed (`invalid_transition`) |
+| 422    | Party does not fit the room (`over_capacity`)                                                |
+| 500    | Anything else (`internal`), logged server-side                                               |
 
 ## Endpoints
 
@@ -115,6 +116,22 @@ Direct emails, web and phone messages, and messages relayed by OTA partners in o
 | `POST /api/housekeeping/tasks/:id/status` | `{ status }`                                                    | `HousekeepingTask`                                                                                                                                                                                    |
 | `POST /api/housekeeping/notes`            | `{ text }`                                                      | `HousekeepingNoteResult`: `{ transcript, changes, skipped, unclear }`. Changes are already applied, as the agent. 503 `ai_not_configured`, 429 `demo_limit`.                                          |
 | `POST /api/housekeeping/voice`            | multipart, `audio`: WAV (mono 16-bit PCM, 16 kHz), at most 5 MB | `HousekeepingNoteResult` with the transcript. 400 if not WAV, 413 if too large, 502 `transcription_failed`, 503 when voice is not configured.                                                         |
+
+## Settings and staff
+
+Requests are signed in with the `x-staff-id` header: the ID of an active staff member ([ADR 0009](decisions/0009-staff-roles-and-demo-sign-in.md)). Reads need no header; changes need an active manager, otherwise `403 forbidden`.
+
+### `GET /api/settings/profile`, `PUT /api/settings/profile`
+
+`HotelProfile`: `name`, `location`, `description`, `phone`, `email`, `website`, `checkInFrom` and `checkOutBy` (`HH:MM`), and `entries` (`{ id, category: 'policy' | 'amenity' | 'info', title, details }`, at most 100). `PUT` replaces the whole profile and returns it; empty strings become `null`. Check-out must be earlier than check-in (`400 invalid_input`). See [domain.md](domain.md#hotel-profile).
+
+### `GET /api/staff`
+
+`StaffMember[]`, active members first, then by name: `id`, `name`, `email`, `role` (`manager` | `receptionist` | `housekeeping`), `active`.
+
+### `POST /api/staff`, `PATCH /api/staff/:id`
+
+`POST` takes `{ name, email?, role }` and returns `201` with the new member. `PATCH` takes any of `name`, `email`, `role`, `active`. A used email is `409 conflict`; removing the last active manager is `400 invalid_input`.
 
 ## Agent
 

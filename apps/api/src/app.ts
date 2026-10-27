@@ -12,6 +12,7 @@ import {
   createInboxService,
   createPendingActionService,
   createSettingsService,
+  createStaffService,
   hotelPolicy,
   hotelToday,
   pricingConfig,
@@ -31,6 +32,7 @@ import { inboxRoutes } from './routes/inbox';
 import { overviewRoutes } from './routes/overview';
 import { pendingActionRoutes } from './routes/pending-actions';
 import { roomRoutes } from './routes/rooms';
+import { settingsRoutes } from './routes/settings';
 import { type UsageReport, usageRoutes } from './routes/usage';
 
 export interface AppDeps {
@@ -65,6 +67,7 @@ export function createApp({
   });
   const actions = createPendingActionService({ repos, hotel, clock, newId });
   const settings = createSettingsService({ repos });
+  const staff = createStaffService({ repos, newId });
   const hotelContext = async (): Promise<HotelContext> => ({
     profile: await settings.getProfile(),
     policy: hotelPolicy,
@@ -116,6 +119,7 @@ export function createApp({
     '/api',
     agentRoutes({ ai, repos, hotel, actions, hotelContext, limiter, gate, clock, usage }),
   );
+  app.route('/api', settingsRoutes({ settings, staff }));
   app.route('/api', usageRoutes({ usage, monthlyBudgetMicroUsd, clock }));
 
   app.notFound((c) => c.json(errorBody('not_found', 'Route not found'), 404));
