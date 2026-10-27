@@ -11,6 +11,7 @@ import {
   Search,
   Sparkles,
   Sun,
+  Sunrise,
 } from 'lucide-react';
 import {
   type KeyboardEvent,
@@ -264,6 +265,7 @@ function SearchView({
             [
               ['light', 'Light', Sun],
               ['dark', 'Dark', Moon],
+              ['daylight', 'Daylight', Sunrise],
               ['system', 'Match system', Monitor],
             ] as const
           ).map(([theme, label, Icon]) => (

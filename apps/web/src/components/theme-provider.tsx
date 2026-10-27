@@ -1,37 +1,63 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { useClockMinute } from '@/hooks/use-clock-minute';
+import { daylightAt, glowColor } from '@/lib/daylight';
 import {
+  DAYLIGHT_TIME_STORAGE_KEY,
+  readStoredPinnedMinute,
   readStoredTheme,
   resolveDark,
   type Theme,
   ThemeContext,
   THEME_STORAGE_KEY,
+  writeStorage,
 } from '@/lib/theme';
+
+const DAYLIGHT_VARS = ['--night', '--ink', '--glow'] as const;
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(readStoredTheme);
+  const [pinnedMinute, setPinnedState] = useState<number | null>(readStoredPinnedMinute);
+  const clockMinute = useClockMinute(theme === 'daylight' && pinnedMinute === null);
+  const daylightMinute = pinnedMinute ?? clockMinute;
 
   useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'daylight') {
+      // Inline variables beat the .dark class, so the blend is whatever the time of day says.
+      const { night, ink, glow } = daylightAt(daylightMinute);
+      root.dataset.theme = 'daylight';
+      root.style.setProperty('--night', String(night));
+      root.style.setProperty('--ink', String(ink));
+      root.style.setProperty('--glow', glowColor(glow));
+      root.style.colorScheme = night >= 0.5 ? 'dark' : 'light';
+      root.classList.toggle('dark', night >= 0.5);
+      return;
+    }
+    delete root.dataset.theme;
+    for (const name of DAYLIGHT_VARS) root.style.removeProperty(name);
+    root.style.removeProperty('color-scheme');
     const media = window.matchMedia('(prefers-color-scheme: dark)');
-    const apply = () =>
-      document.documentElement.classList.toggle('dark', resolveDark(theme, media.matches));
+    const apply = () => root.classList.toggle('dark', resolveDark(theme, media.matches));
     apply();
     media.addEventListener('change', apply);
     return () => media.removeEventListener('change', apply);
-  }, [theme]);
+  }, [theme, daylightMinute]);
 
   const value = useMemo(
     () => ({
       theme,
       setTheme: (next: Theme) => {
-        try {
-          localStorage.setItem(THEME_STORAGE_KEY, next);
-        } catch {
-          // Storage can be unavailable (private mode); the choice still applies for this visit.
-        }
+        writeStorage(THEME_STORAGE_KEY, next);
         setThemeState(next);
       },
+      daylightMinute,
+      pinnedMinute,
+      setPinnedMinute: (minute: number | null) => {
+        writeStorage(DAYLIGHT_TIME_STORAGE_KEY, minute === null ? null : String(minute));
+        setPinnedState(minute);
+      },
     }),
-    [theme],
+    [theme, daylightMinute, pinnedMinute],
   );
 
   return <ThemeContext value={value}>{children}</ThemeContext>;

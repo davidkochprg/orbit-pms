@@ -17,58 +17,266 @@
   --accent-chroma: 0.19;
   --gray-hue: 264;
 
+  /*
+   * 0 = day palette, 1 = night palette. Light and dark set 0 and 1; the daylight theme sets
+   * values in between from the time of day (lib/daylight.ts). --ink is the same for text, but
+   * switches quickly around 0.5 so text keeps its contrast.
+   */
+  --night: 0;
+  --ink: 0;
+  --night-mix: calc(var(--night) * 100%);
+  --ink-mix: calc(var(--ink) * 100%);
+  /* Light under the app's surface; only the daylight theme sets it. */
+  --glow: transparent;
+
+  /* Day palette. */
   /* Surfaces: window chrome (sidebar) < content panel < raised (bars, popovers). */
-  --sidebar: oklch(0.968 0.003 var(--gray-hue));
-  --background: oklch(1 0 0);
-  --surface-sunken: oklch(0.982 0.002 var(--gray-hue));
-  --surface-raised: oklch(1 0 0);
-  --card: oklch(1 0 0);
-  --popover: oklch(1 0 0 / 92%);
+  --sidebar-day: oklch(0.968 0.003 var(--gray-hue));
+  --background-day: oklch(1 0 0);
+  --surface-sunken-day: oklch(0.982 0.002 var(--gray-hue));
+  --surface-raised-day: oklch(1 0 0);
+  --card-day: oklch(1 0 0);
+  --popover-day: oklch(1 0 0 / 92%);
+  --muted-day: oklch(0.955 0.003 var(--gray-hue));
 
-  --foreground: oklch(0.2 0.006 var(--gray-hue));
-  --card-foreground: var(--foreground);
-  --popover-foreground: var(--foreground);
-  --muted: oklch(0.955 0.003 var(--gray-hue));
-  --muted-foreground: oklch(0.52 0.01 var(--gray-hue));
-  --subtle-foreground: oklch(0.66 0.008 var(--gray-hue));
-  --secondary: var(--muted);
-  --secondary-foreground: var(--foreground);
   /* shadcn's "accent" is the hover/selected fill, not the brand color. */
-  --accent: oklch(0.94 0.004 var(--gray-hue));
-  --accent-foreground: var(--foreground);
+  --accent-day: oklch(0.94 0.004 var(--gray-hue));
+  --sidebar-accent-day: oklch(0.915 0.005 var(--gray-hue));
 
-  --border: oklch(0.912 0.004 var(--gray-hue));
-  --border-strong: oklch(0.86 0.006 var(--gray-hue));
-  --grid-line: oklch(0.935 0.003 var(--gray-hue));
-  --input: var(--border);
+  /* Text. */
+  --foreground-day: oklch(0.2 0.006 var(--gray-hue));
+  --primary-text-day: oklch(0.5 var(--accent-chroma) var(--accent-hue));
 
-  --primary: oklch(0.56 var(--accent-chroma) var(--accent-hue));
-  --primary-foreground: oklch(0.99 0 0);
-  --primary-soft: oklch(0.56 var(--accent-chroma) var(--accent-hue) / 7%);
-  --primary-text: oklch(0.5 var(--accent-chroma) var(--accent-hue));
-  --ring: oklch(0.56 var(--accent-chroma) var(--accent-hue) / 60%);
+  /* Lines. */
+  --border-day: oklch(0.912 0.004 var(--gray-hue));
+  --border-strong-day: oklch(0.86 0.006 var(--gray-hue));
+  --grid-line-day: oklch(0.935 0.003 var(--gray-hue));
+  --input-day: oklch(0.912 0.004 var(--gray-hue));
 
-  --destructive: oklch(0.58 0.22 27);
-  --success: oklch(0.6 0.15 152);
-  --warning: oklch(0.72 0.16 70);
+  /* Accent. */
+  --primary-day: oklch(0.56 var(--accent-chroma) var(--accent-hue));
+  --primary-soft-day: oklch(0.56 var(--accent-chroma) var(--accent-hue) / 7%);
+  --ring-day: oklch(0.56 var(--accent-chroma) var(--accent-hue) / 60%);
+
+  /* Feedback. */
+  --destructive-day: oklch(0.58 0.22 27);
+  --success-day: oklch(0.6 0.15 152);
+  --warning-day: oklch(0.72 0.16 70);
 
   /* Booking status: the stripe on tape chart bars and the dot in status pills. */
-  --status-hold: oklch(0.75 0.15 75);
-  --status-confirmed: var(--primary);
-  --status-checked-in: oklch(0.62 0.16 152);
-  --status-checked-out: oklch(0.7 0.01 var(--gray-hue));
-  --status-cancelled: oklch(0.6 0.2 27);
+  --status-hold-day: oklch(0.75 0.15 75);
+  --status-checked-in-day: oklch(0.62 0.16 152);
+  --status-checked-out-day: oklch(0.7 0.01 var(--gray-hue));
+  --status-cancelled-day: oklch(0.6 0.2 27);
 
   /* Room housekeeping status. */
-  --room-inspected: oklch(0.62 0.16 152);
-  --room-clean: oklch(0.68 0.12 215);
-  --room-dirty: oklch(0.72 0.16 55);
-  --room-out-of-order: oklch(0.6 0.21 27);
+  --room-inspected-day: oklch(0.62 0.16 152);
+  --room-clean-day: oklch(0.68 0.12 215);
+  --room-dirty-day: oklch(0.72 0.16 55);
+  --room-out-of-order-day: oklch(0.6 0.21 27);
 
-  --shadow-raised: 0 0 0 0.5px oklch(0 0 0 / 8%), 0 1px 2px oklch(0 0 0 / 6%);
+  /* Shadow colors; the shadows below are built from them. */
+  --shadow-ring-day: oklch(0 0 0 / 8%);
+  --shadow-soft-day: oklch(0 0 0 / 6%);
+  --shadow-deep-day: oklch(0 0 0 / 14%);
+
+  /* Night palette. */
+  /* Surfaces: window chrome (sidebar) < content panel < raised (bars, popovers). */
+  --sidebar-night: oklch(0.175 0.005 var(--gray-hue));
+  --background-night: oklch(0.205 0.005 var(--gray-hue));
+  --surface-sunken-night: oklch(0.19 0.005 var(--gray-hue));
+  --surface-raised-night: oklch(0.26 0.006 var(--gray-hue));
+  --card-night: oklch(0.225 0.005 var(--gray-hue));
+  --popover-night: oklch(0.235 0.006 var(--gray-hue) / 92%);
+  --muted-night: oklch(0.255 0.006 var(--gray-hue));
+
+  /* shadcn's "accent" is the hover/selected fill, not the brand color. */
+  --accent-night: oklch(0.27 0.006 var(--gray-hue));
+  --sidebar-accent-night: oklch(0.255 0.006 var(--gray-hue));
+
+  /* Text. */
+  --foreground-night: oklch(0.95 0.003 var(--gray-hue));
+  --primary-text-night: oklch(0.76 calc(var(--accent-chroma) * 0.8) var(--accent-hue));
+
+  /* Lines. */
+  --border-night: oklch(1 0 0 / 8%);
+  --border-strong-night: oklch(1 0 0 / 14%);
+  --grid-line-night: oklch(1 0 0 / 5%);
+  --input-night: oklch(1 0 0 / 10%);
+
+  /* Accent. */
+  --primary-night: oklch(0.66 var(--accent-chroma) var(--accent-hue));
+  --primary-soft-night: oklch(0.66 var(--accent-chroma) var(--accent-hue) / 9%);
+  --ring-night: oklch(0.66 var(--accent-chroma) var(--accent-hue) / 60%);
+
+  /* Feedback. */
+  --destructive-night: oklch(0.68 0.19 25);
+  --success-night: oklch(0.7 0.15 152);
+  --warning-night: oklch(0.78 0.14 75);
+
+  /* Booking status: the stripe on tape chart bars and the dot in status pills. */
+  --status-hold-night: oklch(0.78 0.14 75);
+  --status-checked-in-night: oklch(0.7 0.15 152);
+  --status-checked-out-night: oklch(0.55 0.01 var(--gray-hue));
+  --status-cancelled-night: oklch(0.66 0.18 25);
+
+  /* Room housekeeping status. */
+  --room-inspected-night: oklch(0.7 0.15 152);
+  --room-clean-night: oklch(0.72 0.11 215);
+  --room-dirty-night: oklch(0.76 0.14 55);
+  --room-out-of-order-night: oklch(0.66 0.19 27);
+
+  /* Shadow colors; the shadows below are built from them. */
+  --shadow-ring-night: oklch(1 0 0 / 9%);
+  --shadow-soft-night: oklch(0 0 0 / 30%);
+  --shadow-deep-night: oklch(0 0 0 / 50%);
+
+  /* Tokens used by components: the day and night palettes blended. */
+  /* Surfaces: window chrome (sidebar) < content panel < raised (bars, popovers). */
+  --sidebar: color-mix(in oklch, var(--sidebar-day), var(--sidebar-night) var(--night-mix));
+  --background: color-mix(
+    in oklch,
+    var(--background-day),
+    var(--background-night) var(--night-mix)
+  );
+  --surface-sunken: color-mix(
+    in oklch,
+    var(--surface-sunken-day),
+    var(--surface-sunken-night) var(--night-mix)
+  );
+  --surface-raised: color-mix(
+    in oklch,
+    var(--surface-raised-day),
+    var(--surface-raised-night) var(--night-mix)
+  );
+  --card: color-mix(in oklch, var(--card-day), var(--card-night) var(--night-mix));
+  --popover: color-mix(in oklch, var(--popover-day), var(--popover-night) var(--night-mix));
+  --muted: color-mix(in oklch, var(--muted-day), var(--muted-night) var(--night-mix));
+
+  /* shadcn's "accent" is the hover/selected fill, not the brand color. */
+  --accent: color-mix(in oklch, var(--accent-day), var(--accent-night) var(--night-mix));
+  --sidebar-accent: color-mix(
+    in oklch,
+    var(--sidebar-accent-day),
+    var(--sidebar-accent-night) var(--night-mix)
+  );
+
+  /* Text. */
+  --foreground: color-mix(in oklch, var(--foreground-day), var(--foreground-night) var(--ink-mix));
+
+  --primary-text: color-mix(
+    in oklch,
+    var(--primary-text-day),
+    var(--primary-text-night) var(--ink-mix)
+  );
+
+  /* Lines. */
+  --border: color-mix(in oklch, var(--border-day), var(--border-night) var(--night-mix));
+  --border-strong: color-mix(
+    in oklch,
+    var(--border-strong-day),
+    var(--border-strong-night) var(--night-mix)
+  );
+  --grid-line: color-mix(in oklch, var(--grid-line-day), var(--grid-line-night) var(--night-mix));
+  --input: color-mix(in oklch, var(--input-day), var(--input-night) var(--night-mix));
+
+  /* Accent. */
+  --primary: color-mix(in oklch, var(--primary-day), var(--primary-night) var(--night-mix));
+  --primary-soft: color-mix(
+    in oklch,
+    var(--primary-soft-day),
+    var(--primary-soft-night) var(--night-mix)
+  );
+  --ring: color-mix(in oklch, var(--ring-day), var(--ring-night) var(--night-mix));
+
+  /* Feedback. */
+  --destructive: color-mix(
+    in oklch,
+    var(--destructive-day),
+    var(--destructive-night) var(--night-mix)
+  );
+  --success: color-mix(in oklch, var(--success-day), var(--success-night) var(--night-mix));
+  --warning: color-mix(in oklch, var(--warning-day), var(--warning-night) var(--night-mix));
+
+  /* Booking status: the stripe on tape chart bars and the dot in status pills. */
+  --status-hold: color-mix(
+    in oklch,
+    var(--status-hold-day),
+    var(--status-hold-night) var(--night-mix)
+  );
+  --status-checked-in: color-mix(
+    in oklch,
+    var(--status-checked-in-day),
+    var(--status-checked-in-night) var(--night-mix)
+  );
+  --status-checked-out: color-mix(
+    in oklch,
+    var(--status-checked-out-day),
+    var(--status-checked-out-night) var(--night-mix)
+  );
+  --status-cancelled: color-mix(
+    in oklch,
+    var(--status-cancelled-day),
+    var(--status-cancelled-night) var(--night-mix)
+  );
+
+  /* Room housekeeping status. */
+  --room-inspected: color-mix(
+    in oklch,
+    var(--room-inspected-day),
+    var(--room-inspected-night) var(--night-mix)
+  );
+  --room-clean: color-mix(
+    in oklch,
+    var(--room-clean-day),
+    var(--room-clean-night) var(--night-mix)
+  );
+  --room-dirty: color-mix(
+    in oklch,
+    var(--room-dirty-day),
+    var(--room-dirty-night) var(--night-mix)
+  );
+  --room-out-of-order: color-mix(
+    in oklch,
+    var(--room-out-of-order-day),
+    var(--room-out-of-order-night) var(--night-mix)
+  );
+
+  /* Shadow colors; the shadows below are built from them. */
+  --shadow-ring: color-mix(
+    in oklch,
+    var(--shadow-ring-day),
+    var(--shadow-ring-night) var(--night-mix)
+  );
+  --shadow-soft: color-mix(
+    in oklch,
+    var(--shadow-soft-day),
+    var(--shadow-soft-night) var(--night-mix)
+  );
+  --shadow-deep: color-mix(
+    in oklch,
+    var(--shadow-deep-day),
+    var(--shadow-deep-night) var(--night-mix)
+  );
+
+  /* Secondary text is the text color pulled toward the background, so it keeps the same
+     relative contrast at every point of the daylight blend. */
+  --muted-foreground: color-mix(in oklch, var(--foreground), var(--background) 40%);
+  --subtle-foreground: color-mix(in oklch, var(--foreground), var(--background) 56%);
+  --card-foreground: var(--foreground);
+  --popover-foreground: var(--foreground);
+  --secondary: var(--muted);
+  --secondary-foreground: var(--foreground);
+  --accent-foreground: var(--foreground);
+  --primary-foreground: oklch(0.99 0 0);
+  --status-confirmed: var(--primary);
+
+  --shadow-raised: 0 0 0 0.5px var(--shadow-ring), 0 1px 2px var(--shadow-soft);
   --shadow-floating:
-    0 0 0 0.5px oklch(0 0 0 / 10%), 0 8px 24px -4px oklch(0 0 0 / 14%), 0 2px 6px oklch(0 0 0 / 6%);
-  --shadow-panel: 0 0 0 0.5px oklch(0 0 0 / 7%), 0 1px 3px oklch(0 0 0 / 4%);
+    0 0 0 0.5px var(--shadow-ring), 0 8px 28px -4px var(--shadow-deep), 0 2px 6px var(--shadow-soft);
+  --shadow-panel:
+    0 0 0 0.5px var(--shadow-ring), 0 1px 3px var(--shadow-soft), 0 28px 80px -24px var(--glow),
+    inset 0 -1px 0 color-mix(in oklch, var(--glow), transparent 30%);
 
   --radius: 0.5rem;
 
@@ -81,59 +289,14 @@
   --sidebar-foreground: var(--foreground);
   --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.915 0.005 var(--gray-hue));
-  --sidebar-accent-foreground: var(--foreground);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
 }
 
 .dark {
   color-scheme: dark;
-  --sidebar: oklch(0.175 0.005 var(--gray-hue));
-  --background: oklch(0.205 0.005 var(--gray-hue));
-  --surface-sunken: oklch(0.19 0.005 var(--gray-hue));
-  --surface-raised: oklch(0.26 0.006 var(--gray-hue));
-  --card: oklch(0.225 0.005 var(--gray-hue));
-  --popover: oklch(0.235 0.006 var(--gray-hue) / 92%);
-
-  --foreground: oklch(0.95 0.003 var(--gray-hue));
-  --muted: oklch(0.255 0.006 var(--gray-hue));
-  --muted-foreground: oklch(0.68 0.01 var(--gray-hue));
-  --subtle-foreground: oklch(0.54 0.01 var(--gray-hue));
-  --accent: oklch(0.27 0.006 var(--gray-hue));
-
-  --border: oklch(1 0 0 / 8%);
-  --border-strong: oklch(1 0 0 / 14%);
-  --grid-line: oklch(1 0 0 / 5%);
-  --input: oklch(1 0 0 / 10%);
-
-  --primary: oklch(0.66 var(--accent-chroma) var(--accent-hue));
-  --primary-foreground: oklch(0.99 0 0);
-  --primary-soft: oklch(0.66 var(--accent-chroma) var(--accent-hue) / 9%);
-  --primary-text: oklch(0.76 calc(var(--accent-chroma) * 0.8) var(--accent-hue));
-  --ring: oklch(0.66 var(--accent-chroma) var(--accent-hue) / 60%);
-
-  --destructive: oklch(0.68 0.19 25);
-  --success: oklch(0.7 0.15 152);
-  --warning: oklch(0.78 0.14 75);
-
-  --status-hold: oklch(0.78 0.14 75);
-  --status-checked-in: oklch(0.7 0.15 152);
-  --status-checked-out: oklch(0.55 0.01 var(--gray-hue));
-  --status-cancelled: oklch(0.66 0.18 25);
-
-  --room-inspected: oklch(0.7 0.15 152);
-  --room-clean: oklch(0.72 0.11 215);
-  --room-dirty: oklch(0.76 0.14 55);
-  --room-out-of-order: oklch(0.66 0.19 27);
-
-  --shadow-raised: 0 0 0 0.5px oklch(1 0 0 / 9%), 0 1px 2px oklch(0 0 0 / 30%);
-  --shadow-floating:
-    0 0 0 0.5px oklch(1 0 0 / 10%), 0 12px 32px -4px oklch(0 0 0 / 50%),
-    0 2px 6px oklch(0 0 0 / 30%);
-  --shadow-panel: 0 0 0 0.5px oklch(1 0 0 / 7%), 0 1px 3px oklch(0 0 0 / 30%);
-
-  --sidebar-accent: oklch(0.255 0.006 var(--gray-hue));
+  --night: 1;
+  --ink: 1;
 }
 
 @theme inline {
@@ -236,6 +399,25 @@
   ::selection {
     background: var(--primary-soft);
   }
+}
+
+/*
+ * Daylight underglow: light rising from below the content panel. --glow is transparent unless
+ * the daylight theme is on, so these rules are invisible in light and dark.
+ */
+[data-slot='sidebar-wrapper'] {
+  background-image:
+    radial-gradient(50% 20% at 60% 100%, var(--glow), transparent),
+    radial-gradient(100% 75% at 60% 112%, var(--glow), transparent 68%);
+}
+@media (width >= 48rem) {
+  /* Lift the panel so the light shows beneath it. */
+  [data-theme='daylight'] [data-slot='sidebar-inset'] {
+    margin-bottom: 1.25rem !important;
+  }
+}
+[data-variant='inset'] [data-slot='sidebar-inner'] {
+  background-color: transparent;
 }
 
 @layer utilities {
