@@ -5,6 +5,7 @@ import {
   bookingSchema,
   type BookingAction,
   type BookingListQuery,
+  dailyBriefSchema,
   dayOverviewSchema,
   guestSchema,
   housekeepingBoardSchema,
@@ -95,6 +96,13 @@ export function useDayOverview(date?: string) {
   return useQuery({
     queryKey: ['day', date ?? 'today'],
     queryFn: () => apiGet(`/api/day${toSearch({ date })}`, dayOverviewSchema),
+  });
+}
+
+export function useDailyBrief(date?: string) {
+  return useQuery({
+    queryKey: ['brief', date ?? 'today'],
+    queryFn: () => apiGet(`/api/brief${toSearch({ date })}`, dailyBriefSchema),
   });
 }
 

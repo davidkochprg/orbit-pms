@@ -51,6 +51,7 @@ Repositories implement the interfaces declared in `packages/domain/src/repositor
 The app shell is a sidebar (navigation, the ⌘K button, the signed-in staff member, appearance) and one content panel per page. Each page renders its own `PageHeader` and body. Two overlays are shared by every page:
 
 - **Command bar** (`components/command-palette.tsx`, ⌘K): search guests and today's arrivals and departures, jump to a page, switch appearance, and talk to the agent. The agent lives here rather than in a chat side panel, see [ADR 0007](decisions/0007-command-bar-for-the-agent.md). `useCommandPalette().openPalette({ mode, text })` opens it from anywhere with context, for example from a booking.
+- **Today** (`pages/dashboard.tsx`): the daily brief (`GET /api/brief`) as tonight's numbers, a "needs attention" list (rooms to prepare, holds, unanswered messages, repairs) and short gaps to sell, each linking to where it is handled; then today's arrivals, departures and in-house guests.
 - **Housekeeping** (`pages/housekeeping.tsx`): rooms in status columns, dragged to change status, with today's occupancy and open tasks. A voice note is recorded with `MediaRecorder`, converted in the browser to the 16 kHz mono WAV Meta's speech-to-text takes (`lib/wav.ts`), and uploaded; a typed note works without a microphone.
 - **Booking inspector** (`components/booking-drawer.tsx`): opened by `?booking=<id>`, so any page, link or agent result can open a booking.
 
