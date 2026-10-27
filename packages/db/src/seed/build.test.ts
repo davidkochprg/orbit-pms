@@ -93,10 +93,16 @@ describe('buildSeed', () => {
 });
 
 describe('buildSeed room statuses', () => {
-  it('marks rooms for today’s arrivals as inspected', () => {
+  it('marks rooms for today’s arrivals as inspected unless someone also leaves today', () => {
+    const departing = new Set(
+      seed.bookings
+        .filter((b) => b.checkOut === today && b.status === 'checked_in')
+        .map((b) => b.roomId),
+    );
     const arrivals = seed.bookings.filter((b) => b.checkIn === today && b.status === 'confirmed');
     for (const a of arrivals) {
-      expect(seed.rooms.find((r) => r.id === a.roomId)?.status).toBe('inspected');
+      const status = seed.rooms.find((r) => r.id === a.roomId)?.status;
+      expect(status).toBe(departing.has(a.roomId) ? 'dirty' : 'inspected');
     }
   });
 });
