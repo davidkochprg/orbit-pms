@@ -1,7 +1,7 @@
 import { Orbit, Search } from 'lucide-react';
 import { NavLink, useLocation } from 'react-router';
-import { StatusDot } from '@/components/status-dot';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { UserCard } from '@/components/user-card';
 import { Kbd } from '@/components/ui/kbd';
 import {
   Sidebar,
@@ -16,7 +16,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useCommandPalette } from '@/hooks/use-command-palette';
-import { useHealth, useInbox } from '@/lib/api';
+import { useInbox } from '@/lib/api';
 import { navItemFor, navItems } from '@/lib/nav';
 
 export function AppSidebar() {
@@ -80,37 +80,10 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="flex-row items-center group-data-[collapsible=icon]:flex-col">
-        <AgentStatus />
+      <SidebarFooter className="flex-row items-center gap-1 pb-3 group-data-[collapsible=icon]:flex-col">
+        <UserCard />
         <ThemeToggle />
       </SidebarFooter>
     </Sidebar>
-  );
-}
-
-function AgentStatus() {
-  const health = useHealth();
-  const label = health.isPending
-    ? 'Connecting…'
-    : health.isError
-      ? 'Server offline'
-      : health.data.ai.configured
-        ? 'Agent ready'
-        : 'Agent not configured';
-  const color = health.isPending
-    ? 'bg-subtle-foreground'
-    : health.isError
-      ? 'bg-destructive'
-      : health.data.ai.configured
-        ? 'bg-success'
-        : 'bg-warning';
-  return (
-    <span
-      title={label}
-      className="flex min-w-0 flex-1 items-center gap-2 px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:px-0"
-    >
-      <StatusDot className={color} />
-      <span className="truncate group-data-[collapsible=icon]:hidden">{label}</span>
-    </span>
   );
 }

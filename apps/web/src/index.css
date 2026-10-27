@@ -282,8 +282,8 @@
   --shadow-floating:
     0 0 0 0.5px var(--shadow-ring), 0 8px 28px -4px var(--shadow-deep), 0 2px 6px var(--shadow-soft);
   --shadow-panel:
-    0 0 0 0.5px var(--shadow-ring), 0 1px 3px var(--shadow-soft), 0 28px 80px -24px var(--glow),
-    inset 0 -1px 0 color-mix(in oklch, var(--glow), transparent 30%);
+    0 0 0 0.5px var(--shadow-ring), 0 1px 3px var(--shadow-soft),
+    0 0 48px -8px color-mix(in oklch, var(--glow), transparent 40%);
 
   --radius: 0.5rem;
 
@@ -416,19 +416,24 @@
 }
 
 /*
- * Daylight underglow: light rising from below the content panel. --glow is transparent unless
- * the daylight theme is on, so these rules are invisible in light and dark.
+ * Daylight glow: soft light behind the content panel that also shines faintly through the
+ * workspace. --glow is transparent unless the daylight theme is on, so these rules are invisible
+ * in light and dark.
  */
 [data-slot='sidebar-wrapper'] {
-  background-image:
-    radial-gradient(50% 20% at 60% 100%, var(--glow), transparent),
-    radial-gradient(100% 75% at 60% 112%, var(--glow), transparent 68%);
+  background-image: radial-gradient(
+    65% 70% at 58% 50%,
+    color-mix(in oklch, var(--glow), transparent 45%),
+    transparent 75%
+  );
 }
-@media (width >= 48rem) {
-  /* Lift the panel so the light shows beneath it. */
-  [data-theme='daylight'] [data-slot='sidebar-inset'] {
-    margin-bottom: 1.25rem !important;
-  }
+.daylight-wash {
+  background-image: radial-gradient(
+    75% 75% at 50% 50%,
+    color-mix(in oklch, var(--glow), transparent 88%),
+    color-mix(in oklch, var(--glow), transparent 96%) 60%,
+    transparent 100%
+  );
 }
 [data-variant='inset'] [data-slot='sidebar-inner'] {
   background-color: transparent;

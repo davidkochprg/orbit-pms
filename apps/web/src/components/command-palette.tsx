@@ -23,6 +23,7 @@ import {
   useState,
 } from 'react';
 import { useNavigate } from 'react-router';
+import { AgentStatus } from '@/components/agent-status';
 import { AgentThread } from '@/components/agent-thread';
 import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
@@ -417,8 +418,8 @@ function InputRow({ icon, children }: { icon: ReactNode; children: ReactNode }) 
 function Footer({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-10 shrink-0 items-center gap-4 border-t px-4 text-xs text-muted-foreground">
-      <span className="mr-auto flex items-center gap-1.5 font-medium text-foreground">
-        <Sparkles className="size-3.5 text-primary-text" /> Orbit
+      <span className="mr-auto">
+        <AgentStatus />
       </span>
       {children}
     </div>

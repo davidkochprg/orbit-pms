@@ -11,6 +11,8 @@ export function AppLayout() {
         <AppSidebar />
         <SidebarInset className="min-h-0 overflow-hidden md:peer-data-[variant=inset]:shadow-panel">
           <Outlet />
+          {/* Daylight glow shining through the workspace; transparent in other themes. */}
+          <div aria-hidden className="daylight-wash pointer-events-none absolute inset-0 z-40" />
         </SidebarInset>
         <BookingDrawer />
       </SidebarProvider>
