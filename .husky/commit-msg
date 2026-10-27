@@ -1,0 +1,5 @@
+pnpm exec commitlint --edit "$1"
+if grep -qiE '^(co-authored-by:.*(claude|anthropic|muse|meta ai|noreply@)|claude-session:)|generated with \[?(claude|muse)' "$1"; then
+  echo "commit-msg: AI attribution lines are not allowed in this repo" >&2
+  exit 1
+fi

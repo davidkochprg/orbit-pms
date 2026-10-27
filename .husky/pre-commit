@@ -1,0 +1,5 @@
+if git diff --cached --name-only | grep -qi '^kickoff\.md$'; then
+  echo "pre-commit: this file must not be committed" >&2
+  exit 1
+fi
+pnpm run --if-present typecheck && pnpm run --if-present lint
