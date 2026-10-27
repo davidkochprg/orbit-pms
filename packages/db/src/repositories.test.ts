@@ -300,6 +300,18 @@ describe('billing (PGlite)', () => {
   });
 });
 
+describe('registrations (PGlite)', () => {
+  it('round-trips the guest book and replaces an entry on save', async () => {
+    const entry = seed.registrations[0]!;
+    expect(await repos.registrations.get(entry.bookingId)).toEqual(entry);
+    expect(await repos.registrations.listByGuest(entry.guestId)).toContainEqual(entry);
+    await repos.registrations.save({ ...entry, documentNumber: 'DEMO-000000' });
+    expect((await repos.registrations.get(entry.bookingId))?.documentNumber).toBe('DEMO-000000');
+    await repos.registrations.save(entry);
+    expect(await repos.registrations.get('nope')).toBeNull();
+  });
+});
+
 describe('staff (PGlite)', () => {
   it('lists active members first, then by name', async () => {
     const staff = await repos.staff.list();

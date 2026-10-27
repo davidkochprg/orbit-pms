@@ -78,6 +78,19 @@ describe('buildSeed', () => {
     }
   });
 
+  it('registers every stay that has started, with synthetic documents only', () => {
+    const started = seed.bookings.filter(
+      (b) => b.status === 'checked_in' || b.status === 'checked_out',
+    );
+    expect(new Set(seed.registrations.map((r) => r.bookingId))).toEqual(
+      new Set(started.map((b) => b.id)),
+    );
+    expect(seed.registrations.every((r) => r.documentNumber.startsWith('DEMO-'))).toBe(true);
+    expect(seed.registrations.every((r) => r.dateOfBirth < today)).toBe(true);
+    const arrivals = seed.bookings.filter((b) => b.checkIn === today && b.status === 'confirmed');
+    expect(seed.registrations.some((r) => arrivals.some((a) => a.id === r.bookingId))).toBe(false);
+  });
+
   it('has a synthetic team with an active manager', () => {
     expect(seed.staff.filter((s) => s.active && s.role === 'manager').length).toBeGreaterThan(0);
     expect(seed.staff.every((s) => s.email === null || s.email.endsWith('@example.com'))).toBe(

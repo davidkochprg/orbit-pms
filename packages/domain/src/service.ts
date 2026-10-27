@@ -41,6 +41,7 @@ import { addonsForWishes, pickOptions, roomKindForWishes, stayRequest } from './
 import type { HotelPolicy } from './policy';
 import { type PricingConfig, quote } from './pricing';
 import { currentPricing } from './rates';
+import { assertRegistered } from './registration';
 import type { NewAuditEntry, Repositories } from './repositories';
 import { containsText } from './text';
 
@@ -114,6 +115,8 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         roomBookings: await tx.bookings.listBookings({ roomId: booking.roomId }),
         roomName: room.name,
       });
+      // After the status rules, so a check-in on the wrong day says so first.
+      if (action === 'check_in') await assertRegistered(tx, id);
       return {
         booking: updated,
         room,
@@ -315,6 +318,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
       room,
       roomType,
       allowedActions: allowedActions(booking, hotelToday(clock())),
+      registered: (await repos.registrations.get(id)) !== null,
     };
   }
 

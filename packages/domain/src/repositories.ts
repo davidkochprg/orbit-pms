@@ -13,6 +13,7 @@ import type {
   PendingAction,
   Payment,
   PricingConfig,
+  Registration,
   Room,
   RoomStatus,
   RoomType,
@@ -132,6 +133,14 @@ export interface BillingRepository {
   createPayment(payment: Payment): Promise<void>;
 }
 
+export interface RegistrationRepository {
+  get(bookingId: string): Promise<Registration | null>;
+  /** Newest first. */
+  listByGuest(guestId: string): Promise<Registration[]>;
+  /** Creates or replaces the stay's registration. */
+  save(registration: Registration): Promise<void>;
+}
+
 export interface Repositories {
   rooms: RoomRepository;
   bookings: BookingRepository;
@@ -143,6 +152,7 @@ export interface Repositories {
   settings: SettingsRepository;
   staff: StaffRepository;
   billing: BillingRepository;
+  registrations: RegistrationRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

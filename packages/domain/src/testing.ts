@@ -9,6 +9,7 @@ import type {
   PendingAction,
   Payment,
   PricingConfig,
+  Registration,
   Room,
   RoomType,
   StaffMember,
@@ -30,6 +31,7 @@ export interface MemoryState {
   staff: StaffMember[];
   charges: Charge[];
   payments: Payment[];
+  registrations: Registration[];
 }
 
 function inBilling<T extends { bookingId: string }>(
@@ -66,6 +68,7 @@ export function createMemoryRepositories(
     staff: [],
     charges: [],
     payments: [],
+    registrations: [],
     ...clone(initial),
   };
 
@@ -241,6 +244,23 @@ export function createMemoryRepositories(
         Promise.resolve(state.payments.filter((p) => inBilling(p, p.paidOn, filter))),
       createPayment: (payment) => {
         state.payments.push(payment);
+        return Promise.resolve();
+      },
+    },
+    registrations: {
+      get: (bookingId) =>
+        Promise.resolve(state.registrations.find((r) => r.bookingId === bookingId) ?? null),
+      listByGuest: (guestId) =>
+        Promise.resolve(
+          state.registrations
+            .filter((r) => r.guestId === guestId)
+            .sort((a, b) => b.registeredAt.localeCompare(a.registeredAt)),
+        ),
+      save: (registration) => {
+        state.registrations = [
+          ...state.registrations.filter((r) => r.bookingId !== registration.bookingId),
+          registration,
+        ];
         return Promise.resolve();
       },
     },

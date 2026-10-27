@@ -26,6 +26,22 @@ function setup() {
           checkOut: '2026-05-14',
         }),
         booking({
+          id: 'bk_today',
+          guestId: 'gst_1',
+          roomId: 'rm_1',
+          checkIn: '2026-05-10',
+          checkOut: '2026-05-12',
+        }),
+        booking({
+          id: 'bk_leaving',
+          guestId: 'gst_1',
+          roomId: 'rm_2',
+          checkIn: '2026-05-07',
+          checkOut: '2026-05-10',
+          adults: 1,
+          status: 'checked_in',
+        }),
+        booking({
           id: 'bk_h',
           guestId: 'gst_1',
           roomId: 'rm_2',
@@ -204,6 +220,37 @@ describe('pending actions', () => {
         input: { bookingId: 'bk_h', label: 'Sauna', quantity: 1, unitPrice: 150 },
       }),
     ).rejects.toMatchObject({ code: 'invalid_transition' });
+  });
+
+  it('proposes a check-in only once the stay is registered', async () => {
+    const { repos, actions } = setup();
+    const checkIn = { kind: 'check_in' as const, input: { bookingId: 'bk_today' } };
+    await expect(actions.propose(checkIn)).rejects.toThrow(/Register the guest/);
+    await repos.registrations.save({
+      bookingId: 'bk_today',
+      guestId: 'gst_1',
+      nationality: 'CZ',
+      dateOfBirth: '1980-01-01',
+      documentType: 'id_card',
+      documentNumber: 'DEMO-1',
+      address: null,
+      registeredAt: now.toISOString(),
+    });
+    const proposed = await actions.propose(checkIn);
+    expect(proposed.summary).toBe(
+      'Check in Tomáš Novák to room 1, 2026-05-10 to 2026-05-12 (2 nights)',
+    );
+    await actions.confirm(proposed.id);
+    expect(repos.state.bookings.find((b) => b.id === 'bk_today')?.status).toBe('checked_in');
+  });
+
+  it('proposes a check-out with what is still due', async () => {
+    const { actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'check_out',
+      input: { bookingId: 'bk_leaving' },
+    });
+    expect(proposed.summary).toBe('Check out Tomáš Novák from room 2; 150 CZK still due');
   });
 
   it('can be rejected, and cannot be resolved twice', async () => {

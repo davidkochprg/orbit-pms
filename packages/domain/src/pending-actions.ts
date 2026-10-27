@@ -79,6 +79,27 @@ export function createPendingActionService({
         const { booking, room } = await hotel.previewBookingAction(action.input.bookingId, verb);
         return `${verb === 'confirm' ? 'Confirm' : 'Cancel'} ${await guestName(booking.guestId)} in room ${room.name}, ${stay(booking)}`;
       }
+      case 'check_in': {
+        const { booking, room } = await hotel.previewBookingAction(
+          action.input.bookingId,
+          'check_in',
+        );
+        return `Check in ${await guestName(booking.guestId)} to room ${room.name}, ${stay(booking)}`;
+      }
+      case 'check_out': {
+        const { booking, room } = await hotel.previewBookingAction(
+          action.input.bookingId,
+          'check_out',
+        );
+        const { balance } = await billing.getFolio(booking.id);
+        const bill =
+          balance > 0
+            ? `${czk(balance)} still due`
+            : balance < 0
+              ? `${czk(-balance)} owed to the guest`
+              : 'bill paid in full';
+        return `Check out ${await guestName(booking.guestId)} from room ${room.name}; ${bill}`;
+      }
       case 'move_booking': {
         const before = await hotel.getBookingDetail(action.input.bookingId);
         const { room } = await hotel.previewMove(action.input.bookingId, action.input.roomId);
@@ -127,6 +148,10 @@ export function createPendingActionService({
         return id(await hotel.applyBookingAction(action.input.bookingId, 'confirm', 'agent'));
       case 'cancel_booking':
         return id(await hotel.applyBookingAction(action.input.bookingId, 'cancel', 'agent'));
+      case 'check_in':
+        return id(await hotel.applyBookingAction(action.input.bookingId, 'check_in', 'agent'));
+      case 'check_out':
+        return id(await hotel.applyBookingAction(action.input.bookingId, 'check_out', 'agent'));
       case 'move_booking':
         return id(await hotel.moveBooking(action.input.bookingId, action.input.roomId, 'agent'));
       case 'change_dates':

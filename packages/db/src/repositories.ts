@@ -9,6 +9,7 @@ import type {
   HousekeepingRepository,
   InquiryRepository,
   PendingActionRepository,
+  RegistrationRepository,
   Repositories,
   RoomRepository,
   SettingsRepository,
@@ -23,6 +24,7 @@ import {
   type Inquiry,
   type PendingAction,
   type Payment,
+  type Registration,
   pendingActionSchema,
   pricingConfigSchema,
 } from '@orbit/shared';
@@ -40,6 +42,7 @@ import {
   payments,
   pendingActions,
   pricing,
+  registrations,
   rooms,
   roomTypes,
   staff,
@@ -379,6 +382,37 @@ function billingRepository(db: Db): BillingRepository {
   };
 }
 
+function toRegistration({ registeredAt, ...row }: typeof registrations.$inferSelect): Registration {
+  return { ...row, registeredAt: registeredAt.toISOString() };
+}
+
+function registrationRepository(db: Db): RegistrationRepository {
+  return {
+    async get(bookingId) {
+      const [row] = await db
+        .select()
+        .from(registrations)
+        .where(eq(registrations.bookingId, bookingId));
+      return row ? toRegistration(row) : null;
+    },
+    async listByGuest(guestId) {
+      const rows = await db
+        .select()
+        .from(registrations)
+        .where(eq(registrations.guestId, guestId))
+        .orderBy(desc(registrations.registeredAt));
+      return rows.map(toRegistration);
+    },
+    async save(registration) {
+      const row = { ...registration, registeredAt: new Date(registration.registeredAt) };
+      await db
+        .insert(registrations)
+        .values(row)
+        .onConflictDoUpdate({ target: registrations.bookingId, set: row });
+    },
+  };
+}
+
 export function createRepositories(db: Db): Repositories {
   return {
     rooms: roomRepository(db),
@@ -391,6 +425,7 @@ export function createRepositories(db: Db): Repositories {
     settings: settingsRepository(db),
     staff: staffRepository(db),
     billing: billingRepository(db),
+    registrations: registrationRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

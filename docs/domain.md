@@ -15,6 +15,7 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 | HotelProfile     | name, location, description, contact, `checkInFrom`, `checkOutBy`, `entries` (`policy` \| `amenity` \| `info`, title, details)                                        |
 | Charge           | booking, label, quantity, `unitPrice` (CZK, negative for a discount), amount, `postedOn`                                                                              |
 | Payment          | booking, `kind` (`payment` \| `refund`), `method` (`cash` \| `card` \| `bank_transfer`), amount (positive CZK), note, `paidOn`                                        |
+| Registration     | booking, guest, `nationality` (ISO alpha-2), `dateOfBirth`, `documentType` (`id_card` \| `passport`), `documentNumber`, address, `registeredAt`                       |
 | StaffMember      | name, email, `role` (`manager` \| `receptionist` \| `housekeeping`), `active`                                                                                         |
 | AuditLog         | `actor` (`user` \| `agent`), action, `subjectId` (e.g. a booking), payload, timestamp                                                                                 |
 
@@ -33,7 +34,7 @@ stateDiagram-v2
 `allowedActions(booking, today)` lists the actions the UI and agent may offer:
 
 - `confirm` a hold. Fails with `conflict` if the room was taken after the hold expired.
-- `check_in` a confirmed booking only on a day of the stay (`checkIn ≤ today < checkOut`).
+- `check_in` a confirmed booking only on a day of the stay (`checkIn ≤ today < checkOut`), once the stay is registered ([Registration](#registration)).
 - `check_out` a checked-in guest, any day. The room becomes `dirty`.
 - `cancel` a hold or confirmed booking. Checked-in guests check out instead.
 
@@ -110,6 +111,14 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - Until a profile is saved, `getProfile()` returns an empty one (`emptyHotelProfile`).
 - `updateProfile(profile, by)` replaces the whole profile; only an active manager may (`forbidden`). Entry IDs must be unique and check-out must be earlier in the day than check-in, so rooms can be turned over (`invalid_input`). It writes `settings.profile` to the audit log with who saved it (`by`) and the names of the changed fields; a save that changes nothing writes nothing.
 - Rules the system enforces (hold length, which room kinds take dogs, prices) stay in `hotelPolicy` and the rates, not in the profile.
+
+## Registration
+
+`createRegistrationService` (`registration.ts`) keeps the guest book: one entry per stay for its main guest, with nationality, date of birth, ID document and, for guests from abroad, a home address.
+
+- `register(bookingId, body, actor)` records or corrects it for a `confirmed` or `checked_in` stay (`invalid_transition` otherwise). The date of birth must be in the past (`invalid_input`). Audited as `booking.register` or `booking.update_registration` with only the nationality: personal data stays out of the audit log.
+- `getView(bookingId)` returns the entry and the guest's latest earlier one, to prefill the form for a returning guest.
+- Check-in needs the entry: without it, `check_in` throws `invalid_transition` (after the date and status rules). `BookingDetail.registered` says whether it exists.
 
 ## Billing
 

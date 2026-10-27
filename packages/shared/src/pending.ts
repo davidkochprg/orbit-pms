@@ -8,6 +8,8 @@ export const pendingActionInputSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('create_hold'), input: createHoldInputSchema }),
   z.object({ kind: z.literal('confirm_booking'), input: z.object({ bookingId: z.string() }) }),
   z.object({ kind: z.literal('cancel_booking'), input: z.object({ bookingId: z.string() }) }),
+  z.object({ kind: z.literal('check_in'), input: z.object({ bookingId: z.string() }) }),
+  z.object({ kind: z.literal('check_out'), input: z.object({ bookingId: z.string() }) }),
   z.object({
     kind: z.literal('move_booking'),
     input: z.object({ bookingId: z.string(), roomId: z.string() }),

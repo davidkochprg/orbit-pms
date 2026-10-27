@@ -11,6 +11,7 @@ export * from './operations';
 export * from './pending';
 export * from './quote';
 export * from './rates';
+export * from './registration';
 export * from './reports';
 export * from './staff';
 export * from './views';

@@ -2,6 +2,7 @@ import {
   auditActors,
   bookingSources,
   bookingStatuses,
+  documentTypes,
   housekeepingTaskStatuses,
   housekeepingTaskTypes,
   inquiryChannels,
@@ -50,6 +51,7 @@ export const auditActor = pgEnum('audit_actor', auditActors);
 export const pendingActionStatus = pgEnum('pending_action_status', pendingActionStatuses);
 export const staffRole = pgEnum('staff_role', staffRoles);
 export const paymentKind = pgEnum('payment_kind', paymentKinds);
+export const documentType = pgEnum('document_type', documentTypes);
 export const paymentMethod = pgEnum('payment_method', paymentMethods);
 
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
@@ -230,6 +232,26 @@ export const payments = pgTable(
     index('payments_paid_idx').on(t.paidOn),
     check('payments_amount_check', sql`${t.amount} > 0`),
   ],
+);
+
+/** The guest book: one registration per stay, for its main guest. Check-in needs it. */
+export const registrations = pgTable(
+  'registrations',
+  {
+    bookingId: text('booking_id')
+      .primaryKey()
+      .references(() => bookings.id),
+    guestId: text('guest_id')
+      .notNull()
+      .references(() => guests.id),
+    nationality: text('nationality').notNull(),
+    dateOfBirth: date('date_of_birth', { mode: 'string' }).notNull(),
+    documentType: documentType('document_type').notNull(),
+    documentNumber: text('document_number').notNull(),
+    address: text('address'),
+    registeredAt: timestamp('registered_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('registrations_guest_idx').on(t.guestId, t.registeredAt)],
 );
 
 /** Rates from Settings: seasons, discounts and add-on prices. One row, `id = 'hotel'`. */

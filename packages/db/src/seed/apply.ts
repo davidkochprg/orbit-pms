@@ -10,6 +10,7 @@ import {
   payments,
   pendingActions,
   pricing,
+  registrations,
   rooms,
   roomTypes,
   staff,
@@ -20,6 +21,7 @@ import type { SeedData } from './build';
 export async function applySeed(db: Db, seed: SeedData): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.delete(pendingActions);
+    await tx.delete(registrations);
     await tx.delete(charges);
     await tx.delete(payments);
     await tx.delete(auditLog);
@@ -48,6 +50,9 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
     await tx
       .insert(payments)
       .values(seed.payments.map((p) => ({ ...p, createdAt: new Date(p.createdAt) })));
+    await tx
+      .insert(registrations)
+      .values(seed.registrations.map((r) => ({ ...r, registeredAt: new Date(r.registeredAt) })));
     await tx.insert(inquiries).values(
       seed.inquiries.map((i) => ({
         ...i,

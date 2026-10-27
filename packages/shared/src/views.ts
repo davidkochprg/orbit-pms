@@ -18,6 +18,8 @@ export const bookingDetailSchema = z.object({
   room: roomSchema,
   roomType: roomTypeSchema,
   allowedActions: z.array(bookingActionSchema),
+  /** Whether the guest book has this stay's registration; check-in needs it. */
+  registered: z.boolean(),
 });
 export type BookingDetail = z.infer<typeof bookingDetailSchema>;
 

@@ -1,4 +1,4 @@
-import type { Guest } from '@orbit/shared';
+import type { Guest, Registration } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { DomainError } from './errors';
 import { hotelPolicy } from './policy';
@@ -16,6 +16,19 @@ const guest: Guest = {
   language: 'en',
   notes: null,
 };
+
+function registration(bookingId: string): Registration {
+  return {
+    bookingId,
+    guestId: 'gst_test',
+    nationality: 'CZ',
+    dateOfBirth: '1980-01-01',
+    documentType: 'id_card',
+    documentNumber: 'DEMO-0001',
+    address: null,
+    registeredAt: now.toISOString(),
+  };
+}
 
 function setup() {
   const repos = createMemoryRepositories(
@@ -65,8 +78,19 @@ describe('createHotelService', () => {
     await expect(service.getBookingDetail('nope')).rejects.toMatchObject({ code: 'not_found' });
   });
 
+  it('checks in only once the stay is registered', async () => {
+    const { repos, service } = setup();
+    await expect(service.applyBookingAction('arrival', 'check_in', 'user')).rejects.toThrow(
+      /Register the guest before check-in/,
+    );
+    expect((await service.getBookingDetail('arrival')).registered).toBe(false);
+    await repos.registrations.save(registration('arrival'));
+    expect((await service.getBookingDetail('arrival')).registered).toBe(true);
+  });
+
   it('applies an action and records who did it', async () => {
     const { repos, service } = setup();
+    await repos.registrations.save(registration('arrival'));
     await service.applyBookingAction('arrival', 'check_in', 'agent');
     expect((await repos.bookings.getBooking('arrival'))?.status).toBe('checked_in');
     expect(repos.state.audit).toEqual([
