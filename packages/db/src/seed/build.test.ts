@@ -91,3 +91,12 @@ describe('buildSeed', () => {
     expect(buildSeed(today, now, pricingConfig)).toEqual(seed);
   });
 });
+
+describe('buildSeed room statuses', () => {
+  it('marks rooms for today’s arrivals as inspected', () => {
+    const arrivals = seed.bookings.filter((b) => b.checkIn === today && b.status === 'confirmed');
+    for (const a of arrivals) {
+      expect(seed.rooms.find((r) => r.id === a.roomId)?.status).toBe('inspected');
+    }
+  });
+});

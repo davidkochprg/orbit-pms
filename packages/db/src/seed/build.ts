@@ -175,12 +175,16 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
   const departingToday = new Set(
     kept.filter((b) => b.checkOut === today && b.status === 'checked_in').map((b) => b.roomId),
   );
+  const arrivingToday = new Set(
+    kept.filter((b) => b.checkIn === today && b.status === 'confirmed').map((b) => b.roomId),
+  );
   const inHouse = kept.filter((b) => b.status === 'checked_in' && b.checkOut > today);
+  // Departed rooms still need cleaning; rooms for today's arrivals are ready and inspected.
   const rooms = seedRooms.map((r) => ({
     ...r,
     status: departingToday.has(r.id)
       ? ('dirty' as const)
-      : r.id === 'rm_103'
+      : arrivingToday.has(r.id)
         ? ('inspected' as const)
         : r.status,
   }));
