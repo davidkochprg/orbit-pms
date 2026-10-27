@@ -36,19 +36,20 @@ Staff talk to the agent in the ⌘K command bar. Each step the agent takes is li
 
 Defined in `packages/ai/src/tools.ts` with zod input schemas from `packages/shared`. Each is a thin wrapper over the domain service. Domain errors are returned to the model as `{ error: { code, message } }` so it can explain them and try something else.
 
-| Tool                              | Does                                                     | Side effect |
-| --------------------------------- | -------------------------------------------------------- | ----------- |
-| `listRooms`                       | Rooms with IDs, kind, type, status                       | none        |
-| `searchBookings`                  | By guest name (accents ignored), room, dates, status     | none        |
-| `getBooking`                      | Booking detail with price breakdown                      | none        |
-| `checkAvailability`               | Free rooms that fit the party, cheapest first            | none        |
-| `quote`                           | Line-item price for a room or room type                  | none        |
-| `getArrivals`, `getDepartures`    | For a date, default today                                | none        |
-| `getDailyBrief`                   | The day's brief (see [domain.md](domain.md#daily-brief)) | none        |
-| `createHold`                      | Hold for a new or existing guest                         | proposal    |
-| `confirmBooking`, `cancelBooking` | Status change                                            | proposal    |
-| `moveBooking`                     | Same dates, another room                                 | proposal    |
-| `changeDates`                     | New dates, same room, re-priced                          | proposal    |
+| Tool                              | Does                                                                                            | Side effect |
+| --------------------------------- | ----------------------------------------------------------------------------------------------- | ----------- |
+| `listRooms`                       | Rooms with IDs, kind, type, status                                                              | none        |
+| `searchBookings`                  | By guest name (accents ignored), room, dates, status                                            | none        |
+| `getBooking`                      | Booking detail with price breakdown                                                             | none        |
+| `checkAvailability`               | Free rooms that fit the party, cheapest first                                                   | none        |
+| `quote`                           | Line-item price for a room or room type                                                         | none        |
+| `getArrivals`, `getDepartures`    | For a date, default today                                                                       | none        |
+| `getDailyBrief`                   | The day's brief (see [domain.md](domain.md#daily-brief))                                        | none        |
+| `createHold`                      | Hold for a new or existing guest                                                                | proposal    |
+| `confirmBooking`, `cancelBooking` | Status change                                                                                   | proposal    |
+| `moveBooking`                     | Same dates, another room                                                                        | proposal    |
+| `changeDates`                     | New dates, same room, re-priced                                                                 | proposal    |
+| `updateBooking`                   | Party, add-ons, source, notes, and room and dates, in one step; re-priced when the stay changes | proposal    |
 
 ## Approval pattern
 

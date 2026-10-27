@@ -45,6 +45,7 @@ const toolLabels: Record<string, [running: string, done: string]> = {
   cancelBooking: ['Preparing the cancellation', 'Prepared the cancellation'],
   moveBooking: ['Preparing the room move', 'Prepared the room move'],
   changeDates: ['Preparing the date change', 'Prepared the date change'],
+  updateBooking: ['Preparing the booking change', 'Prepared the booking change'],
 };
 
 /** A plain-language line for a tool step, so staff see what the agent looked at. */

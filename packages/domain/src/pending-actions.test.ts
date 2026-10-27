@@ -67,6 +67,24 @@ describe('pending actions', () => {
     expect(repos.state.audit).toEqual([]);
   });
 
+  it('proposes an edit with a summary of what changes, and runs it on confirm', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'update_booking',
+      input: { bookingId: 'bk_a', adults: 1, notes: 'Vegetarian breakfast' },
+    });
+    expect(proposed.summary).toMatch(
+      /^Update Tomáš Novák in room 1: party 2 adults → 1 adult, notes "Vegetarian breakfast", total 2000 CZK \(was \?\)$/,
+    );
+    expect(repos.state.bookings.find((b) => b.id === 'bk_a')?.adults).toBe(2);
+    await actions.confirm(proposed.id);
+    expect(repos.state.bookings.find((b) => b.id === 'bk_a')).toMatchObject({
+      adults: 1,
+      notes: 'Vegetarian breakfast',
+    });
+    expect(repos.state.audit[0]).toMatchObject({ actor: 'agent', action: 'booking.update' });
+  });
+
   it('refuses to propose an invalid change', async () => {
     const { repos, actions } = setup();
     await expect(

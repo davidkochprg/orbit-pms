@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { isoDateSchema } from './dates';
-import { createHoldInputSchema } from './operations';
+import { bookingPatchSchema, createHoldInputSchema } from './operations';
 
 /** A mutation the agent proposed. It runs only when a user confirms it. */
 export const pendingActionInputSchema = z.discriminatedUnion('kind', [
@@ -14,6 +14,10 @@ export const pendingActionInputSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('change_dates'),
     input: z.object({ bookingId: z.string(), checkIn: isoDateSchema, checkOut: isoDateSchema }),
+  }),
+  z.object({
+    kind: z.literal('update_booking'),
+    input: bookingPatchSchema.extend({ bookingId: z.string() }),
   }),
 ]);
 export type PendingActionInput = z.infer<typeof pendingActionInputSchema>;

@@ -1,4 +1,5 @@
-import type { Booking, PendingAction, PendingActionInput } from '@orbit/shared';
+import type { Booking, BookingPatch, PendingAction, PendingActionInput } from '@orbit/shared';
+import { changedBookingFields } from './bookings';
 import { nightsBetween } from './dates';
 import { DomainError } from './errors';
 import type { Repositories } from './repositories';
@@ -22,6 +23,31 @@ function stay(b: Pick<Booking, 'checkIn' | 'checkOut'>): string {
 }
 
 const czk = (n: number | undefined) => (n === undefined ? '?' : `${n} CZK`);
+
+/** "party 2 adults → 1 adult, notes" for an edit summary. */
+function changes(before: Booking, after: Booking, patch: BookingPatch): string {
+  return changedBookingFields(before, patch)
+    .map((field) => {
+      switch (field) {
+        case 'adults':
+        case 'childAges':
+          return `party ${party(before)} → ${party(after)}`;
+        case 'checkIn':
+        case 'checkOut':
+          return `dates ${stay(after)}`;
+        case 'addons':
+          return `add-ons wellness ${after.addons.wellness ? 'yes' : 'no'}, dogs ${after.addons.dogs}, extra beds ${after.addons.extraBeds}`;
+        case 'source':
+          return `source ${after.source}`;
+        case 'notes':
+          return `notes "${after.notes ?? ''}"`;
+        case 'roomId':
+          return null;
+      }
+    })
+    .filter((s, i, all) => s !== null && all.indexOf(s) === i)
+    .join(', ');
+}
 
 /**
  * Agent mutations are proposed, not executed. `propose` validates the change against current
@@ -55,6 +81,14 @@ export function createPendingActionService({ repos, hotel, clock, newId }: Pendi
         const { booking } = await hotel.previewDates(action.input.bookingId, action.input);
         return `Change ${before.guest.name} in room ${before.room.name} to ${stay(booking)}, total ${czk(booking.priceSnapshot?.total)} (was ${czk(before.booking.priceSnapshot?.total)})`;
       }
+      case 'update_booking': {
+        const { bookingId, ...patch } = action.input;
+        const before = await hotel.getBookingDetail(bookingId);
+        const { booking, room } = await hotel.previewUpdate(bookingId, patch);
+        const moved = room.id !== before.room.id ? `, move to room ${room.name}` : '';
+        const details = changes(before.booking, booking, patch);
+        return `Update ${before.guest.name} in room ${before.room.name}${details ? `: ${details}` : ''}${moved}, total ${czk(booking.priceSnapshot?.total)} (was ${czk(before.booking.priceSnapshot?.total)})`;
+      }
     }
   }
 
@@ -70,6 +104,10 @@ export function createPendingActionService({ repos, hotel, clock, newId }: Pendi
         return hotel.moveBooking(action.input.bookingId, action.input.roomId, 'agent');
       case 'change_dates':
         return hotel.changeBookingDates(action.input.bookingId, action.input, 'agent');
+      case 'update_booking': {
+        const { bookingId, ...patch } = action.input;
+        return hotel.updateBooking(bookingId, patch, 'agent');
+      }
     }
   }
 

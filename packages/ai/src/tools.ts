@@ -2,6 +2,7 @@ import { DomainError, type HotelService, type PendingActionService } from '@orbi
 import {
   availabilityQuerySchema,
   type BookingSummary,
+  bookingPatchSchema,
   bookingSearchSchema,
   createHoldInputSchema,
   isoDateSchema,
@@ -74,6 +75,7 @@ export const proposalToolNames = [
   'cancelBooking',
   'moveBooking',
   'changeDates',
+  'updateBooking',
 ] as const;
 
 /**
@@ -158,6 +160,12 @@ export function createAgentTools({ hotel, actions, listRooms }: ToolDeps) {
         'Propose new dates for a booking in the same room, e.g. to extend by a night. The user must confirm.',
       inputSchema: bookingIdSchema.extend({ checkIn: isoDateSchema, checkOut: isoDateSchema }),
       execute: (input) => propose({ kind: 'change_dates', input }),
+    }),
+    updateBooking: tool({
+      description:
+        'Propose editing a booking: party (adults, childAges), add-ons (wellness, dogs, extraBeds; send all three), source or notes, and optionally room and dates in the same step. Only send the fields that change. Re-priced when the stay changes. The user must confirm.',
+      inputSchema: bookingPatchSchema.extend(bookingIdSchema.shape),
+      execute: (input) => propose({ kind: 'update_booking', input }),
     }),
   };
 }

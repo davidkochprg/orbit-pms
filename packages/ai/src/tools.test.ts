@@ -68,6 +68,17 @@ describe('agent tools', () => {
     expect(repos.state.guests).toHaveLength(1);
   });
 
+  it('proposes a booking edit without changing anything', async () => {
+    const { tools, repos } = setup();
+    const result = await tools.updateBooking.execute(
+      { bookingId: 'bk_1', adults: 1, notes: 'Late arrival' },
+      callOptions,
+    );
+    expect(result).toMatchObject({ status: 'awaiting_confirmation' });
+    expect(repos.state.pendingActions[0]).toMatchObject({ kind: 'update_booking' });
+    expect(repos.state.bookings.find((b) => b.id === 'bk_1')?.notes).toBeNull();
+  });
+
   it('returns domain errors to the model as data', async () => {
     const { tools, repos } = setup();
     const result = await tools.moveBooking.execute(
