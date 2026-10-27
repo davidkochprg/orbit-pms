@@ -4,15 +4,15 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 
 ## Entities
 
-| Entity           | Key fields                                                                                                                     |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| RoomType         | name, `maxAdults`, `maxChildren`, `basePrice` (adult rate per person per night, CZK), description                              |
-| Room             | name, room type, `kind` (`room` \| `apartment`), floor, `status` (`clean` \| `dirty` \| `inspected` \| `out_of_order`)         |
-| Guest            | name, email, phone, `language` (`cs` \| `de` \| `en` \| `pl`), notes                                                           |
-| Booking          | guest, room, `checkIn`, `checkOut`, adults, `childAges`, `status`, `holdExpiresAt`, `source`, `priceSnapshot` (a quote), notes |
-| Inquiry          | raw text, channel, received at, parsed extraction, `status`, linked booking                                                    |
-| HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes                  |
-| AuditLog         | `actor` (`user` \| `agent`), action, payload, timestamp                                                                        |
+| Entity           | Key fields                                                                                                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RoomType         | name, `maxAdults`, `maxChildren`, `basePrice` (adult rate per person per night, CZK), description                                                                     |
+| Room             | name, room type, `kind` (`room` \| `apartment`), floor, `status` (`clean` \| `dirty` \| `inspected` \| `out_of_order`)                                                |
+| Guest            | name, email, phone, `language` (`cs` \| `de` \| `en` \| `pl`), notes                                                                                                  |
+| Booking          | guest, room, `checkIn`, `checkOut`, adults, `childAges`, `status`, `holdExpiresAt`, `source`, `addons` (wellness, dogs, extra beds), `priceSnapshot` (a quote), notes |
+| Inquiry          | raw text, channel, received at, parsed extraction, `status`, linked booking                                                                                           |
+| HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes                                                         |
+| AuditLog         | `actor` (`user` \| `agent`), action, `subjectId` (e.g. a booking), payload, timestamp                                                                                 |
 
 ## Booking lifecycle
 
