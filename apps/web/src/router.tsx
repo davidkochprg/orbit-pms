@@ -4,7 +4,8 @@ import { DashboardPage } from '@/pages/dashboard';
 import { GuestDetailPage } from '@/pages/guest-detail';
 import { GuestsPage } from '@/pages/guests';
 import { InboxPage } from '@/pages/inbox';
-import { HousekeepingPage, NotFoundPage, TapeChartPage } from '@/pages/sections';
+import { HousekeepingPage, NotFoundPage } from '@/pages/sections';
+import { TapeChartPage } from '@/pages/tape-chart';
 
 export const router = createBrowserRouter([
   {

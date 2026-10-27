@@ -1,15 +1,5 @@
-import { BedDouble, CalendarRange, Compass, Inbox } from 'lucide-react';
+import { BedDouble, Compass, Inbox } from 'lucide-react';
 import { PlaceholderPage } from './placeholder-page';
-
-export function TapeChartPage() {
-  return (
-    <PlaceholderPage
-      icon={CalendarRange}
-      title="Tape chart"
-      description="Rooms × dates with every booking on the grid."
-    />
-  );
-}
 
 export function InboxPage() {
   return (
