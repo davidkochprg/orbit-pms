@@ -15,6 +15,7 @@ import {
   type Quote,
   type QuoteAddons,
 } from '@orbit/shared';
+import type { AiFeature } from '@orbit/ai';
 import { sql } from 'drizzle-orm';
 import {
   bigint,
@@ -154,3 +155,20 @@ export const pendingActions = pgTable('pending_actions', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
 });
+
+/** Every model call and what it cost. Not touched by the demo seed or resets: it is real spend. */
+export const aiUsage = pgTable(
+  'ai_usage',
+  {
+    id: bigint('id', { mode: 'number' }).primaryKey().generatedAlwaysAsIdentity(),
+    feature: text('feature').$type<AiFeature>().notNull(),
+    model: text('model').notNull(),
+    inputTokens: integer('input_tokens').notNull(),
+    cachedInputTokens: integer('cached_input_tokens').notNull(),
+    outputTokens: integer('output_tokens').notNull(),
+    audioSeconds: integer('audio_seconds').notNull().default(0),
+    costMicroUsd: bigint('cost_micro_usd', { mode: 'number' }).notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('ai_usage_created_idx').on(t.createdAt)],
+);
