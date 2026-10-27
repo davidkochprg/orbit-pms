@@ -9,6 +9,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { GuestEditorDialog } from '@/components/guest-editor';
 import { Property, PropertyList } from '@/components/property-list';
+import { RegistrationDialog } from '@/components/registration-dialog';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
 import {
@@ -76,10 +77,12 @@ export function BookingDrawer() {
 }
 
 function BookingDetailView({ detail }: { detail: BookingDetail }) {
-  const { booking, guest, room, roomType, allowedActions } = detail;
+  const { booking, guest, room, roomType, allowedActions, registered } = detail;
   const { openPalette } = useCommandPalette();
   const { openEdit } = useBookingEditor();
   const [editingGuest, setEditingGuest] = useState(false);
+  const [registering, setRegistering] = useState(false);
+  const canRegister = booking.status === 'confirmed' || booking.status === 'checked_in';
   const nights = booking.priceSnapshot?.nights;
 
   return (
@@ -106,6 +109,18 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
             <Property label="Nights">{nights ?? '–'}</Property>
             <Property label="Guests">{formatParty(booking.adults, booking.childAges)}</Property>
             <Property label="Source">{sourceLabels[booking.source]}</Property>
+            {canRegister && (
+              <Property label="Registration">
+                <span className="flex items-center gap-2">
+                  <span className={registered ? undefined : 'text-muted-foreground'}>
+                    {registered ? 'In the guest book' : 'Not yet'}
+                  </span>
+                  <Button variant="ghost" size="xs" onClick={() => setRegistering(true)}>
+                    {registered ? 'Edit' : 'Register'}
+                  </Button>
+                </span>
+              </Property>
+            )}
             {booking.holdExpiresAt && (
               <Property label="Hold expires">{formatDateTime(booking.holdExpiresAt)}</Property>
             )}
@@ -137,6 +152,12 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
           </PropertyList>
         </Section>
         <GuestEditorDialog open={editingGuest} onOpenChange={setEditingGuest} guest={guest} />
+        <RegistrationDialog
+          bookingId={booking.id}
+          guestName={guest.name}
+          open={registering}
+          onOpenChange={setRegistering}
+        />
 
         <BookingBill booking={booking} />
 
@@ -144,7 +165,12 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
       </div>
 
       <footer className="flex flex-wrap items-center gap-2 border-t p-3">
-        <BookingActions bookingId={booking.id} actions={allowedActions} />
+        <BookingActions
+          bookingId={booking.id}
+          guestName={guest.name}
+          actions={allowedActions}
+          registered={registered}
+        />
         <Button variant="outline" size="sm" onClick={() => openEdit(booking.id)}>
           <Pencil /> Edit
         </Button>
@@ -171,13 +197,26 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
   );
 }
 
-function BookingActions({ bookingId, actions }: { bookingId: string; actions: BookingAction[] }) {
+function BookingActions({
+  bookingId,
+  guestName,
+  actions,
+  registered,
+}: {
+  bookingId: string;
+  guestName: string;
+  actions: BookingAction[];
+  registered: boolean;
+}) {
   const mutation = useBookingAction(bookingId);
   const folio = useFolio(bookingId);
   const [settling, setSettling] = useState(false);
-  // Checking out with money still due asks first, and offers to take the payment.
+  const [registering, setRegistering] = useState(false);
+  // Check-in asks for the guest-book entry first; checking out with money still due asks first
+  // and offers to take the payment.
   const run = (action: BookingAction) => {
-    if (action === 'check_out' && (folio.data?.balance ?? 0) > 0) setSettling(true);
+    if (action === 'check_in' && !registered) setRegistering(true);
+    else if (action === 'check_out' && (folio.data?.balance ?? 0) > 0) setSettling(true);
     else mutation.mutate(action);
   };
   // The main next step gets the primary button; cancelling is always secondary.
@@ -214,6 +253,14 @@ function BookingActions({ bookingId, actions }: { bookingId: string; actions: Bo
         </Button>
       )}
       <CancelBookingDialog bookingId={bookingId} open={cancelling} onOpenChange={setCancelling} />
+      <RegistrationDialog
+        bookingId={bookingId}
+        guestName={guestName}
+        open={registering}
+        onOpenChange={setRegistering}
+        submitLabel="Register and check in"
+        onSaved={() => mutation.mutate('check_in')}
+      />
       {folio.data && (
         <CheckOutDialog
           bookingId={bookingId}
@@ -289,6 +336,8 @@ const auditActionLabels: Record<string, string> = {
   'booking.reschedule': 'Rescheduled',
   'booking.create': 'Created',
   'booking.update': 'Edited',
+  'booking.register': 'Registered in the guest book',
+  'booking.update_registration': 'Corrected the registration',
   'folio.charge': 'Added a charge',
   'folio.remove_charge': 'Removed a charge',
   'folio.payment': 'Took a payment',

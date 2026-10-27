@@ -123,12 +123,19 @@ function BookingMenuItems({
           <LoaderCircle className="animate-spin" /> Loading actions…
         </Item>
       ) : (
-        steps.map((a) => (
-          <Item key={a} onSelect={() => action.mutate(a)}>
-            <span className="size-4" aria-hidden />
-            {actionLabels[a]}
-          </Item>
-        ))
+        steps.map((a) => {
+          // Check-in may need the registration and check-out may need a payment: both are asked
+          // for in the inspector, so these open it instead of running straight away.
+          const viaInspector = (a === 'check_in' && !d.registered) || a === 'check_out';
+          if (viaInspector && inInspector) return null;
+          return (
+            <Item key={a} onSelect={() => (viaInspector ? open(bookingId) : action.mutate(a))}>
+              <span className="size-4" aria-hidden />
+              {actionLabels[a]}
+              {viaInspector && '…'}
+            </Item>
+          );
+        })
       )}
       <Separator />
       {d && (

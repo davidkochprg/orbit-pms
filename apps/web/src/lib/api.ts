@@ -38,6 +38,9 @@ import {
   type RoomOptionsQuery,
   roomTypeSchema,
   type ReportQuery,
+  type RegistrationBody,
+  registrationSchema,
+  registrationViewSchema,
   reportSchema,
   type NewStaffBody,
   STAFF_HEADER,
@@ -203,6 +206,26 @@ export function useReport(query: ReportQuery | null) {
     enabled: query !== null,
     placeholderData: (previous) => previous,
   });
+}
+
+export function useRegistration(bookingId: string, enabled = true) {
+  return useQuery({
+    queryKey: ['registration', bookingId],
+    queryFn: () =>
+      apiGet(`/api/bookings/${encodeURIComponent(bookingId)}/registration`, registrationViewSchema),
+    enabled,
+  });
+}
+
+export function useSaveRegistration(bookingId: string) {
+  return useRefreshingMutation((body: RegistrationBody) =>
+    apiPost(
+      `/api/bookings/${encodeURIComponent(bookingId)}/registration`,
+      body,
+      registrationSchema,
+      'PUT',
+    ),
+  );
 }
 
 export function useFolio(bookingId: string) {
