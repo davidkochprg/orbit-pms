@@ -1,13 +1,20 @@
 import { describe, expect, it } from 'vitest';
 import {
+  bayer,
+  DEFAULT_LIGHT,
   GLYPHS,
+  glitchOffset,
+  haloShade,
+  lightFrom,
   glyphIndex,
   onPlanet,
   PLANET,
   RING,
   planetShade,
   ringShade,
+  revealAt,
   satellitePosition,
+  shootingStar,
   starShade,
 } from './space-scene';
 
@@ -66,5 +73,51 @@ describe('stars and glyphs', () => {
     expect(glyphIndex(2)).toBe(GLYPHS.length - 1);
     expect(glyphIndex(-1)).toBe(0);
     expect(glyphIndex(0.5)).toBeGreaterThan(glyphIndex(0.2));
+  });
+});
+
+describe('lighting', () => {
+  it('moves the lit side with the pointer', () => {
+    const left = [PLANET.u - PLANET.r * 0.6, PLANET.v] as const;
+    const fromLeft = planetShade(...left, 0, lightFrom(-1, 0))!;
+    const fromRight = planetShade(...left, 0, lightFrom(1, 0))!;
+    expect(fromLeft).toBeGreaterThan(fromRight);
+  });
+
+  it('glows just outside the disk, brighter towards the light', () => {
+    const d = PLANET.r * 1.08;
+    expect(haloShade(PLANET.u, PLANET.v - PLANET.r * 2, DEFAULT_LIGHT)).toBe(0);
+    expect(haloShade(PLANET.u - d * 0.7, PLANET.v - d * 0.7)).toBeGreaterThan(
+      haloShade(PLANET.u + d * 0.7, PLANET.v + d * 0.7),
+    );
+  });
+});
+
+describe('effects', () => {
+  it('dithers within -0.5..0.5', () => {
+    const values = Array.from({ length: 16 }, (_, i) => bayer(i % 4, Math.floor(i / 4)));
+    expect(new Set(values).size).toBe(16);
+    expect(Math.min(...values)).toBe(-0.5);
+    expect(Math.max(...values)).toBeLessThan(0.5);
+  });
+
+  it('tears rows only for a moment every few seconds', () => {
+    const torn = (t: number) => Array.from({ length: 90 }, (_, row) => glitchOffset(row, t));
+    expect(torn(3).every((o) => o === 0)).toBe(true);
+    expect([5.55, 11.05, 16.55, 22.05, 27.55].some((t) => torn(t).some((o) => o !== 0))).toBe(true);
+  });
+
+  it('reveals every cell within two seconds, top rows first on average', () => {
+    const times = (row: number) =>
+      Array.from({ length: 50 }, (_, col) => revealAt(col, row, 50, 40));
+    const all = Array.from({ length: 40 }, (_, row) => times(row)).flat();
+    expect(Math.max(...all)).toBeLessThan(2);
+    const avg = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
+    expect(avg(times(0))).toBeLessThan(avg(times(39)));
+  });
+
+  it('sends a shooting star now and then', () => {
+    expect(shootingStar(9.2)).not.toBeNull();
+    expect(shootingStar(13)).toBeNull();
   });
 });

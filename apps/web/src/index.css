@@ -295,6 +295,11 @@
   --space-line: oklch(0.85 0.05 var(--accent-hue) / 70%);
   --space-tag: oklch(0.9 0.03 var(--accent-hue));
   --space-tag-ink: oklch(0.2 0.04 var(--accent-hue));
+  --space-glow: oklch(0.7 0.16 var(--accent-hue) / 55%);
+  --space-fringe-warm: oklch(0.65 0.22 20 / 35%);
+  --space-fringe-cool: oklch(0.75 0.14 210 / 35%);
+  --space-scanline: oklch(0 0 0 / 28%);
+  --space-vignette: oklch(0.05 0.02 var(--accent-hue) / 85%);
 
   --chart-1: var(--primary);
   --chart-2: var(--status-checked-in);
@@ -460,6 +465,73 @@
 }
 .dark .daylight-wash {
   mix-blend-mode: screen;
+}
+/* Film grain over the welcome page's space panel: a noise tile jumping around each frame. */
+@keyframes space-grain {
+  0% {
+    transform: translate(0, 0);
+  }
+  17% {
+    transform: translate(-7%, 4%);
+  }
+  33% {
+    transform: translate(5%, -6%);
+  }
+  50% {
+    transform: translate(-3%, 8%);
+  }
+  67% {
+    transform: translate(8%, 2%);
+  }
+  83% {
+    transform: translate(-6%, -4%);
+  }
+  100% {
+    transform: translate(2%, 5%);
+  }
+}
+.space-grain {
+  position: absolute;
+  inset: -20%;
+  pointer-events: none;
+  background-repeat: repeat;
+  mix-blend-mode: overlay;
+  opacity: 0.32;
+  animation: space-grain 0.5s steps(1) infinite;
+}
+.space-scanlines {
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2px,
+    var(--space-scanline) 2px,
+    var(--space-scanline) 3px
+  );
+}
+.space-vignette {
+  background: radial-gradient(
+    ellipse 75% 70% at 50% 50%,
+    transparent 40%,
+    var(--space-vignette) 100%
+  );
+}
+@keyframes space-signal {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+.space-signal {
+  animation: space-signal 1.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .space-grain,
+  .space-signal {
+    animation: none;
+  }
 }
 [data-variant='inset'] [data-slot='sidebar-inner'] {
   background-color: transparent;
