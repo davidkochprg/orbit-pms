@@ -7,7 +7,12 @@ import { parseEnv } from './env';
 const env = parseEnv(process.env);
 const db = createDb(env.DATABASE_URL);
 const ai = createAi(env);
-const app = createApp({ repos: createRepositories(db.db), aiConfigured: ai !== null, log: true });
+const app = createApp({
+  repos: createRepositories(db.db),
+  ai,
+  limits: { perIpPerHour: env.AI_RATE_LIMIT_PER_HOUR, dailyTokenBudget: env.AI_DAILY_TOKEN_BUDGET },
+  log: true,
+});
 
 const server = serve({ fetch: app.fetch, port: env.PORT }, (info) => {
   console.log(

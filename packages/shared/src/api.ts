@@ -45,3 +45,8 @@ export const auditLogQuerySchema = z.object({
 });
 
 export const auditLogListSchema = z.array(auditLogEntrySchema);
+
+/** `POST /api/agent`: the chat so far as AI SDK UI messages, validated further by the SDK. */
+export const agentRequestSchema = z.object({
+  messages: z.array(z.unknown()).min(1).max(100),
+});

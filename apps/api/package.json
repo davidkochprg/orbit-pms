@@ -15,6 +15,7 @@
     "@orbit/db": "workspace:*",
     "@orbit/domain": "workspace:*",
     "@orbit/shared": "workspace:*",
+    "ai": "^7.0.153",
     "hono": "^4.13.14",
     "zod": "^4.6.7"
   },

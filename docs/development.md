@@ -32,7 +32,7 @@ Read from `.env` at the repo root by the API and the db scripts, and validated w
 | `AI_RATE_LIMIT_PER_HOUR` | `20`                     | Agent calls per IP per hour               |
 | `PORT`                   | `3001`                   | API port                                  |
 
-The two limits are parsed but not enforced yet.
+The two limits are enforced in memory by the API; see [ai.md](ai.md#rate-limits).
 
 ## Scripts
 

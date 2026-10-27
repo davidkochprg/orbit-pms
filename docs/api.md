@@ -86,3 +86,27 @@ A body that fails validation returns 400 `invalid_json`; malformed JSON returns 
 ### `GET /api/audit-log?subjectId=&limit=`
 
 `AuditLogEntry[]`, newest first: `id`, `actor` (`user` | `agent`), `action` (e.g. `booking.check_in`), `subjectId`, `payload`, `createdAt`. `limit` defaults to 50, max 200.
+
+## Agent
+
+### `POST /api/agent`
+
+Body: `{ "messages": UIMessage[] }`, the chat so far in AI SDK UI message format. Responds with an AI SDK UI message stream (`text/event-stream`): text deltas, tool calls and tool results. Proposal tools stream a result of `{ pendingActionId, summary, status: "awaiting_confirmation" }`. See [ai.md](ai.md).
+
+| Status | Code                               | When                                                                          |
+| ------ | ---------------------------------- | ----------------------------------------------------------------------------- |
+| 400    | `invalid_json`, `invalid_messages` | Missing or malformed messages                                                 |
+| 429    | `demo_limit`                       | Per-IP hourly limit or daily token budget reached; `message` is ready to show |
+| 503    | `ai_not_configured`                | `META_API_KEY` or `META_MODEL_AGENT` not set                                  |
+
+### `GET /api/pending-actions/:id`
+
+`PendingAction`: `id`, `kind` (`create_hold`, `confirm_booking`, `cancel_booking`, `move_booking`, `change_dates`), `input` (the stored arguments), `summary`, `status` (`pending`, `confirmed`, `rejected`, `failed`), `bookingId`, `error`, `createdAt`, `resolvedAt`.
+
+### `POST /api/pending-actions/:id/confirm`
+
+Runs the stored action through the domain service as the `agent` actor and returns the resolved `PendingAction` (`bookingId` set to the booking created or changed). If the action is no longer valid, it comes back with `status: "failed"`, an `error`, and HTTP 409. Resolving an action twice returns 409 `invalid_transition`.
+
+### `POST /api/pending-actions/:id/reject`
+
+Marks the action `rejected` without running it.

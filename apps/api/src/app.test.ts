@@ -24,11 +24,7 @@ const today = '2026-10-27';
 const now = new Date('2026-10-27T08:00:00Z');
 const handle = createDb('memory://');
 const seed = buildSeed(today, now, pricingConfig);
-const app = createApp({
-  repos: createRepositories(handle.db),
-  aiConfigured: false,
-  clock: () => now,
-});
+const app = createApp({ repos: createRepositories(handle.db), ai: null, clock: () => now });
 
 beforeAll(() => handle.migrate());
 beforeEach(() => applySeed(handle.db, seed));
