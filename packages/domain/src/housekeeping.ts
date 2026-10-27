@@ -20,6 +20,14 @@ export function canChangeRoomStatus(from: RoomStatus, to: RoomStatus): boolean {
   return !(from === 'out_of_order' && (to === 'clean' || to === 'inspected'));
 }
 
+/**
+ * Whether a note's status changes the room. A note saying a room is clean must not undo an
+ * inspection that already happened, so "clean" leaves an inspected room as it is.
+ */
+export function noteChangesStatus(current: RoomStatus, said: RoomStatus): boolean {
+  return said !== current && !(said === 'clean' && current === 'inspected');
+}
+
 /** Cleaning tasks that a clean or inspected status completes. */
 export function completedByStatus(status: RoomStatus, task: HousekeepingTask): boolean {
   return (

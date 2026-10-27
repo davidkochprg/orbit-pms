@@ -17,6 +17,7 @@ import {
   buildHousekeepingBoard,
   canChangeRoomStatus,
   completedByStatus,
+  noteChangesStatus,
   resolveRoom,
 } from './housekeeping';
 import type { Repositories } from './repositories';
@@ -164,7 +165,7 @@ export function createHousekeepingService({ repos, clock, newId }: HousekeepingD
           }
           // Re-read: an earlier update in the same note may have changed it.
           const room = await loadRoom(tx, found.id);
-          if (update.status && update.status !== room.status) {
+          if (update.status && noteChangesStatus(room.status, update.status)) {
             if (canChangeRoomStatus(room.status, update.status)) {
               const from = await changeStatus(tx, room, update.status, actor);
               changes.push({

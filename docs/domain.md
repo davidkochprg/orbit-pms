@@ -72,7 +72,7 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - **Room status** is `dirty`, `clean`, `inspected` or `out_of_order`. Staff may set any status, except straight from `out_of_order` to `clean` or `inspected`: a repaired room is marked `dirty` and cleaned first.
 - **Tasks** are `turnover`, `stayover` or `maintenance`, each `open`, `in_progress` or `done`. A maintenance task needs a description. Setting a room `clean` or `inspected` completes its open turnover and stayover tasks.
 - **Board**: every room with what happens in it today, from the bookings: `turnover` (one guest leaves, another arrives), `arriving`, `departing`, `staying` or `vacant`. A room is **urgent** when a guest arrives today and it is not `inspected`. Urgent rooms come first, then by occupancy, then by name.
-- **Notes**: a housekeeping note (voice or typed) is read by the model into room/status/issue updates. The domain resolves the room names (whole words: "pokoj 104", "A 1"), applies status changes and creates maintenance tasks in one transaction, and skips updates for unknown rooms or forbidden changes with a reason.
+- **Notes**: a housekeeping note (voice or typed) is read by the model into room/status/issue updates. The domain resolves the room names (whole words: "pokoj 104", "A 1"), applies status changes and creates maintenance tasks in one transaction, and skips updates for unknown rooms or forbidden changes with a reason. A note saying a room is clean leaves an already inspected room inspected.
 - Every change is written to the audit log (`room.status`, `task.create`, `task.status`), with the room as subject.
 
 ## Availability rules

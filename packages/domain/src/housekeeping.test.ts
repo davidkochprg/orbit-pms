@@ -4,6 +4,7 @@ import {
   buildHousekeepingBoard,
   canChangeRoomStatus,
   completedByStatus,
+  noteChangesStatus,
   resolveRoom,
   roomDay,
 } from './housekeeping';
@@ -30,6 +31,15 @@ describe('canChangeRoomStatus', () => {
     expect(canChangeRoomStatus('out_of_order', 'dirty')).toBe(true);
     expect(canChangeRoomStatus('out_of_order', 'clean')).toBe(false);
     expect(canChangeRoomStatus('out_of_order', 'inspected')).toBe(false);
+  });
+});
+
+describe('noteChangesStatus', () => {
+  it('never lets "clean" undo an inspection', () => {
+    expect(noteChangesStatus('inspected', 'clean')).toBe(false);
+    expect(noteChangesStatus('dirty', 'clean')).toBe(true);
+    expect(noteChangesStatus('inspected', 'dirty')).toBe(true);
+    expect(noteChangesStatus('clean', 'clean')).toBe(false);
   });
 });
 
