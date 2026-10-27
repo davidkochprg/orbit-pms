@@ -21,6 +21,10 @@ export const bookingDetailSchema = z.object({
 });
 export type BookingDetail = z.infer<typeof bookingDetailSchema>;
 
+/** What a booking would look like after an edit, before it is saved. */
+export const bookingPreviewSchema = z.object({ booking: bookingSchema, room: roomSchema });
+export type BookingPreview = z.infer<typeof bookingPreviewSchema>;
+
 export const dayOverviewSchema = z.object({
   date: isoDateSchema,
   arrivals: z.array(bookingSummarySchema),

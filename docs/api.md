@@ -64,22 +64,41 @@ Query parameters, all optional:
 }
 ```
 
+### `POST /api/availability`
+
+Free rooms for a stay, cheapest first, each priced: body `{ checkIn, checkOut, adults, childAges, kind?, roomTypeId?, addons?, excludeBookingId? }` (leave out the booking being edited with `excludeBookingId`). Returns `RoomOption[]`: `roomId`, `roomName`, `kind`, `roomType`, `quote`.
+
+### `POST /api/quote`
+
+The exact price of a stay without booking it: body `{ roomId | roomTypeId, checkIn, checkOut, adults, childAges, addons? }`. Returns the `Quote` with line items.
+
+### `POST /api/bookings`
+
+A booking entered by staff: body as the agent's hold (`guest` as `{ guestId }` or `{ name, email, phone, language }`, `roomId`, `checkIn`, `checkOut`, `adults`, `childAges`, `addons`, `source`, `notes`, `inquiryId`) plus `status`: `hold` (default, lapses after the hold time) or `confirmed`. Returns 201 `BookingDetail`. Errors as for a hold: 400 for dates in the past or an invalid party, 409 `conflict`, 422 `over_capacity`.
+
 ### Booking mutations
 
 All take JSON, act as `user` in the audit log, and return the updated `BookingDetail`. Rules are in [domain.md](domain.md#booking-operations).
 
-| Endpoint                            | Body                                                                        | Errors                                                                     |
-| ----------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `POST /api/bookings/:id/actions`    | `{ "action": "confirm" \| "check_in" \| "check_out" \| "cancel" }`          | 409 `invalid_transition`, 409 `conflict`                                   |
-| `POST /api/bookings/:id/move`       | `{ "roomId": "rm_201" }`                                                    | 409 `conflict`, 422 `over_capacity`, 404 room                              |
-| `POST /api/bookings/:id/dates`      | `{ "checkIn": "2026-10-27", "checkOut": "2026-10-30" }`                     | 400 `invalid_date_range`, 409 `conflict`                                   |
-| `POST /api/bookings/:id/reschedule` | `{ "roomId": "rm_201", "checkIn": "2026-10-28", "checkOut": "2026-10-31" }` | 400 `invalid_input` (nothing changed), 409 `conflict`, 422 `over_capacity` |
+| Endpoint                            | Body                                                                                       | Errors                                                                                               |
+| ----------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
+| `PATCH /api/bookings/:id`           | Any of `roomId`, `checkIn`, `checkOut`, `adults`, `childAges`, `addons`, `source`, `notes` | 400 `invalid_input` (nothing changed), 409 `invalid_transition`, 409 `conflict`, 422 `over_capacity` |
+| `POST /api/bookings/:id/actions`    | `{ "action": "confirm" \| "check_in" \| "check_out" \| "cancel" }`                         | 409 `invalid_transition`, 409 `conflict`                                                             |
+| `POST /api/bookings/:id/move`       | `{ "roomId": "rm_201" }`                                                                   | 409 `conflict`, 422 `over_capacity`, 404 room                                                        |
+| `POST /api/bookings/:id/dates`      | `{ "checkIn": "2026-10-27", "checkOut": "2026-10-30" }`                                    | 400 `invalid_date_range`, 409 `conflict`                                                             |
+| `POST /api/bookings/:id/reschedule` | `{ "roomId": "rm_201", "checkIn": "2026-10-28", "checkOut": "2026-10-31" }`                | 400 `invalid_input` (nothing changed), 409 `conflict`, 422 `over_capacity`                           |
 
 A body that fails validation returns 400 `invalid_json`; malformed JSON returns 400 `bad_request`.
+
+`POST /api/bookings/:id/preview` takes the same body as `PATCH` and returns `{ booking, room }` as they would be after the edit, including the new price, without saving.
 
 ### `GET /api/guests`, `GET /api/guests/:id`
 
 `Guest[]` ordered by name, or one `Guest`: `id`, `name`, `email`, `phone`, `language`, `notes`.
+
+### `POST /api/guests`, `PATCH /api/guests/:id`
+
+`POST` takes `{ name, email?, phone?, language, notes? }` and returns 201 `Guest`; `PATCH` takes any of those fields. Empty strings become `null`. An email another guest has is 409 `conflict`.
 
 ### `GET /api/day?date=`
 
@@ -104,6 +123,7 @@ Direct emails, web and phone messages, and messages relayed by OTA partners in o
 | `GET /api/inbox/:id`          |                                                                          | `Inquiry`                                                                                                                                      |
 | `POST /api/inbox/:id/process` | `{ force?: boolean }`                                                    | `Inquiry` with `parsed` and `suggestion`. Already processed messages return immediately at no cost. 503 `ai_not_configured`, 429 `demo_limit`. |
 | `POST /api/inbox/:id/hold`    | `{ roomId }`                                                             | 201 `BookingDetail` of a new hold for the requested stay. 409 if the message has no complete stay request or already has a hold.               |
+| `POST /api/inbox/:id/decline` |                                                                          | `Inquiry` with `status: "declined"`. 409 `invalid_transition` if it already led to a booking.                                                  |
 | `POST /api/inbox/:id/replied` | `{ reply }`                                                              | `Inquiry` with `status: "replied"` and the reply text (sending happens outside Orbit).                                                         |
 
 ## Housekeeping

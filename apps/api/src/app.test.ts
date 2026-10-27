@@ -12,11 +12,14 @@ import type {
   AuditLogEntry,
   Booking,
   BookingDetail,
+  BookingPreview,
   DailyBrief,
   DayOverview,
   Guest,
   Health,
+  Quote,
   Room,
+  RoomOption,
 } from '@orbit/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
@@ -265,6 +268,92 @@ describe('POST /api/bookings/:id/reschedule', () => {
     });
     expect(res.status).toBe(400);
     expect(res.body.error.code).toBe('invalid_input');
+  });
+});
+
+describe('manual bookings', () => {
+  const stay = { checkIn: '2026-11-02', checkOut: '2026-11-04', adults: 2, childAges: [] };
+  const patch = <T>(path: string, body: unknown) => call<T>('PATCH', path, body);
+
+  it('lists free rooms with prices and books one, confirmed', async () => {
+    const options = await post<RoomOption[]>('/api/availability', stay);
+    expect(options.status).toBe(200);
+    const option = options.body[0]!;
+    expect(option.quote.nights).toBe(2);
+    expect(options.body.map((o) => o.quote.total)).toEqual(
+      [...options.body.map((o) => o.quote.total)].sort((a, b) => a - b),
+    );
+
+    const created = await post<BookingDetail>('/api/bookings', {
+      ...stay,
+      roomId: option.roomId,
+      guest: { name: 'Phone Guest', email: null, phone: null, language: 'cs' },
+      source: 'phone',
+      status: 'confirmed',
+    });
+    expect(created.status).toBe(201);
+    expect(created.body.booking).toMatchObject({ status: 'confirmed', source: 'phone' });
+    expect(created.body.booking.priceSnapshot?.total).toBe(option.quote.total);
+    expect(created.body.guest.name).toBe('Phone Guest');
+
+    const again = await post<RoomOption[]>('/api/availability', stay);
+    expect(again.body.map((o) => o.roomId)).not.toContain(option.roomId);
+  });
+
+  it('quotes a stay without booking it', async () => {
+    const { status, body } = await post<Quote>('/api/quote', { ...stay, roomTypeId: 'rt_double' });
+    expect(status).toBe(200);
+    expect(body.lines.length).toBeGreaterThan(0);
+  });
+
+  it('previews and saves an edit to party, add-ons and notes', async () => {
+    const body = {
+      adults: 1,
+      notes: 'Arrives late',
+      addons: { wellness: true, dogs: 0, extraBeds: 0 },
+    };
+    const preview = await post<BookingPreview>(`/api/bookings/${arrival.id}/preview`, body);
+    expect(preview.body.booking).toMatchObject({ adults: 1, notes: 'Arrives late' });
+    expect((await get<BookingDetail>(`/api/bookings/${arrival.id}`)).body.booking.notes).not.toBe(
+      'Arrives late',
+    );
+
+    const saved = await patch<BookingDetail>(`/api/bookings/${arrival.id}`, body);
+    expect(saved.status).toBe(200);
+    expect(saved.body.booking).toMatchObject({ adults: 1, notes: 'Arrives late' });
+    expect(saved.body.booking.priceSnapshot?.lines.map((l) => l.kind)).toContain('wellness');
+  });
+
+  it('rejects an edit the room cannot take', async () => {
+    const { status, body } = await patch<ApiError>(`/api/bookings/${arrival.id}`, { adults: 9 });
+    expect(status).toBe(422);
+    expect(body.error.code).toBe('over_capacity');
+  });
+});
+
+describe('guest records', () => {
+  it('creates and edits a guest', async () => {
+    const created = await post<Guest>('/api/guests', {
+      name: 'Walk-in Guest',
+      email: '',
+      language: 'en',
+    });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ name: 'Walk-in Guest', email: null });
+    const edited = await call<Guest>('PATCH', `/api/guests/${created.body.id}`, {
+      phone: '+420 000 000 000',
+    });
+    expect(edited.body.phone).toBe('+420 000 000 000');
+  });
+
+  it('refuses an email another guest has', async () => {
+    const taken = seed.guests.find((g) => g.email)!;
+    const { status } = await post('/api/guests', {
+      name: 'Copy',
+      email: taken.email!.toUpperCase(),
+      language: 'en',
+    });
+    expect(status).toBe(409);
   });
 });
 

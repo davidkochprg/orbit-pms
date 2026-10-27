@@ -156,6 +156,13 @@ describe('unified inbox', () => {
     expect(res.body.error.code).toBe('ai_not_configured');
   });
 
+  it('declines a message without AI', async () => {
+    const app = appWith(null);
+    const { status, body } = await call<Inquiry>(app, 'POST', '/api/inbox/inq_02/decline');
+    expect(status).toBe(200);
+    expect(body.status).toBe('declined');
+  });
+
   it('refuses to process once the monthly budget is spent', async () => {
     await usageStore.record({
       feature: 'agent',

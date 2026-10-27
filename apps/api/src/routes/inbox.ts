@@ -47,6 +47,7 @@ export function inboxRoutes({ inbox, hotel, pipeline, gate }: InboxRouteDeps) {
       const booking = await inbox.createHold(c.req.param('id'), c.req.valid('json').roomId, 'user');
       return c.json(await hotel.getBookingDetail(booking.id), 201);
     })
+    .post('/inbox/:id/decline', async (c) => c.json(await inbox.decline(c.req.param('id'), 'user')))
     .post('/inbox/:id/replied', validate('json', markRepliedBodySchema), async (c) =>
       c.json(await inbox.markReplied(c.req.param('id'), c.req.valid('json').reply, 'user')),
     );

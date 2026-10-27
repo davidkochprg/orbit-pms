@@ -7,6 +7,7 @@ import {
   type UsageStore,
 } from '@orbit/ai';
 import {
+  createGuestService,
   createHotelService,
   createHousekeepingService,
   createInboxService,
@@ -110,7 +111,7 @@ export function createApp({
   );
   app.route('/api', roomRoutes(repos));
   app.route('/api', bookingRoutes(repos, hotel));
-  app.route('/api', guestRoutes(repos));
+  app.route('/api', guestRoutes(repos, createGuestService({ repos, newId })));
   app.route('/api', overviewRoutes(repos, hotel));
   app.route('/api', pendingActionRoutes(actions));
   app.route('/api', inboxRoutes({ inbox, hotel, pipeline, gate }));
