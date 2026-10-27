@@ -10,5 +10,6 @@ export type ReasoningEffort = NonNullable<Parameters<typeof generateText>[0]['re
 export const reasoningEffort = {
   extraction: 'minimal',
   draft: 'minimal',
+  housekeeping: 'minimal',
   agent: 'low',
 } as const satisfies Record<string, ReasoningEffort>;

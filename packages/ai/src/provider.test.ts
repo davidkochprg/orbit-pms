@@ -10,7 +10,20 @@ describe('createMetaProvider', () => {
     });
     expect(provider.agent).toMatchObject({ modelId: 'agent-model' });
     expect(provider.vision).toMatchObject({ modelId: 'vision-model' });
-    expect(provider.voiceModelId).toBeNull();
+    expect(provider.transcription).toBeNull();
+  });
+
+  it('carries the speech-to-text settings when a voice model is set', () => {
+    const provider = createMetaProvider({
+      apiKey: 'k',
+      baseURL: 'https://example.invalid/v1',
+      models: { agent: 'a', voice: 'voice-model' },
+    });
+    expect(provider.transcription).toEqual({
+      apiKey: 'k',
+      baseURL: 'https://example.invalid/v1',
+      model: 'voice-model',
+    });
   });
 
   it('leaves optional models unset', () => {

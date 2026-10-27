@@ -1,4 +1,5 @@
-import type { InquiryExtraction } from '@orbit/shared';
+import type { HousekeepingNoteReading, InquiryExtraction } from '@orbit/shared';
+import type { HousekeepingNoteFixture } from './housekeeping-notes';
 
 export type ExtractionField = 'kind' | 'language' | 'dates' | 'adults' | 'childAges' | 'wishes';
 
@@ -30,4 +31,43 @@ export function scoreExtraction(
   };
   const failed = (Object.keys(checks) as ExtractionField[]).filter((field) => !checks[field]);
   return { passed: failed.length === 0, failed };
+}
+
+export interface NoteScore {
+  passed: boolean;
+  problems: string[];
+}
+
+/**
+ * Scores a housekeeping note reading: the same rooms (one update each), the same status per room,
+ * an issue exactly where one was reported, and `unclear` set exactly when expected.
+ */
+export function scoreHousekeepingNote(
+  fixture: Pick<HousekeepingNoteFixture, 'expected' | 'unclear'>,
+  actual: HousekeepingNoteReading,
+): NoteScore {
+  const problems: string[] = [];
+  const byRoom = new Map<string, HousekeepingNoteReading['updates']>();
+  for (const update of actual.updates) {
+    const key = update.room.trim().toUpperCase();
+    byRoom.set(key, [...(byRoom.get(key) ?? []), update]);
+  }
+  for (const want of fixture.expected) {
+    const got = byRoom.get(want.room.toUpperCase());
+    byRoom.delete(want.room.toUpperCase());
+    if (!got) {
+      problems.push(`missing ${want.room}`);
+      continue;
+    }
+    // Several updates for one room are read together: the last status and any issue count.
+    const status = got.findLast((u) => u.status !== null)?.status ?? null;
+    const issue = got.some((u) => Boolean(u.issue?.trim()));
+    if (status !== want.status) problems.push(`${want.room} status ${status} != ${want.status}`);
+    if (issue !== want.issue) problems.push(`${want.room} issue ${issue} != ${want.issue}`);
+  }
+  for (const extra of byRoom.keys()) problems.push(`unexpected ${extra}`);
+  if (Boolean(actual.unclear?.trim()) !== fixture.unclear) {
+    problems.push(fixture.unclear ? 'unclear not reported' : 'unexpected unclear');
+  }
+  return { passed: problems.length === 0, problems };
 }

@@ -1,5 +1,6 @@
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel } from 'ai';
+import type { TranscriptionConfig } from './transcribe';
 
 export interface MetaModelConfig {
   apiKey: string;
@@ -17,8 +18,8 @@ export interface MetaProvider {
   agentModelId: string;
   /** Vision-capable chat model, if configured. */
   vision: LanguageModel | null;
-  /** Transcription model ID, if configured. Wired up with the voice feature. */
-  voiceModelId: string | null;
+  /** Speech-to-text settings, if a voice model is configured. */
+  transcription: TranscriptionConfig | null;
 }
 
 /**
@@ -38,6 +39,8 @@ export function createMetaProvider(config: MetaModelConfig): MetaProvider {
     agent: meta.chatModel(config.models.agent),
     agentModelId: config.models.agent,
     vision: config.models.vision ? meta.chatModel(config.models.vision) : null,
-    voiceModelId: config.models.voice ?? null,
+    transcription: config.models.voice
+      ? { apiKey: config.apiKey, baseURL: config.baseURL, model: config.models.voice }
+      : null,
   };
 }

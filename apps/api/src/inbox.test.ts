@@ -50,7 +50,12 @@ function scriptedModel() {
 function appWith(model: MockLanguageModelV4 | null, monthlyBudgetUsd = 100) {
   return createApp({
     repos,
-    ai: model && { agent: model, agentModelId: 'muse-spark-1.3', vision: null, voiceModelId: null },
+    ai: model && {
+      agent: model,
+      agentModelId: 'muse-spark-1.3',
+      vision: null,
+      transcription: null,
+    },
     usage: usageStore,
     monthlyBudgetUsd,
     clock: () => now,

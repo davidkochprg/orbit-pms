@@ -68,7 +68,12 @@ function appWith(
 ) {
   return createApp({
     repos,
-    ai: model && { agent: model, agentModelId: 'muse-spark-1.3', vision: null, voiceModelId: null },
+    ai: model && {
+      agent: model,
+      agentModelId: 'muse-spark-1.3',
+      vision: null,
+      transcription: null,
+    },
     limits,
     usage: usageStore,
     monthlyBudgetUsd,
