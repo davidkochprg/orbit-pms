@@ -1,6 +1,16 @@
 import type { HotelInfoEntry, HotelProfile } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
-import { isSettingsSection, newEntry, sameProfile } from './settings';
+import {
+  fromPercent,
+  fromSurcharge,
+  isProfileSection,
+  isSettingsSection,
+  newEntry,
+  newSeason,
+  sameSettings,
+  toPercent,
+  toSurcharge,
+} from './settings';
 
 const entry = (id: string): HotelInfoEntry => ({
   id,
@@ -30,7 +40,7 @@ describe('newEntry', () => {
   });
 });
 
-describe('sameProfile', () => {
+describe('sameSettings', () => {
   const profile: HotelProfile = {
     name: 'A',
     location: 'B',
@@ -44,7 +54,42 @@ describe('sameProfile', () => {
   };
 
   it('compares by value', () => {
-    expect(sameProfile(profile, structuredClone(profile))).toBe(true);
-    expect(sameProfile(profile, { ...profile, entries: [] })).toBe(false);
+    expect(sameSettings(profile, structuredClone(profile))).toBe(true);
+    expect(sameSettings(profile, { ...profile, entries: [] })).toBe(false);
+  });
+});
+
+describe('isProfileSection', () => {
+  it('groups the sections saved as the hotel profile', () => {
+    expect(isProfileSection('property')).toBe(true);
+    expect(isProfileSection('info')).toBe(true);
+    expect(isProfileSection('rates')).toBe(false);
+    expect(isProfileSection('rooms')).toBe(false);
+    expect(isProfileSection('team')).toBe(false);
+  });
+});
+
+describe('percent helpers', () => {
+  it('round-trips fractions without float noise', () => {
+    expect(toPercent(0.15)).toBe(15);
+    expect(toPercent(1 / 3)).toBe(33.3);
+    expect(fromPercent(15)).toBe(0.15);
+    expect(fromPercent(12.5)).toBe(0.125);
+  });
+
+  it('shows a season multiplier as a surcharge', () => {
+    expect(toSurcharge(1.3)).toBe(30);
+    expect(toSurcharge(0.9)).toBe(-10);
+    expect(fromSurcharge(30)).toBe(1.3);
+    expect(fromSurcharge(-10)).toBe(0.9);
+  });
+});
+
+describe('newSeason', () => {
+  it('picks an unused name', () => {
+    expect(newSeason([]).name).toBe('season_1');
+    expect(newSeason([newSeason([]), { ...newSeason([]), name: 'season_2' }]).name).toBe(
+      'season_3',
+    );
   });
 });

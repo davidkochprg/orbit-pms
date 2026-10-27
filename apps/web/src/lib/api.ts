@@ -25,6 +25,10 @@ import {
   type NewGuestBody,
   type NewMessageBody,
   pendingActionSchema,
+  type PricingConfig,
+  pricingConfigSchema,
+  type RoomBody,
+  type RoomTypeBody,
   roomSchema,
   type RoomStatus,
   roomOptionSchema,
@@ -351,6 +355,37 @@ export function useHotelProfile() {
 export function useSaveHotelProfile() {
   return useRefreshingMutation((profile: HotelProfile) =>
     apiPost('/api/settings/profile', profile, hotelProfileSchema, 'PUT'),
+  );
+}
+
+export function usePricing() {
+  return useQuery({
+    queryKey: ['pricing'],
+    queryFn: () => apiGet('/api/settings/pricing', pricingConfigSchema),
+  });
+}
+
+export function useSavePricing() {
+  return useRefreshingMutation((pricing: PricingConfig) =>
+    apiPost('/api/settings/pricing', pricing, pricingConfigSchema, 'PUT'),
+  );
+}
+
+/** Adds a room type, or replaces one when `id` is given. */
+export function useSaveRoomType() {
+  return useRefreshingMutation(({ id, ...body }: RoomTypeBody & { id?: string }) =>
+    id
+      ? apiPost(`/api/room-types/${encodeURIComponent(id)}`, body, roomTypeSchema, 'PUT')
+      : apiPost('/api/room-types', body, roomTypeSchema),
+  );
+}
+
+/** Adds a room, or replaces one when `id` is given. */
+export function useSaveRoom() {
+  return useRefreshingMutation(({ id, ...body }: RoomBody & { id?: string }) =>
+    id
+      ? apiPost(`/api/rooms/${encodeURIComponent(id)}`, body, roomSchema, 'PUT')
+      : apiPost('/api/rooms', body, roomSchema),
   );
 }
 
