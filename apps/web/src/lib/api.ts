@@ -7,12 +7,18 @@ import {
   type BookingListQuery,
   dayOverviewSchema,
   guestSchema,
+  housekeepingBoardSchema,
+  housekeepingNoteResultSchema,
+  housekeepingTaskSchema,
+  type HousekeepingTaskStatus,
+  type NewTaskBody,
   healthSchema,
   inquiryListSchema,
   inquirySchema,
   type NewMessageBody,
   pendingActionSchema,
   roomSchema,
+  type RoomStatus,
   roomTypeSchema,
 } from '@orbit/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -60,6 +66,11 @@ export function apiPost<S extends z.ZodType>(path: string, body: unknown, schema
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+/** Multipart upload, e.g. a recording. The browser sets the content type with its boundary. */
+export function apiPostForm<S extends z.ZodType>(path: string, form: FormData, schema: S) {
+  return request(path, schema, { method: 'POST', body: form });
 }
 
 function toSearch(params: Record<string, string | string[] | undefined>): string {
@@ -249,5 +260,51 @@ export function useChangeBookingDates() {
     mutationFn: ({ id, ...body }: { id: string; checkIn: string; checkOut: string }) =>
       apiPost(`/api/bookings/${encodeURIComponent(id)}/dates`, body, bookingDetailSchema),
     onSettled: () => queryClient.invalidateQueries(),
+  });
+}
+
+export function useHousekeeping() {
+  return useQuery({
+    queryKey: ['housekeeping'],
+    queryFn: () => apiGet('/api/housekeeping', housekeepingBoardSchema),
+  });
+}
+
+function useRefreshingMutation<T, R>(fn: (input: T) => Promise<R>) {
+  const queryClient = useQueryClient();
+  return useMutation({ mutationFn: fn, onSettled: () => queryClient.invalidateQueries() });
+}
+
+export function useSetRoomStatus() {
+  return useRefreshingMutation(({ roomId, status }: { roomId: string; status: RoomStatus }) =>
+    apiPost(`/api/rooms/${encodeURIComponent(roomId)}/status`, { status }, roomSchema),
+  );
+}
+
+export function useCreateTask() {
+  return useRefreshingMutation((body: NewTaskBody) =>
+    apiPost('/api/housekeeping/tasks', body, housekeepingTaskSchema),
+  );
+}
+
+export function useSetTaskStatus() {
+  return useRefreshingMutation(({ id, status }: { id: string; status: HousekeepingTaskStatus }) =>
+    apiPost(
+      `/api/housekeeping/tasks/${encodeURIComponent(id)}/status`,
+      { status },
+      housekeepingTaskSchema,
+    ),
+  );
+}
+
+/** A housekeeping note, typed or recorded (WAV). The agent applies it right away. */
+export function useHousekeepingNote() {
+  return useRefreshingMutation((note: { text: string } | { audio: Blob }) => {
+    if ('text' in note) {
+      return apiPost('/api/housekeeping/notes', note, housekeepingNoteResultSchema);
+    }
+    const form = new FormData();
+    form.append('audio', note.audio, 'note.wav');
+    return apiPostForm('/api/housekeeping/voice', form, housekeepingNoteResultSchema);
   });
 }

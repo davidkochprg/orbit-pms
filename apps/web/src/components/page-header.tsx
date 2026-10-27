@@ -15,7 +15,9 @@ export function PageHeader({ title, meta, actions }: PageHeaderProps) {
     <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
       <SidebarTrigger className="text-muted-foreground" />
       <h1 className="truncate text-sm font-semibold tracking-tight">{title}</h1>
-      {meta && <span className="truncate text-sm text-muted-foreground">{meta}</span>}
+      {meta && (
+        <span className="hidden truncate text-sm text-muted-foreground sm:inline">{meta}</span>
+      )}
       {actions && <div className="ml-auto flex shrink-0 items-center gap-1.5">{actions}</div>}
     </header>
   );
