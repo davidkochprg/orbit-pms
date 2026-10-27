@@ -10,6 +10,7 @@ import type {
   Inquiry,
   IsoDate,
   PendingAction,
+  PricingConfig,
   Room,
   RoomStatus,
   RoomType,
@@ -30,6 +31,12 @@ export interface RoomRepository {
   listRooms(): Promise<Room[]>;
   getRoom(id: string): Promise<Room | null>;
   setRoomStatus(id: string, status: RoomStatus): Promise<void>;
+  createRoomType(roomType: RoomType): Promise<void>;
+  /** Replaces a stored room type. */
+  updateRoomType(roomType: RoomType): Promise<void>;
+  createRoom(room: Room): Promise<void>;
+  /** Replaces a stored room, including its status. */
+  updateRoom(room: Room): Promise<void>;
 }
 
 export interface BookingRepository {
@@ -92,6 +99,9 @@ export interface SettingsRepository {
   /** Null until a profile has been saved. */
   getProfile(): Promise<HotelProfile | null>;
   saveProfile(profile: HotelProfile): Promise<void>;
+  /** Null until rates have been saved. */
+  getPricing(): Promise<PricingConfig | null>;
+  savePricing(pricing: PricingConfig): Promise<void>;
 }
 
 export interface StaffRepository {

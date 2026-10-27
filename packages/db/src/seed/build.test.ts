@@ -1,6 +1,7 @@
 import { amountsInText } from '@orbit/ai';
 import { buildInquiryFixtures, evalRoomNames } from '@orbit/ai/evals';
 import {
+  assertValidPricing,
   assertValidProfile,
   blocksRoom,
   checkAvailability,
@@ -37,6 +38,11 @@ describe('buildSeed', () => {
     }
     // Prices come from quote(); an amount here would bypass the draft price guard.
     expect(amountsInText(JSON.stringify(seed.hotelProfile))).toEqual([]);
+  });
+
+  it('stores the valid rates its bookings were priced with', () => {
+    expect(seed.pricing).toEqual(pricingConfig);
+    expect(() => assertValidPricing(seed.pricing)).not.toThrow();
   });
 
   it('has a synthetic team with an active manager', () => {

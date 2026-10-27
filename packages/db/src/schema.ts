@@ -15,6 +15,7 @@ import {
   type InquiryExtraction,
   type InquirySuggestion,
   type PendingActionInput,
+  type PricingConfig,
   type Quote,
   type QuoteAddons,
 } from '@orbit/shared';
@@ -183,6 +184,13 @@ export const staff = pgTable('staff', {
 export const hotelProfile = pgTable('hotel_profile', {
   id: text('id').primaryKey(),
   profile: jsonb('profile').$type<HotelProfile>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Rates from Settings: seasons, discounts and add-on prices. One row, `id = 'hotel'`. */
+export const pricing = pgTable('pricing', {
+  id: text('id').primaryKey(),
+  config: jsonb('config').$type<PricingConfig>().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 

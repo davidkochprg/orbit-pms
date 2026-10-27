@@ -64,6 +64,13 @@
       "when": 1793122443100,
       "tag": "0008_staff",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793136156570,
+      "tag": "0009_pricing",
+      "breakpoints": true
     }
   ]
 }

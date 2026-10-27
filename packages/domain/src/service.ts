@@ -45,6 +45,7 @@ import { containsText } from './text';
 
 export interface ServiceDeps {
   repos: Repositories;
+  /** Used until a manager saves rates in Settings. */
   pricing: PricingConfig;
   policy: HotelPolicy;
   clock: () => Date;
@@ -89,6 +90,11 @@ async function loadRoom(repos: Repositories, id: string) {
  * same checks against current data without saving, so the agent can propose only valid changes.
  */
 export function createHotelService({ repos, pricing, policy, clock, newId }: ServiceDeps) {
+  /** The saved rates, read in the caller's transaction so a price matches what is committed. */
+  async function loadPricing(r: Repositories): Promise<PricingConfig> {
+    return (await r.settings.getPricing()) ?? pricing;
+  }
+
   async function commit(plan: (tx: Repositories) => Promise<Plan>, actor: AuditActor) {
     return repos.transaction(async (tx) => {
       const p = await plan(tx);
@@ -155,7 +161,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         ...current,
         roomBookings: await tx.bookings.listBookings({ roomId: booking.roomId }),
         now: clock(),
-        pricing,
+        pricing: await loadPricing(tx),
       });
       return {
         booking: updated,
@@ -188,7 +194,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
           ...dest,
           roomBookings: await tx.bookings.listBookings({ roomId: target.roomId }),
           now: clock(),
-          pricing,
+          pricing: await loadPricing(tx),
         },
       );
       return {
@@ -219,7 +225,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         ...target,
         roomBookings: await tx.bookings.listBookings({ roomId: target.room.id }),
         now: clock(),
-        pricing,
+        pricing: await loadPricing(tx),
       });
       return {
         booking: updated,
@@ -265,7 +271,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         roomBookings: await tx.bookings.listBookings({ roomId: input.roomId }),
         now,
         today: hotelToday(now),
-        pricing,
+        pricing: await loadPricing(tx),
         holdHours: policy.holdHours,
       });
       // Staff may enter a booking as confirmed straight away; it then never lapses.
@@ -393,12 +399,13 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
   /** Free rooms for a stay, cheapest first, each with an exact quote including add-ons. */
   async function roomOptions(query: RoomOptionsQuery): Promise<RoomOption[]> {
     const available = await findAvailableRooms(query);
+    const rates = await loadPricing(repos);
     return available.map((r) => ({
       roomId: r.roomId,
       roomName: r.roomName,
       kind: r.kind,
       roomType: r.roomType,
-      quote: quote({ ...query, roomType: r.roomType }, pricing),
+      quote: quote({ ...query, roomType: r.roomType }, rates),
     }));
   }
 
@@ -409,7 +416,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     const roomType = (await repos.rooms.listRoomTypes()).find((t) => t.id === roomTypeId);
     if (!roomType)
       throw new DomainError('not_found', `Room type ${roomTypeId ?? '(none)'} not found`);
-    return quote({ ...input, roomType }, pricing);
+    return quote({ ...input, roomType }, await loadPricing(repos));
   }
 
   /** Up to three priced rooms (one per room type) for the stay a message asks for. */
@@ -427,12 +434,13 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
       };
     }
     const addons = addonsForWishes(analysis.wishes);
+    const rates = await loadPricing(repos);
     const options = pickOptions(available).map((r) => ({
       roomId: r.roomId,
       roomName: r.roomName,
       roomTypeName: r.roomType.name,
       kind: r.kind,
-      quote: quote({ ...stay, roomType: r.roomType, addons }, pricing),
+      quote: quote({ ...stay, roomType: r.roomType, addons }, rates),
     }));
     return { options, note: null };
   }

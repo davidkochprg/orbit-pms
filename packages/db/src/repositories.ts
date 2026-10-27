@@ -20,6 +20,7 @@ import {
   type Inquiry,
   type PendingAction,
   pendingActionSchema,
+  pricingConfigSchema,
 } from '@orbit/shared';
 import { and, asc, desc, eq, gt, inArray, lt, type SQL } from 'drizzle-orm';
 import type { Db } from './client';
@@ -31,6 +32,7 @@ import {
   housekeepingTasks,
   inquiries,
   pendingActions,
+  pricing,
   rooms,
   roomTypes,
   staff,
@@ -57,6 +59,18 @@ function roomRepository(db: Db): RoomRepository {
     },
     async setRoomStatus(id, status) {
       await db.update(rooms).set({ status }).where(eq(rooms.id, id));
+    },
+    async createRoomType(roomType) {
+      await db.insert(roomTypes).values(roomType);
+    },
+    async updateRoomType({ id, ...roomType }) {
+      await db.update(roomTypes).set(roomType).where(eq(roomTypes.id, id));
+    },
+    async createRoom(room) {
+      await db.insert(rooms).values(room);
+    },
+    async updateRoom({ id, ...room }) {
+      await db.update(rooms).set(room).where(eq(rooms.id, id));
     },
   };
 }
@@ -276,6 +290,7 @@ function staffRepository(db: Db): StaffRepository {
 }
 
 const PROFILE_ID = 'hotel';
+const PRICING_ID = 'hotel';
 
 function settingsRepository(db: Db): SettingsRepository {
   return {
@@ -292,6 +307,17 @@ function settingsRepository(db: Db): SettingsRepository {
           target: hotelProfile.id,
           set: { profile, updatedAt: new Date() },
         });
+    },
+    async getPricing() {
+      const [row] = await db.select().from(pricing).where(eq(pricing.id, PRICING_ID));
+      // Validated on read, like the profile: every quote is computed from it.
+      return row ? pricingConfigSchema.parse(row.config) : null;
+    },
+    async savePricing(config) {
+      await db
+        .insert(pricing)
+        .values({ id: PRICING_ID, config })
+        .onConflictDoUpdate({ target: pricing.id, set: { config, updatedAt: new Date() } });
     },
   };
 }

@@ -9,5 +9,6 @@ export * from './inquiry';
 export * from './operations';
 export * from './pending';
 export * from './quote';
+export * from './rates';
 export * from './staff';
 export * from './views';

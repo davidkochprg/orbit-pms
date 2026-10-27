@@ -107,7 +107,17 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 
 - Until a profile is saved, `getProfile()` returns an empty one (`emptyHotelProfile`).
 - `updateProfile(profile, by)` replaces the whole profile; only an active manager may (`forbidden`). Entry IDs must be unique and check-out must be earlier in the day than check-in, so rooms can be turned over (`invalid_input`). It writes `settings.profile` to the audit log with who saved it (`by`) and the names of the changed fields; a save that changes nothing writes nothing.
-- Rules the system enforces (hold length, which room kinds take dogs, prices) stay in `hotelPolicy` and the pricing config, not in the profile.
+- Rules the system enforces (hold length, which room kinds take dogs, prices) stay in `hotelPolicy` and the rates, not in the profile.
+
+## Rates and rooms
+
+`createRatesService` (`rates.ts`) keeps the rates (the `PricingConfig` that `quote()` reads), room types and rooms. Anyone may read them; every change needs an active manager (`forbidden`) and is audited with `by` in the payload.
+
+- Until rates are saved, `getPricing()` returns the defaults from `pricing/config.ts` (placeholders). The demo seed saves those defaults.
+- `updatePricing(config, by)` replaces the rates. Season days must be real `MM-DD` days (29 February counts) and season names unique, child tiers must go up in age, and there is one long-stay tier per length (`invalid_input`). Audited as `settings.pricing` with the changed fields; a save that changes nothing writes nothing.
+- `createRoomType` / `updateRoomType` set the name, capacity, base price and description (`room_type.create`, `room_type.update`; a price change logs the old and new base price).
+- `createRoom` / `updateRoom` set the name, room type, kind and floor. Room names are unique, ignoring case (`conflict`), and the room type must exist (`not_found`). New rooms start `clean`; an edit keeps the housekeeping status (`room.create`, `room.update`).
+- The hotel service reads the saved rates inside each operation's transaction. Existing bookings keep their `priceSnapshot`; only new quotes and re-pricing (date or party changes) use new rates.
 
 ## Staff
 
@@ -130,7 +140,7 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 
 ## Pricing rules
 
-`quote(input, pricingConfig)` returns a line-item breakdown whose amounts sum to `total`. Config lives in `packages/domain/src/pricing/config.ts`. **All values there are placeholders until replaced with real prices.**
+`quote(input, pricing)` returns a line-item breakdown whose amounts sum to `total`. The rates are edited in Settings → Rates ([Rates and rooms](#rates-and-rooms)); the defaults in `packages/domain/src/pricing/config.ts` and the seeded base prices **are placeholders until replaced with real prices.**
 
 1. **Accommodation** is per person per night: `basePrice × season multiplier`, rounded to whole CZK. One line per season the stay touches.
 2. **Seasons** are `MM-DD` ranges, inclusive of both nights, and may wrap the new year (`12-20` → `03-15`). The first matching season wins; other nights use multiplier 1.

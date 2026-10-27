@@ -6,6 +6,7 @@ import type {
   HousekeepingTask,
   Inquiry,
   PendingAction,
+  PricingConfig,
   Room,
   RoomType,
   StaffMember,
@@ -23,6 +24,7 @@ export interface MemoryState {
   pendingActions: PendingAction[];
   tasks: HousekeepingTask[];
   profile: HotelProfile | null;
+  pricing: PricingConfig | null;
   staff: StaffMember[];
 }
 
@@ -46,6 +48,7 @@ export function createMemoryRepositories(
     pendingActions: [],
     tasks: [],
     profile: null,
+    pricing: null,
     staff: [],
     ...clone(initial),
   };
@@ -58,6 +61,22 @@ export function createMemoryRepositories(
       getRoom: (id) => Promise.resolve(state.rooms.find((r) => r.id === id) ?? null),
       setRoomStatus: (id, status) => {
         state.rooms = state.rooms.map((r) => (r.id === id ? { ...r, status } : r));
+        return Promise.resolve();
+      },
+      createRoomType: (roomType) => {
+        state.roomTypes.push(roomType);
+        return Promise.resolve();
+      },
+      updateRoomType: (roomType) => {
+        state.roomTypes = state.roomTypes.map((t) => (t.id === roomType.id ? roomType : t));
+        return Promise.resolve();
+      },
+      createRoom: (room) => {
+        state.rooms.push(room);
+        return Promise.resolve();
+      },
+      updateRoom: (room) => {
+        state.rooms = state.rooms.map((r) => (r.id === room.id ? room : r));
         return Promise.resolve();
       },
     },
@@ -165,6 +184,11 @@ export function createMemoryRepositories(
       getProfile: () => Promise.resolve(state.profile && clone(state.profile)),
       saveProfile: (profile) => {
         state.profile = clone(profile);
+        return Promise.resolve();
+      },
+      getPricing: () => Promise.resolve(state.pricing && clone(state.pricing)),
+      savePricing: (pricing) => {
+        state.pricing = clone(pricing);
         return Promise.resolve();
       },
     },

@@ -213,6 +213,44 @@ describe('hotel profile (PGlite)', () => {
   });
 });
 
+describe('pricing (PGlite)', () => {
+  it('reads the seeded rates and replaces them on save', async () => {
+    expect(await repos.settings.getPricing()).toEqual(seed.pricing);
+    const updated = { ...seed.pricing, dog: { perNight: 321 }, seasons: [] };
+    await repos.settings.savePricing(updated);
+    expect(await repos.settings.getPricing()).toEqual(updated);
+    await repos.settings.savePricing(seed.pricing);
+  });
+});
+
+describe('room setup (PGlite)', () => {
+  it('creates and replaces room types and rooms', async () => {
+    const roomType = {
+      id: 'rt_test',
+      name: 'Test loft',
+      maxAdults: 2,
+      maxChildren: 0,
+      basePrice: 1500,
+      description: 'Synthetic test type.',
+    };
+    await repos.rooms.createRoomType(roomType);
+    await repos.rooms.updateRoomType({ ...roomType, basePrice: 1600 });
+    expect(await repos.rooms.listRoomTypes()).toContainEqual({ ...roomType, basePrice: 1600 });
+
+    const room = {
+      id: 'rm_test',
+      name: 'T1',
+      roomTypeId: 'rt_test',
+      kind: 'room' as const,
+      floor: 5,
+      status: 'clean' as const,
+    };
+    await repos.rooms.createRoom(room);
+    await repos.rooms.updateRoom({ ...room, name: 'T2', status: 'dirty' });
+    expect(await repos.rooms.getRoom('rm_test')).toEqual({ ...room, name: 'T2', status: 'dirty' });
+  });
+});
+
 describe('staff (PGlite)', () => {
   it('lists active members first, then by name', async () => {
     const staff = await repos.staff.list();

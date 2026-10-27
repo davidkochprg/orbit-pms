@@ -32,6 +32,8 @@ export interface SeedData {
   inquiries: Inquiry[];
   housekeepingTasks: HousekeepingTask[];
   hotelProfile: HotelProfile;
+  /** The rates the seed's bookings were priced with. */
+  pricing: PricingConfig;
   staff: StaffMember[];
 }
 
@@ -227,6 +229,7 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
     inquiries,
     housekeepingTasks,
     hotelProfile: seedHotelProfile,
+    pricing,
     staff: seedStaff,
   };
 }

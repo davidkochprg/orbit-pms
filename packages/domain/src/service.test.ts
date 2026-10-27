@@ -230,6 +230,22 @@ describe('queries', () => {
     });
   });
 
+  it('prices with the saved rates once a manager has saved them', async () => {
+    const { repos, service } = setup();
+    const before = await service.quoteStay({
+      ...stay,
+      roomTypeId: double.id,
+      addons: { ...stay.addons, dogs: 1 },
+    });
+    await repos.settings.savePricing({ ...pricingConfig, dog: { perNight: 450 } });
+    const after = await service.quoteStay({
+      ...stay,
+      roomTypeId: double.id,
+      addons: { ...stay.addons, dogs: 1 },
+    });
+    expect(after.total - before.total).toBe(2 * (450 - pricingConfig.dog.perNight));
+  });
+
   it('searches bookings by guest name without accents and by room', async () => {
     const { service } = setup();
     expect(await service.searchBookings({ guestName: 'test guest' })).toHaveLength(3);
