@@ -145,6 +145,18 @@ Requests are signed in with the `x-staff-id` header: the ID of an active staff m
 
 `HotelProfile`: `name`, `location`, `description`, `phone`, `email`, `website`, `checkInFrom` and `checkOutBy` (`HH:MM`), and `entries` (`{ id, category: 'policy' | 'amenity' | 'info', title, details }`, at most 100). `PUT` replaces the whole profile and returns it; empty strings become `null`. Check-out must be earlier than check-in (`400 invalid_input`). See [domain.md](domain.md#hotel-profile).
 
+### `GET /api/settings/pricing`, `PUT /api/settings/pricing`
+
+`PricingConfig`: `seasons` (`{ name, from, to, multiplier }`, days as `MM-DD`), `childDiscounts` (`{ maxAge, discount }`, ascending age), `longStay` (`{ minNights, discount }`), `wellness` (`{ perPersonPerNight, minAge }`), `extraBed` (`{ perNight }`) and `dog` (`{ perNight }`). Discounts are fractions (0.5 = half); money is whole CZK. `PUT` replaces the rates and returns them; new quotes use them right away, existing bookings keep their price. An impossible day, a duplicate season or out-of-order child tiers are `400 invalid_input`. See [domain.md](domain.md#rates-and-rooms).
+
+### `POST /api/room-types`, `PUT /api/room-types/:id`
+
+Body `{ name, maxAdults, maxChildren, basePrice, description }`. `POST` returns `201` with the new `RoomType`; `PUT` replaces the fields and returns it.
+
+### `POST /api/rooms`, `PUT /api/rooms/:id`
+
+Body `{ name, roomTypeId, kind, floor }`. `POST` returns `201` with the new `Room`, status `clean`; `PUT` keeps the room's status. A name another room has is `409 conflict`; an unknown room type is `404`.
+
 ### `GET /api/staff`
 
 `StaffMember[]`, active members first, then by name: `id`, `name`, `email`, `role` (`manager` | `receptionist` | `housekeeping`), `active`.
