@@ -23,11 +23,17 @@ export function AgentThread({ messages }: { messages: UIMessage[] }) {
 }
 
 function AssistantMessage({ message }: { message: UIMessage }) {
+  // Text before the last tool step is the agent narrating its progress; only the rest is the answer.
+  const lastTool = message.parts.findLastIndex((p) => isToolUIPart(p));
   return (
     <div className="-mt-3 flex flex-col gap-2">
       {message.parts.map((part, i) => {
         if (part.type === 'text') {
-          return (
+          return i < lastTool ? (
+            <p key={i} className="text-xs text-muted-foreground">
+              {part.text}
+            </p>
+          ) : (
             <p key={i} className="leading-relaxed whitespace-pre-wrap">
               {part.text}
             </p>
