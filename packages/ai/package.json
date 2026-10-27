@@ -8,7 +8,7 @@
     "./evals": "./src/evals/index.ts"
   },
   "scripts": {
-    "eval": "tsx src/evals/run.ts",
+    "eval": "tsx --env-file-if-exists=../../.env src/evals/run.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

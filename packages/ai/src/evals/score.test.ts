@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { scoreExtraction } from './score';
 
 const expected: InquiryExtraction = {
+  kind: 'booking_request',
+  question: null,
   language: 'de',
   guestName: 'Familie Beispiel',
   checkIn: '2026-11-06',
@@ -14,10 +16,21 @@ const expected: InquiryExtraction = {
 
 describe('scoreExtraction', () => {
   it('passes an exact match regardless of child age order and name', () => {
-    expect(scoreExtraction(expected, { ...expected, guestName: null, childAges: [8, 4] })).toEqual({
+    expect(
+      scoreExtraction(expected, {
+        ...expected,
+        guestName: null,
+        question: 'Price?',
+        childAges: [8, 4],
+      }),
+    ).toEqual({
       passed: true,
       failed: [],
     });
+  });
+
+  it('fails a misclassified message', () => {
+    expect(scoreExtraction(expected, { ...expected, kind: 'question' }).failed).toEqual(['kind']);
   });
 
   it('lists every failed field', () => {

@@ -59,7 +59,7 @@ describe('agent tools', () => {
         addons: { wellness: true, dogs: 0, extraBeds: 0 },
         source: 'email',
         notes: null,
-        inquiryId: 'inq_01',
+        inquiryId: null,
       },
       callOptions,
     );

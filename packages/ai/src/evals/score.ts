@@ -1,6 +1,6 @@
 import type { InquiryExtraction } from '@orbit/shared';
 
-export type ExtractionField = 'language' | 'dates' | 'adults' | 'childAges' | 'wishes';
+export type ExtractionField = 'kind' | 'language' | 'dates' | 'adults' | 'childAges' | 'wishes';
 
 export interface ExtractionScore {
   passed: boolean;
@@ -12,12 +12,13 @@ function sameAges(a: number[], b: number[]): boolean {
   return sorted(a) === sorted(b);
 }
 
-/** Exact match on the fields the booking flow depends on. Guest name is not scored. */
+/** Exact match on the fields the booking flow depends on. Guest name and question text are not scored. */
 export function scoreExtraction(
   expected: InquiryExtraction,
   actual: InquiryExtraction,
 ): ExtractionScore {
   const checks: Record<ExtractionField, boolean> = {
+    kind: expected.kind === actual.kind,
     language: expected.language === actual.language,
     dates: expected.checkIn === actual.checkIn && expected.checkOut === actual.checkOut,
     adults: expected.adults === actual.adults,
