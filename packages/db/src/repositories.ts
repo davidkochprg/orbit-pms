@@ -9,10 +9,12 @@ import type {
   PendingActionRepository,
   Repositories,
   RoomRepository,
+  SettingsRepository,
 } from '@orbit/domain';
 import {
   type AuditLogEntry,
   type Booking,
+  hotelProfileSchema,
   type HousekeepingTask,
   type Inquiry,
   type PendingAction,
@@ -24,6 +26,7 @@ import {
   auditLog,
   bookings,
   guests,
+  hotelProfile,
   housekeepingTasks,
   inquiries,
   pendingActions,
@@ -244,6 +247,27 @@ function housekeepingRepository(db: Db): HousekeepingRepository {
   };
 }
 
+const PROFILE_ID = 'hotel';
+
+function settingsRepository(db: Db): SettingsRepository {
+  return {
+    async getProfile() {
+      const [row] = await db.select().from(hotelProfile).where(eq(hotelProfile.id, PROFILE_ID));
+      // Validated on read: the column is plain JSON and the prompts are built from it.
+      return row ? hotelProfileSchema.parse(row.profile) : null;
+    },
+    async saveProfile(profile) {
+      await db
+        .insert(hotelProfile)
+        .values({ id: PROFILE_ID, profile })
+        .onConflictDoUpdate({
+          target: hotelProfile.id,
+          set: { profile, updatedAt: new Date() },
+        });
+    },
+  };
+}
+
 export function createRepositories(db: Db): Repositories {
   return {
     rooms: roomRepository(db),
@@ -253,6 +277,7 @@ export function createRepositories(db: Db): Repositories {
     inquiries: inquiryRepository(db),
     pendingActions: pendingActionRepository(db),
     housekeeping: housekeepingRepository(db),
+    settings: settingsRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

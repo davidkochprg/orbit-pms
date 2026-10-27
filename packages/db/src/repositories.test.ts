@@ -202,3 +202,13 @@ describe('housekeeping tasks (PGlite)', () => {
     expect(await repos.housekeeping.getTask('nope')).toBeNull();
   });
 });
+
+describe('hotel profile (PGlite)', () => {
+  it('reads the seeded profile and replaces it on save', async () => {
+    expect(await repos.settings.getProfile()).toEqual(seed.hotelProfile);
+    const updated = { ...seed.hotelProfile, name: 'Renamed Lodge', entries: [] };
+    await repos.settings.saveProfile(updated);
+    expect(await repos.settings.getProfile()).toEqual(updated);
+    await repos.settings.saveProfile(seed.hotelProfile);
+  });
+});

@@ -77,6 +77,7 @@ A PGlite directory can only be open in one process at a time; two processes writ
 - About 440 bookings from three weeks ago to six weeks ahead, filling about half the hotel on a typical night, priced with `quote()`. There are always arrivals and departures today, at least one family arrival, and some open holds.
 - 10 open inquiries in mixed languages (from `packages/ai/src/evals/inquiries.ts`). The seed makes sure each one has at least one free room.
 - Housekeeping tasks: turnovers for today's departures, stayovers for in-house guests, one maintenance task.
+- The hotel profile of the fictional "Orbit Demo Penzion" (`packages/db/src/seed/hotel.ts`): policies, amenities and guest information, without prices. Seeding replaces any profile edited in Settings.
 
 The generator is deterministic (fixed PRNG seed), and its invariants are tested in `packages/db/src/seed/build.test.ts`.
 

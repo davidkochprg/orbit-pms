@@ -4,6 +4,7 @@ import type {
   Booking,
   BookingStatus,
   Guest,
+  HotelProfile,
   HousekeepingTask,
   HousekeepingTaskStatus,
   Inquiry,
@@ -84,6 +85,12 @@ export interface HousekeepingRepository {
   updateTask(task: HousekeepingTask): Promise<void>;
 }
 
+export interface SettingsRepository {
+  /** Null until a profile has been saved. */
+  getProfile(): Promise<HotelProfile | null>;
+  saveProfile(profile: HotelProfile): Promise<void>;
+}
+
 export interface Repositories {
   rooms: RoomRepository;
   bookings: BookingRepository;
@@ -92,6 +99,7 @@ export interface Repositories {
   inquiries: InquiryRepository;
   pendingActions: PendingActionRepository;
   housekeeping: HousekeepingRepository;
+  settings: SettingsRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

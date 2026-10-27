@@ -13,4 +13,5 @@ export * from './policy';
 export * from './pricing';
 export type * from './repositories';
 export * from './service';
+export * from './settings';
 export * from './text';

@@ -10,6 +10,7 @@ import {
   pendingActionStatuses,
   roomKinds,
   roomStatuses,
+  type HotelProfile,
   type InquiryExtraction,
   type InquirySuggestion,
   type PendingActionInput,
@@ -163,6 +164,13 @@ export const pendingActions = pgTable('pending_actions', {
   error: text('error'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+});
+
+/** The hotel profile from Settings. One row, `id = 'hotel'`. */
+export const hotelProfile = pgTable('hotel_profile', {
+  id: text('id').primaryKey(),
+  profile: jsonb('profile').$type<HotelProfile>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 /** Every model call and what it cost. Not touched by the demo seed or resets: it is real spend. */

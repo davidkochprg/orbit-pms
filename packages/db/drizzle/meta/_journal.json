@@ -50,6 +50,13 @@
       "when": 1793104573419,
       "tag": "0006_inquiry_inbox_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793121998214,
+      "tag": "0007_hotel_profile",
+      "breakpoints": true
     }
   ]
 }

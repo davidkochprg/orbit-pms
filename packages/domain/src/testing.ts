@@ -2,6 +2,7 @@ import type {
   AuditLogEntry,
   Booking,
   Guest,
+  HotelProfile,
   HousekeepingTask,
   Inquiry,
   PendingAction,
@@ -20,6 +21,7 @@ export interface MemoryState {
   inquiries: Inquiry[];
   pendingActions: PendingAction[];
   tasks: HousekeepingTask[];
+  profile: HotelProfile | null;
 }
 
 // State is plain JSON, so a JSON round-trip is a full deep copy.
@@ -41,6 +43,7 @@ export function createMemoryRepositories(
     inquiries: [],
     pendingActions: [],
     tasks: [],
+    profile: null,
     ...clone(initial),
   };
 
@@ -148,6 +151,13 @@ export function createMemoryRepositories(
       },
       updateTask: (task) => {
         state.tasks = state.tasks.map((t) => (t.id === task.id ? task : t));
+        return Promise.resolve();
+      },
+    },
+    settings: {
+      getProfile: () => Promise.resolve(state.profile && clone(state.profile)),
+      saveProfile: (profile) => {
+        state.profile = clone(profile);
         return Promise.resolve();
       },
     },

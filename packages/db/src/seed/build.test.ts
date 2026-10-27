@@ -1,6 +1,19 @@
+import { amountsInText } from '@orbit/ai';
 import { buildInquiryFixtures, evalRoomNames } from '@orbit/ai/evals';
-import { blocksRoom, checkAvailability, pricingConfig, rangesOverlap } from '@orbit/domain';
-import { bookingSchema, guestSchema, inquirySchema, roomSchema } from '@orbit/shared';
+import {
+  assertValidProfile,
+  blocksRoom,
+  checkAvailability,
+  pricingConfig,
+  rangesOverlap,
+} from '@orbit/domain';
+import {
+  bookingSchema,
+  guestSchema,
+  hotelProfileSchema,
+  inquirySchema,
+  roomSchema,
+} from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { buildSeed } from './build';
 
@@ -14,6 +27,16 @@ describe('buildSeed', () => {
     expect(new Set(seed.rooms.map((r) => r.roomTypeId)).size).toBe(6);
     expect(seed.rooms.filter((r) => r.kind === 'apartment')).toHaveLength(6);
     expect(new Set(seed.rooms.map((r) => r.id)).size).toBe(50);
+  });
+
+  it('describes the demo hotel with a valid profile and no prices', () => {
+    expect(hotelProfileSchema.parse(seed.hotelProfile)).toEqual(seed.hotelProfile);
+    expect(() => assertValidProfile(seed.hotelProfile)).not.toThrow();
+    for (const category of ['policy', 'amenity', 'info']) {
+      expect(seed.hotelProfile.entries.some((e) => e.category === category)).toBe(true);
+    }
+    // Prices come from quote(); an amount here would bypass the draft price guard.
+    expect(amountsInText(JSON.stringify(seed.hotelProfile))).toEqual([]);
   });
 
   it('fills about half the hotel on a typical night', () => {
