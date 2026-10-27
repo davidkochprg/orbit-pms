@@ -12,7 +12,7 @@ import {
   writeStorage,
 } from '@/lib/theme';
 
-const DAYLIGHT_VARS = ['--night', '--ink', '--glow'] as const;
+const DAYLIGHT_VARS = ['--night', '--glow'] as const;
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(readStoredTheme);
@@ -23,14 +23,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'daylight') {
-      // Inline variables beat the .dark class, so the blend is whatever the time of day says.
-      const { night, ink, glow } = daylightAt(daylightMinute);
+      // Inline variables beat the .dark class; the CSS fades --night when it flips.
+      const { night, glow } = daylightAt(daylightMinute);
       root.dataset.theme = 'daylight';
       root.style.setProperty('--night', String(night));
-      root.style.setProperty('--ink', String(ink));
       root.style.setProperty('--glow', glowColor(glow));
-      root.style.colorScheme = night >= 0.5 ? 'dark' : 'light';
-      root.classList.toggle('dark', night >= 0.5);
+      root.style.colorScheme = night ? 'dark' : 'light';
+      root.classList.toggle('dark', night === 1);
       return;
     }
     delete root.dataset.theme;

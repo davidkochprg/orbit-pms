@@ -12,20 +12,24 @@
  * The accent is one hue: change --accent-hue / --accent-chroma to re-color every accent at once.
  * Neutrals carry a faint cool tint from --gray-hue.
  */
+@property --night {
+  syntax: '<number>';
+  inherits: true;
+  initial-value: 0;
+}
+
 :root {
   --accent-hue: 256;
   --accent-chroma: 0.19;
   --gray-hue: 264;
 
   /*
-   * 0 = day palette, 1 = night palette. Light and dark set 0 and 1; the daylight theme sets
-   * values in between from the time of day (lib/daylight.ts). --ink is the same for text, but
-   * switches quickly around 0.5 so text keeps its contrast.
+   * 0 = day palette, 1 = night palette. Light and dark set 0 and 1, and so does the daylight
+   * theme by time of day (lib/daylight.ts). --night is a registered number (see @property above),
+   * so a change fades instead of snapping.
    */
   --night: 0;
-  --ink: 0;
   --night-mix: calc(var(--night) * 100%);
-  --ink-mix: calc(var(--ink) * 100%);
   /* Light under the app's surface; only the daylight theme sets it. */
   --glow: transparent;
 
@@ -162,12 +166,16 @@
   );
 
   /* Text. */
-  --foreground: color-mix(in oklch, var(--foreground-day), var(--foreground-night) var(--ink-mix));
+  --foreground: color-mix(
+    in oklch,
+    var(--foreground-day),
+    var(--foreground-night) var(--night-mix)
+  );
 
   --primary-text: color-mix(
     in oklch,
     var(--primary-text-day),
-    var(--primary-text-night) var(--ink-mix)
+    var(--primary-text-night) var(--night-mix)
   );
 
   /* Lines. */
@@ -259,8 +267,7 @@
     var(--shadow-deep-night) var(--night-mix)
   );
 
-  /* Secondary text is the text color pulled toward the background, so it keeps the same
-     relative contrast at every point of the daylight blend. */
+  /* Secondary text is the text color pulled toward the background, so it tracks the theme. */
   --muted-foreground: color-mix(in oklch, var(--foreground), var(--background) 40%);
   --subtle-foreground: color-mix(in oklch, var(--foreground), var(--background) 56%);
   --card-foreground: var(--foreground);
@@ -296,7 +303,6 @@
 .dark {
   color-scheme: dark;
   --night: 1;
-  --ink: 1;
 }
 
 @theme inline {
@@ -384,6 +390,14 @@
 }
 
 @layer base {
+  html {
+    transition: --night 700ms ease-in-out;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      transition: none;
+    }
+  }
   * {
     @apply border-border outline-ring/50;
   }
