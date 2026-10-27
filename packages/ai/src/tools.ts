@@ -123,6 +123,12 @@ export function createAgentTools({ hotel, actions, listRooms }: ToolDeps) {
       execute: ({ date }) =>
         safely(async () => (await hotel.getDayOverview(date)).departures.map(compact)),
     }),
+    getDailyBrief: tool({
+      description:
+        'Summary of a day: occupancy tonight, turnovers, rooms to prepare for arrivals, holds needing a decision, broken rooms, open maintenance, unanswered messages and short gaps between stays worth discounting.',
+      inputSchema: dateInputSchema,
+      execute: ({ date }) => safely(() => hotel.getDailyBrief(date)),
+    }),
     createHold: tool({
       description:
         'Propose a hold (tentative booking) for a room. Needs a free room from checkAvailability. The user must confirm.',

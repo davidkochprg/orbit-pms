@@ -86,4 +86,11 @@ describe('agent tools', () => {
       expect.objectContaining({ bookingId: 'bk_1' }),
     ]);
   });
+
+  it('returns the daily brief', async () => {
+    const { tools } = setup();
+    expect(await tools.getDailyBrief.execute({}, callOptions)).toEqual(
+      expect.objectContaining({ date: '2026-05-10', arrivals: 1 }),
+    );
+  });
 });

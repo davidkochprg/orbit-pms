@@ -39,6 +39,7 @@ const toolLabels: Record<string, [running: string, done: string]> = {
   quote: ['Calculating the price', 'Calculated the price'],
   getArrivals: ['Checking arrivals', 'Checked arrivals'],
   getDepartures: ['Checking departures', 'Checked departures'],
+  getDailyBrief: ['Reading the daily brief', 'Read the daily brief'],
   createHold: ['Preparing a hold', 'Prepared a hold'],
   confirmBooking: ['Preparing the confirmation', 'Prepared the confirmation'],
   cancelBooking: ['Preparing the cancellation', 'Prepared the cancellation'],
