@@ -4,14 +4,14 @@
 
 Orbit PMS is a pnpm monorepo. Each layer has one job:
 
-| Package | Role |
-|---|---|
-| `apps/web` | React UI. No business logic. |
-| `apps/api` | Hono server. Thin routes that validate input and call the domain. |
+| Package           | Role                                                                         |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `apps/web`        | React UI. No business logic.                                                 |
+| `apps/api`        | Hono server. Thin routes that validate input and call the domain.            |
 | `packages/domain` | Pure TypeScript business logic. No I/O except through repository interfaces. |
-| `packages/db` | Drizzle schema, migrations, seed, repository implementations. |
-| `packages/ai` | Meta model provider, agent tools, prompts, evals. |
-| `packages/shared` | zod schemas and types used across packages. |
+| `packages/db`     | Drizzle schema, migrations, seed, repository implementations.                |
+| `packages/ai`     | Meta model provider, agent tools, prompts, evals.                            |
+| `packages/shared` | zod schemas and types used across packages.                                  |
 
 ## The architecture rule
 
