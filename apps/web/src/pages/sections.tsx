@@ -1,15 +1,5 @@
-import { BedDouble, CalendarRange, Compass, Inbox, LayoutDashboard, Users } from 'lucide-react';
+import { BedDouble, CalendarRange, Compass, Inbox } from 'lucide-react';
 import { PlaceholderPage } from './placeholder-page';
-
-export function DashboardPage() {
-  return (
-    <PlaceholderPage
-      icon={LayoutDashboard}
-      title="Dashboard"
-      description="Today's arrivals, departures and the daily brief will appear here."
-    />
-  );
-}
 
 export function TapeChartPage() {
   return (
@@ -38,12 +28,6 @@ export function HousekeepingPage() {
       title="Housekeeping"
       description="Room status board and maintenance tasks."
     />
-  );
-}
-
-export function GuestsPage() {
-  return (
-    <PlaceholderPage icon={Users} title="Guests" description="Guest list with booking history." />
   );
 }
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet } from 'react-router';
 import { AgentPanel } from '@/components/agent-panel';
 import { AppSidebar } from '@/components/app-sidebar';
+import { BookingDrawer } from '@/components/booking-drawer';
 import { TopBar } from '@/components/top-bar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
@@ -18,6 +19,7 @@ export function AppLayout() {
           </main>
         </div>
         {agentOpen && <AgentPanel />}
+        <BookingDrawer />
       </SidebarInset>
     </SidebarProvider>
   );
