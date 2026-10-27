@@ -1,6 +1,7 @@
 import { pricingConfig } from '@orbit/domain';
 import { applySeed, buildSeed, createDb, createRepositories, createUsageStore } from '@orbit/db';
 import type {
+  ActivityItem,
   ApiError,
   AuditLogEntry,
   HotelProfile,
@@ -241,5 +242,22 @@ describe('room types and rooms', () => {
       (await call('POST', '/api/rooms', { ...body, name: 'Z9' }, receptionist.id)).status,
     ).toBe(403);
     expect((await call('POST', '/api/room-types', typeBody)).status).toBe(403);
+  });
+});
+
+describe('activity', () => {
+  it('lists changes with names, filtered by actor', async () => {
+    await call(
+      'PUT',
+      '/api/settings/pricing',
+      { ...seed.pricing, dog: { perNight: 1 } },
+      manager.id,
+    );
+    const { status, body } = await call<ActivityItem[]>('GET', '/api/activity?limit=5');
+    expect(status).toBe(200);
+    expect(body[0]).toMatchObject({ action: 'settings.pricing', byName: manager.name });
+    const agent = await call<ActivityItem[]>('GET', '/api/activity?actor=agent');
+    expect(agent.body.every((i) => i.actor === 'agent')).toBe(true);
+    expect((await call('GET', '/api/activity?actor=robot')).status).toBe(400);
   });
 });

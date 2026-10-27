@@ -7,6 +7,7 @@ import {
   type UsageStore,
 } from '@orbit/ai';
 import {
+  createActivityService,
   createBillingService,
   createGuestService,
   createHotelService,
@@ -29,6 +30,7 @@ import { logger } from 'hono/logger';
 import { createAiGate } from './ai-gate';
 import { errorBody, handleError } from './http';
 import { type AiLimitsConfig, createAiLimiter } from './limits';
+import { activityRoutes } from './routes/activity';
 import { agentRoutes } from './routes/agent';
 import { billingRoutes } from './routes/billing';
 import { bookingRoutes } from './routes/bookings';
@@ -125,6 +127,7 @@ export function createApp({
   app.route('/api', billingRoutes(billing));
   app.route('/api', reportRoutes(reports));
   app.route('/api', registrationRoutes(registrations));
+  app.route('/api', activityRoutes(createActivityService({ repos })));
   app.route('/api', guestRoutes(repos, createGuestService({ repos, newId })));
   app.route('/api', overviewRoutes(repos, hotel));
   app.route('/api', pendingActionRoutes(actions));

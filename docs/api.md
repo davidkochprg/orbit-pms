@@ -125,6 +125,10 @@ Takes `{ kind?: 'payment' | 'refund', method: 'cash' | 'card' | 'bank_transfer',
 
 `DailyBrief` for `date` (default: today): `occupancy` (`occupied`, `sellable`, `total` rooms tonight), `guestsTonight`, `arrivals` and `departures` counts, `turnovers`, `roomsToPrepare`, `holds` (`{ summary, expired }`), `outOfOrder`, `maintenance`, `unansweredMessages` and `gaps` (`{ roomId, roomName, from, to, nights }`). See [domain.md](domain.md#daily-brief).
 
+### `GET /api/activity?actor=&limit=`
+
+The hotel-wide audit log, newest first: `ActivityItem[]`, each an audit entry plus `subject` (`{ kind, id, label }` or `null`) and `byName` (the staff member who made the change, when recorded). `actor` is `user` or `agent`; `limit` 1–200, default 100. See [domain.md](domain.md#activity).
+
 ### `GET /api/reports?from=&to=`
 
 A `Report` for the nights `[from, to)` (at most 366): `occupancy`, `adr`, `revpar`, `roomRevenue`, `addonRevenue`, `extrasRevenue`, `cityTax`, room nights, guest nights, `arrivals`, `averageStay`, `cancellations`, `bySource`, `byRoomType`, `payments` by method, `unpaidDepartures` and a daily series `days`. A reversed or missing period is `400`. See [domain.md](domain.md#reports).
