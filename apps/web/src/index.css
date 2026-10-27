@@ -416,24 +416,36 @@
 }
 
 /*
- * Daylight glow: soft light behind the content panel that also shines faintly through the
- * workspace. --glow is transparent unless the daylight theme is on, so these rules are invisible
- * in light and dark.
+ * Daylight glow: soft light behind the content panel that also falls on the workspace. --glow is
+ * transparent unless the daylight theme is on, so these rules are invisible in light and dark.
+ * The workspace layer blends like light on a surface: multiply tints light surfaces and leaves
+ * dark text alone; screen lifts dark surfaces and leaves light text alone.
  */
 [data-slot='sidebar-wrapper'] {
   background-image: radial-gradient(
-    65% 70% at 58% 50%,
-    color-mix(in oklch, var(--glow), transparent 45%),
-    transparent 75%
+    85% 95% at 58% 50%,
+    color-mix(in oklch, var(--glow), transparent 50%),
+    transparent 80%
   );
 }
 .daylight-wash {
-  background-image: radial-gradient(
-    75% 75% at 50% 50%,
-    color-mix(in oklch, var(--glow), transparent 88%),
-    color-mix(in oklch, var(--glow), transparent 96%) 60%,
+  --wash: radial-gradient(
+    90% 85% at 50% 45%,
+    color-mix(in oklch, var(--glow), transparent 55%),
+    color-mix(in oklch, var(--glow), transparent 85%) 75%,
     transparent 100%
   );
+  mix-blend-mode: multiply;
+  background-image: var(--wash);
+}
+/* A faint grain dithers the gradient so it shows no banding. */
+[data-theme='daylight'] .daylight-wash {
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
+    var(--wash);
+}
+.dark .daylight-wash {
+  mix-blend-mode: screen;
 }
 [data-variant='inset'] [data-slot='sidebar-inner'] {
   background-color: transparent;

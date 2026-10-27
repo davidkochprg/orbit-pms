@@ -1,18 +1,37 @@
 import { describe, expect, it } from 'vitest';
 import { daylightAt, formatMinute, glowColor, phaseLabel } from './daylight';
 
+const hue = (minute: number) => ((daylightAt(minute).glow.h % 360) + 360) % 360;
+
 describe('daylightAt', () => {
-  it('is white with an orange glow at sunrise', () => {
-    const s = daylightAt(7 * 60);
-    expect(s.night).toBe(0);
-    expect(s.glow.h).toBe(55);
+  it('follows the colors of the sky through the day', () => {
+    expect(hue(5 * 60 + 30)).toBe(275); // blue hour, indigo
+    expect(hue(6 * 60)).toBe(15); // dawn pink
+    expect(hue(7 * 60 + 15)).toBe(75); // golden light
+    expect(hue(13 * 60)).toBe(235); // pale sky blue
+    expect(hue(18 * 60 + 30)).toBe(45); // sunset orange
+    expect(hue(20 * 60)).toBe(275); // evening blue hour
   });
 
-  it('is fully dark at night with a pale blue moon glow', () => {
+  it('keeps midday light pale and low in saturation', () => {
+    const { glow } = daylightAt(13 * 60);
+    expect(glow.l).toBeGreaterThan(0.8);
+    expect(glow.c).toBeLessThan(0.1);
+  });
+
+  it('is faint cool moonlight at night', () => {
     const s = daylightAt(23 * 60);
     expect(s.night).toBe(1);
-    expect(s.glow.l).toBeGreaterThan(0.75);
-    expect(((s.glow.h % 360) + 360) % 360).toBe(235);
+    expect(hue(23 * 60)).toBe(255);
+    expect(s.glow.c).toBeLessThan(0.08);
+  });
+
+  it('never turns green when moving between warm and blue light', () => {
+    for (let m = 0; m < 1440; m++) {
+      const { glow } = daylightAt(m);
+      const h = ((glow.h % 360) + 360) % 360;
+      if (h > 110 && h < 200) expect(glow.c).toBeLessThan(0.01);
+    }
   });
 
   it('is only ever fully light or fully dark, switching at 06:30 and 19:30', () => {
@@ -39,8 +58,9 @@ describe('formatting', () => {
     expect(formatMinute(7 * 60 + 5)).toBe('07:05');
     expect(formatMinute(1440)).toBe('00:00');
     expect(phaseLabel(7 * 60)).toBe('Sunrise');
-    expect(phaseLabel(13 * 60)).toBe('Daytime');
-    expect(phaseLabel(19 * 60)).toBe('Dusk');
+    expect(phaseLabel(13 * 60)).toBe('Midday');
+    expect(phaseLabel(19 * 60)).toBe('Sunset');
+    expect(phaseLabel(5 * 60 + 30)).toBe('Blue hour');
     expect(phaseLabel(2 * 60)).toBe('Night');
   });
 

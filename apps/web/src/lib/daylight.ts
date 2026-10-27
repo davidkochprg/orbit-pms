@@ -1,6 +1,6 @@
 /**
- * The daylight theme: the app switches between the light and dark palettes at fixed times, and an
- * underglow below the app follows the time of day continuously.
+ * The daylight theme: the app switches between the light and dark palettes at fixed times, and a
+ * glow behind and through the app follows the color of daylight continuously.
  *
  * `night` is 0 (light) or 1 (dark); the CSS fades between them when it changes. There are no
  * in-between palettes, because mid-gray surfaces leave too little contrast for text.
@@ -27,21 +27,33 @@ export interface DaylightState {
 
 type Keyframe = [minute: number, l: number, c: number, h: number, alpha: number];
 
-// Sunrise glows orange, the day sky blue, dusk a deepening blue, and the moon rises pale blue.
-// Hues run 55 → -115 (= 245) through rose and violet, like a morning sky.
+// Modeled on the real sky. Night is faint cool moonlight; the blue hour before sunrise is indigo;
+// dawn passes the pink "Belt of Venus" into an orange sun and golden light. Midday light is near
+// white, then a pale, low-saturation sky blue. Late afternoon turns golden, sunset goes orange to
+// red-pink to a violet afterglow, and the evening blue hour fades into moonlight.
+//
+// Hues are unwrapped (they may go below 0 or above 360) so each segment turns the intended way
+// around the wheel. Where the hue would cross unrelated colors, chroma drops to 0 first.
 const keyframes: Keyframe[] = [
-  [0, 0.82, 0.08, -125, 0.55], // night, full moon glow
-  [300, 0.8, 0.06, -110, 0.3], // 05:00 moon fading
-  [350, 0.72, 0.1, 10, 0.35], // 05:50 first light
-  [370, 0.74, 0.13, 40, 0.55], // 06:10 dawn
-  [420, 0.76, 0.16, 55, 0.85], // 07:00 sunrise
-  [540, 0.78, 0.13, 45, 0.6], // 09:00 morning
-  [660, 0.72, 0.14, -115, 0.55], // 11:00 blue sky
-  [960, 0.72, 0.14, -115, 0.55], // 16:00
-  [1080, 0.64, 0.14, -112, 0.5], // 18:00 dusk
-  [1170, 0.55, 0.12, -105, 0.35], // 19:30 dark
-  [1260, 0.72, 0.07, -125, 0.35], // 21:00 moonrise
-  [1350, 0.82, 0.08, -125, 0.55], // 22:30 moon up
+  [0, 0.76, 0.05, -105, 0.32], // moonlight
+  [270, 0.7, 0.05, -105, 0.22], // 04:30 deep night
+  [330, 0.55, 0.12, -85, 0.38], // 05:30 blue hour
+  [360, 0.76, 0.09, 15, 0.4], // 06:00 dawn pink
+  [390, 0.78, 0.14, 50, 0.5], // 06:30 sunrise
+  [435, 0.85, 0.13, 75, 0.45], // 07:15 golden light
+  [510, 0.91, 0.05, 85, 0.3], // 08:30 warm morning
+  [555, 0.93, 0, 85, 0.22], // 09:15 white daylight
+  [556, 0.93, 0, 235, 0.22],
+  [630, 0.87, 0.07, 235, 0.3], // 10:30 pale sky blue
+  [930, 0.87, 0.07, 235, 0.3], // 15:30
+  [975, 0.92, 0, 235, 0.22], // 16:15 white daylight
+  [976, 0.92, 0, 85, 0.22],
+  [1050, 0.86, 0.12, 75, 0.42], // 17:30 golden hour
+  [1110, 0.74, 0.16, 45, 0.55], // 18:30 sunset
+  [1140, 0.66, 0.15, 20, 0.5], // 19:00 red-pink
+  [1170, 0.56, 0.12, -30, 0.42], // 19:30 violet afterglow
+  [1200, 0.5, 0.13, -85, 0.4], // 20:00 blue hour
+  [1260, 0.7, 0.06, -105, 0.32], // 21:00 moonrise
 ];
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -82,12 +94,23 @@ export function formatMinute(minute: number): string {
   return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`;
 }
 
+const phases: [from: number, label: string][] = [
+  [0, 'Night'],
+  [300, 'Blue hour'],
+  [350, 'Dawn'],
+  [385, 'Sunrise'],
+  [480, 'Morning'],
+  [690, 'Midday'],
+  [840, 'Afternoon'],
+  [1020, 'Golden hour'],
+  [1095, 'Sunset'],
+  [1155, 'Dusk'],
+  [1215, 'Night'],
+];
+
 export function phaseLabel(minute: number): string {
   const m = wrap(minute);
-  if (m >= 330 && m < 540) return 'Sunrise';
-  if (m >= 540 && m < 1050) return 'Daytime';
-  if (m >= 1050 && m < DARK_FROM) return 'Dusk';
-  return 'Night';
+  return phases.findLast(([from]) => from <= m)![1];
 }
 
 /** Color stops for a slider track that previews the whole day, midnight to midnight. */
