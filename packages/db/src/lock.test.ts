@@ -1,10 +1,19 @@
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { acquireLock, DatabaseLockedError } from './lock';
 
-const lockPath = () => path.join(mkdtempSync(path.join(tmpdir(), 'orbit-lock-')), 'db.lock');
+const dirs: string[] = [];
+const lockPath = () => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'orbit-lock-'));
+  dirs.push(dir);
+  return path.join(dir, 'db.lock');
+};
+
+afterEach(() => {
+  for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true });
+});
 
 describe('acquireLock', () => {
   it('writes our PID and removes the file on release', () => {
