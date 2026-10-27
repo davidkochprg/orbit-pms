@@ -5,6 +5,7 @@ import {
   guests,
   housekeepingTasks,
   inquiries,
+  pendingActions,
   rooms,
   roomTypes,
 } from '../schema';
@@ -13,6 +14,7 @@ import type { SeedData } from './build';
 /** Replaces all data with the given seed, in one transaction. */
 export async function applySeed(db: Db, seed: SeedData): Promise<void> {
   await db.transaction(async (tx) => {
+    await tx.delete(pendingActions);
     await tx.delete(auditLog);
     await tx.delete(housekeepingTasks);
     await tx.delete(inquiries);

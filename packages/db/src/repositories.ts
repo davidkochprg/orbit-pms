@@ -4,13 +4,19 @@ import type {
   BookingFilter,
   BookingRepository,
   GuestRepository,
+  PendingActionRepository,
   Repositories,
   RoomRepository,
 } from '@orbit/domain';
-import type { AuditLogEntry, Booking } from '@orbit/shared';
+import {
+  type AuditLogEntry,
+  type Booking,
+  type PendingAction,
+  pendingActionSchema,
+} from '@orbit/shared';
 import { and, asc, desc, eq, gt, inArray, lt, type SQL } from 'drizzle-orm';
 import type { Db } from './client';
-import { auditLog, bookings, guests, rooms, roomTypes } from './schema';
+import { auditLog, bookings, guests, pendingActions, rooms, roomTypes } from './schema';
 
 type BookingRow = typeof bookings.$inferSelect;
 type AuditRow = typeof auditLog.$inferSelect;
@@ -57,6 +63,11 @@ function bookingRepository(db: Db): BookingRepository {
       const [row] = await db.select().from(bookings).where(eq(bookings.id, id));
       return row ? toBooking(row) : null;
     },
+    async createBooking({ holdExpiresAt, ...booking }) {
+      await db
+        .insert(bookings)
+        .values({ ...booking, holdExpiresAt: holdExpiresAt ? new Date(holdExpiresAt) : null });
+    },
     async updateBooking({ id, holdExpiresAt, ...booking }) {
       await db
         .update(bookings)
@@ -77,6 +88,9 @@ function guestRepository(db: Db): GuestRepository {
       if (!row) return null;
       const { createdAt: _, ...guest } = row;
       return guest;
+    },
+    async createGuest(guest) {
+      await db.insert(guests).values(guest);
     },
   };
 }
@@ -103,12 +117,54 @@ function auditRepository(db: Db): AuditRepository {
   };
 }
 
+type PendingRow = typeof pendingActions.$inferSelect;
+
+function toPendingAction(row: PendingRow): PendingAction {
+  // Validated on read: kind and input are stored as separate columns.
+  return pendingActionSchema.parse({
+    ...row,
+    createdAt: row.createdAt.toISOString(),
+    resolvedAt: row.resolvedAt?.toISOString() ?? null,
+  });
+}
+
+function toPendingRow(action: PendingAction): PendingRow {
+  return {
+    id: action.id,
+    kind: action.kind,
+    input: action.input,
+    summary: action.summary,
+    status: action.status,
+    bookingId: action.bookingId,
+    error: action.error,
+    createdAt: new Date(action.createdAt),
+    resolvedAt: action.resolvedAt ? new Date(action.resolvedAt) : null,
+  };
+}
+
+function pendingActionRepository(db: Db): PendingActionRepository {
+  return {
+    async create(action) {
+      await db.insert(pendingActions).values(toPendingRow(action));
+    },
+    async get(id) {
+      const [row] = await db.select().from(pendingActions).where(eq(pendingActions.id, id));
+      return row ? toPendingAction(row) : null;
+    },
+    async update(action) {
+      const { id, ...row } = toPendingRow(action);
+      await db.update(pendingActions).set(row).where(eq(pendingActions.id, id));
+    },
+  };
+}
+
 export function createRepositories(db: Db): Repositories {
   return {
     rooms: roomRepository(db),
     bookings: bookingRepository(db),
     guests: guestRepository(db),
     audit: auditRepository(db),
+    pendingActions: pendingActionRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

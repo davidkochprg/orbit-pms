@@ -7,9 +7,11 @@ import {
   inquiryChannels,
   inquiryStatuses,
   languages,
+  pendingActionStatuses,
   roomKinds,
   roomStatuses,
   type InquiryExtraction,
+  type PendingActionInput,
   type Quote,
   type QuoteAddons,
 } from '@orbit/shared';
@@ -36,6 +38,7 @@ export const inquiryStatus = pgEnum('inquiry_status', inquiryStatuses);
 export const housekeepingTaskType = pgEnum('housekeeping_task_type', housekeepingTaskTypes);
 export const housekeepingTaskStatus = pgEnum('housekeeping_task_status', housekeepingTaskStatuses);
 export const auditActor = pgEnum('audit_actor', auditActors);
+export const pendingActionStatus = pgEnum('pending_action_status', pendingActionStatuses);
 
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
@@ -135,3 +138,16 @@ export const auditLog = pgTable(
   },
   (t) => [index('audit_log_subject_idx').on(t.subjectId, t.createdAt)],
 );
+
+/** Mutations the agent proposed, waiting for a user to confirm or reject them. */
+export const pendingActions = pgTable('pending_actions', {
+  id: text('id').primaryKey(),
+  kind: text('kind').$type<PendingActionInput['kind']>().notNull(),
+  input: jsonb('input').$type<PendingActionInput['input']>().notNull(),
+  summary: text('summary').notNull(),
+  status: pendingActionStatus('status').notNull().default('pending'),
+  bookingId: text('booking_id'),
+  error: text('error'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+});

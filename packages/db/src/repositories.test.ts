@@ -119,3 +119,52 @@ describe('repository writes (PGlite)', () => {
     expect(await repos.audit.list({ subjectId: original.id })).toEqual([]);
   });
 });
+
+describe('creating records (PGlite)', () => {
+  it('creates a guest and a booking', async () => {
+    const guest = {
+      id: 'gst_new',
+      name: 'New Guest',
+      email: null,
+      phone: null,
+      language: 'en' as const,
+      notes: null,
+    };
+    await repos.guests.createGuest(guest);
+    expect(await repos.guests.getGuest('gst_new')).toEqual(guest);
+    const booking = {
+      ...seed.bookings[0]!,
+      id: 'bk_new',
+      guestId: 'gst_new',
+      status: 'hold' as const,
+      holdExpiresAt: '2026-10-29T08:00:00.000Z',
+    };
+    await repos.bookings.createBooking(booking);
+    expect(await repos.bookings.getBooking('bk_new')).toEqual(booking);
+  });
+
+  it('round-trips pending actions', async () => {
+    const action = {
+      id: 'act_1',
+      kind: 'move_booking' as const,
+      input: { bookingId: seed.bookings[0]!.id, roomId: 'rm_201' },
+      summary: 'Move someone',
+      status: 'pending' as const,
+      bookingId: seed.bookings[0]!.id,
+      error: null,
+      createdAt: '2026-10-27T08:00:00.000Z',
+      resolvedAt: null,
+    };
+    await repos.pendingActions.create(action);
+    expect(await repos.pendingActions.get('act_1')).toEqual(action);
+    const resolved = {
+      ...action,
+      status: 'failed' as const,
+      error: 'Room taken',
+      resolvedAt: '2026-10-27T08:05:00.000Z',
+    };
+    await repos.pendingActions.update(resolved);
+    expect(await repos.pendingActions.get('act_1')).toEqual(resolved);
+    expect(await repos.pendingActions.get('nope')).toBeNull();
+  });
+});
