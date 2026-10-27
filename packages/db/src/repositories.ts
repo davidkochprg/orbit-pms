@@ -25,7 +25,7 @@ function toBooking({ createdAt: _, holdExpiresAt, ...row }: BookingRow): Booking
   return { ...row, holdExpiresAt: holdExpiresAt?.toISOString() ?? null };
 }
 
-function toAuditEntry(row: AuditRow): AuditLogEntry {
+function toAuditEntry({ seq: _, ...row }: AuditRow): AuditLogEntry {
   return { ...row, createdAt: row.createdAt.toISOString() };
 }
 
@@ -110,7 +110,7 @@ function auditRepository(db: Db): AuditRepository {
         .select()
         .from(auditLog)
         .where(subjectId ? eq(auditLog.subjectId, subjectId) : undefined)
-        .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
+        .orderBy(desc(auditLog.seq))
         .limit(limit);
       return rows.map(toAuditEntry);
     },

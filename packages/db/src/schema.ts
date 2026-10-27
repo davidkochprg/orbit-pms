@@ -17,6 +17,7 @@ import {
 } from '@orbit/shared';
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   check,
   date,
   index,
@@ -130,13 +131,15 @@ export const auditLog = pgTable(
   'audit_log',
   {
     id: text('id').primaryKey(),
+    /** Insertion order; timestamps can tie within a millisecond. */
+    seq: bigint('seq', { mode: 'number' }).generatedAlwaysAsIdentity(),
     actor: auditActor('actor').notNull(),
     action: text('action').notNull(),
     subjectId: text('subject_id'),
     payload: jsonb('payload').$type<unknown>(),
     createdAt: createdAt(),
   },
-  (t) => [index('audit_log_subject_idx').on(t.subjectId, t.createdAt)],
+  (t) => [index('audit_log_subject_idx').on(t.subjectId, t.seq)],
 );
 
 /** Mutations the agent proposed, waiting for a user to confirm or reject them. */
