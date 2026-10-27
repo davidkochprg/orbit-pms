@@ -23,10 +23,10 @@ All responses are JSON. Dates are `YYYY-MM-DD`, timestamps are ISO 8601 UTC, mon
 ### `GET /health`
 
 ```json
-{ "status": "ok", "ai": { "configured": false } }
+{ "status": "ok", "ai": { "configured": false, "voice": false } }
 ```
 
-`ai.configured` is true when `META_API_KEY` and `META_MODEL_AGENT` are set.
+`ai.configured` is true when `META_API_KEY` and `META_MODEL_AGENT` are set; `ai.voice` when `META_MODEL_VOICE` is set too.
 
 ### `GET /api/room-types`
 
@@ -100,6 +100,17 @@ Direct emails, web and phone messages, and messages relayed by OTA partners in o
 | `POST /api/inbox/:id/process` | `{ force?: boolean }`                                                    | `Inquiry` with `parsed` and `suggestion`. Already processed messages return immediately at no cost. 503 `ai_not_configured`, 429 `demo_limit`. |
 | `POST /api/inbox/:id/hold`    | `{ roomId }`                                                             | 201 `BookingDetail` of a new hold for the requested stay. 409 if the message has no complete stay request or already has a hold.               |
 | `POST /api/inbox/:id/replied` | `{ reply }`                                                              | `Inquiry` with `status: "replied"` and the reply text (sending happens outside Orbit).                                                         |
+
+## Housekeeping
+
+| Endpoint                                  | Body                                                            | Returns                                                                                                                                                                                               |
+| ----------------------------------------- | --------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/housekeeping`                   |                                                                 | `{ date, rooms: HousekeepingRoom[] }`: each room with `roomTypeName`, `occupancy` (`turnover`, `arriving`, `departing`, `staying`, `vacant`), `guestName`, `urgent`, `openTasks`. Urgent rooms first. |
+| `POST /api/rooms/:id/status`              | `{ status }`                                                    | `Room`. 409 `invalid_transition` from `out_of_order` straight to `clean` or `inspected`.                                                                                                              |
+| `POST /api/housekeeping/tasks`            | `{ roomId, type, notes }`                                       | 201 `HousekeepingTask`. 400 `invalid_input` for a maintenance task without notes.                                                                                                                     |
+| `POST /api/housekeeping/tasks/:id/status` | `{ status }`                                                    | `HousekeepingTask`                                                                                                                                                                                    |
+| `POST /api/housekeeping/notes`            | `{ text }`                                                      | `HousekeepingNoteResult`: `{ transcript, changes, skipped, unclear }`. Changes are already applied, as the agent. 503 `ai_not_configured`, 429 `demo_limit`.                                          |
+| `POST /api/housekeeping/voice`            | multipart, `audio`: WAV (mono 16-bit PCM, 16 kHz), at most 5 MB | `HousekeepingNoteResult` with the transcript. 400 if not WAV, 413 if too large, 502 `transcription_failed`, 503 when voice is not configured.                                                         |
 
 ## Agent
 

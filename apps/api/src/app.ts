@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import { createInboxPipeline, hotelProfile, type MetaProvider, type UsageStore } from '@orbit/ai';
+import {
+  createHousekeepingNotePipeline,
+  createInboxPipeline,
+  hotelProfile,
+  type MetaProvider,
+  type UsageStore,
+} from '@orbit/ai';
 import {
   createHotelService,
+  createHousekeepingService,
   createInboxService,
   createPendingActionService,
   hotelPolicy,
@@ -18,6 +25,7 @@ import { type AiLimitsConfig, createAiLimiter } from './limits';
 import { agentRoutes } from './routes/agent';
 import { bookingRoutes } from './routes/bookings';
 import { guestRoutes } from './routes/guests';
+import { housekeepingRoutes } from './routes/housekeeping';
 import { inboxRoutes } from './routes/inbox';
 import { overviewRoutes } from './routes/overview';
 import { pendingActionRoutes } from './routes/pending-actions';
@@ -71,16 +79,33 @@ export function createApp({
       canSpend: withinBudget,
       today: () => hotelToday(clock()),
     });
+  const housekeeping = createHousekeepingService({ repos, clock, newId });
+  const notes =
+    ai &&
+    createHousekeepingNotePipeline({
+      model: ai.agent,
+      modelId: ai.agentModelId,
+      transcription: ai.transcription,
+      housekeeping,
+      listRooms: () => repos.rooms.listRooms(),
+      usage,
+    });
   const app = new Hono();
   if (log) app.use(logger());
 
-  app.get('/health', (c) => c.json<Health>({ status: 'ok', ai: { configured: ai !== null } }));
+  app.get('/health', (c) =>
+    c.json<Health>({
+      status: 'ok',
+      ai: { configured: ai !== null, voice: ai?.transcription != null },
+    }),
+  );
   app.route('/api', roomRoutes(repos));
   app.route('/api', bookingRoutes(repos, hotel));
   app.route('/api', guestRoutes(repos));
   app.route('/api', overviewRoutes(repos, hotel));
   app.route('/api', pendingActionRoutes(actions));
   app.route('/api', inboxRoutes({ inbox, hotel, pipeline, gate }));
+  app.route('/api', housekeepingRoutes({ housekeeping, notes, gate }));
   app.route('/api', agentRoutes({ ai, repos, hotel, actions, limiter, gate, clock, usage }));
   app.route('/api', usageRoutes({ usage, monthlyBudgetMicroUsd, clock }));
 

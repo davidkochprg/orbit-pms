@@ -19,7 +19,11 @@ export type BookingListQuery = z.infer<typeof bookingListQuerySchema>;
 
 export const healthSchema = z.object({
   status: z.literal('ok'),
-  ai: z.object({ configured: z.boolean() }),
+  ai: z.object({
+    configured: z.boolean(),
+    /** Whether voice notes can be transcribed. */
+    voice: z.boolean(),
+  }),
 });
 export type Health = z.infer<typeof healthSchema>;
 

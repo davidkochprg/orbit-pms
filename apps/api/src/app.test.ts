@@ -64,7 +64,7 @@ describe('GET /health', () => {
   it('reports ok and whether AI is configured', async () => {
     expect(await get<Health>('/health')).toEqual({
       status: 200,
-      body: { status: 'ok', ai: { configured: false } },
+      body: { status: 'ok', ai: { configured: false, voice: false } },
     });
   });
 });
