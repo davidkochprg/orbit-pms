@@ -1,18 +1,36 @@
+import {
+  DndContext,
+  type DragEndEvent,
+  PointerSensor,
+  useDraggable,
+  useDroppable,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
 import type { Booking, BookingStatus, Room, RoomStatus } from '@orbit/shared';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, X } from 'lucide-react';
+import { useRef } from 'react';
 import { useSearchParams } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
-import { useBookings, useGuests, useRooms } from '@/lib/api';
+import {
+  useBookings,
+  useChangeBookingDates,
+  useDayOverview,
+  useGuests,
+  useRescheduleBooking,
+  useRooms,
+} from '@/lib/api';
 import { formatDate, formatRange, statusLabels } from '@/lib/format';
 import {
   addDaysIso,
   buildWindow,
-  hotelToday,
   isIsoDate,
   isWeekend,
+  moveTarget,
   placeBooking,
+  resizeTarget,
   TAPE_DAYS,
 } from '@/lib/tape-chart';
 import { cn } from '@/lib/utils';
@@ -27,6 +45,9 @@ const barClasses: Record<Exclude<BookingStatus, 'cancelled'>, string> = {
   checked_out: 'bg-muted text-muted-foreground hover:bg-muted/70',
 };
 
+/** Statuses whose bars can be dragged; the API still checks every rule. */
+const movable: BookingStatus[] = ['hold', 'confirmed', 'checked_in'];
+
 const roomStatusLabels: Record<RoomStatus, string> = {
   clean: 'Clean',
   dirty: 'Dirty',
@@ -35,8 +56,16 @@ const roomStatusLabels: Record<RoomStatus, string> = {
 };
 
 export function TapeChartPage() {
+  // Today comes from the API, so it is the hotel's date (Europe/Prague), not the browser's.
+  const day = useDayOverview();
+  const today = day.data?.date;
+  if (day.isError) return <p className="text-destructive">{day.error.message}</p>;
+  if (!today) return <Skeleton className="h-96 w-full" />;
+  return <TapeChart today={today} />;
+}
+
+function TapeChart({ today }: { today: string }) {
   const [params, setParams] = useSearchParams();
-  const today = hotelToday();
   const fromParam = params.get('from');
   const start = isIsoDate(fromParam) ? fromParam : today;
   const days = buildWindow(start);
@@ -45,7 +74,12 @@ export function TapeChartPage() {
   const rooms = useRooms();
   const guests = useGuests();
   const bookings = useBookings({ from: start, to: end });
+  const reschedule = useRescheduleBooking();
+  const changeDates = useChangeBookingDates();
   const { open } = useBookingDrawer();
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  // A drag ends with a click on the bar; this keeps that click from opening the drawer.
+  const dragged = useRef(false);
 
   const shift = (delta: number) =>
     setParams((p) => {
@@ -66,8 +100,26 @@ export function TapeChartPage() {
     list.push(booking);
     byRoom.set(booking.roomId, list);
   }
-  const occupied = (day: string) =>
-    visible.filter((b) => b.checkIn <= day && day < b.checkOut).length;
+  const occupied = (d: string) => visible.filter((b) => b.checkIn <= d && d < b.checkOut).length;
+
+  function onDragEnd({ active, delta, over }: DragEndEvent) {
+    setTimeout(() => (dragged.current = false), 0);
+    const [mode, id] = String(active.id).split(':');
+    const booking = visible.find((b) => b.id === id);
+    if (!booking) return;
+    reschedule.reset();
+    changeDates.reset();
+    if (mode === 'move') {
+      const target = moveTarget(booking, delta.x, DAY_COL, over ? String(over.id) : null);
+      if (target) reschedule.mutate({ id: booking.id, ...target });
+    } else {
+      const checkOut = resizeTarget(booking, delta.x, DAY_COL);
+      if (checkOut) changeDates.mutate({ id: booking.id, checkIn: booking.checkIn, checkOut });
+    }
+  }
+
+  const error = reschedule.error ?? changeDates.error;
+  const busy = reschedule.isPending || changeDates.isPending;
 
   return (
     <div className="flex flex-col gap-4">
@@ -92,8 +144,30 @@ export function TapeChartPage() {
           <ChevronRight />
         </Button>
         <p className="text-sm font-medium">{formatRange(start, addDaysIso(end, -1))}</p>
+        {busy && <p className="text-sm text-muted-foreground">Saving…</p>}
         <Legend />
       </div>
+      <p className="text-xs text-muted-foreground">
+        Drag a booking to another room or day. Drag its right edge to change the departure.
+      </p>
+
+      {error && (
+        <div className="flex items-center gap-2 rounded-md border border-destructive/40 px-3 py-2 text-sm text-destructive">
+          {error.message}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-auto size-6"
+            aria-label="Dismiss"
+            onClick={() => {
+              reschedule.reset();
+              changeDates.reset();
+            }}
+          >
+            <X />
+          </Button>
+        </div>
+      )}
 
       {bookings.isError || rooms.isError || guests.isError ? (
         <p className="text-destructive">
@@ -104,23 +178,31 @@ export function TapeChartPage() {
       ) : rooms.data.length === 0 ? (
         <p className="text-sm text-muted-foreground">No rooms.</p>
       ) : (
-        <div className="overflow-x-auto rounded-lg border">
-          <div style={{ width: ROOM_COL + TAPE_DAYS * DAY_COL }}>
-            <DayHeader days={days} today={today} occupied={occupied} />
-            {rooms.data.map((room) => (
-              <RoomRow
-                key={room.id}
-                room={room}
-                days={days}
-                today={today}
-                start={start}
-                bookings={byRoom.get(room.id) ?? []}
-                guestName={guestName}
-                onOpen={open}
-              />
-            ))}
+        <DndContext
+          sensors={sensors}
+          onDragStart={() => (dragged.current = true)}
+          onDragEnd={onDragEnd}
+          onDragCancel={() => (dragged.current = false)}
+        >
+          <div className="overflow-x-auto rounded-lg border">
+            <div style={{ width: ROOM_COL + TAPE_DAYS * DAY_COL }}>
+              <DayHeader days={days} today={today} occupied={occupied} />
+              {rooms.data.map((room) => (
+                <RoomRow
+                  key={room.id}
+                  room={room}
+                  days={days}
+                  today={today}
+                  start={start}
+                  bookings={byRoom.get(room.id) ?? []}
+                  guestName={guestName}
+                  onOpen={(id) => !dragged.current && open(id)}
+                  disabled={busy}
+                />
+              ))}
+            </div>
           </div>
-        </div>
+        </DndContext>
       )}
     </div>
   );
@@ -176,6 +258,7 @@ function RoomRow({
   bookings,
   guestName,
   onOpen,
+  disabled,
 }: {
   room: Room;
   days: string[];
@@ -184,7 +267,9 @@ function RoomRow({
   bookings: Booking[];
   guestName: (id: string) => string;
   onOpen: (id: string) => void;
+  disabled: boolean;
 }) {
+  const { setNodeRef, isOver } = useDroppable({ id: room.id });
   return (
     <div className="relative flex border-b last:border-b-0">
       <div
@@ -196,7 +281,11 @@ function RoomRow({
           Floor {room.floor} · {roomStatusLabels[room.status]}
         </span>
       </div>
-      <div className="relative flex" style={{ width: TAPE_DAYS * DAY_COL, height: 52 }}>
+      <div
+        ref={setNodeRef}
+        className={cn('relative flex', isOver && 'bg-primary/5')}
+        style={{ width: TAPE_DAYS * DAY_COL, height: 52 }}
+      >
         {days.map((day) => (
           <div
             key={day}
@@ -208,35 +297,97 @@ function RoomRow({
             style={{ width: DAY_COL }}
           />
         ))}
-        {bookings.map((booking) => {
-          const place = placeBooking(booking, start);
-          if (!place) return null;
-          const name = guestName(booking.guestId);
-          const label = `${name}, ${formatRange(booking.checkIn, booking.checkOut)}, ${statusLabels[booking.status]}`;
-          return (
-            <button
-              key={booking.id}
-              type="button"
-              title={label}
-              aria-label={label}
-              onClick={() => onOpen(booking.id)}
-              className={cn(
-                'absolute top-1.5 bottom-1.5 truncate rounded-md px-2 text-left text-xs font-medium',
-                booking.status !== 'cancelled' && barClasses[booking.status],
-              )}
-              style={{
-                left: place.startIndex * DAY_COL + 2,
-                width: place.span * DAY_COL - 4,
-              }}
-            >
-              {place.continuesBefore ? '‹ ' : ''}
-              {name}
-              {place.continuesAfter ? ' ›' : ''}
-            </button>
-          );
-        })}
+        {bookings.map((booking) => (
+          <BookingBar
+            key={booking.id}
+            booking={booking}
+            start={start}
+            name={guestName(booking.guestId)}
+            onOpen={onOpen}
+            disabled={disabled}
+          />
+        ))}
       </div>
     </div>
+  );
+}
+
+function BookingBar({
+  booking,
+  start,
+  name,
+  onOpen,
+  disabled,
+}: {
+  booking: Booking;
+  start: string;
+  name: string;
+  onOpen: (id: string) => void;
+  disabled: boolean;
+}) {
+  const canDrag = !disabled && movable.includes(booking.status);
+  const {
+    setNodeRef: moveRef,
+    listeners: moveListeners,
+    attributes: moveAttributes,
+    transform: moveTransform,
+    isDragging: moving,
+  } = useDraggable({ id: `move:${booking.id}`, disabled: !canDrag });
+  const {
+    setNodeRef: resizeRef,
+    listeners: resizeListeners,
+    attributes: resizeAttributes,
+    transform: resizeTransform,
+    isDragging: resizing,
+  } = useDraggable({ id: `resize:${booking.id}`, disabled: !canDrag });
+  const place = placeBooking(booking, start);
+  if (!place || booking.status === 'cancelled') return null;
+
+  const label = `${name}, ${formatRange(booking.checkIn, booking.checkOut)}, ${statusLabels[booking.status]}`;
+  const left = place.startIndex * DAY_COL + 2;
+  // While resizing, the bar follows the pointer horizontally, never narrower than one night.
+  const width = Math.max(place.span * DAY_COL - 4 + (resizeTransform?.x ?? 0), DAY_COL - 4);
+  const dragging = moving || resizing;
+
+  return (
+    <>
+      <button
+        ref={moveRef}
+        type="button"
+        title={label}
+        aria-label={label}
+        onClick={() => onOpen(booking.id)}
+        {...moveListeners}
+        {...moveAttributes}
+        className={cn(
+          'absolute top-1.5 bottom-1.5 truncate rounded-md px-2 text-left text-xs font-medium',
+          barClasses[booking.status],
+          canDrag && 'cursor-grab active:cursor-grabbing',
+          dragging && 'z-20 opacity-80 shadow-lg',
+        )}
+        style={{
+          left,
+          width,
+          transform: moveTransform
+            ? `translate3d(${moveTransform.x}px, ${moveTransform.y}px, 0)`
+            : undefined,
+        }}
+      >
+        {place.continuesBefore ? '‹ ' : ''}
+        {name}
+        {place.continuesAfter ? ' ›' : ''}
+      </button>
+      {canDrag && !place.continuesAfter && !moving && (
+        <span
+          ref={resizeRef}
+          {...resizeListeners}
+          {...resizeAttributes}
+          aria-label={`Change departure of ${name}`}
+          className="absolute top-1.5 bottom-1.5 z-10 w-2 cursor-ew-resize rounded-r-md hover:bg-foreground/20"
+          style={{ left: left + width - 8 }}
+        />
+      )}
+    </>
   );
 }
 

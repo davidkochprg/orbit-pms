@@ -10,16 +10,6 @@ export function isIsoDate(value: string | null): value is IsoDate {
   return value !== null && ISO_DATE.test(value);
 }
 
-/** The current calendar date at the hotel (`Europe/Prague`), as `YYYY-MM-DD`. */
-export function hotelToday(now = new Date()): IsoDate {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Europe/Prague',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(now);
-}
-
 export function addDaysIso(date: IsoDate, days: number): IsoDate {
   return format(addDays(parseISO(date), days), 'yyyy-MM-dd');
 }
@@ -64,4 +54,43 @@ export function placeBooking(
     continuesBefore: startOffset < 0,
     continuesAfter: endOffset > windowDays,
   };
+}
+
+/** Whole nights a horizontal drag covers, snapped to the nearest day column. */
+export function nightsFromDelta(deltaX: number, dayWidth: number): number {
+  return Math.round(deltaX / dayWidth) || 0;
+}
+
+export interface DropTarget {
+  roomId: string;
+  checkIn: IsoDate;
+  checkOut: IsoDate;
+}
+
+/** Where a dragged bar lands: the room under the pointer, shifted by whole days. Null if unchanged. */
+export function moveTarget(
+  booking: Pick<Booking, 'roomId' | 'checkIn' | 'checkOut'>,
+  deltaX: number,
+  dayWidth: number,
+  overRoomId: string | null,
+): DropTarget | null {
+  const shift = nightsFromDelta(deltaX, dayWidth);
+  const roomId = overRoomId ?? booking.roomId;
+  if (shift === 0 && roomId === booking.roomId) return null;
+  return {
+    roomId,
+    checkIn: addDaysIso(booking.checkIn, shift),
+    checkOut: addDaysIso(booking.checkOut, shift),
+  };
+}
+
+/** New check-out after dragging a bar's right edge, keeping at least one night. Null if unchanged. */
+export function resizeTarget(
+  booking: Pick<Booking, 'checkIn' | 'checkOut'>,
+  deltaX: number,
+  dayWidth: number,
+): IsoDate | null {
+  const nights = differenceInCalendarDays(parseISO(booking.checkOut), parseISO(booking.checkIn));
+  const change = Math.max(nightsFromDelta(deltaX, dayWidth), 1 - nights);
+  return change === 0 ? null : addDaysIso(booking.checkOut, change);
 }

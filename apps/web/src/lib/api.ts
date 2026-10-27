@@ -215,3 +215,30 @@ export function useMarkReplied(id: string) {
     apiPost(`/api/inbox/${encodeURIComponent(id)}/replied`, { reply }, inquirySchema),
   );
 }
+
+/** Tape chart drag: new room and/or dates in one step. */
+export function useRescheduleBooking() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: string;
+      roomId: string;
+      checkIn: string;
+      checkOut: string;
+    }) => apiPost(`/api/bookings/${encodeURIComponent(id)}/reschedule`, body, bookingDetailSchema),
+    onSettled: () => queryClient.invalidateQueries(),
+  });
+}
+
+/** Tape chart edge drag: new departure date. */
+export function useChangeBookingDates() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: string; checkIn: string; checkOut: string }) =>
+      apiPost(`/api/bookings/${encodeURIComponent(id)}/dates`, body, bookingDetailSchema),
+    onSettled: () => queryClient.invalidateQueries(),
+  });
+}

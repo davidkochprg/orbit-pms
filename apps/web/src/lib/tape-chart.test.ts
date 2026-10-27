@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { addDaysIso, buildWindow, isIsoDate, placeBooking } from './tape-chart';
+import {
+  addDaysIso,
+  buildWindow,
+  isIsoDate,
+  moveTarget,
+  nightsFromDelta,
+  placeBooking,
+  resizeTarget,
+} from './tape-chart';
 
 const start = '2026-10-27'; // Tuesday
 
@@ -58,5 +66,40 @@ describe('placeBooking', () => {
       continuesBefore: false,
       continuesAfter: false,
     });
+  });
+});
+
+describe('drag targets', () => {
+  const b = { roomId: 'rm_101', checkIn: '2026-10-29', checkOut: '2026-11-01' };
+
+  it('snaps a drag to whole days', () => {
+    expect(nightsFromDelta(100, 72)).toBe(1);
+    expect(nightsFromDelta(30, 72)).toBe(0);
+    expect(nightsFromDelta(-110, 72)).toBe(-2);
+  });
+
+  it('moves a bar to another room and shifts its dates', () => {
+    expect(moveTarget(b, 144, 72, 'rm_201')).toEqual({
+      roomId: 'rm_201',
+      checkIn: '2026-10-31',
+      checkOut: '2026-11-03',
+    });
+    expect(moveTarget(b, 0, 72, 'rm_201')).toEqual({
+      roomId: 'rm_201',
+      checkIn: b.checkIn,
+      checkOut: b.checkOut,
+    });
+  });
+
+  it('treats a drop in place, or off the grid without moving, as no change', () => {
+    expect(moveTarget(b, 20, 72, 'rm_101')).toBeNull();
+    expect(moveTarget(b, 10, 72, null)).toBeNull();
+  });
+
+  it('extends and shortens by the right edge, never below one night', () => {
+    expect(resizeTarget(b, 72, 72)).toBe('2026-11-02');
+    expect(resizeTarget(b, -72, 72)).toBe('2026-10-31');
+    expect(resizeTarget(b, -1000, 72)).toBe('2026-10-30');
+    expect(resizeTarget(b, 10, 72)).toBeNull();
   });
 });
