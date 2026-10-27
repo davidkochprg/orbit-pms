@@ -8,8 +8,8 @@ import {
 } from '@orbit/shared';
 import { generateText, type LanguageModel, Output } from 'ai';
 import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from './cost';
-import type { HotelProfile } from './hotel';
-import { checkDraftPrices } from './price-guard';
+import { amountsInText, checkDraftPrices } from './price-guard';
+import { type HotelContext, hotelFacts } from './prompts/hotel';
 import { reasoningEffort, type ReasoningEffort } from './reasoning';
 import {
   draftPrompt,
@@ -24,7 +24,8 @@ export interface InboxPipelineDeps {
   modelId: string;
   hotel: HotelService;
   inbox: InboxService;
-  profile: HotelProfile;
+  /** Read for every draft, so edits in Settings apply to the next reply. */
+  hotelContext: () => Promise<HotelContext>;
   usage: UsageStore;
   /** False once the monthly AI budget is spent. */
   canSpend: () => Promise<boolean>;
@@ -53,12 +54,12 @@ export async function extractMessage(
 
 export async function draftReply(
   model: LanguageModel,
-  profile: HotelProfile,
+  hotel: HotelContext,
   params: Parameters<typeof draftPrompt>[0],
 ) {
   const result = await generateText({
     model,
-    system: draftSystemPrompt(profile),
+    system: draftSystemPrompt(hotel),
     prompt: draftPrompt(params),
     temperature: 0.3,
     reasoning: reasoningEffort.draft,
@@ -72,7 +73,7 @@ export async function draftReply(
  * prices don't match the quotes). Results are stored, so each message is processed once.
  */
 export function createInboxPipeline(deps: InboxPipelineDeps) {
-  const { model, modelId, hotel, inbox, profile, usage, canSpend, today } = deps;
+  const { model, modelId, hotel, inbox, hotelContext, usage, canSpend, today } = deps;
 
   async function record(feature: AiFeature, tokens: TokenUsage) {
     await usage.record({
@@ -90,9 +91,12 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
     options: StayOption[],
     note: string | null,
   ): Promise<{ draft: string | null; note: string | null }> {
+    const context = await hotelContext();
+    // Fees the profile states may be repeated; every other amount must come from a quote.
+    const stated = amountsInText(hotelFacts(context));
     let feedback: string | undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
-      const { draft, tokens } = await draftReply(model, profile, {
+      const { draft, tokens } = await draftReply(model, context, {
         inquiry,
         analysis,
         options,
@@ -100,7 +104,7 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
         ...(feedback && { feedback }),
       });
       await record('inbox_draft', tokens);
-      const check = checkDraftPrices(draft, options);
+      const check = checkDraftPrices(draft, options, stated);
       if (check.ok) return { draft, note };
       feedback = [
         check.unexpected.length

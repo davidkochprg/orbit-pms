@@ -1,7 +1,7 @@
 import {
   buildSystemPrompt,
   createAgentTools,
-  hotelProfile,
+  type HotelContext,
   type MetaProvider,
   runAgent,
   tokenCostMicroUsd,
@@ -33,6 +33,8 @@ export interface AgentRouteDeps {
   repos: Repositories;
   hotel: HotelService;
   actions: PendingActionService;
+  /** Read for every turn, so edits in Settings apply to the next message. */
+  hotelContext: () => Promise<HotelContext>;
   limiter: AiLimiter;
   gate: AiGate;
   clock: () => Date;
@@ -48,6 +50,7 @@ export function agentRoutes({
   repos,
   hotel,
   actions,
+  hotelContext,
   limiter,
   clock,
   usage,
@@ -78,7 +81,7 @@ export function agentRoutes({
     const result = runAgent({
       model: ai.agent,
       system: buildSystemPrompt({
-        hotel: hotelProfile,
+        hotel: await hotelContext(),
         today: hotelToday(clock()),
         timezone: HOTEL_TIMEZONE,
       }),

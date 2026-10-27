@@ -150,6 +150,20 @@ describe('POST /api/agent', () => {
     expect((await post(app, `/api/pending-actions/${actionId}/confirm`)).status).toBe(409);
   });
 
+  it('tells the agent about the hotel as saved in Settings', async () => {
+    await repos.settings.saveProfile({
+      ...seed.hotelProfile,
+      entries: [
+        { id: 'pool', category: 'amenity', title: 'Pool', details: 'Indoor pool, 08:00 to 20:00.' },
+      ],
+    });
+    const model = scriptedModel([{ text: 'The pool is open from 08:00 to 20:00.' }]);
+    await (await post(appWith(model), '/api/agent', { messages: [userMessage('Pool?')] })).text();
+    const system = JSON.stringify(model.doStreamCalls[0]?.prompt[0]);
+    expect(system).toContain('Pool: Indoor pool, 08:00 to 20:00.');
+    expect(system).toContain(seed.hotelProfile.name);
+  });
+
   it('rejects a proposal without changing anything', async () => {
     const app = appWith(
       scriptedModel([

@@ -74,4 +74,8 @@ describe('checkDraftPrices', () => {
       missing: [],
     });
   });
+
+  it('accepts amounts the hotel profile states', () => {
+    expect(checkDraftPrices('Parking costs 200 CZK per night.', [], [200]).ok).toBe(true);
+  });
 });

@@ -1,5 +1,5 @@
 import type { Inquiry, InquiryExtraction, Language, StayOption } from '@orbit/shared';
-import type { HotelProfile } from '../hotel';
+import { type HotelContext, hotelFacts } from './hotel';
 
 const languageNames: Record<Language, string> = {
   cs: 'Czech',
@@ -35,19 +35,19 @@ ${inquiry.rawText}
 """`;
 }
 
-export function draftSystemPrompt(hotel: HotelProfile): string {
-  return `You write replies to guests for the reception of ${hotel.name} (${hotel.location}). Warm, short, professional.
+export function draftSystemPrompt(hotel: HotelContext): string {
+  const { name } = hotel.profile;
+  return `You write replies to guests for the reception of ${name}. Warm, short, professional.
 
-Facts you may use:
-- Check-in from ${hotel.checkInFrom}, check-out by ${hotel.checkOutBy}.
-${hotel.policies.map((p) => `- ${p}`).join('\n')}
+Facts you may use (from Settings):
+${hotelFacts(hotel)}
 
 Rules:
-- Write only in the language you are told to use, and translate every word you take from the options, such as room types and "total".
+- Write only in the language you are told to use, and translate every word you take from the options or the facts, such as room types and "total".
 - Prices: state each offered room type with its total exactly as written in the options, e.g. "12 500 CZK". Never calculate, round, convert or invent any amount.
 - Do not confirm a booking. Offer to hold the room for the guest and ask them to reply to confirm.
 - If something is not covered by the facts above, say you will check and get back to them. Never invent facilities or prices.
-- Output only the message body, without a subject line. Sign off as the reception of ${hotel.name}, in the guest's language.`;
+- Output only the message body, without a subject line. Sign off as the reception of ${name}, in the guest's language.`;
 }
 
 export function draftPrompt(params: {

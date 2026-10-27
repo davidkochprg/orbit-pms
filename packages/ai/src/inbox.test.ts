@@ -1,6 +1,7 @@
 import {
   createHotelService,
   createInboxService,
+  emptyHotelProfile,
   hotelPolicy,
   type PricingConfig,
 } from '@orbit/domain';
@@ -8,7 +9,6 @@ import { createMemoryRepositories } from '@orbit/domain/testing';
 import type { InquiryExtraction } from '@orbit/shared';
 import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
-import { hotelProfile } from './hotel';
 import { createInboxPipeline } from './inbox';
 import type { UsageRecord } from './usage';
 
@@ -91,7 +91,7 @@ function setup(replies: string[], { budgetLeft = true } = {}) {
     modelId: 'muse-spark-1.3',
     hotel,
     inbox,
-    profile: hotelProfile,
+    hotelContext: () => Promise.resolve({ profile: emptyHotelProfile, policy: hotelPolicy }),
     usage: {
       record: (r) => {
         records.push(r);

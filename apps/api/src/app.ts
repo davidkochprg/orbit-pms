@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import {
   createHousekeepingNotePipeline,
   createInboxPipeline,
-  hotelProfile,
+  type HotelContext,
   type MetaProvider,
   type UsageStore,
 } from '@orbit/ai';
@@ -11,6 +11,7 @@ import {
   createHousekeepingService,
   createInboxService,
   createPendingActionService,
+  createSettingsService,
   hotelPolicy,
   hotelToday,
   pricingConfig,
@@ -63,6 +64,11 @@ export function createApp({
     newId,
   });
   const actions = createPendingActionService({ repos, hotel, clock, newId });
+  const settings = createSettingsService({ repos });
+  const hotelContext = async (): Promise<HotelContext> => ({
+    profile: await settings.getProfile(),
+    policy: hotelPolicy,
+  });
   const inbox = createInboxService({ repos, hotel, clock, newId });
   const limiter = createAiLimiter(limits, clock);
   const monthlyBudgetMicroUsd = Math.round(monthlyBudgetUsd * 1_000_000);
@@ -74,7 +80,7 @@ export function createApp({
       modelId: ai.agentModelId,
       hotel,
       inbox,
-      profile: hotelProfile,
+      hotelContext,
       usage,
       canSpend: withinBudget,
       today: () => hotelToday(clock()),
@@ -106,7 +112,10 @@ export function createApp({
   app.route('/api', pendingActionRoutes(actions));
   app.route('/api', inboxRoutes({ inbox, hotel, pipeline, gate }));
   app.route('/api', housekeepingRoutes({ housekeeping, notes, gate }));
-  app.route('/api', agentRoutes({ ai, repos, hotel, actions, limiter, gate, clock, usage }));
+  app.route(
+    '/api',
+    agentRoutes({ ai, repos, hotel, actions, hotelContext, limiter, gate, clock, usage }),
+  );
   app.route('/api', usageRoutes({ usage, monthlyBudgetMicroUsd, clock }));
 
   app.notFound((c) => c.json(errorBody('not_found', 'Route not found'), 404));

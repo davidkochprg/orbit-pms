@@ -31,16 +31,22 @@ export interface PriceCheck {
 
 /**
  * The model drafts the wording; prices come only from `quote()`. A draft passes if every amount
- * it states is a quoted total or line amount, and every option's total appears.
+ * it states is a quoted total or line amount (or in `alsoAllowed`, e.g. a fee the hotel profile
+ * states), and every option's total appears.
  */
-export function checkDraftPrices(draft: string, options: StayOption[]): PriceCheck {
-  const allowed = new Set(
-    options.flatMap((o) => [
+export function checkDraftPrices(
+  draft: string,
+  options: StayOption[],
+  alsoAllowed: number[] = [],
+): PriceCheck {
+  const allowed = new Set([
+    ...alsoAllowed,
+    ...options.flatMap((o) => [
       o.quote.total,
       ...o.quote.lines.map((l) => Math.abs(l.amount)),
       ...o.quote.lines.map((l) => Math.abs(l.unitPrice)),
     ]),
-  );
+  ]);
   const found = amountsInText(draft);
   const unexpected = [...new Set(found.filter((a) => !allowed.has(a)))];
   const missing = options.map((o) => o.quote.total).filter((t) => !found.includes(t));

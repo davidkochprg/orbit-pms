@@ -79,7 +79,7 @@ flowchart LR
 1. **Extract**: `generateText` with `Output.object(inquiryExtractionSchema)` (Meta `response_format: json_schema`, `strictJsonSchema: false` because strict mode only adds a server check that may reject keywords zod emits). Classifies the message (`booking_request`, `question`, `other`), its language, stay, party and wishes.
 2. **Options** (no model): for a complete booking request, `hotel.inboxOptions` finds free rooms (an apartment if asked for, or if a dog comes, per `hotelPolicy.dogsAllowedIn`) and quotes up to three, one per room type, with wished add-ons.
 3. **Draft**: the model writes a reply in the guest's language, given the exact totals as text (e.g. `12 500 CZK`).
-4. **Price guard** (`price-guard.ts`): every money amount in the draft must be one of the quoted totals, line amounts or unit prices, and every option's total must appear. Czech, German, Polish and English number formats are recognised. A failing draft is regenerated once; if it fails again, no draft is shown, so a wrong price never reaches a guest.
+4. **Price guard** (`price-guard.ts`): every money amount in the draft must be one of the quoted totals, line amounts or unit prices, or an amount the hotel profile states, and every option's total must appear. Czech, German, Polish and English number formats are recognised. A failing draft is regenerated once; if it fails again, no draft is shown, so a wrong price never reaches a guest.
 
 The pipeline checks the monthly budget before calling the model and records `inbox_extract` and `inbox_draft` usage separately. Errors are stored on the message (`processingError`) and the next open retries.
 
@@ -95,7 +95,9 @@ Usage is recorded under the `voice` feature: audio seconds for the transcription
 
 ## Prompts
 
-`packages/ai/src/prompts/system.ts` builds the system prompt from a `HotelProfile` (`packages/ai/src/hotel.ts`: name, location, check-in and check-out times, policies), today's date and the hotel timezone. The prompt tells the model to use tools for every fact, never to compute prices or availability, and that changes are proposals.
+Hotel facts come from the **hotel profile** staff edit in Settings ([domain.md](domain.md#hotel-profile)), read for every agent turn and every draft, so a change applies to the next message. `hotelFacts` (`packages/ai/src/prompts/hotel.ts`) turns it into one block: name, location, description, contact, check-in and check-out times, then the policies, amenities and guest information, then the rules the domain enforces, written out from `hotelPolicy` (hold length, where dogs may stay) so the model never contradicts them.
+
+`packages/ai/src/prompts/system.ts` builds the agent's system prompt from that block, today's date and the hotel timezone. The prompt tells the model to use tools for every fact, never to compute prices or availability, that changes are proposals, and to answer questions about the hotel only from the profile, saying so when Settings does not cover something. `draftSystemPrompt` (`prompts/inbox.ts`) gives reply drafts the same block. The block has no dates, so it is identical between calls and Meta's prefix cache applies.
 
 ## Evals
 
