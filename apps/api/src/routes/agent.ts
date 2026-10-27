@@ -13,6 +13,7 @@ import {
   hotelToday,
   type HotelService,
   type PendingActionService,
+  type ReportService,
   type Repositories,
 } from '@orbit/domain';
 import { agentRequestSchema } from '@orbit/shared';
@@ -34,6 +35,7 @@ export interface AgentRouteDeps {
   repos: Repositories;
   hotel: HotelService;
   billing: BillingService;
+  reports: ReportService;
   actions: PendingActionService;
   /** Read for every turn, so edits in Settings apply to the next message. */
   hotelContext: () => Promise<HotelContext>;
@@ -52,6 +54,7 @@ export function agentRoutes({
   repos,
   hotel,
   billing,
+  reports,
   actions,
   hotelContext,
   limiter,
@@ -62,6 +65,7 @@ export function agentRoutes({
   const tools = createAgentTools({
     hotel,
     billing,
+    reports,
     actions,
     listRooms: () => repos.rooms.listRooms(),
   });

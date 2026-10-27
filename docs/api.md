@@ -120,6 +120,10 @@ Takes `{ kind?: 'payment' | 'refund', method: 'cash' | 'card' | 'bank_transfer',
 
 `DailyBrief` for `date` (default: today): `occupancy` (`occupied`, `sellable`, `total` rooms tonight), `guestsTonight`, `arrivals` and `departures` counts, `turnovers`, `roomsToPrepare`, `holds` (`{ summary, expired }`), `outOfOrder`, `maintenance`, `unansweredMessages` and `gaps` (`{ roomId, roomName, from, to, nights }`). See [domain.md](domain.md#daily-brief).
 
+### `GET /api/reports?from=&to=`
+
+A `Report` for the nights `[from, to)` (at most 366): `occupancy`, `adr`, `revpar`, `roomRevenue`, `addonRevenue`, `extrasRevenue`, `cityTax`, room nights, guest nights, `arrivals`, `averageStay`, `cancellations`, `bySource`, `byRoomType`, `payments` by method, `unpaidDepartures` and a daily series `days`. A reversed or missing period is `400`. See [domain.md](domain.md#reports).
+
 ### `GET /api/audit-log?subjectId=&limit=`
 
 `AuditLogEntry[]`, newest first: `id`, `actor` (`user` | `agent`), `action` (e.g. `booking.check_in`), `subjectId`, `payload`, `createdAt`. `limit` defaults to 50, max 200.

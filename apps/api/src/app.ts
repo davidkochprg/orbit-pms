@@ -14,6 +14,7 @@ import {
   createInboxService,
   createPendingActionService,
   createRatesService,
+  createReportService,
   createSettingsService,
   createStaffService,
   hotelPolicy,
@@ -35,6 +36,7 @@ import { housekeepingRoutes } from './routes/housekeeping';
 import { inboxRoutes } from './routes/inbox';
 import { overviewRoutes } from './routes/overview';
 import { pendingActionRoutes } from './routes/pending-actions';
+import { reportRoutes } from './routes/reports';
 import { roomRoutes } from './routes/rooms';
 import { settingsRoutes } from './routes/settings';
 import { type UsageReport, usageRoutes } from './routes/usage';
@@ -70,6 +72,7 @@ export function createApp({
     newId,
   });
   const billing = createBillingService({ repos, pricing: pricingConfig, clock, newId });
+  const reports = createReportService({ repos, pricing: pricingConfig });
   const actions = createPendingActionService({ repos, hotel, billing, clock, newId });
   const settings = createSettingsService({ repos });
   const staff = createStaffService({ repos, newId });
@@ -117,6 +120,7 @@ export function createApp({
   app.route('/api', roomRoutes(repos));
   app.route('/api', bookingRoutes(repos, hotel));
   app.route('/api', billingRoutes(billing));
+  app.route('/api', reportRoutes(reports));
   app.route('/api', guestRoutes(repos, createGuestService({ repos, newId })));
   app.route('/api', overviewRoutes(repos, hotel));
   app.route('/api', pendingActionRoutes(actions));
@@ -129,6 +133,7 @@ export function createApp({
       repos,
       hotel,
       billing,
+      reports,
       actions,
       hotelContext,
       limiter,

@@ -1,6 +1,6 @@
 import { buildFolio, pricingConfig } from '@orbit/domain';
 import { applySeed, buildSeed, createDb, createRepositories, createUsageStore } from '@orbit/db';
-import type { ApiError, AuditLogEntry, Folio } from '@orbit/shared';
+import type { ApiError, AuditLogEntry, Folio, Report } from '@orbit/shared';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 
@@ -100,5 +100,25 @@ describe('folio', () => {
 
   it('answers 404 for an unknown booking', async () => {
     expect((await call('GET', '/api/bookings/nope/folio')).status).toBe(404);
+  });
+});
+
+describe('reports', () => {
+  it('reports the last two weeks with consistent totals', async () => {
+    const { status, body } = await call<Report>(
+      'GET',
+      '/api/reports?from=2026-10-13&to=2026-10-27',
+    );
+    expect(status).toBe(200);
+    expect(body).toMatchObject({ nights: 14, rooms: 50, roomNightsAvailable: 700 });
+    expect(body.occupancy).toBeGreaterThan(0.3);
+    expect(body.days).toHaveLength(14);
+    expect(body.days.reduce((sum, d) => sum + d.roomRevenue, 0)).toBe(body.roomRevenue);
+    expect(body.payments.reduce((sum, p) => sum + p.amount, 0)).toBeGreaterThan(0);
+  });
+
+  it('answers 400 for a bad or reversed period', async () => {
+    expect((await call('GET', '/api/reports?from=2026-10-27')).status).toBe(400);
+    expect((await call('GET', '/api/reports?from=2026-10-27&to=2026-10-01')).status).toBe(400);
   });
 });
