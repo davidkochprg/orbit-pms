@@ -1,6 +1,7 @@
 import {
   BedDouble,
   ChartColumn,
+  History,
   CalendarRange,
   Inbox,
   type LucideIcon,
@@ -22,6 +23,7 @@ export const navItems: NavItem[] = [
   { label: 'Housekeeping', path: '/housekeeping', icon: BedDouble },
   { label: 'Guests', path: '/guests', icon: Users },
   { label: 'Reports', path: '/reports', icon: ChartColumn },
+  { label: 'Activity', path: '/activity', icon: History },
   { label: 'Settings', path: '/settings', icon: Settings },
 ];
 

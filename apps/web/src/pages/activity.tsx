@@ -1,0 +1,157 @@
+import type { ActivityItem, AuditActor } from '@orbit/shared';
+import { History, Sparkles, UserRound } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router';
+import { EmptyState } from '@/components/empty-state';
+import { ErrorNotice } from '@/components/error-notice';
+import { PageBody, PageHeader } from '@/components/page-header';
+import { Section } from '@/components/section';
+import { Segmented } from '@/components/segmented';
+import { Skeleton } from '@/components/ui/skeleton';
+import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { activityDetail, activityLabel } from '@/lib/activity';
+import { useActivity } from '@/lib/api';
+import { formatLongDate } from '@/lib/format';
+
+type Filter = 'all' | AuditActor;
+
+const filters: { value: Filter; label: string }[] = [
+  { value: 'all', label: 'Everything' },
+  { value: 'user', label: 'Staff' },
+  { value: 'agent', label: 'Orbit' },
+];
+
+const time = new Intl.DateTimeFormat('en-GB', {
+  hour: '2-digit',
+  minute: '2-digit',
+  timeZone: 'Europe/Prague',
+});
+const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague' });
+
+/** Every change by staff or the agent, newest first, grouped by hotel day. */
+export function ActivityPage() {
+  const [params, setParams] = useSearchParams();
+  const raw = params.get('actor');
+  const filter: Filter = raw === 'user' || raw === 'agent' ? raw : 'all';
+  const activity = useActivity(filter === 'all' ? undefined : filter);
+
+  const groups = new Map<string, ActivityItem[]>();
+  for (const item of activity.data ?? []) {
+    const date = day.format(new Date(item.createdAt));
+    groups.set(date, [...(groups.get(date) ?? []), item]);
+  }
+
+  return (
+    <>
+      <PageHeader title="Activity" meta="The latest 100 changes" />
+      <PageBody>
+        <div className="mx-auto flex max-w-3xl flex-col gap-8">
+          <Segmented
+            label="Who"
+            value={filter}
+            options={filters}
+            onChange={(f) => setParams(f === 'all' ? {} : { actor: f }, { replace: true })}
+            className="self-start"
+          />
+          {activity.isError ? (
+            <ErrorNotice message={activity.error.message} />
+          ) : !activity.data ? (
+            <Skeleton className="h-96" />
+          ) : activity.data.length === 0 ? (
+            <EmptyState
+              icon={History}
+              title="Nothing yet"
+              description="Changes by staff and by Orbit show up here, with who made them."
+            />
+          ) : (
+            [...groups].map(([date, items]) => (
+              <Section key={date} title={formatLongDate(date)} count={items.length}>
+                <ol className="-mx-2 flex flex-col">
+                  {items.map((item) => (
+                    <ActivityRow key={item.id} item={item} />
+                  ))}
+                </ol>
+              </Section>
+            ))
+          )}
+        </div>
+      </PageBody>
+    </>
+  );
+}
+
+function ActivityRow({ item }: { item: ActivityItem }) {
+  const byAgent = item.actor === 'agent';
+  const detail = activityDetail(item.action, item.payload);
+  return (
+    <li className="flex items-start gap-3 rounded-lg px-2 py-2">
+      <span
+        className={
+          byAgent
+            ? 'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-text'
+            : 'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground'
+        }
+        aria-hidden
+      >
+        {byAgent ? <Sparkles className="size-3.5" /> : <UserRound className="size-3.5" />}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex flex-wrap items-baseline gap-x-1.5">
+          <span className="font-medium">{activityLabel(item.action)}</span>
+          {item.subject && <Subject subject={item.subject} />}
+        </span>
+        <span className="truncate text-xs text-muted-foreground">
+          {[byAgent ? 'by Orbit' : (item.byName ?? 'Staff'), detail].filter(Boolean).join(' · ')}
+        </span>
+      </div>
+      <time
+        dateTime={item.createdAt}
+        className="shrink-0 pt-0.5 text-xs text-muted-foreground tabular-nums"
+      >
+        {time.format(new Date(item.createdAt))}
+      </time>
+    </li>
+  );
+}
+
+const linkClass =
+  'truncate text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring';
+
+function Subject({ subject }: { subject: NonNullable<ActivityItem['subject']> }) {
+  const { open } = useBookingDrawer();
+  switch (subject.kind) {
+    case 'booking':
+      return (
+        <button type="button" onClick={() => open(subject.id)} className={linkClass}>
+          {subject.label}
+        </button>
+      );
+    case 'guest':
+      return (
+        <Link to={`/guests/${subject.id}`} className={linkClass}>
+          {subject.label}
+        </Link>
+      );
+    case 'inquiry':
+      return (
+        <Link to={`/inbox/${subject.id}`} className={linkClass}>
+          {subject.label}
+        </Link>
+      );
+    case 'room':
+      return (
+        <Link to="/housekeeping" className={linkClass}>
+          {subject.label}
+        </Link>
+      );
+    case 'room_type':
+    case 'staff':
+      return (
+        <Link
+          to={subject.kind === 'staff' ? '/settings/team' : '/settings/rooms'}
+          className={linkClass}
+        >
+          {subject.label}
+        </Link>
+      );
+  }
+}

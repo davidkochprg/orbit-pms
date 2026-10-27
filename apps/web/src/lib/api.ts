@@ -1,4 +1,6 @@
 import {
+  activityItemSchema,
+  type AuditActor,
   apiErrorSchema,
   auditLogListSchema,
   bookingDetailSchema,
@@ -183,6 +185,14 @@ export function useBookingDetail(id: string | null) {
     queryKey: ['booking', id],
     queryFn: () => apiGet(`/api/bookings/${encodeURIComponent(id ?? '')}`, bookingDetailSchema),
     enabled: id !== null,
+  });
+}
+
+/** The hotel-wide activity feed, optionally only staff or only the agent. */
+export function useActivity(actor: AuditActor | undefined) {
+  return useQuery({
+    queryKey: ['activity', actor ?? 'all'],
+    queryFn: () => apiGet(`/api/activity${toSearch({ actor })}`, z.array(activityItemSchema)),
   });
 }
 

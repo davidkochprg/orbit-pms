@@ -4,6 +4,7 @@ import { AppError, PageError } from '@/components/route-error';
 import { DashboardPage } from '@/pages/dashboard';
 import { GuestDetailPage } from '@/pages/guest-detail';
 import { ReportsPage } from '@/pages/reports';
+import { ActivityPage } from '@/pages/activity';
 import { GuestsPage } from '@/pages/guests';
 import { InboxPage } from '@/pages/inbox';
 import { HousekeepingPage } from '@/pages/housekeeping';
@@ -30,6 +31,7 @@ export const router = createBrowserRouter([
           { path: 'guests', element: <GuestsPage /> },
           { path: 'guests/:id', element: <GuestDetailPage /> },
           { path: 'reports', element: <ReportsPage /> },
+          { path: 'activity', element: <ActivityPage /> },
           { path: 'settings/:section?', element: <SettingsPage /> },
           { path: '*', element: <NotFoundPage /> },
         ],

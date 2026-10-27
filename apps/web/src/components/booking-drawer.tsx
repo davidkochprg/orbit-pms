@@ -31,6 +31,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
+import { activityLabel } from '@/lib/activity';
 import { useAuditLog, useBookingAction, useBookingDetail, useFolio } from '@/lib/api';
 import {
   actionLabels,
@@ -325,25 +326,6 @@ function CheckOutDialog({
   );
 }
 
-const auditActionLabels: Record<string, string> = {
-  'booking.create_hold': 'Created a hold',
-  'booking.confirm': 'Confirmed',
-  'booking.check_in': 'Checked in',
-  'booking.check_out': 'Checked out',
-  'booking.cancel': 'Cancelled',
-  'booking.move': 'Moved to another room',
-  'booking.change_dates': 'Changed dates',
-  'booking.reschedule': 'Rescheduled',
-  'booking.create': 'Created',
-  'booking.update': 'Edited',
-  'booking.register': 'Registered in the guest book',
-  'booking.update_registration': 'Corrected the registration',
-  'folio.charge': 'Added a charge',
-  'folio.remove_charge': 'Removed a charge',
-  'folio.payment': 'Took a payment',
-  'folio.refund': 'Refunded',
-};
-
 function Activity({ bookingId }: { bookingId: string }) {
   const log = useAuditLog(bookingId);
   if (!log.data?.length) return null;
@@ -365,7 +347,7 @@ function ActivityItem({ entry }: { entry: AuditLogEntry }) {
       <span className="absolute top-1.5 left-0 size-[7px] rounded-full border border-border-strong bg-background" />
       <div className="flex min-w-0 flex-1 items-baseline justify-between gap-3">
         <span className="flex items-center gap-1.5">
-          {auditActionLabels[entry.action] ?? entry.action}
+          {activityLabel(entry.action)}
           {byAgent && (
             <span className="inline-flex items-center gap-1 text-xs text-primary-text">
               <Sparkles className="size-3" /> by Orbit
