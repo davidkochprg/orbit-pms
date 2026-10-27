@@ -3,11 +3,15 @@ import { createDb } from './client';
 import { aiUsage } from './schema';
 import { createUsageStore } from './usage';
 
+// PGlite migrates and seeds in setup hooks; with every test file running in parallel that can
+// take longer than Vitest's 10 s default.
+const DB_SETUP_TIMEOUT = 60_000;
+
 const handle = createDb('memory://');
 const store = createUsageStore(handle.db);
 const tokens = { input: 1000, cachedInput: 400, output: 100 };
 
-beforeAll(() => handle.migrate());
+beforeAll(() => handle.migrate(), DB_SETUP_TIMEOUT);
 afterAll(() => handle.close());
 
 describe('usage store (PGlite)', () => {

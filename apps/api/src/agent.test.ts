@@ -13,6 +13,10 @@ import { MockLanguageModelV4 } from 'ai/test';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 
+// PGlite migrates and seeds in setup hooks; with every test file running in parallel that can
+// take longer than Vitest's 10 s default.
+const DB_SETUP_TIMEOUT = 60_000;
+
 const today = '2026-10-27';
 const now = new Date('2026-10-27T08:00:00Z');
 const handle = createDb('memory://');
@@ -89,11 +93,11 @@ async function post(app: ReturnType<typeof createApp>, path: string, body?: unkn
   });
 }
 
-beforeAll(() => handle.migrate());
+beforeAll(() => handle.migrate(), DB_SETUP_TIMEOUT);
 beforeEach(async () => {
   await applySeed(handle.db, seed);
   await handle.db.delete(schema.aiUsage);
-});
+}, DB_SETUP_TIMEOUT);
 afterAll(() => handle.close());
 
 const arrival = seed.bookings.find((b) => b.checkIn === today && b.status === 'confirmed')!;

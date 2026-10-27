@@ -20,6 +20,10 @@ import type {
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 
+// PGlite migrates and seeds in setup hooks; with every test file running in parallel that can
+// take longer than Vitest's 10 s default.
+const DB_SETUP_TIMEOUT = 60_000;
+
 const today = '2026-10-27';
 const now = new Date('2026-10-27T08:00:00Z');
 const handle = createDb('memory://');
@@ -31,8 +35,8 @@ const app = createApp({
   clock: () => now,
 });
 
-beforeAll(() => handle.migrate());
-beforeEach(() => applySeed(handle.db, seed));
+beforeAll(() => handle.migrate(), DB_SETUP_TIMEOUT);
+beforeEach(() => applySeed(handle.db, seed), DB_SETUP_TIMEOUT);
 afterAll(() => handle.close());
 
 async function call<T>(

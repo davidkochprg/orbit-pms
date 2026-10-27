@@ -4,6 +4,10 @@ import { createDb } from './client';
 import { createRepositories } from './repositories';
 import { applySeed, buildSeed } from './seed';
 
+// PGlite migrates and seeds in setup hooks; with every test file running in parallel that can
+// take longer than Vitest's 10 s default.
+const DB_SETUP_TIMEOUT = 60_000;
+
 const handle = createDb('memory://');
 const repos = createRepositories(handle.db);
 const seed = buildSeed('2026-10-27', new Date('2026-10-27T08:00:00Z'), pricingConfig);
@@ -11,7 +15,7 @@ const seed = buildSeed('2026-10-27', new Date('2026-10-27T08:00:00Z'), pricingCo
 beforeAll(async () => {
   await handle.migrate();
   await applySeed(handle.db, seed);
-});
+}, DB_SETUP_TIMEOUT);
 
 afterAll(() => handle.close());
 
