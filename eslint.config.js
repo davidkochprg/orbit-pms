@@ -41,5 +41,10 @@ export default tseslint.config(
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
     },
   },
+  {
+    // Generated shadcn components export variants next to components by design.
+    files: ['apps/web/src/components/ui/**/*.tsx'],
+    rules: { 'react-refresh/only-export-components': 'off' },
+  },
   prettier,
 );

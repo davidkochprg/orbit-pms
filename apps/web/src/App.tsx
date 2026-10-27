@@ -1,14 +1,21 @@
-import { navItems } from './lib/nav';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { RouterProvider } from 'react-router';
+import { ThemeProvider } from '@/components/theme-provider';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { router } from '@/router';
+
+const queryClient = new QueryClient({
+  defaultOptions: { queries: { staleTime: 10_000, retry: 1 } },
+});
 
 export function App() {
   return (
-    <main>
-      <h1>Orbit</h1>
-      <ul>
-        {navItems.map((item) => (
-          <li key={item.path}>{item.label}</li>
-        ))}
-      </ul>
-    </main>
+    <ThemeProvider>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <RouterProvider router={router} />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 }
