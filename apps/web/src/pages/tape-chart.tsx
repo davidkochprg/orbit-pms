@@ -305,7 +305,7 @@ function DayHeader({
                 className="text-subtle-foreground tabular-nums"
                 title={`${occupied(day)} of ${total} rooms occupied`}
               >
-                {occupied(day)}/{total}
+                {total > 0 ? Math.round((occupied(day) / total) * 100) : 0}%
               </span>
             </span>
             <span
