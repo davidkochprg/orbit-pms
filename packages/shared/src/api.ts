@@ -37,6 +37,14 @@ export type MoveBookingBody = z.infer<typeof moveBookingBodySchema>;
 export const changeDatesBodySchema = z.object({ checkIn: isoDateSchema, checkOut: isoDateSchema });
 export type ChangeDatesBody = z.infer<typeof changeDatesBodySchema>;
 
+/** A tape chart drag: the booking's new room and dates. */
+export const rescheduleBodySchema = z.object({
+  roomId: z.string().min(1),
+  checkIn: isoDateSchema,
+  checkOut: isoDateSchema,
+});
+export type RescheduleBody = z.infer<typeof rescheduleBodySchema>;
+
 export const dayQuerySchema = z.object({ date: isoDateSchema.optional() });
 
 export const auditLogQuerySchema = z.object({

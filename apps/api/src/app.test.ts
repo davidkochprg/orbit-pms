@@ -232,6 +232,37 @@ describe('POST /api/bookings/:id/dates', () => {
   });
 });
 
+describe('POST /api/bookings/:id/reschedule', () => {
+  it('moves a future booking two days later into a free room', async () => {
+    const b = seed.bookings.find((x) => x.status === 'confirmed' && x.checkIn > today)!;
+    const range = { checkIn: addDays(b.checkIn, 2), checkOut: addDays(b.checkOut, 2) };
+    const target = seed.rooms.find(
+      (r) =>
+        fitsRoomType(
+          seed.roomTypes.find((t) => t.id === r.roomTypeId)!,
+          b,
+          b.addons.extraBeds,
+        ) && findConflicts(r.id, range, seed.bookings, now, b.id).length === 0,
+    )!;
+    const res = await post<BookingDetail>(`/api/bookings/${b.id}/reschedule`, {
+      roomId: target.id,
+      ...range,
+    });
+    expect(res.status).toBe(200);
+    expect(res.body.booking).toMatchObject({ roomId: target.id, ...range });
+  });
+
+  it('returns 400 for a drop that changes nothing', async () => {
+    const res = await post<ApiError>(`/api/bookings/${arrival.id}/reschedule`, {
+      roomId: arrival.roomId,
+      checkIn: arrival.checkIn,
+      checkOut: arrival.checkOut,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe('invalid_input');
+  });
+});
+
 describe('GET /api/day', () => {
   it('returns today’s arrivals, departures and in-house guests with names', async () => {
     const { body } = await get<DayOverview>('/api/day');

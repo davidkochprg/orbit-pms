@@ -4,6 +4,7 @@ import {
   bookingListQuerySchema,
   changeDatesBodySchema,
   moveBookingBodySchema,
+  rescheduleBodySchema,
 } from '@orbit/shared';
 import { Hono } from 'hono';
 import { validate } from '../validate';
@@ -37,6 +38,11 @@ export function bookingRoutes(repos: Repositories, service: HotelService) {
     .post('/bookings/:id/dates', validate('json', changeDatesBodySchema), async (c) => {
       const id = c.req.param('id');
       await service.changeBookingDates(id, c.req.valid('json'), 'user');
+      return c.json(await service.getBookingDetail(id));
+    })
+    .post('/bookings/:id/reschedule', validate('json', rescheduleBodySchema), async (c) => {
+      const id = c.req.param('id');
+      await service.rescheduleBooking(id, c.req.valid('json'), 'user');
       return c.json(await service.getBookingDetail(id));
     });
 }

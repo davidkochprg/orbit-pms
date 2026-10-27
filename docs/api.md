@@ -67,11 +67,12 @@ Query parameters, all optional:
 
 All take JSON, act as `user` in the audit log, and return the updated `BookingDetail`. Rules are in [domain.md](domain.md#booking-operations).
 
-| Endpoint                         | Body                                                               | Errors                                        |
-| -------------------------------- | ------------------------------------------------------------------ | --------------------------------------------- |
-| `POST /api/bookings/:id/actions` | `{ "action": "confirm" \| "check_in" \| "check_out" \| "cancel" }` | 409 `invalid_transition`, 409 `conflict`      |
-| `POST /api/bookings/:id/move`    | `{ "roomId": "rm_201" }`                                           | 409 `conflict`, 422 `over_capacity`, 404 room |
-| `POST /api/bookings/:id/dates`   | `{ "checkIn": "2026-10-27", "checkOut": "2026-10-30" }`            | 400 `invalid_date_range`, 409 `conflict`      |
+| Endpoint                            | Body                                                                        | Errors                                                                     |
+| ----------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `POST /api/bookings/:id/actions`    | `{ "action": "confirm" \| "check_in" \| "check_out" \| "cancel" }`          | 409 `invalid_transition`, 409 `conflict`                                   |
+| `POST /api/bookings/:id/move`       | `{ "roomId": "rm_201" }`                                                    | 409 `conflict`, 422 `over_capacity`, 404 room                              |
+| `POST /api/bookings/:id/dates`      | `{ "checkIn": "2026-10-27", "checkOut": "2026-10-30" }`                     | 400 `invalid_date_range`, 409 `conflict`                                   |
+| `POST /api/bookings/:id/reschedule` | `{ "roomId": "rm_201", "checkIn": "2026-10-28", "checkOut": "2026-10-31" }` | 400 `invalid_input` (nothing changed), 409 `conflict`, 422 `over_capacity` |
 
 A body that fails validation returns 400 `invalid_json`; malformed JSON returns 400 `bad_request`.
 
