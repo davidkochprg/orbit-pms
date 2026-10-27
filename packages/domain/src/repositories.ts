@@ -1,4 +1,14 @@
-import type { Booking, BookingStatus, Guest, IsoDate, Room, RoomType } from '@orbit/shared';
+import type {
+  AuditActor,
+  AuditLogEntry,
+  Booking,
+  BookingStatus,
+  Guest,
+  IsoDate,
+  Room,
+  RoomStatus,
+  RoomType,
+} from '@orbit/shared';
 
 export interface BookingFilter {
   /** Bookings with at least one night in `[from, to)`. */
@@ -13,11 +23,14 @@ export interface RoomRepository {
   listRoomTypes(): Promise<RoomType[]>;
   listRooms(): Promise<Room[]>;
   getRoom(id: string): Promise<Room | null>;
+  setRoomStatus(id: string, status: RoomStatus): Promise<void>;
 }
 
 export interface BookingRepository {
   listBookings(filter?: BookingFilter): Promise<Booking[]>;
   getBooking(id: string): Promise<Booking | null>;
+  /** Replaces a stored booking. */
+  updateBooking(booking: Booking): Promise<void>;
 }
 
 export interface GuestRepository {
@@ -25,8 +38,24 @@ export interface GuestRepository {
   getGuest(id: string): Promise<Guest | null>;
 }
 
+export interface NewAuditEntry {
+  actor: AuditActor;
+  action: string;
+  subjectId: string | null;
+  payload: unknown;
+}
+
+export interface AuditRepository {
+  append(entry: NewAuditEntry): Promise<AuditLogEntry>;
+  /** Newest first. */
+  list(filter?: { subjectId?: string; limit?: number }): Promise<AuditLogEntry[]>;
+}
+
 export interface Repositories {
   rooms: RoomRepository;
   bookings: BookingRepository;
   guests: GuestRepository;
+  audit: AuditRepository;
+  /** Runs `fn` atomically; repositories passed to it share one transaction. */
+  transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

@@ -1,5 +1,10 @@
 export type DomainErrorCode =
-  'invalid_date_range' | 'invalid_party' | 'over_capacity' | 'not_found' | 'conflict';
+  | 'invalid_date_range'
+  | 'invalid_party'
+  | 'over_capacity'
+  | 'not_found'
+  | 'conflict'
+  | 'invalid_transition';
 
 export class DomainError extends Error {
   readonly code: DomainErrorCode;

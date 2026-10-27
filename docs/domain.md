@@ -19,14 +19,33 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 ```mermaid
 stateDiagram-v2
   [*] --> hold
-  hold --> confirmed
-  hold --> cancelled
-  confirmed --> checked_in
-  confirmed --> cancelled
-  checked_in --> checked_out
+  hold --> confirmed: confirm
+  hold --> cancelled: cancel
+  confirmed --> checked_in: check_in
+  confirmed --> cancelled: cancel
+  checked_in --> checked_out: check_out
 ```
 
-Transitions are not enforced yet; they arrive with booking operations.
+`allowedActions(booking, today)` lists the actions the UI and agent may offer:
+
+- `confirm` a hold. Fails with `conflict` if the room was taken after the hold expired.
+- `check_in` a confirmed booking only on a day of the stay (`checkIn ≤ today < checkOut`).
+- `check_out` a checked-in guest, any day. The room becomes `dirty`.
+- `cancel` a hold or confirmed booking. Checked-in guests check out instead.
+
+Anything else throws `invalid_transition`.
+
+## Booking operations
+
+Pure functions in `packages/domain/src/bookings.ts`, wrapped by `createHotelService` (`service.ts`), which loads data through the repositories, runs each mutation in a transaction and appends an audit entry (`actor`, `action`, `subjectId`, `payload`).
+
+| Operation                               | Rules                                                                                                                                                                                                                                        |
+| --------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `applyBookingAction(id, action, actor)` | See lifecycle above. Audit action `booking.<action>`.                                                                                                                                                                                        |
+| `moveBooking(id, roomId, actor)`        | Same dates, different room. Booking must be `hold`, `confirmed` or `checked_in`. The target room must not be out of order, must fit the party (counting extra beds), and must be free. **The agreed price is kept**, even across room types. |
+| `changeBookingDates(id, range, actor)`  | Same room, new dates, **re-priced** with `quote()` and the booking's stored add-ons. Checked-in guests can only change their departure.                                                                                                      |
+| `getBookingDetail(id)`                  | Booking with guest, room, room type and `allowedActions`.                                                                                                                                                                                    |
+| `getDayOverview(date)`                  | `arrivals` (check-in that day: hold, confirmed or already checked in), `departures` (check-out that day: checked in or already checked out), `inHouse` (arrived earlier, leaving later). Defaults to today at the hotel.                     |
 
 ## Availability rules
 
