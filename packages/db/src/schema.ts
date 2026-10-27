@@ -11,6 +11,7 @@ import {
   roomKinds,
   roomStatuses,
   type InquiryExtraction,
+  type InquirySuggestion,
   type PendingActionInput,
   type Quote,
   type QuoteAddons,
@@ -111,10 +112,18 @@ export const inquiries = pgTable('inquiries', {
   id: text('id').primaryKey(),
   rawText: text('raw_text').notNull(),
   channel: inquiryChannel('channel').notNull(),
+  partner: text('partner'),
+  subject: text('subject'),
+  senderName: text('sender_name'),
+  senderAddress: text('sender_address'),
   receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
   parsed: jsonb('parsed').$type<InquiryExtraction>(),
+  suggestion: jsonb('suggestion').$type<InquirySuggestion>(),
+  reply: text('reply'),
   status: inquiryStatus('status').notNull().default('new'),
   bookingId: text('booking_id').references(() => bookings.id),
+  processedAt: timestamp('processed_at', { withTimezone: true }),
+  processingError: text('processing_error'),
 });
 
 export const housekeepingTasks = pgTable('housekeeping_tasks', {

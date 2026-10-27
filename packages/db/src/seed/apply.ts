@@ -32,9 +32,13 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
         holdExpiresAt: b.holdExpiresAt ? new Date(b.holdExpiresAt) : null,
       })),
     );
-    await tx
-      .insert(inquiries)
-      .values(seed.inquiries.map((i) => ({ ...i, receivedAt: new Date(i.receivedAt) })));
+    await tx.insert(inquiries).values(
+      seed.inquiries.map((i) => ({
+        ...i,
+        receivedAt: new Date(i.receivedAt),
+        processedAt: i.processedAt ? new Date(i.processedAt) : null,
+      })),
+    );
     await tx
       .insert(housekeepingTasks)
       .values(seed.housekeepingTasks.map((t) => ({ ...t, createdAt: new Date(t.createdAt) })));

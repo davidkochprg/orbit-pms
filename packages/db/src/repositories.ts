@@ -4,6 +4,7 @@ import type {
   BookingFilter,
   BookingRepository,
   GuestRepository,
+  InquiryRepository,
   PendingActionRepository,
   Repositories,
   RoomRepository,
@@ -11,12 +12,13 @@ import type {
 import {
   type AuditLogEntry,
   type Booking,
+  type Inquiry,
   type PendingAction,
   pendingActionSchema,
 } from '@orbit/shared';
 import { and, asc, desc, eq, gt, inArray, lt, type SQL } from 'drizzle-orm';
 import type { Db } from './client';
-import { auditLog, bookings, guests, pendingActions, rooms, roomTypes } from './schema';
+import { auditLog, bookings, guests, inquiries, pendingActions, rooms, roomTypes } from './schema';
 
 type BookingRow = typeof bookings.$inferSelect;
 type AuditRow = typeof auditLog.$inferSelect;
@@ -117,6 +119,44 @@ function auditRepository(db: Db): AuditRepository {
   };
 }
 
+type InquiryRow = typeof inquiries.$inferSelect;
+
+function toInquiry(row: InquiryRow): Inquiry {
+  return {
+    ...row,
+    receivedAt: row.receivedAt.toISOString(),
+    processedAt: row.processedAt?.toISOString() ?? null,
+  };
+}
+
+function toInquiryRow(inquiry: Inquiry): InquiryRow {
+  return {
+    ...inquiry,
+    receivedAt: new Date(inquiry.receivedAt),
+    processedAt: inquiry.processedAt ? new Date(inquiry.processedAt) : null,
+  };
+}
+
+function inquiryRepository(db: Db): InquiryRepository {
+  return {
+    async listInquiries() {
+      const rows = await db.select().from(inquiries).orderBy(desc(inquiries.receivedAt));
+      return rows.map(toInquiry);
+    },
+    async getInquiry(id) {
+      const [row] = await db.select().from(inquiries).where(eq(inquiries.id, id));
+      return row ? toInquiry(row) : null;
+    },
+    async createInquiry(inquiry) {
+      await db.insert(inquiries).values(toInquiryRow(inquiry));
+    },
+    async updateInquiry(inquiry) {
+      const { id, ...row } = toInquiryRow(inquiry);
+      await db.update(inquiries).set(row).where(eq(inquiries.id, id));
+    },
+  };
+}
+
 type PendingRow = typeof pendingActions.$inferSelect;
 
 function toPendingAction(row: PendingRow): PendingAction {
@@ -164,6 +204,7 @@ export function createRepositories(db: Db): Repositories {
     bookings: bookingRepository(db),
     guests: guestRepository(db),
     audit: auditRepository(db),
+    inquiries: inquiryRepository(db),
     pendingActions: pendingActionRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };

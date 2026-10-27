@@ -43,6 +43,13 @@
       "when": 1793103939714,
       "tag": "0005_ai_usage",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793104573419,
+      "tag": "0006_inquiry_inbox_fields",
+      "breakpoints": true
     }
   ]
 }

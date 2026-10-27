@@ -53,11 +53,13 @@ describe('buildSeed', () => {
 
   it('leaves a free room for every inquiry', () => {
     for (const f of buildInquiryFixtures(today)) {
+      const { checkIn, checkOut, adults } = f.expected;
+      if (f.expected.kind !== 'booking_request' || !checkIn || !checkOut || !adults) continue;
       const available = checkAvailability(
         {
-          checkIn: f.expected.checkIn,
-          checkOut: f.expected.checkOut,
-          adults: f.expected.adults,
+          checkIn,
+          checkOut,
+          adults,
           childAges: f.expected.childAges,
           ...(f.expected.wishes.apartment ? { kind: 'apartment' as const } : {}),
         },

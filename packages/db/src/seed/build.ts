@@ -166,10 +166,18 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
     id: f.id,
     rawText: f.rawText,
     channel: f.channel,
+    partner: f.partner,
+    subject: f.subject,
+    senderName: f.senderName,
+    senderAddress: f.senderAddress,
     receivedAt: new Date(now.getTime() - f.receivedHoursAgo * 3600_000).toISOString(),
     parsed: null,
+    suggestion: null,
+    reply: null,
     status: 'new',
     bookingId: null,
+    processedAt: null,
+    processingError: null,
   }));
 
   const departingToday = new Set(
@@ -221,10 +229,12 @@ function makeInquiriesBookable(
   let result = bookings;
 
   for (const f of fixtures) {
+    const { checkIn, checkOut, adults } = f.expected;
+    if (f.expected.kind !== 'booking_request' || !checkIn || !checkOut || !adults) continue;
     const query = {
-      checkIn: f.expected.checkIn,
-      checkOut: f.expected.checkOut,
-      adults: f.expected.adults,
+      checkIn,
+      checkOut,
+      adults,
       childAges: f.expected.childAges,
       ...(f.expected.wishes.apartment ? { kind: 'apartment' as const } : {}),
     };
