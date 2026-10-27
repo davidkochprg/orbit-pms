@@ -9,6 +9,7 @@ const statusFor: Record<DomainErrorCode, ContentfulStatusCode> = {
   over_capacity: 422,
   not_found: 404,
   conflict: 409,
+  invalid_transition: 409,
 };
 
 export function errorBody(code: string, message: string): ApiError {

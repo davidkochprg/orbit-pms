@@ -1,19 +1,26 @@
+import { randomUUID } from 'node:crypto';
 import type {
+  AuditRepository,
   BookingFilter,
   BookingRepository,
   GuestRepository,
   Repositories,
   RoomRepository,
 } from '@orbit/domain';
-import type { Booking } from '@orbit/shared';
-import { and, asc, eq, gt, inArray, lt, type SQL } from 'drizzle-orm';
+import type { AuditLogEntry, Booking } from '@orbit/shared';
+import { and, asc, desc, eq, gt, inArray, lt, type SQL } from 'drizzle-orm';
 import type { Db } from './client';
-import { bookings, guests, rooms, roomTypes } from './schema';
+import { auditLog, bookings, guests, rooms, roomTypes } from './schema';
 
 type BookingRow = typeof bookings.$inferSelect;
+type AuditRow = typeof auditLog.$inferSelect;
 
 function toBooking({ createdAt: _, holdExpiresAt, ...row }: BookingRow): Booking {
   return { ...row, holdExpiresAt: holdExpiresAt?.toISOString() ?? null };
+}
+
+function toAuditEntry(row: AuditRow): AuditLogEntry {
+  return { ...row, createdAt: row.createdAt.toISOString() };
 }
 
 function roomRepository(db: Db): RoomRepository {
@@ -23,6 +30,9 @@ function roomRepository(db: Db): RoomRepository {
     async getRoom(id) {
       const [row] = await db.select().from(rooms).where(eq(rooms.id, id));
       return row ?? null;
+    },
+    async setRoomStatus(id, status) {
+      await db.update(rooms).set({ status }).where(eq(rooms.id, id));
     },
   };
 }
@@ -47,6 +57,12 @@ function bookingRepository(db: Db): BookingRepository {
       const [row] = await db.select().from(bookings).where(eq(bookings.id, id));
       return row ? toBooking(row) : null;
     },
+    async updateBooking({ id, holdExpiresAt, ...booking }) {
+      await db
+        .update(bookings)
+        .set({ ...booking, holdExpiresAt: holdExpiresAt ? new Date(holdExpiresAt) : null })
+        .where(eq(bookings.id, id));
+    },
   };
 }
 
@@ -65,10 +81,34 @@ function guestRepository(db: Db): GuestRepository {
   };
 }
 
+function auditRepository(db: Db): AuditRepository {
+  return {
+    async append(entry) {
+      const [row] = await db
+        .insert(auditLog)
+        .values({ id: `audit_${randomUUID()}`, ...entry })
+        .returning();
+      if (!row) throw new Error('Audit insert returned no row');
+      return toAuditEntry(row);
+    },
+    async list({ subjectId, limit = 50 } = {}) {
+      const rows = await db
+        .select()
+        .from(auditLog)
+        .where(subjectId ? eq(auditLog.subjectId, subjectId) : undefined)
+        .orderBy(desc(auditLog.createdAt), desc(auditLog.id))
+        .limit(limit);
+      return rows.map(toAuditEntry);
+    },
+  };
+}
+
 export function createRepositories(db: Db): Repositories {
   return {
     rooms: roomRepository(db),
     bookings: bookingRepository(db),
     guests: guestRepository(db),
+    audit: auditRepository(db),
+    transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

@@ -58,3 +58,64 @@ describe('repositories (PGlite)', () => {
     expect(await repos.bookings.listBookings()).toHaveLength(seed.bookings.length);
   });
 });
+
+describe('repository writes (PGlite)', () => {
+  it('updates a booking in place', async () => {
+    const original = seed.bookings.find((b) => b.status === 'hold')!;
+    const updated = {
+      ...original,
+      status: 'confirmed' as const,
+      holdExpiresAt: null,
+      notes: 'Confirmed by phone',
+    };
+    await repos.bookings.updateBooking(updated);
+    expect(await repos.bookings.getBooking(original.id)).toEqual(updated);
+    await repos.bookings.updateBooking(original);
+    expect(await repos.bookings.getBooking(original.id)).toEqual(original);
+  });
+
+  it('sets room status', async () => {
+    await repos.rooms.setRoomStatus('rm_101', 'out_of_order');
+    expect((await repos.rooms.getRoom('rm_101'))?.status).toBe('out_of_order');
+    await repos.rooms.setRoomStatus('rm_101', 'clean');
+  });
+
+  it('appends and lists audit entries newest first, filtered by subject', async () => {
+    const a = await repos.audit.append({
+      actor: 'user',
+      action: 'test.a',
+      subjectId: 'bk_x',
+      payload: { n: 1 },
+    });
+    const b = await repos.audit.append({
+      actor: 'agent',
+      action: 'test.b',
+      subjectId: 'bk_x',
+      payload: null,
+    });
+    await repos.audit.append({ actor: 'user', action: 'test.c', subjectId: 'bk_y', payload: {} });
+    expect(a.createdAt).toMatch(/Z$/);
+    const forX = await repos.audit.list({ subjectId: 'bk_x' });
+    expect(forX.map((e) => e.action)).toEqual([b.action, a.action]);
+    expect(forX[1]?.payload).toEqual({ n: 1 });
+    expect(await repos.audit.list({ limit: 1 })).toHaveLength(1);
+  });
+
+  it('rolls back a transaction that throws', async () => {
+    const original = seed.bookings[0]!;
+    await expect(
+      repos.transaction(async (tx) => {
+        await tx.bookings.updateBooking({ ...original, notes: 'should not stick' });
+        await tx.audit.append({
+          actor: 'user',
+          action: 'test.rollback',
+          subjectId: original.id,
+          payload: {},
+        });
+        throw new Error('boom');
+      }),
+    ).rejects.toThrow('boom');
+    expect((await repos.bookings.getBooking(original.id))?.notes).toBe(original.notes);
+    expect(await repos.audit.list({ subjectId: original.id })).toEqual([]);
+  });
+});

@@ -130,7 +130,7 @@ export const auditLog = pgTable(
     actor: auditActor('actor').notNull(),
     action: text('action').notNull(),
     subjectId: text('subject_id'),
-    payload: jsonb('payload').$type<unknown>().notNull(),
+    payload: jsonb('payload').$type<unknown>(),
     createdAt: createdAt(),
   },
   (t) => [index('audit_log_subject_idx').on(t.subjectId, t.createdAt)],
