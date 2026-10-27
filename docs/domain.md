@@ -75,6 +75,22 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - **Notes**: a housekeeping note (voice or typed) is read by the model into room/status/issue updates. The domain resolves the room names (whole words: "pokoj 104", "A 1"), applies status changes and creates maintenance tasks in one transaction, and skips updates for unknown rooms or forbidden changes with a reason. A note saying a room is clean leaves an already inspected room inspected.
 - Every change is written to the audit log (`room.status`, `task.create`, `task.status`), with the room as subject.
 
+## Daily brief
+
+`buildDailyBrief` (`packages/domain/src/brief.ts`), via `getDailyBrief(date)` on the hotel service, sums up a day for the staff. It is computed from current data on every request; no model is involved.
+
+| Field                       | Meaning                                                                                                                                                                                     |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `occupancy`                 | Rooms taken tonight (`occupied`) out of rooms not out of order (`sellable`) and all rooms (`total`). A lapsed hold does not count.                                                          |
+| `guestsTonight`             | Adults and children in the rooms taken tonight.                                                                                                                                             |
+| `arrivals`, `departures`    | Counts, as in the day overview.                                                                                                                                                             |
+| `turnovers`                 | Rooms where one guest leaves and another arrives today, with the room status.                                                                                                               |
+| `roomsToPrepare`            | Rooms a guest arrives in today (not yet checked in) that are not `inspected`.                                                                                                               |
+| `holds`                     | Unconfirmed holds that lapsed, lapse within 24 hours, or arrive within 7 days, by check-in.                                                                                                 |
+| `outOfOrder`, `maintenance` | Out-of-order rooms and open maintenance tasks.                                                                                                                                              |
+| `unansweredMessages`        | Inbox messages that are `new` or `quoted`.                                                                                                                                                  |
+| `gaps`                      | Runs of 1–2 empty nights between two stays in the same room, starting within the next 14 days, worth a discount. A run already under way counts from today. Out-of-order rooms are skipped. |
+
 ## Availability rules
 
 `checkAvailability(query, { rooms, roomTypes, bookings, now })` returns rooms that can take the whole stay, cheapest room type first.

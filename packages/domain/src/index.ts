@@ -1,5 +1,6 @@
 export * from './availability';
 export * from './bookings';
+export * from './brief';
 export * from './dates';
 export * from './day';
 export * from './errors';

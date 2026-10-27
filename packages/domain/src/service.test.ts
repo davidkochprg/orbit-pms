@@ -126,6 +126,19 @@ describe('createHotelService', () => {
     expect(day.departures.map((s) => s.booking.id)).toEqual(['leaving']);
     expect(day.inHouse).toEqual([]);
   });
+
+  it('builds the daily brief from current data', async () => {
+    const { service } = setup();
+    const brief = await service.getDailyBrief();
+    expect(brief.date).toBe('2026-05-10');
+    expect(brief.occupancy).toEqual({ occupied: 1, sellable: 2, total: 2 });
+    expect(brief.roomsToPrepare.map((r) => [r.roomName, r.guestName])).toEqual([
+      ['1', 'Test Guest'],
+    ]);
+    expect(brief.gaps).toEqual([
+      { roomId: 'rm_2', roomName: '2', from: '2026-05-10', to: '2026-05-12', nights: 2 },
+    ]);
+  });
 });
 
 describe('createHold', () => {

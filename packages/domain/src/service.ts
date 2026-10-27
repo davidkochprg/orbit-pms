@@ -7,6 +7,7 @@ import type {
   BookingSearch,
   BookingSummary,
   CreateHoldInput,
+  DailyBrief,
   DayOverview,
   Guest,
   InquiryExtraction,
@@ -18,6 +19,7 @@ import type {
   StayOption,
 } from '@orbit/shared';
 import { checkAvailability } from './availability';
+import { briefBookingRange, buildDailyBrief } from './brief';
 import {
   allowedActions,
   applyAction,
@@ -297,6 +299,17 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     };
   }
 
+  async function getDailyBrief(date: IsoDate = hotelToday(clock())): Promise<DailyBrief> {
+    const [rooms, guests, bookings, tasks, inquiries] = await Promise.all([
+      repos.rooms.listRooms(),
+      repos.guests.listGuests(),
+      repos.bookings.listBookings(briefBookingRange(date)),
+      repos.housekeeping.listTasks({ status: ['open', 'in_progress'] }),
+      repos.inquiries.listInquiries(),
+    ]);
+    return buildDailyBrief({ date, now: clock(), rooms, guests, bookings, tasks, inquiries });
+  }
+
   async function searchBookings(search: BookingSearch): Promise<BookingSummary[]> {
     const bookings = await repos.bookings.listBookings({
       ...(search.from && { from: search.from }),
@@ -376,6 +389,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
   return {
     getBookingDetail,
     getDayOverview,
+    getDailyBrief,
     searchBookings,
     findAvailableRooms,
     quoteStay,
