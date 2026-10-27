@@ -43,6 +43,8 @@ const toolLabels: Record<string, [running: string, done: string]> = {
   createHold: ['Preparing a hold', 'Prepared a hold'],
   confirmBooking: ['Preparing the confirmation', 'Prepared the confirmation'],
   cancelBooking: ['Preparing the cancellation', 'Prepared the cancellation'],
+  checkIn: ['Preparing the check-in', 'Prepared the check-in'],
+  checkOut: ['Preparing the check-out', 'Prepared the check-out'],
   moveBooking: ['Preparing the room move', 'Prepared the room move'],
   changeDates: ['Preparing the date change', 'Prepared the date change'],
   updateBooking: ['Preparing the booking change', 'Prepared the booking change'],

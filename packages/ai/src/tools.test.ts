@@ -120,6 +120,13 @@ describe('agent tools', () => {
     expect(repos.state.pendingActions.map((a) => a.kind)).toEqual(['add_charge', 'record_payment']);
   });
 
+  it('explains that a check-in needs the registration first', async () => {
+    const { tools } = setup();
+    const result = await tools.checkIn.execute({ bookingId: 'bk_1' }, callOptions);
+    expect(result).toMatchObject({ error: { code: 'invalid_transition' } });
+    expect(JSON.stringify(result)).toMatch(/Register the guest/);
+  });
+
   it('returns domain errors to the model as data', async () => {
     const { tools, repos } = setup();
     const result = await tools.moveBooking.execute(

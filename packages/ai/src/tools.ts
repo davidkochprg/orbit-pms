@@ -89,6 +89,8 @@ export const proposalToolNames = [
   'updateBooking',
   'addCharge',
   'recordPayment',
+  'checkIn',
+  'checkOut',
 ] as const;
 
 /**
@@ -159,6 +161,18 @@ export function createAgentTools({ hotel, billing, reports, actions, listRooms }
       description: 'Propose cancelling a hold or confirmed booking. The user must confirm.',
       inputSchema: bookingIdSchema,
       execute: (input) => propose({ kind: 'cancel_booking', input }),
+    }),
+    checkIn: tool({
+      description:
+        'Propose checking in a guest arriving today. The stay must be registered (nationality, date of birth, ID document); if not, tell the staff member to register the guest in the booking first. The user must confirm.',
+      inputSchema: bookingIdSchema,
+      execute: (input) => propose({ kind: 'check_in', input }),
+    }),
+    checkOut: tool({
+      description:
+        'Propose checking out an in-house guest. The summary says what is still due; mention it. The user must confirm.',
+      inputSchema: bookingIdSchema,
+      execute: (input) => propose({ kind: 'check_out', input }),
     }),
     moveBooking: tool({
       description:

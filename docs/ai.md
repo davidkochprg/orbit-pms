@@ -47,6 +47,7 @@ Defined in `packages/ai/src/tools.ts` with zod input schemas from `packages/shar
 | `getDailyBrief`                   | The day's brief (see [domain.md](domain.md#daily-brief))                                                                     | none        |
 | `createHold`                      | Hold for a new or existing guest                                                                                             | proposal    |
 | `confirmBooking`, `cancelBooking` | Status change                                                                                                                | proposal    |
+| `checkIn`, `checkOut`             | Check-in needs the stay's registration; the check-out summary says what is still due                                         | proposal    |
 | `moveBooking`                     | Same dates, another room                                                                                                     | proposal    |
 | `changeDates`                     | New dates, same room, re-priced                                                                                              | proposal    |
 | `updateBooking`                   | Party, add-ons, source, notes, and room and dates, in one step; re-priced when the stay changes                              | proposal    |
