@@ -8,5 +8,9 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@orbit/shared": "workspace:*",
+    "date-fns": "^4.4.0"
   }
 }
