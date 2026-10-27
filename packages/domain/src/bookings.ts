@@ -1,5 +1,13 @@
-import type { Booking, BookingAction, BookingStatus, IsoDate, Room, RoomType } from '@orbit/shared';
-import { findConflicts, fitsRoomType } from './availability';
+import type {
+  Booking,
+  BookingAction,
+  BookingPatch,
+  BookingStatus,
+  IsoDate,
+  Room,
+  RoomType,
+} from '@orbit/shared';
+import { assertValidParty, findConflicts, fitsRoomType } from './availability';
 import { assertValidRange, type DateRange } from './dates';
 import { DomainError } from './errors';
 import { type PricingConfig, quote } from './pricing';
@@ -249,5 +257,90 @@ export function reschedule(booking: Booking, range: DateRange, ctx: RescheduleCo
           },
           ctx.pricing,
         ),
+  };
+}
+
+export interface UpdateContext {
+  /** The room the booking ends up in, and its bookings. */
+  room: Room;
+  roomType: RoomType;
+  roomBookings: Booking[];
+  now: Date;
+  pricing: PricingConfig;
+}
+
+/** Booking fields that describe the stay itself, as opposed to notes and source. */
+const STAY_FIELDS = ['roomId', 'checkIn', 'checkOut', 'adults', 'childAges', 'addons'] as const;
+
+/** The patch fields whose value differs from the booking. */
+export function changedBookingFields(
+  booking: Booking,
+  patch: BookingPatch,
+): (keyof BookingPatch)[] {
+  return (Object.keys(patch) as (keyof BookingPatch)[]).filter(
+    (key) =>
+      patch[key] !== undefined && JSON.stringify(patch[key]) !== JSON.stringify(booking[key]),
+  );
+}
+
+/**
+ * Edits a booking: room, dates, party, add-ons, source and notes, in one step. The rules of a
+ * move and a date change apply, and the party must fit the room. The stay is re-priced when the
+ * dates, party or add-ons change; a room change alone keeps the agreed price. Finished and
+ * cancelled bookings only take note changes.
+ */
+export function updateBooking(booking: Booking, patch: BookingPatch, ctx: UpdateContext): Booking {
+  const changed = changedBookingFields(booking, patch);
+  if (changed.length === 0) throw new DomainError('invalid_input', 'Nothing to change');
+  const stayChanged = changed.some((f) => (STAY_FIELDS as readonly string[]).includes(f));
+  if (!CHANGEABLE.includes(booking.status) && changed.some((f) => f !== 'notes')) {
+    throw new DomainError(
+      'invalid_transition',
+      `Only notes can change on a ${booking.status.replace('_', ' ')} booking`,
+    );
+  }
+
+  const updated: Booking = {
+    ...booking,
+    ...patch,
+    childAges: [...(patch.childAges ?? booking.childAges)],
+  };
+  if (!stayChanged) return updated;
+
+  assertValidRange(updated);
+  assertValidParty(updated);
+  if (booking.status === 'checked_in' && updated.checkIn !== booking.checkIn) {
+    throw new DomainError(
+      'invalid_transition',
+      'Cannot change the arrival date of a guest who has checked in',
+    );
+  }
+  const roomChanged = updated.roomId !== booking.roomId;
+  if (roomChanged && ctx.room.status === 'out_of_order') {
+    throw new DomainError('conflict', `Room ${ctx.room.name} is out of order`);
+  }
+  if (!fitsRoomType(ctx.roomType, updated, updated.addons.extraBeds)) {
+    throw new DomainError('over_capacity', `Party does not fit room ${ctx.room.name}`);
+  }
+  const datesChanged = updated.checkIn !== booking.checkIn || updated.checkOut !== booking.checkOut;
+  if (roomChanged || datesChanged) {
+    assertNoConflicts(ctx.room.id, updated, booking, ctx.roomBookings, ctx.now, ctx.room.name);
+  }
+  const reprice = changed.some((f) => f !== 'roomId' && f !== 'source' && f !== 'notes');
+  return {
+    ...updated,
+    priceSnapshot: reprice
+      ? quote(
+          {
+            roomType: ctx.roomType,
+            checkIn: updated.checkIn,
+            checkOut: updated.checkOut,
+            adults: updated.adults,
+            childAges: updated.childAges,
+            addons: updated.addons,
+          },
+          ctx.pricing,
+        )
+      : booking.priceSnapshot,
   };
 }

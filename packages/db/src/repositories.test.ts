@@ -244,3 +244,20 @@ describe('staff (PGlite)', () => {
     expect(await repos.staff.get('nope')).toBeNull();
   });
 });
+
+describe('guest writes (PGlite)', () => {
+  it('updates a guest in place', async () => {
+    const original = seed.guests[1]!;
+    await repos.guests.updateGuest({
+      ...original,
+      phone: '+420 000 000 000',
+      notes: 'Prefers ground floor',
+    });
+    expect(await repos.guests.getGuest(original.id)).toEqual({
+      ...original,
+      phone: '+420 000 000 000',
+      notes: 'Prefers ground floor',
+    });
+    await repos.guests.updateGuest(original);
+  });
+});

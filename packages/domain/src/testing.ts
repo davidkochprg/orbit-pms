@@ -91,6 +91,10 @@ export function createMemoryRepositories(
         state.guests.push(guest);
         return Promise.resolve();
       },
+      updateGuest: (guest) => {
+        state.guests = state.guests.map((g) => (g.id === guest.id ? guest : g));
+        return Promise.resolve();
+      },
     },
     audit: {
       append: (entry) => {

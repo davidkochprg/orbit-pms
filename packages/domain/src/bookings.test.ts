@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { allowedActions, applyAction, changeDates, moveBooking, reschedule } from './bookings';
+import {
+  allowedActions,
+  applyAction,
+  changeDates,
+  changedBookingFields,
+  moveBooking,
+  reschedule,
+  updateBooking,
+} from './bookings';
 import { DomainError } from './errors';
 import type { PricingConfig } from './pricing';
 import { apartment, booking, double, room } from './test-fixtures';
@@ -278,5 +286,92 @@ describe('reschedule', () => {
     );
     expectCode(() => reschedule({ ...b, adults: 4 }, b, ctx), 'over_capacity');
     expectCode(() => reschedule({ ...b, status: 'checked_out' }, b, ctx), 'invalid_transition');
+  });
+});
+
+describe('updateBooking', () => {
+  const pricedRates: PricingConfig = {
+    ...pricing,
+    wellness: { perPersonPerNight: 100, minAge: 0 },
+  };
+  const b = booking({ id: 'b', roomId: '1', checkIn: '2026-05-10', checkOut: '2026-05-12' });
+  const ctx = { room: room('1'), roomType: double, roomBookings: [b], now, pricing: pricedRates };
+
+  it('lists only the fields that really change', () => {
+    expect(
+      changedBookingFields(b, { adults: 2, notes: 'Late arrival', checkIn: b.checkIn }),
+    ).toEqual(['notes']);
+  });
+
+  it('changes party and add-ons and re-prices', () => {
+    const updated = updateBooking(
+      b,
+      { adults: 1, childAges: [6], addons: { wellness: true, dogs: 0, extraBeds: 0 } },
+      ctx,
+    );
+    expect(updated).toMatchObject({ adults: 1, childAges: [6], addons: { wellness: true } });
+    expect(updated.priceSnapshot?.lines.map((l) => l.kind)).toContain('wellness');
+  });
+
+  it('keeps the price for notes, source or a room change alone', () => {
+    const priced = { ...b, priceSnapshot: null };
+    expect(
+      updateBooking(priced, { notes: 'Cot please', source: 'phone' }, ctx).priceSnapshot,
+    ).toBeNull();
+    expect(
+      updateBooking(priced, { roomId: '2' }, { ...ctx, room: room('2'), roomBookings: [] })
+        .priceSnapshot,
+    ).toBeNull();
+  });
+
+  it('moves room and dates with the usual checks', () => {
+    const other = booking({ id: 'o', roomId: '2', checkIn: '2026-05-11', checkOut: '2026-05-13' });
+    const target = { ...ctx, room: room('2'), roomBookings: [other] };
+    expectCode(() => updateBooking(b, { roomId: '2' }, target), 'conflict');
+    expectCode(
+      () =>
+        updateBooking(
+          b,
+          { roomId: '2' },
+          { ...target, room: room('2', { status: 'out_of_order' }), roomBookings: [] },
+        ),
+      'conflict',
+    );
+    expectCode(() => updateBooking(b, { checkOut: '2026-05-10' }, ctx), 'invalid_date_range');
+    const moved = updateBooking(
+      b,
+      { roomId: '2', checkOut: '2026-05-11' },
+      { ...target, roomBookings: [] },
+    );
+    expect(moved).toMatchObject({ roomId: '2', checkOut: '2026-05-11' });
+  });
+
+  it('needs the party to fit the room', () => {
+    expectCode(() => updateBooking(b, { adults: 3 }, ctx), 'over_capacity');
+    expectCode(() => updateBooking(b, { adults: 0 }, ctx), 'invalid_party');
+    expect(
+      updateBooking(b, { adults: 3, addons: { wellness: false, dogs: 0, extraBeds: 1 } }, ctx)
+        .adults,
+    ).toBe(3);
+  });
+
+  it('keeps the arrival of a checked-in guest', () => {
+    const inHouse = { ...b, status: 'checked_in' as const };
+    expectCode(() => updateBooking(inHouse, { checkIn: '2026-05-09' }, ctx), 'invalid_transition');
+    expect(updateBooking(inHouse, { checkOut: '2026-05-13' }, ctx).checkOut).toBe('2026-05-13');
+  });
+
+  it('only takes notes on finished or cancelled bookings', () => {
+    const done = { ...b, status: 'checked_out' as const };
+    expect(updateBooking(done, { notes: 'Left an umbrella' }, ctx).notes).toBe('Left an umbrella');
+    expectCode(() => updateBooking(done, { adults: 1 }, ctx), 'invalid_transition');
+    expectCode(
+      () => updateBooking({ ...b, status: 'cancelled' }, { source: 'web' }, ctx),
+      'invalid_transition',
+    );
+  });
+
+  it('refuses a patch that changes nothing', () => {
+    expectCode(() => updateBooking(b, { adults: b.adults }, ctx), 'invalid_input');
   });
 });

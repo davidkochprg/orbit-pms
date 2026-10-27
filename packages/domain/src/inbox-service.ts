@@ -128,6 +128,26 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
       return hotel.createHold(input, actor);
     },
 
+    /** Marks a message as not leading to a booking, e.g. spam or a request that can't be met. */
+    async decline(id: string, actor: AuditActor): Promise<Inquiry> {
+      return repos.transaction(async (tx) => {
+        const inquiry = await tx.inquiries.getInquiry(id);
+        if (!inquiry) throw new DomainError('not_found', `Message ${id} not found`);
+        if (inquiry.status === 'converted' || inquiry.bookingId) {
+          throw new DomainError('invalid_transition', 'This message already led to a booking');
+        }
+        const updated: Inquiry = { ...inquiry, status: 'declined' };
+        await tx.inquiries.updateInquiry(updated);
+        await tx.audit.append({
+          actor,
+          action: 'inquiry.decline',
+          subjectId: id,
+          payload: { from: inquiry.status },
+        });
+        return updated;
+      });
+    },
+
     /** Records the reply as sent (sending itself happens outside Orbit). */
     async markReplied(id: string, reply: string, actor: AuditActor): Promise<Inquiry> {
       if (!reply.trim()) throw new DomainError('invalid_input', 'The reply is empty');

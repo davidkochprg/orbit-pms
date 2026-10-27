@@ -44,6 +44,8 @@ export interface GuestRepository {
   listGuests(): Promise<Guest[]>;
   getGuest(id: string): Promise<Guest | null>;
   createGuest(guest: Guest): Promise<void>;
+  /** Replaces a stored guest. */
+  updateGuest(guest: Guest): Promise<void>;
 }
 
 export interface NewAuditEntry {

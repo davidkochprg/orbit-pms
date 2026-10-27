@@ -269,3 +269,72 @@ describe('rescheduleBooking', () => {
     expect(repos.state.audit).toEqual([]);
   });
 });
+
+describe('createBooking and updateBooking', () => {
+  const input = {
+    guest: { name: 'Walk In', email: null, phone: null, language: 'en' as const },
+    roomId: 'rm_1',
+    checkIn: '2026-05-12',
+    checkOut: '2026-05-13',
+    adults: 1,
+    childAges: [],
+    addons: { wellness: false, dogs: 0, extraBeds: 0 },
+    source: 'walk_in' as const,
+    notes: null,
+    inquiryId: null,
+  };
+
+  it('creates a confirmed booking that never lapses', async () => {
+    const { repos, service } = setup();
+    const created = await service.createBooking({ ...input, status: 'confirmed' }, 'user');
+    expect(created).toMatchObject({ status: 'confirmed', holdExpiresAt: null, source: 'walk_in' });
+    expect(repos.state.audit.at(-1)).toMatchObject({
+      action: 'booking.create',
+      subjectId: created.id,
+    });
+  });
+
+  it('creates a hold by default', async () => {
+    const { service } = setup();
+    const created = await service.createBooking({ ...input, status: 'hold' }, 'user');
+    expect(created.status).toBe('hold');
+    expect(created.holdExpiresAt).not.toBeNull();
+  });
+
+  it('edits a booking and audits the changed fields and totals', async () => {
+    const { repos, service } = setup();
+    const updated = await service.updateBooking(
+      'arrival',
+      { adults: 1, notes: 'Quiet room please' },
+      'user',
+    );
+    expect(updated).toMatchObject({ adults: 1, notes: 'Quiet room please' });
+    expect(repos.state.audit.at(-1)).toMatchObject({
+      action: 'booking.update',
+      subjectId: 'arrival',
+      payload: { changed: ['adults', 'notes'] },
+    });
+  });
+
+  it('previews an edit without saving it', async () => {
+    const { repos, service } = setup();
+    const { booking } = await service.previewUpdate('arrival', { roomId: 'rm_2' });
+    expect(booking.roomId).toBe('rm_2');
+    expect((await repos.bookings.getBooking('arrival'))?.roomId).toBe('rm_1');
+  });
+
+  it('lists free rooms with quotes, ignoring the booking being edited', async () => {
+    const { service } = setup();
+    const query = { checkIn: '2026-05-10', checkOut: '2026-05-12', adults: 2, childAges: [] };
+    expect(
+      (await service.roomOptions({ ...query, addons: input.addons })).map((o) => o.roomId),
+    ).toEqual(['rm_2']);
+    const options = await service.roomOptions({
+      ...query,
+      addons: input.addons,
+      excludeBookingId: 'arrival',
+    });
+    expect(options.map((o) => o.roomId)).toEqual(['rm_1', 'rm_2']);
+    expect(options[0]?.quote.nights).toBe(2);
+  });
+});

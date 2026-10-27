@@ -4,8 +4,10 @@ import type {
   Booking,
   BookingAction,
   BookingDetail,
+  BookingPatch,
   BookingSearch,
   BookingSummary,
+  CreateBookingInput,
   CreateHoldInput,
   DailyBrief,
   DayOverview,
@@ -15,6 +17,8 @@ import type {
   Quote,
   QuoteInput,
   Room,
+  RoomOption,
+  RoomOptionsQuery,
   RoomType,
   StayOption,
 } from '@orbit/shared';
@@ -23,10 +27,12 @@ import { briefBookingRange, buildDailyBrief } from './brief';
 import {
   allowedActions,
   applyAction,
+  changedBookingFields,
   changeDates,
   createHold,
   moveBooking,
   reschedule,
+  updateBooking,
 } from './bookings';
 import { addDays, type DateRange, hotelToday } from './dates';
 import { arrivalsOn, departuresOn, stayingOver } from './day';
@@ -205,7 +211,36 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     };
   }
 
-  function planHold(input: CreateHoldInput) {
+  function planUpdate(id: string, patch: BookingPatch) {
+    return async (tx: Repositories): Promise<Plan> => {
+      const booking = await loadBooking(tx, id);
+      const target = await loadRoom(tx, patch.roomId ?? booking.roomId);
+      const updated = updateBooking(booking, patch, {
+        ...target,
+        roomBookings: await tx.bookings.listBookings({ roomId: target.room.id }),
+        now: clock(),
+        pricing,
+      });
+      return {
+        booking: updated,
+        room: target.room,
+        audit: {
+          action: 'booking.update',
+          subjectId: id,
+          payload: {
+            changed: changedBookingFields(booking, patch),
+            total: {
+              from: booking.priceSnapshot?.total ?? null,
+              to: updated.priceSnapshot?.total ?? null,
+            },
+          },
+        },
+        apply: (r) => r.bookings.updateBooking(updated),
+      };
+    };
+  }
+
+  function planHold(input: CreateHoldInput, status: CreateBookingInput['status'] = 'hold') {
     return async (tx: Repositories): Promise<Plan> => {
       const now = clock();
       let guestId: string;
@@ -223,7 +258,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         throw new DomainError('not_found', `Inquiry ${input.inquiryId} not found`);
       }
       const target = await loadRoom(tx, input.roomId);
-      const booking = createHold(input, {
+      const hold = createHold(input, {
         ...target,
         id: newId('bk'),
         guestId,
@@ -233,12 +268,15 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         pricing,
         holdHours: policy.holdHours,
       });
+      // Staff may enter a booking as confirmed straight away; it then never lapses.
+      const booking: Booking =
+        status === 'confirmed' ? { ...hold, status, holdExpiresAt: null } : hold;
       return {
         booking,
         room: target.room,
         ...(newGuest && { newGuest }),
         audit: {
-          action: 'booking.create_hold',
+          action: status === 'confirmed' ? 'booking.create' : 'booking.create_hold',
           subjectId: booking.id,
           payload: {
             roomId: booking.roomId,
@@ -324,7 +362,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
   }
 
   async function findAvailableRooms(
-    query: AvailabilityQueryInput,
+    query: AvailabilityQueryInput & { excludeBookingId?: string },
   ): Promise<AvailableRoomSummary[]> {
     const bookings = await repos.bookings.listBookings({ from: query.checkIn, to: query.checkOut });
     const available = checkAvailability(
@@ -335,6 +373,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         childAges: query.childAges,
         ...(query.kind && { kind: query.kind }),
         ...(query.roomTypeId && { roomTypeId: query.roomTypeId }),
+        ...(query.excludeBookingId && { excludeBookingId: query.excludeBookingId }),
       },
       {
         rooms: await repos.rooms.listRooms(),
@@ -348,6 +387,18 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
       roomName: room.name,
       kind: room.kind,
       roomType,
+    }));
+  }
+
+  /** Free rooms for a stay, cheapest first, each with an exact quote including add-ons. */
+  async function roomOptions(query: RoomOptionsQuery): Promise<RoomOption[]> {
+    const available = await findAvailableRooms(query);
+    return available.map((r) => ({
+      roomId: r.roomId,
+      roomName: r.roomName,
+      kind: r.kind,
+      roomType: r.roomType,
+      quote: quote({ ...query, roomType: r.roomType }, pricing),
     }));
   }
 
@@ -392,6 +443,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     getDailyBrief,
     searchBookings,
     findAvailableRooms,
+    roomOptions,
     quoteStay,
     inboxOptions,
     applyBookingAction: (id: string, action: BookingAction, actor: AuditActor) =>
@@ -401,12 +453,17 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     changeBookingDates: (id: string, range: DateRange, actor: AuditActor) =>
       commit(planDates(id, range), actor),
     createHold: (input: CreateHoldInput, actor: AuditActor) => commit(planHold(input), actor),
+    createBooking: (input: CreateBookingInput, actor: AuditActor) =>
+      commit(planHold(input, input.status), actor),
+    updateBooking: (id: string, patch: BookingPatch, actor: AuditActor) =>
+      commit(planUpdate(id, patch), actor),
     rescheduleBooking: (id: string, target: DateRange & { roomId: string }, actor: AuditActor) =>
       commit(planReschedule(id, target), actor),
     previewBookingAction: (id: string, action: BookingAction) => preview(planAction(id, action)),
     previewMove: (id: string, roomId: string) => preview(planMove(id, roomId)),
     previewDates: (id: string, range: DateRange) => preview(planDates(id, range)),
     previewHold: (input: CreateHoldInput) => preview(planHold(input)),
+    previewUpdate: (id: string, patch: BookingPatch) => preview(planUpdate(id, patch)),
   };
 }
 

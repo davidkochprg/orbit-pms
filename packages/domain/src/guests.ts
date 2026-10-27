@@ -1,0 +1,65 @@
+import type { AuditActor, Guest, GuestPatch, NewGuestBody } from '@orbit/shared';
+import { DomainError } from './errors';
+import type { Repositories } from './repositories';
+import { normalizeText } from './text';
+
+/**
+ * Throws if another guest already has this email. The inbox recognises returning guests by
+ * email, so two records with one address would make that ambiguous.
+ */
+export function assertUniqueGuestEmail(guests: Guest[], email: string | null, exceptId?: string) {
+  if (!email) return;
+  const key = normalizeText(email);
+  const taken = guests.find((g) => g.id !== exceptId && g.email && normalizeText(g.email) === key);
+  if (taken) throw new DomainError('conflict', `${email} already belongs to ${taken.name}`);
+}
+
+export interface GuestDeps {
+  repos: Repositories;
+  newId: (prefix: string) => string;
+}
+
+/** Guest records created and edited by staff. Every change is audited with the guest as subject. */
+export function createGuestService({ repos, newId }: GuestDeps) {
+  return {
+    async create(input: NewGuestBody, actor: AuditActor): Promise<Guest> {
+      return repos.transaction(async (tx) => {
+        assertUniqueGuestEmail(await tx.guests.listGuests(), input.email);
+        const guest: Guest = { id: newId('gst'), ...input };
+        await tx.guests.createGuest(guest);
+        await tx.audit.append({
+          actor,
+          action: 'guest.create',
+          subjectId: guest.id,
+          payload: null,
+        });
+        return guest;
+      });
+    },
+
+    async update(id: string, patch: GuestPatch, actor: AuditActor): Promise<Guest> {
+      return repos.transaction(async (tx) => {
+        const guest = await tx.guests.getGuest(id);
+        if (!guest) throw new DomainError('not_found', `Guest ${id} not found`);
+        const updated: Guest = { ...guest, ...patch };
+        const changed = (Object.keys(patch) as (keyof GuestPatch)[]).filter(
+          (key) => guest[key] !== updated[key],
+        );
+        if (changed.length === 0) return guest;
+        if (changed.includes('email')) {
+          assertUniqueGuestEmail(await tx.guests.listGuests(), updated.email, id);
+        }
+        await tx.guests.updateGuest(updated);
+        await tx.audit.append({
+          actor,
+          action: 'guest.update',
+          subjectId: id,
+          payload: { changed },
+        });
+        return updated;
+      });
+    },
+  };
+}
+
+export type GuestService = ReturnType<typeof createGuestService>;

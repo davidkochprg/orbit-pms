@@ -175,4 +175,20 @@ describe('inbox service', () => {
       code: 'invalid_input',
     });
   });
+
+  it('declines a message unless it already led to a booking', async () => {
+    const { inbox, repos, msg } = await processed();
+    const declined = await inbox.decline(msg.id, 'user');
+    expect(declined.status).toBe('declined');
+    expect(repos.state.audit.at(-1)).toMatchObject({
+      action: 'inquiry.decline',
+      payload: { from: 'quoted' },
+    });
+
+    const other = await processed();
+    await other.inbox.createHold(other.msg.id, 'rm_2', 'user');
+    await expect(other.inbox.decline(other.msg.id, 'user')).rejects.toMatchObject({
+      code: 'invalid_transition',
+    });
+  });
 });

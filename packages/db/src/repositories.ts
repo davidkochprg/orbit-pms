@@ -110,6 +110,9 @@ function guestRepository(db: Db): GuestRepository {
     async createGuest(guest) {
       await db.insert(guests).values(guest);
     },
+    async updateGuest({ id, ...guest }) {
+      await db.update(guests).set(guest).where(eq(guests.id, id));
+    },
   };
 }
 
