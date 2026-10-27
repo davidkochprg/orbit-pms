@@ -84,6 +84,10 @@ A body that fails validation returns 400 `invalid_json`; malformed JSON returns 
 
 `DayOverview` for `date` (default: today in `Europe/Prague`): `arrivals`, `departures` and `inHouse`, each a list of `{ booking, guestName, roomName }`.
 
+### `GET /api/brief?date=`
+
+`DailyBrief` for `date` (default: today): `occupancy` (`occupied`, `sellable`, `total` rooms tonight), `guestsTonight`, `arrivals` and `departures` counts, `turnovers`, `roomsToPrepare`, `holds` (`{ summary, expired }`), `outOfOrder`, `maintenance`, `unansweredMessages` and `gaps` (`{ roomId, roomName, from, to, nights }`). See [domain.md](domain.md#daily-brief).
+
 ### `GET /api/audit-log?subjectId=&limit=`
 
 `AuditLogEntry[]`, newest first: `id`, `actor` (`user` | `agent`), `action` (e.g. `booking.check_in`), `subjectId`, `payload`, `createdAt`. `limit` defaults to 50, max 200.

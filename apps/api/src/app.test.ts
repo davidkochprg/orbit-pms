@@ -12,6 +12,7 @@ import type {
   AuditLogEntry,
   Booking,
   BookingDetail,
+  DailyBrief,
   DayOverview,
   Guest,
   Health,
@@ -280,6 +281,22 @@ describe('GET /api/day', () => {
   it('accepts another date', async () => {
     expect((await get<DayOverview>('/api/day?date=2026-11-01')).body.date).toBe('2026-11-01');
     expect((await get('/api/day?date=tomorrow')).status).toBe(400);
+  });
+});
+
+describe('GET /api/brief', () => {
+  it('sums up today from the seed', async () => {
+    const { status, body } = await get<DailyBrief>('/api/brief');
+    expect(status).toBe(200);
+    expect(body.date).toBe(today);
+    expect(body.arrivals).toBeGreaterThan(0);
+    expect(body.occupancy.total).toBe(seed.rooms.length);
+    expect(body.unansweredMessages).toBe(seed.inquiries.length);
+    expect(body.maintenance.map((t) => t.roomName)).toContain('203');
+  });
+
+  it('rejects an invalid date', async () => {
+    expect((await get('/api/brief?date=tomorrow')).status).toBe(400);
   });
 });
 
