@@ -5,6 +5,7 @@ import {
   documentTypes,
   housekeepingTaskStatuses,
   housekeepingTaskTypes,
+  idScanStatuses,
   inquiryChannels,
   inquiryStatuses,
   languages,
@@ -15,6 +16,7 @@ import {
   roomStatuses,
   staffRoles,
   type HotelProfile,
+  type IdScanResult,
   type InquiryExtraction,
   type InquirySuggestion,
   type PendingActionInput,
@@ -55,6 +57,7 @@ export const paymentKind = pgEnum('payment_kind', paymentKinds);
 export const documentType = pgEnum('document_type', documentTypes);
 export const paymentMethod = pgEnum('payment_method', paymentMethods);
 export const vatBracket = pgEnum('vat_bracket', vatBrackets);
+export const idScanStatus = pgEnum('id_scan_status', idScanStatuses);
 
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
@@ -237,24 +240,50 @@ export const payments = pgTable(
   ],
 );
 
-/** The guest book: one registration per stay, for its main guest. Check-in needs it. */
-export const registrations = pgTable(
-  'registrations',
+/**
+ * The guest book: everyone staying in a booking's room. The main guest's row has the ID
+ * `sg_<bookingId>` and links their profile; companions have only a name. ID fields stay null until
+ * recorded.
+ */
+export const stayGuests = pgTable(
+  'stay_guests',
   {
+    id: text('id').primaryKey(),
     bookingId: text('booking_id')
-      .primaryKey()
-      .references(() => bookings.id),
-    guestId: text('guest_id')
       .notNull()
-      .references(() => guests.id),
-    nationality: text('nationality').notNull(),
-    dateOfBirth: date('date_of_birth', { mode: 'string' }).notNull(),
-    documentType: documentType('document_type').notNull(),
-    documentNumber: text('document_number').notNull(),
+      .references(() => bookings.id),
+    guestId: text('guest_id').references(() => guests.id),
+    name: text('name').notNull(),
+    nationality: text('nationality'),
+    dateOfBirth: date('date_of_birth', { mode: 'string' }),
+    documentType: documentType('document_type'),
+    documentNumber: text('document_number'),
     address: text('address'),
-    registeredAt: timestamp('registered_at', { withTimezone: true }).notNull(),
+    registeredAt: timestamp('registered_at', { withTimezone: true }),
+    createdAt: createdAt(),
   },
-  (t) => [index('registrations_guest_idx').on(t.guestId, t.registeredAt)],
+  (t) => [
+    index('stay_guests_booking_idx').on(t.bookingId, t.createdAt),
+    index('stay_guests_guest_idx').on(t.guestId, t.registeredAt),
+  ],
+);
+
+/** Open phone ID-scan links. The photo is never stored; a row is deleted once saved or expired. */
+export const idScans = pgTable(
+  'id_scans',
+  {
+    id: text('id').primaryKey(),
+    bookingId: text('booking_id')
+      .notNull()
+      .references(() => bookings.id),
+    stayGuestId: text('stay_guest_id'),
+    status: idScanStatus('status').notNull(),
+    result: jsonb('result').$type<IdScanResult>(),
+    error: text('error'),
+    createdAt: createdAt(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('id_scans_expires_idx').on(t.expiresAt)],
 );
 
 /** Rates from Settings: seasons, discounts and add-on prices. One row, `id = 'hotel'`. */

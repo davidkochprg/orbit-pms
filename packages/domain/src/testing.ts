@@ -5,14 +5,15 @@ import type {
   Guest,
   HotelProfile,
   HousekeepingTask,
+  IdScan,
   Inquiry,
   PendingAction,
   Payment,
   PricingConfig,
-  Registration,
   Room,
   RoomType,
   StaffMember,
+  StayGuest,
 } from '@orbit/shared';
 import { rangesOverlap } from './dates';
 import type { BillingFilter, Repositories } from './repositories';
@@ -31,7 +32,8 @@ export interface MemoryState {
   staff: StaffMember[];
   charges: Charge[];
   payments: Payment[];
-  registrations: Registration[];
+  stayGuests: StayGuest[];
+  idScans: IdScan[];
 }
 
 function inBilling<T extends { bookingId: string }>(
@@ -68,7 +70,8 @@ export function createMemoryRepositories(
     staff: [],
     charges: [],
     payments: [],
-    registrations: [],
+    stayGuests: [],
+    idScans: [],
     ...clone(initial),
   };
 
@@ -253,20 +256,43 @@ export function createMemoryRepositories(
         return Promise.resolve();
       },
     },
-    registrations: {
-      get: (bookingId) =>
-        Promise.resolve(state.registrations.find((r) => r.bookingId === bookingId) ?? null),
-      listByGuest: (guestId) =>
+    stayGuests: {
+      listByBooking: (bookingId) =>
         Promise.resolve(
-          state.registrations
-            .filter((r) => r.guestId === guestId)
-            .sort((a, b) => b.registeredAt.localeCompare(a.registeredAt)),
+          state.stayGuests
+            .filter((s) => s.bookingId === bookingId)
+            .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
         ),
-      save: (registration) => {
-        state.registrations = [
-          ...state.registrations.filter((r) => r.bookingId !== registration.bookingId),
-          registration,
-        ];
+      latestRegistered: (guestId, exceptBookingId) =>
+        Promise.resolve(
+          state.stayGuests
+            .filter(
+              (s) =>
+                s.guestId === guestId && s.bookingId !== exceptBookingId && s.registeredAt !== null,
+            )
+            .sort((a, b) => b.registeredAt!.localeCompare(a.registeredAt!))[0] ?? null,
+        ),
+      save: (stayGuest) => {
+        state.stayGuests = [...state.stayGuests.filter((s) => s.id !== stayGuest.id), stayGuest];
+        return Promise.resolve();
+      },
+      delete: (id) => {
+        state.stayGuests = state.stayGuests.filter((s) => s.id !== id);
+        return Promise.resolve();
+      },
+    },
+    idScans: {
+      get: (id) => Promise.resolve(state.idScans.find((s) => s.id === id) ?? null),
+      save: (scan) => {
+        state.idScans = [...state.idScans.filter((s) => s.id !== scan.id), scan];
+        return Promise.resolve();
+      },
+      delete: (id) => {
+        state.idScans = state.idScans.filter((s) => s.id !== id);
+        return Promise.resolve();
+      },
+      deleteExpired: (at) => {
+        state.idScans = state.idScans.filter((s) => s.expiresAt > at);
         return Promise.resolve();
       },
     },

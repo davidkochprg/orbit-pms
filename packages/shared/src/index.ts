@@ -6,6 +6,7 @@ export * from './dates';
 export * from './entities';
 export * from './enums';
 export * from './hotel';
+export * from './id-scan';
 export * from './housekeeping';
 export * from './inquiry';
 export * from './operations';

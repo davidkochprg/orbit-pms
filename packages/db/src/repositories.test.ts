@@ -325,15 +325,82 @@ describe('audit log filters (PGlite)', () => {
   });
 });
 
-describe('registrations (PGlite)', () => {
+describe('stay guests (PGlite)', () => {
   it('round-trips the guest book and replaces an entry on save', async () => {
-    const entry = seed.registrations[0]!;
-    expect(await repos.registrations.get(entry.bookingId)).toEqual(entry);
-    expect(await repos.registrations.listByGuest(entry.guestId)).toContainEqual(entry);
-    await repos.registrations.save({ ...entry, documentNumber: 'DEMO-000000' });
-    expect((await repos.registrations.get(entry.bookingId))?.documentNumber).toBe('DEMO-000000');
-    await repos.registrations.save(entry);
-    expect(await repos.registrations.get('nope')).toBeNull();
+    const entry = seed.stayGuests[0]!;
+    const sameStay = seed.stayGuests.filter((s) => s.bookingId === entry.bookingId);
+    expect(await repos.stayGuests.listByBooking(entry.bookingId)).toEqual(sameStay);
+    await repos.stayGuests.save({ ...entry, documentNumber: 'DEMO-000000' });
+    expect((await repos.stayGuests.listByBooking(entry.bookingId))[0]?.documentNumber).toBe(
+      'DEMO-000000',
+    );
+    await repos.stayGuests.save(entry);
+    expect(await repos.stayGuests.listByBooking('nope')).toEqual([]);
+  });
+
+  it("finds a guest's latest registered entry from another stay", async () => {
+    const entry = seed.stayGuests.find((s) => s.guestId !== null)!;
+    const latest = await repos.stayGuests.latestRegistered(entry.guestId!, 'elsewhere');
+    expect(latest?.guestId).toBe(entry.guestId);
+    expect(await repos.stayGuests.latestRegistered(entry.guestId!, latest!.bookingId)).not.toEqual(
+      latest,
+    );
+  });
+
+  it('adds and deletes a companion', async () => {
+    const entry = seed.stayGuests[0]!;
+    const companion = {
+      ...entry,
+      id: 'sg_test',
+      guestId: null,
+      name: 'Demo Companion',
+      registeredAt: null,
+      createdAt: '2030-01-01T00:00:00.000Z',
+    };
+    await repos.stayGuests.save(companion);
+    expect((await repos.stayGuests.listByBooking(entry.bookingId)).at(-1)).toEqual(companion);
+    await repos.stayGuests.delete('sg_test');
+    expect((await repos.stayGuests.listByBooking(entry.bookingId)).at(-1)?.id).not.toBe('sg_test');
+  });
+});
+
+describe('id scans (PGlite)', () => {
+  it('saves, replaces, deletes and expires scans', async () => {
+    const scan = {
+      id: 'tok_test',
+      bookingId: seed.bookings[0]!.id,
+      stayGuestId: null,
+      status: 'waiting' as const,
+      result: null,
+      error: null,
+      createdAt: '2026-05-10T08:00:00.000Z',
+      expiresAt: '2026-05-10T08:15:00.000Z',
+    };
+    await repos.idScans.save(scan);
+    expect(await repos.idScans.get('tok_test')).toEqual(scan);
+    const done = {
+      ...scan,
+      status: 'done' as const,
+      result: {
+        name: 'Demo Person',
+        nationality: 'DE',
+        dateOfBirth: '1980-01-01',
+        documentType: 'passport' as const,
+        documentNumber: 'DEMO-1',
+        address: null,
+        expiresOn: null,
+        warnings: [],
+      },
+    };
+    await repos.idScans.save(done);
+    expect(await repos.idScans.get('tok_test')).toEqual(done);
+    await repos.idScans.deleteExpired('2026-05-10T08:14:59.000Z');
+    expect(await repos.idScans.get('tok_test')).not.toBeNull();
+    await repos.idScans.deleteExpired('2026-05-10T08:15:00.000Z');
+    expect(await repos.idScans.get('tok_test')).toBeNull();
+    await repos.idScans.save(scan);
+    await repos.idScans.delete('tok_test');
+    expect(await repos.idScans.get('tok_test')).toBeNull();
   });
 });
 

@@ -1,93 +1,286 @@
 import type {
   AuditActor,
   Booking,
-  Registration,
-  RegistrationBody,
-  RegistrationView,
+  Guest,
+  GuestBook,
+  IdentityFields,
+  IsoDate,
+  NewStayGuestBody,
+  RegistrationField,
+  StayGuest,
+  StayGuestPatch,
+  StayGuestView,
 } from '@orbit/shared';
 import { hotelToday } from './dates';
 import { DomainError } from './errors';
+import type { HotelPolicy } from './policy';
 import type { Repositories } from './repositories';
 
-/** Throws unless the stay may be registered: before or during the stay, and born before today. */
-export function assertCanRegister(booking: Booking, body: RegistrationBody, today: string): void {
-  if (booking.status !== 'confirmed' && booking.status !== 'checked_in') {
-    throw new DomainError('invalid_transition', `A ${booking.status} booking can't be registered`);
+const identityKeys = [
+  'nationality',
+  'dateOfBirth',
+  'documentType',
+  'documentNumber',
+  'address',
+] as const satisfies readonly (keyof IdentityFields)[];
+
+const emptyIdentity: IdentityFields = {
+  nationality: null,
+  dateOfBirth: null,
+  documentType: null,
+  documentNumber: null,
+  address: null,
+};
+
+/** The main guest's entry has a fixed ID, so it exists before anything about them is recorded. */
+export function primaryStayGuestId(bookingId: string): string {
+  return `sg_${bookingId}`;
+}
+
+/** Whole years from `dateOfBirth` to `day`. */
+export function ageOn(dateOfBirth: IsoDate, day: IsoDate): number {
+  const years = Number(day.slice(0, 4)) - Number(dateOfBirth.slice(0, 4));
+  return day.slice(5) < dateOfBirth.slice(5) ? years - 1 : years;
+}
+
+/**
+ * Guest-book fields a person still needs: nationality and date of birth always, an ID document
+ * from `idDocumentMinAge` (or when the age is unknown), and a home address for guests from abroad.
+ */
+export function missingFields(
+  person: IdentityFields,
+  today: IsoDate,
+  policy: Pick<HotelPolicy, 'homeCountry' | 'idDocumentMinAge'>,
+): RegistrationField[] {
+  const missing: RegistrationField[] = [];
+  if (!person.nationality) missing.push('nationality');
+  if (!person.dateOfBirth) missing.push('dateOfBirth');
+  const needsDocument =
+    !person.dateOfBirth || ageOn(person.dateOfBirth, today) >= policy.idDocumentMinAge;
+  if (needsDocument && !person.documentType) missing.push('documentType');
+  if (needsDocument && !person.documentNumber) missing.push('documentNumber');
+  if (person.nationality && person.nationality !== policy.homeCountry && !person.address) {
+    missing.push('address');
   }
-  if (body.dateOfBirth >= today) {
+  return missing;
+}
+
+/**
+ * Everyone in the room: the main guest (from their profile, entry or not) first, then companions.
+ * People the party counts but nobody has added yet count as missing.
+ */
+export function buildGuestBook(
+  booking: Booking,
+  guest: Guest,
+  stored: StayGuest[],
+  previous: IdentityFields | null,
+  today: IsoDate,
+  policy: Pick<HotelPolicy, 'homeCountry' | 'idDocumentMinAge'>,
+): GuestBook {
+  const primaryId = primaryStayGuestId(booking.id);
+  const primary: StayGuest = stored.find((s) => s.id === primaryId) ?? {
+    id: primaryId,
+    bookingId: booking.id,
+    guestId: guest.id,
+    name: guest.name,
+    ...emptyIdentity,
+    registeredAt: null,
+    createdAt: new Date(0).toISOString(),
+  };
+  const companions = stored
+    .filter((s) => s.id !== primaryId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  const view = (s: StayGuest, isPrimary: boolean): StayGuestView => ({
+    ...s,
+    ...(isPrimary && { name: guest.name, guestId: guest.id }),
+    primary: isPrimary,
+    missing: missingFields(s, today, policy),
+  });
+  const guests = [view(primary, true), ...companions.map((c) => view(c, false))];
+  const partySize = booking.adults + booking.childAges.length;
+  const incomplete = guests.filter((g) => g.missing.length > 0).length;
+  return {
+    guests,
+    partySize,
+    missing: incomplete + Math.max(0, partySize - guests.length),
+    previous,
+  };
+}
+
+/** Throws unless the booking's guest book may change: anything but a cancelled booking. */
+export function assertCanEditGuests(booking: Booking): void {
+  if (booking.status === 'cancelled') {
+    throw new DomainError('invalid_transition', "A cancelled booking's guests can't be changed");
+  }
+}
+
+/** Throws unless the date of birth is in the past. */
+export function assertValidIdentity(fields: Partial<IdentityFields>, today: IsoDate): void {
+  if (fields.dateOfBirth && fields.dateOfBirth >= today) {
     throw new DomainError('invalid_input', 'The date of birth must be in the past');
   }
 }
 
-/** Check-in needs the stay's registration in the guest book. */
-export async function assertRegistered(repos: Repositories, bookingId: string): Promise<void> {
-  if (!(await repos.registrations.get(bookingId))) {
-    throw new DomainError(
-      'invalid_transition',
-      'Register the guest before check-in: nationality, date of birth and ID document',
-    );
-  }
+function identityOf(s: IdentityFields): IdentityFields {
+  const { nationality, dateOfBirth, documentType, documentNumber, address } = s;
+  return { nationality, dateOfBirth, documentType, documentNumber, address };
+}
+
+function hasIdentity(fields: Partial<IdentityFields>): boolean {
+  return identityKeys.some((k) => fields[k] !== undefined);
 }
 
 export interface RegistrationDeps {
   repos: Repositories;
+  policy: HotelPolicy;
   clock: () => Date;
+  newId: (prefix: string) => string;
 }
 
-/** The guest book: one registration per stay, for its main guest. */
-export function createRegistrationService({ repos, clock }: RegistrationDeps) {
-  async function loadBooking(id: string): Promise<Booking> {
-    const booking = await repos.bookings.getBooking(id);
-    if (!booking) throw new DomainError('not_found', `Booking ${id} not found`);
-    return booking;
+/**
+ * The guest book: one entry per person in the room. Check-in doesn't wait for it; missing entries
+ * stay flagged on the booking until someone records them. The audit log notes which fields changed,
+ * never their values.
+ */
+export function createRegistrationService({ repos, policy, clock, newId }: RegistrationDeps) {
+  async function load(r: Repositories, bookingId: string) {
+    const booking = await r.bookings.getBooking(bookingId);
+    if (!booking) throw new DomainError('not_found', `Booking ${bookingId} not found`);
+    const guest = await r.guests.getGuest(booking.guestId);
+    if (!guest) throw new DomainError('not_found', `Guest ${booking.guestId} not found`);
+    return { booking, guest };
+  }
+
+  async function bookOf(r: Repositories, booking: Booking, guest: Guest): Promise<GuestBook> {
+    const earlier = await r.stayGuests.latestRegistered(guest.id, booking.id);
+    return buildGuestBook(
+      booking,
+      guest,
+      await r.stayGuests.listByBooking(booking.id),
+      earlier && identityOf(earlier),
+      hotelToday(clock()),
+      policy,
+    );
   }
 
   return {
-    /** The stay's registration, and the guest's latest earlier one to prefill from. */
-    async getView(bookingId: string): Promise<RegistrationView> {
-      const booking = await loadBooking(bookingId);
-      const registration = await repos.registrations.get(bookingId);
-      const earlier = (await repos.registrations.listByGuest(booking.guestId)).find(
-        (r) => r.bookingId !== bookingId,
-      );
-      const previous = earlier
-        ? {
-            nationality: earlier.nationality,
-            dateOfBirth: earlier.dateOfBirth,
-            documentType: earlier.documentType,
-            documentNumber: earlier.documentNumber,
-            address: earlier.address,
-          }
-        : null;
-      return { registration, previous };
+    async getGuestBook(bookingId: string): Promise<GuestBook> {
+      const { booking, guest } = await load(repos, bookingId);
+      return bookOf(repos, booking, guest);
     },
 
-    /** Records or corrects the registration. The audit log notes it without the personal data. */
-    async register(
-      bookingId: string,
-      body: RegistrationBody,
-      actor: AuditActor,
-    ): Promise<Registration> {
+    /** Adds a companion to the room, up to the party size, e.g. straight from an ID scan. */
+    async addGuest(bookingId: string, body: NewStayGuestBody, actor: AuditActor) {
       return repos.transaction(async (tx) => {
-        const booking = await tx.bookings.getBooking(bookingId);
-        if (!booking) throw new DomainError('not_found', `Booking ${bookingId} not found`);
+        const { booking, guest } = await load(tx, bookingId);
+        assertCanEditGuests(booking);
         const now = clock();
-        assertCanRegister(booking, body, hotelToday(now));
-        const existed = (await tx.registrations.get(bookingId)) !== null;
-        const registration: Registration = {
-          ...body,
+        const { scanId, ...fields } = body;
+        assertValidIdentity(fields, hotelToday(now));
+        const before = await bookOf(tx, booking, guest);
+        if (before.guests.length >= before.partySize) {
+          throw new DomainError(
+            'over_capacity',
+            `The booking is for ${before.partySize} ${before.partySize === 1 ? 'guest' : 'guests'}; change the party to add another`,
+          );
+        }
+        const added: StayGuest = {
+          ...emptyIdentity,
+          ...fields,
+          id: newId('sg'),
           bookingId,
-          guestId: booking.guestId,
-          registeredAt: now.toISOString(),
+          guestId: null,
+          registeredAt: hasIdentity(fields) ? now.toISOString() : null,
+          createdAt: now.toISOString(),
         };
-        await tx.registrations.save(registration);
+        await tx.stayGuests.save(added);
+        if (scanId) await tx.idScans.delete(scanId);
         await tx.audit.append({
           actor,
-          action: existed ? 'booking.update_registration' : 'booking.register',
+          action: 'booking.add_guest',
           subjectId: bookingId,
-          payload: { nationality: registration.nationality },
+          payload: {
+            stayGuestId: added.id,
+            fields: identityKeys.filter((k) => fields[k]),
+            ...(scanId && { scanned: true }),
+          },
         });
-        return registration;
+        return bookOf(tx, booking, guest);
+      });
+    },
+
+    /**
+     * Changes a person's name or ID details. The main guest's name lives in their profile. Values
+     * from a scan (`scanId`) discard that scan in the same transaction.
+     */
+    async updateGuest(
+      bookingId: string,
+      stayGuestId: string,
+      patch: StayGuestPatch,
+      actor: AuditActor,
+    ): Promise<GuestBook> {
+      return repos.transaction(async (tx) => {
+        const { booking, guest } = await load(tx, bookingId);
+        assertCanEditGuests(booking);
+        const now = clock();
+        const { scanId, ...fields } = patch;
+        assertValidIdentity(fields, hotelToday(now));
+        const current = (await bookOf(tx, booking, guest)).guests.find((g) => g.id === stayGuestId);
+        if (!current) {
+          throw new DomainError('not_found', `Guest ${stayGuestId} not found on this booking`);
+        }
+        if (current.primary && fields.name !== undefined && fields.name !== guest.name) {
+          throw new DomainError(
+            'invalid_input',
+            "The main guest's name is changed on their profile",
+          );
+        }
+        const updated: StayGuest = {
+          ...identityOf(current),
+          id: current.id,
+          bookingId,
+          guestId: current.guestId,
+          name: current.name,
+          createdAt: current.createdAt,
+          ...fields,
+          registeredAt: hasIdentity(fields) ? now.toISOString() : current.registeredAt,
+        };
+        await tx.stayGuests.save(updated);
+        if (scanId) await tx.idScans.delete(scanId);
+        await tx.audit.append({
+          actor,
+          action: 'booking.update_guest',
+          subjectId: bookingId,
+          payload: {
+            stayGuestId,
+            fields: Object.keys(fields),
+            ...(scanId && { scanned: true }),
+          },
+        });
+        return bookOf(tx, booking, guest);
+      });
+    },
+
+    /** Takes a companion off the booking. The main guest stays. */
+    async removeGuest(bookingId: string, stayGuestId: string, actor: AuditActor) {
+      return repos.transaction(async (tx) => {
+        const { booking, guest } = await load(tx, bookingId);
+        assertCanEditGuests(booking);
+        if (stayGuestId === primaryStayGuestId(bookingId)) {
+          throw new DomainError('invalid_input', "The main guest can't be removed");
+        }
+        const stored = await tx.stayGuests.listByBooking(bookingId);
+        if (!stored.some((s) => s.id === stayGuestId)) {
+          throw new DomainError('not_found', `Guest ${stayGuestId} not found on this booking`);
+        }
+        await tx.stayGuests.delete(stayGuestId);
+        await tx.audit.append({
+          actor,
+          action: 'booking.remove_guest',
+          subjectId: bookingId,
+          payload: { stayGuestId },
+        });
+        return bookOf(tx, booking, guest);
       });
     },
   };

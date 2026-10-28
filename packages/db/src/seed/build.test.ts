@@ -78,17 +78,32 @@ describe('buildSeed', () => {
     }
   });
 
-  it('registers every stay that has started, with synthetic documents only', () => {
+  it('puts everyone of a started stay in the guest book, with synthetic documents only', () => {
     const started = seed.bookings.filter(
       (b) => b.status === 'checked_in' || b.status === 'checked_out',
     );
-    expect(new Set(seed.registrations.map((r) => r.bookingId))).toEqual(
-      new Set(started.map((b) => b.id)),
+    for (const b of started) {
+      const entries = seed.stayGuests.filter((s) => s.bookingId === b.id);
+      expect(entries).toHaveLength(b.adults + b.childAges.length);
+      expect(entries[0]).toMatchObject({ id: `sg_${b.id}`, guestId: b.guestId });
+    }
+    const documents = seed.stayGuests.flatMap((s) => (s.documentNumber ? [s.documentNumber] : []));
+    expect(documents.length).toBeGreaterThan(0);
+    expect(documents.every((d) => d.startsWith('DEMO-'))).toBe(true);
+    expect(seed.stayGuests.every((s) => s.dateOfBirth === null || s.dateOfBirth < today)).toBe(
+      true,
     );
-    expect(seed.registrations.every((r) => r.documentNumber.startsWith('DEMO-'))).toBe(true);
-    expect(seed.registrations.every((r) => r.dateOfBirth < today)).toBe(true);
     const arrivals = seed.bookings.filter((b) => b.checkIn === today && b.status === 'confirmed');
-    expect(seed.registrations.some((r) => arrivals.some((a) => a.id === r.bookingId))).toBe(false);
+    expect(seed.stayGuests.some((s) => arrivals.some((a) => a.id === s.bookingId))).toBe(false);
+  });
+
+  it('leaves some in-house companions without an ID to fill in later', () => {
+    const inHouse = new Set(
+      seed.bookings.filter((b) => b.status === 'checked_in').map((b) => b.id),
+    );
+    const late = seed.stayGuests.filter((s) => inHouse.has(s.bookingId) && s.registeredAt === null);
+    expect(late.length).toBeGreaterThan(0);
+    expect(late.every((s) => s.guestId === null)).toBe(true);
   });
 
   it('has a synthetic team with an active manager', () => {

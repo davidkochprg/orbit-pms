@@ -92,6 +92,20 @@
       "when": 1793175010309,
       "tag": "0012_charge_vat_bracket",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "7",
+      "when": 1793175290305,
+      "tag": "0013_stay_guests",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793175291899,
+      "tag": "0014_drop_registrations",
+      "breakpoints": true
     }
   ]
 }

@@ -41,7 +41,7 @@ import { addonsForWishes, pickOptions, roomKindForWishes, stayRequest } from './
 import type { HotelPolicy } from './policy';
 import { type PricingConfig, quote } from './pricing';
 import { currentPricing } from './rates';
-import { assertRegistered } from './registration';
+import { buildGuestBook } from './registration';
 import type { NewAuditEntry, Repositories } from './repositories';
 import { containsText } from './text';
 
@@ -115,8 +115,6 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         roomBookings: await tx.bookings.listBookings({ roomId: booking.roomId }),
         roomName: room.name,
       });
-      // After the status rules, so a check-in on the wrong day says so first.
-      if (action === 'check_in') await assertRegistered(tx, id);
       return {
         booking: updated,
         room,
@@ -312,13 +310,22 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     const guest = await repos.guests.getGuest(booking.guestId);
     if (!guest) throw new DomainError('not_found', `Guest ${booking.guestId} not found`);
     const { room, roomType } = await loadRoom(repos, booking.roomId);
+    const today = hotelToday(clock());
+    const book = buildGuestBook(
+      booking,
+      guest,
+      await repos.stayGuests.listByBooking(id),
+      null,
+      today,
+      policy,
+    );
     return {
       booking,
       guest,
       room,
       roomType,
-      allowedActions: allowedActions(booking, hotelToday(clock())),
-      registered: (await repos.registrations.get(id)) !== null,
+      allowedActions: allowedActions(booking, today),
+      missingIds: book.missing,
     };
   }
 

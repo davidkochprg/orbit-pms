@@ -4,20 +4,21 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 
 ## Entities
 
-| Entity           | Key fields                                                                                                                                                            |
-| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| RoomType         | name, `maxAdults`, `maxChildren`, `basePrice` (adult rate per person per night, CZK), description                                                                     |
-| Room             | name, room type, `kind` (`room` \| `apartment`), floor, `status` (`clean` \| `dirty` \| `inspected` \| `out_of_order`)                                                |
-| Guest            | name, email, phone, `language` (`cs` \| `de` \| `en` \| `pl`), notes                                                                                                  |
-| Booking          | guest, room, `checkIn`, `checkOut`, adults, `childAges`, `status`, `holdExpiresAt`, `source`, `addons` (wellness, dogs, extra beds), `priceSnapshot` (a quote), notes |
-| Inquiry          | raw text, channel, received at, parsed extraction, `status`, linked booking                                                                                           |
-| HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes                                                         |
-| HotelProfile     | name, location, description, contact, `checkInFrom`, `checkOutBy`, `entries` (`policy` \| `amenity` \| `info`, title, details)                                        |
-| Charge           | booking, label, quantity, `unitPrice` (CZK, negative for a discount), amount, `vatBracket` (`standard` \| `reduced` \| `none`), `postedOn`                            |
-| Payment          | booking, `kind` (`payment` \| `refund`), `method` (`cash` \| `card` \| `bank_transfer`), amount (positive CZK), note, `paidOn`                                        |
-| Registration     | booking, guest, `nationality` (ISO alpha-2), `dateOfBirth`, `documentType` (`id_card` \| `passport`), `documentNumber`, address, `registeredAt`                       |
-| StaffMember      | name, email, `role` (`manager` \| `receptionist` \| `housekeeping`), `active`                                                                                         |
-| AuditLog         | `actor` (`user` \| `agent`), action, `subjectId` (e.g. a booking), payload, timestamp                                                                                 |
+| Entity           | Key fields                                                                                                                                                                                                      |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| RoomType         | name, `maxAdults`, `maxChildren`, `basePrice` (adult rate per person per night, CZK), description                                                                                                               |
+| Room             | name, room type, `kind` (`room` \| `apartment`), floor, `status` (`clean` \| `dirty` \| `inspected` \| `out_of_order`)                                                                                          |
+| Guest            | name, email, phone, `language` (`cs` \| `de` \| `en` \| `pl`), notes                                                                                                                                            |
+| Booking          | guest, room, `checkIn`, `checkOut`, adults, `childAges`, `status`, `holdExpiresAt`, `source`, `addons` (wellness, dogs, extra beds), `priceSnapshot` (a quote), notes                                           |
+| Inquiry          | raw text, channel, received at, parsed extraction, `status`, linked booking                                                                                                                                     |
+| HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes                                                                                                   |
+| HotelProfile     | name, location, description, contact, `checkInFrom`, `checkOutBy`, `entries` (`policy` \| `amenity` \| `info`, title, details)                                                                                  |
+| Charge           | booking, label, quantity, `unitPrice` (CZK, negative for a discount), amount, `vatBracket` (`standard` \| `reduced` \| `none`), `postedOn`                                                                      |
+| Payment          | booking, `kind` (`payment` \| `refund`), `method` (`cash` \| `card` \| `bank_transfer`), amount (positive CZK), note, `paidOn`                                                                                  |
+| StayGuest        | booking, guest profile (main guest only), name, `nationality` (ISO alpha-2), `dateOfBirth`, `documentType` (`id_card` \| `passport`), `documentNumber`, address, `registeredAt`, each ID field null until known |
+| IdScan           | booking, stay guest (or none, for a companion still to add), `status` (`waiting` \| `reading` \| `done` \| `failed`), checked result, error, `expiresAt`                                                        |
+| StaffMember      | name, email, `role` (`manager` \| `receptionist` \| `housekeeping`), `active`                                                                                                                                   |
+| AuditLog         | `actor` (`user` \| `agent`), action, `subjectId` (e.g. a booking), payload, timestamp                                                                                                                           |
 
 ## Booking lifecycle
 
@@ -34,7 +35,7 @@ stateDiagram-v2
 `allowedActions(booking, today)` lists the actions the UI and agent may offer:
 
 - `confirm` a hold. Fails with `conflict` if the room was taken after the hold expired.
-- `check_in` a confirmed booking only on a day of the stay (`checkIn ≤ today < checkOut`), once the stay is registered ([Registration](#registration)).
+- `check_in` a confirmed booking only on a day of the stay (`checkIn ≤ today < checkOut`). It doesn't wait for the guest book: missing IDs stay flagged on the booking ([Guest book](#guest-book)), see [ADR 0010](decisions/0010-guest-book-per-person-and-phone-id-scans.md).
 - `check_out` a checked-in guest, any day. The room becomes `dirty`.
 - `cancel` a hold or confirmed booking. Checked-in guests check out instead.
 
@@ -116,13 +117,38 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 
 `createActivityService` (`activity.ts`) lists the audit log hotel-wide, newest first, optionally only the agent's or only staff changes. `describeActivity` names each entry's subject from its action prefix (`booking.*` and `folio.*` → the booking as "guest, room"; `room.*` and `task.*` → the room; `room_type.*`, `guest.*`, `staff.*`, `inquiry.*`) and the staff member recorded as `by` in its payload. A subject that no longer exists is left unnamed.
 
-## Registration
+## Guest book
 
-`createRegistrationService` (`registration.ts`) keeps the guest book: one entry per stay for its main guest, with nationality, date of birth, ID document and, for guests from abroad, a home address.
+`createRegistrationService` (`registration.ts`) keeps the guest book: one entry per person staying in the room (`StayGuest`). The main guest's entry has the fixed ID `sg_<bookingId>` and takes its name from their profile; it exists in the book before anything is recorded. Companions are added by name, with ID details if known.
 
-- `register(bookingId, body, actor)` records or corrects it for a `confirmed` or `checked_in` stay (`invalid_transition` otherwise). The date of birth must be in the past (`invalid_input`). Audited as `booking.register` or `booking.update_registration` with only the nationality: personal data stays out of the audit log.
-- `getView(bookingId)` returns the entry and the guest's latest earlier one, to prefill the form for a returning guest.
-- Check-in needs the entry: without it, `check_in` throws `invalid_transition` (after the date and status rules). `BookingDetail.registered` says whether it exists.
+`missingFields(person, today, policy)` lists what an entry still needs:
+
+- nationality and date of birth, always;
+- document type and number, from `idDocumentMinAge` (15: Czech ID cards are compulsory from 15) or when the age is unknown;
+- a home address when the nationality is not the hotel's `homeCountry` (`CZ`).
+
+`buildGuestBook` returns everyone (main guest first, then companions in the order they were added), the party size (adults plus children) and `missing`: people with an incomplete entry plus people the party counts that nobody added yet. `BookingDetail.missingIds` is the same number.
+
+- `getGuestBook(bookingId)` also returns the main guest's details from their latest earlier stay, to prefill.
+- `addGuest(bookingId, body, actor)` adds a companion, up to the party size (`over_capacity`).
+- `updateGuest(bookingId, stayGuestId, patch, actor)` changes a name or ID fields; `null` clears one. The main guest's name is changed on their profile (`invalid_input`).
+- `removeGuest(bookingId, stayGuestId, actor)` takes a companion off; the main guest stays (`invalid_input`).
+- Any status but `cancelled` may change (`invalid_transition`), so a missing ID can be added after check-in or check-out. A date of birth must be in the past (`invalid_input`).
+- Audited on the booking as `booking.add_guest`, `booking.update_guest` and `booking.remove_guest` with the stay guest ID and the names of the changed fields, never their values. `scanned: true` marks values from an ID scan; saving them deletes the scan in the same transaction.
+- Check-in does not wait for the guest book, and the agent's check-in proposal says how many guests still need an ID.
+
+## ID scans
+
+`createIdScanService` (`id-scan.ts`) runs phone scans of ID documents. The domain never sees the photo: the API has the vision model read it and passes the reading in.
+
+1. `start(bookingId, stayGuestId | null)` opens a scan for one person, or for a companion still to add, and deletes expired scans. Its ID is an unguessable token (144 random bits from the API) and the only key to the phone link; it expires after `idScanMinutes` (15).
+2. `getForPhone(id)` returns only the status, the person's first name and the room, never the result.
+3. `beginReading(id)` marks a photo as being read (`conflict` while one already is); a retake after `done` or `failed` is fine. `complete(id, reading)` stores the checked result, or fails with a retake message when the model says the photo shows no readable ID. `fail(id, message)` records a failed model call.
+4. `getForDesk(bookingId, id)` returns the result to the booking that opened the scan. Staff review and save it to the guest book; nothing is saved before that.
+
+`checkReading(reading, today)` turns the model's reading into reviewable values: names printed in capitals are title-cased (`tidyName`), the nationality must be two letters, dates must be real `YYYY-MM-DD` days and a birth date in the past, the document number loses spaces and must be 3 to 30 characters. Anything malformed is dropped rather than guessed. An expired document, an impossible birth date and a document that is not an ID card or passport become warnings for staff.
+
+An unknown, expired or already saved scan is `not_found`.
 
 ## Billing
 

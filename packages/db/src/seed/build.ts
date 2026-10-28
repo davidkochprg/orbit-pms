@@ -17,7 +17,7 @@ import type {
   Inquiry,
   IsoDate,
   Payment,
-  Registration,
+  StayGuest,
   Room,
   RoomType,
   StaffMember,
@@ -25,7 +25,7 @@ import type {
 import { buildBilling } from './billing';
 import { seedGuests, seedRooms, seedRoomTypes } from './catalog';
 import { seedHotelProfile } from './hotel';
-import { buildRegistrations } from './registrations';
+import { buildStayGuests } from './registrations';
 import { seedStaff } from './staff';
 import { createRandom } from './random';
 
@@ -42,7 +42,7 @@ export interface SeedData {
   staff: StaffMember[];
   charges: Charge[];
   payments: Payment[];
-  registrations: Registration[];
+  stayGuests: StayGuest[];
 }
 
 interface Draft {
@@ -240,7 +240,7 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
     pricing,
     staff: seedStaff,
     ...buildBilling(kept, today, pricing),
-    registrations: buildRegistrations(kept, seedGuests, today),
+    stayGuests: buildStayGuests(kept, seedGuests, today),
   };
 }
 

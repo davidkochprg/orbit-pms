@@ -9,7 +9,8 @@ import type {
   HousekeepingRepository,
   InquiryRepository,
   PendingActionRepository,
-  RegistrationRepository,
+  IdScanRepository,
+  StayGuestRepository,
   Repositories,
   RoomRepository,
   SettingsRepository,
@@ -24,11 +25,25 @@ import {
   type Inquiry,
   type PendingAction,
   type Payment,
-  type Registration,
+  type IdScan,
+  type StayGuest,
   pendingActionSchema,
   pricingConfigSchema,
 } from '@orbit/shared';
-import { and, asc, desc, eq, gt, gte, inArray, lt, type SQL } from 'drizzle-orm';
+import {
+  and,
+  asc,
+  desc,
+  eq,
+  gt,
+  gte,
+  inArray,
+  isNotNull,
+  lt,
+  lte,
+  ne,
+  type SQL,
+} from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import type { Db } from './client';
 import {
@@ -42,7 +57,8 @@ import {
   payments,
   pendingActions,
   pricing,
-  registrations,
+  idScans,
+  stayGuests,
   rooms,
   roomTypes,
   staff,
@@ -390,33 +406,83 @@ function billingRepository(db: Db): BillingRepository {
   };
 }
 
-function toRegistration({ registeredAt, ...row }: typeof registrations.$inferSelect): Registration {
-  return { ...row, registeredAt: registeredAt.toISOString() };
+function toStayGuest({
+  registeredAt,
+  createdAt,
+  ...row
+}: typeof stayGuests.$inferSelect): StayGuest {
+  return {
+    ...row,
+    registeredAt: registeredAt?.toISOString() ?? null,
+    createdAt: createdAt.toISOString(),
+  };
 }
 
-function registrationRepository(db: Db): RegistrationRepository {
+function stayGuestRepository(db: Db): StayGuestRepository {
   return {
-    async get(bookingId) {
-      const [row] = await db
-        .select()
-        .from(registrations)
-        .where(eq(registrations.bookingId, bookingId));
-      return row ? toRegistration(row) : null;
-    },
-    async listByGuest(guestId) {
+    async listByBooking(bookingId) {
       const rows = await db
         .select()
-        .from(registrations)
-        .where(eq(registrations.guestId, guestId))
-        .orderBy(desc(registrations.registeredAt));
-      return rows.map(toRegistration);
+        .from(stayGuests)
+        .where(eq(stayGuests.bookingId, bookingId))
+        .orderBy(asc(stayGuests.createdAt), asc(stayGuests.id));
+      return rows.map(toStayGuest);
     },
-    async save(registration) {
-      const row = { ...registration, registeredAt: new Date(registration.registeredAt) };
+    async latestRegistered(guestId, exceptBookingId) {
+      const [row] = await db
+        .select()
+        .from(stayGuests)
+        .where(
+          and(
+            eq(stayGuests.guestId, guestId),
+            ne(stayGuests.bookingId, exceptBookingId),
+            isNotNull(stayGuests.registeredAt),
+          ),
+        )
+        .orderBy(desc(stayGuests.registeredAt))
+        .limit(1);
+      return row ? toStayGuest(row) : null;
+    },
+    async save(stayGuest) {
+      const row = {
+        ...stayGuest,
+        registeredAt: stayGuest.registeredAt ? new Date(stayGuest.registeredAt) : null,
+        createdAt: new Date(stayGuest.createdAt),
+      };
       await db
-        .insert(registrations)
+        .insert(stayGuests)
         .values(row)
-        .onConflictDoUpdate({ target: registrations.bookingId, set: row });
+        .onConflictDoUpdate({ target: stayGuests.id, set: row });
+    },
+    async delete(id) {
+      await db.delete(stayGuests).where(eq(stayGuests.id, id));
+    },
+  };
+}
+
+function toIdScan({ createdAt, expiresAt, ...row }: typeof idScans.$inferSelect): IdScan {
+  return { ...row, createdAt: createdAt.toISOString(), expiresAt: expiresAt.toISOString() };
+}
+
+function idScanRepository(db: Db): IdScanRepository {
+  return {
+    async get(id) {
+      const [row] = await db.select().from(idScans).where(eq(idScans.id, id));
+      return row ? toIdScan(row) : null;
+    },
+    async save(scan) {
+      const row = {
+        ...scan,
+        createdAt: new Date(scan.createdAt),
+        expiresAt: new Date(scan.expiresAt),
+      };
+      await db.insert(idScans).values(row).onConflictDoUpdate({ target: idScans.id, set: row });
+    },
+    async delete(id) {
+      await db.delete(idScans).where(eq(idScans.id, id));
+    },
+    async deleteExpired(now) {
+      await db.delete(idScans).where(lte(idScans.expiresAt, new Date(now)));
     },
   };
 }
@@ -433,7 +499,8 @@ export function createRepositories(db: Db): Repositories {
     settings: settingsRepository(db),
     staff: staffRepository(db),
     billing: billingRepository(db),
-    registrations: registrationRepository(db),
+    stayGuests: stayGuestRepository(db),
+    idScans: idScanRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

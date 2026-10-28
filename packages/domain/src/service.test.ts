@@ -1,4 +1,4 @@
-import type { Guest, Registration } from '@orbit/shared';
+import type { Guest, StayGuest } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { DomainError } from './errors';
 import { hotelPolicy } from './policy';
@@ -17,16 +17,19 @@ const guest: Guest = {
   notes: null,
 };
 
-function registration(bookingId: string): Registration {
+function registration(bookingId: string): StayGuest {
   return {
+    id: `sg_${bookingId}`,
     bookingId,
     guestId: 'gst_test',
+    name: 'Test Guest',
     nationality: 'CZ',
     dateOfBirth: '1980-01-01',
     documentType: 'id_card',
     documentNumber: 'DEMO-0001',
     address: null,
     registeredAt: now.toISOString(),
+    createdAt: now.toISOString(),
   };
 }
 
@@ -78,19 +81,22 @@ describe('createHotelService', () => {
     await expect(service.getBookingDetail('nope')).rejects.toMatchObject({ code: 'not_found' });
   });
 
-  it('checks in only once the stay is registered', async () => {
+  it('counts the party members without a guest-book entry', async () => {
     const { repos, service } = setup();
-    await expect(service.applyBookingAction('arrival', 'check_in', 'user')).rejects.toThrow(
-      /Register the guest before check-in/,
-    );
-    expect((await service.getBookingDetail('arrival')).registered).toBe(false);
-    await repos.registrations.save(registration('arrival'));
-    expect((await service.getBookingDetail('arrival')).registered).toBe(true);
+    expect((await service.getBookingDetail('arrival')).missingIds).toBe(2);
+    await repos.stayGuests.save(registration('arrival'));
+    expect((await service.getBookingDetail('arrival')).missingIds).toBe(1);
+  });
+
+  it('checks in without waiting for the guest book', async () => {
+    const { repos, service } = setup();
+    await service.applyBookingAction('arrival', 'check_in', 'user');
+    expect((await repos.bookings.getBooking('arrival'))?.status).toBe('checked_in');
+    expect((await service.getBookingDetail('arrival')).missingIds).toBe(2);
   });
 
   it('applies an action and records who did it', async () => {
     const { repos, service } = setup();
-    await repos.registrations.save(registration('arrival'));
     await service.applyBookingAction('arrival', 'check_in', 'agent');
     expect((await repos.bookings.getBooking('arrival'))?.status).toBe('checked_in');
     expect(repos.state.audit).toEqual([

@@ -9,6 +9,7 @@ export * from './errors';
 export * from './guests';
 export * from './housekeeping';
 export * from './housekeeping-service';
+export * from './id-scan';
 export * from './inbox';
 export * from './inbox-service';
 export * from './pending-actions';

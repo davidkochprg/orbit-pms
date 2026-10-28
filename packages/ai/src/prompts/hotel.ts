@@ -16,7 +16,7 @@ const sections: [HotelInfoCategory, string][] = [
 const kindNames: Record<RoomKind, string> = { room: 'rooms', apartment: 'apartments' };
 
 /** The rules Orbit enforces, in words, so the model never contradicts the domain. */
-export function enforcedRules(policy: HotelPolicy): string[] {
+export function enforcedRules(policy: Pick<HotelPolicy, 'holdHours' | 'dogsAllowedIn'>): string[] {
   const allowed = policy.dogsAllowedIn;
   const dogs =
     allowed.length === 0

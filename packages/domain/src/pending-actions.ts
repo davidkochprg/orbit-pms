@@ -84,7 +84,11 @@ export function createPendingActionService({
           action.input.bookingId,
           'check_in',
         );
-        return `Check in ${await guestName(booking.guestId)} to room ${room.name}, ${stay(booking)}`;
+        const { missingIds } = await hotel.getBookingDetail(booking.id);
+        const ids = missingIds
+          ? `; ${missingIds} ${missingIds === 1 ? 'guest still needs' : 'guests still need'} an ID in the guest book`
+          : '';
+        return `Check in ${await guestName(booking.guestId)} to room ${room.name}, ${stay(booking)}${ids}`;
       }
       case 'check_out': {
         const { booking, room } = await hotel.previewBookingAction(

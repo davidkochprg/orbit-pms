@@ -8,16 +8,17 @@ import type {
   HotelProfile,
   HousekeepingTask,
   HousekeepingTaskStatus,
+  IdScan,
   Inquiry,
   IsoDate,
   PendingAction,
   Payment,
   PricingConfig,
-  Registration,
   Room,
   RoomStatus,
   RoomType,
   StaffMember,
+  StayGuest,
 } from '@orbit/shared';
 
 export interface BookingFilter {
@@ -139,12 +140,24 @@ export interface BillingRepository {
   createPayment(payment: Payment): Promise<void>;
 }
 
-export interface RegistrationRepository {
-  get(bookingId: string): Promise<Registration | null>;
-  /** Newest first. */
-  listByGuest(guestId: string): Promise<Registration[]>;
-  /** Creates or replaces the stay's registration. */
-  save(registration: Registration): Promise<void>;
+/** Guest-book entries: the people staying in each booking's room. */
+export interface StayGuestRepository {
+  /** Oldest first. */
+  listByBooking(bookingId: string): Promise<StayGuest[]>;
+  /** The guest's most recently registered entry from another booking, to prefill from. */
+  latestRegistered(guestId: string, exceptBookingId: string): Promise<StayGuest | null>;
+  /** Creates or replaces an entry. */
+  save(stayGuest: StayGuest): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+
+export interface IdScanRepository {
+  get(id: string): Promise<IdScan | null>;
+  /** Creates or replaces a scan. */
+  save(scan: IdScan): Promise<void>;
+  delete(id: string): Promise<void>;
+  /** Removes scans that expired at or before `now` (ISO datetime). */
+  deleteExpired(now: string): Promise<void>;
 }
 
 export interface Repositories {
@@ -158,7 +171,8 @@ export interface Repositories {
   settings: SettingsRepository;
   staff: StaffRepository;
   billing: BillingRepository;
-  registrations: RegistrationRepository;
+  stayGuests: StayGuestRepository;
+  idScans: IdScanRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

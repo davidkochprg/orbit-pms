@@ -234,23 +234,28 @@ describe('pending actions', () => {
     ).rejects.toMatchObject({ code: 'invalid_transition' });
   });
 
-  it('proposes a check-in only once the stay is registered', async () => {
+  it('proposes a check-in, saying how many guests still need an ID', async () => {
     const { repos, actions } = setup();
     const checkIn = { kind: 'check_in' as const, input: { bookingId: 'bk_today' } };
-    await expect(actions.propose(checkIn)).rejects.toThrow(/Register the guest/);
-    await repos.registrations.save({
+    expect((await actions.propose(checkIn)).summary).toBe(
+      'Check in Tomáš Novák to room 1, 2026-05-10 to 2026-05-12 (2 nights); 2 guests still need an ID in the guest book',
+    );
+    await repos.stayGuests.save({
+      id: 'sg_bk_today',
       bookingId: 'bk_today',
       guestId: 'gst_1',
+      name: 'Tomáš Novák',
       nationality: 'CZ',
       dateOfBirth: '1980-01-01',
       documentType: 'id_card',
       documentNumber: 'DEMO-1',
       address: null,
       registeredAt: now.toISOString(),
+      createdAt: now.toISOString(),
     });
     const proposed = await actions.propose(checkIn);
     expect(proposed.summary).toBe(
-      'Check in Tomáš Novák to room 1, 2026-05-10 to 2026-05-12 (2 nights)',
+      'Check in Tomáš Novák to room 1, 2026-05-10 to 2026-05-12 (2 nights); 1 guest still needs an ID in the guest book',
     );
     await actions.confirm(proposed.id);
     expect(repos.state.bookings.find((b) => b.id === 'bk_today')?.status).toBe('checked_in');
