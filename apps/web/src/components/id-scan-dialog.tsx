@@ -148,11 +148,20 @@ function WaitForPhone({
   const fileInput = useRef<HTMLInputElement>(null);
   const url = scanId ? scanUrl(window.location.origin, scanId) : null;
   const local = isLocalOnly(window.location.hostname);
+  const [unreadable, setUnreadable] = useState(false);
   const reading = status === 'reading' || upload.isPending;
 
-  async function onFile(file: File | undefined) {
+  async function onFile(input: HTMLInputElement) {
+    const file = input.files?.[0];
+    // Cleared, so picking the same photo again still counts as a change.
+    input.value = '';
     if (!file) return;
-    upload.mutate(await prepareIdPhoto(file));
+    setUnreadable(false);
+    try {
+      upload.mutate(await prepareIdPhoto(file));
+    } catch {
+      setUnreadable(true);
+    }
   }
 
   return (
@@ -202,13 +211,16 @@ function WaitForPhone({
       )}
       {status === 'failed' && error && <ErrorNotice message={error} />}
       {upload.error && <ErrorNotice message={upload.error.message} />}
+      {unreadable && (
+        <ErrorNotice message="This browser couldn't open that photo. Try a JPEG or PNG." />
+      )}
       <input
         ref={fileInput}
         type="file"
         accept="image/*"
         className="sr-only"
         tabIndex={-1}
-        onChange={(e) => void onFile(e.target.files?.[0])}
+        onChange={(e) => void onFile(e.currentTarget)}
       />
       <Button
         variant="outline"

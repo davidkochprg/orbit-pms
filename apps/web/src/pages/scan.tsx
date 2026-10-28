@@ -18,18 +18,28 @@ export function ScanPage() {
   const camera = useRef<HTMLInputElement>(null);
   const library = useRef<HTMLInputElement>(null);
   const [preparing, setPreparing] = useState(false);
+  const [unreadable, setUnreadable] = useState(false);
   const busy = preparing || upload.isPending || view.data?.status === 'reading';
   const status = upload.data?.status ?? view.data?.status;
 
-  async function send(file: File | undefined) {
+  async function send(input: HTMLInputElement) {
+    const file = input.files?.[0];
+    // Cleared, so picking the same photo again still counts as a change.
+    input.value = '';
     if (!file) return;
     setPreparing(true);
+    setUnreadable(false);
     try {
       upload.mutate(await prepareIdPhoto(file));
+    } catch {
+      setUnreadable(true);
     } finally {
       setPreparing(false);
     }
   }
+  const problem = unreadable
+    ? "This phone couldn't open that photo. Take it again with the camera."
+    : (upload.error?.message ?? view.data?.error ?? null);
 
   const who = view.data?.firstName ? `${view.data.firstName}'s` : 'the guest’s';
 
@@ -57,6 +67,7 @@ export function ScanPage() {
               The details are checked on the reception screen. The photo isn&apos;t kept. You can
               close this page.
             </p>
+            {unreadable && problem && <ErrorNotice message={problem} />}
             <Button
               variant="ghost"
               size="sm"
@@ -81,9 +92,7 @@ export function ScanPage() {
                 frame and avoid glare.
               </p>
             </div>
-            {(view.data.error ?? upload.error?.message) && (
-              <ErrorNotice message={view.data.error ?? upload.error?.message ?? ''} />
-            )}
+            {problem && <ErrorNotice message={problem} />}
             <div className="flex flex-col gap-2">
               <Button size="lg" className="h-14 text-base" onClick={() => camera.current?.click()}>
                 <Camera className="size-5" /> Take a photo
@@ -103,7 +112,7 @@ export function ScanPage() {
         capture="environment"
         className="sr-only"
         tabIndex={-1}
-        onChange={(e) => void send(e.target.files?.[0])}
+        onChange={(e) => void send(e.currentTarget)}
       />
       <input
         ref={library}
@@ -111,7 +120,7 @@ export function ScanPage() {
         accept="image/*"
         className="sr-only"
         tabIndex={-1}
-        onChange={(e) => void send(e.target.files?.[0])}
+        onChange={(e) => void send(e.currentTarget)}
       />
       <footer className="text-center text-xs text-subtle-foreground">
         The photo is read once to fill in the guest book and then discarded.
