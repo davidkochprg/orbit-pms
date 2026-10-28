@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 28 28" fill="none">
+  <!-- Orbit's mark: the aurora orb from .bg-orb with its ring, as in brand-mark.tsx. -->
+  <defs>
+    <linearGradient id="body" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#98a4cf" />
+      <stop offset="0.32" stop-color="#7588db" />
+      <stop offset="0.52" stop-color="#6a88ee" />
+      <stop offset="0.82" stop-color="#47579c" />
+      <stop offset="1" stop-color="#313763" />
+    </linearGradient>
+    <radialGradient id="rim" cx="0.68" cy="0.06" r="0.42">
+      <stop offset="0" stop-color="#e9a780" stop-opacity="0.9" />
+      <stop offset="1" stop-color="#e9a780" stop-opacity="0" />
+    </radialGradient>
+  </defs>
+  <circle cx="14" cy="14" r="9" fill="url(#body)" />
+  <circle cx="14" cy="14" r="9" fill="url(#rim)" />
+  <g transform="rotate(-20 14 14)" stroke="#6a88ee" stroke-width="1.6" stroke-linecap="round">
+    <path d="M1.5 14a12.5 3.6 0 0 1 25 0" stroke-opacity="0.35" />
+    <path d="M1.5 14a12.5 3.6 0 0 0 25 0" />
+  </g>
+</svg>
