@@ -357,12 +357,6 @@
     color-mix(in oklab, var(--ink) 16%, transparent) 40%,
     color-mix(in oklab, var(--ink) 14%, transparent) 100%
   );
-  /* The agent's ring: cool blue from the lower left, a warm flare, then dark slate. */
-  --stroke-aurora:
-    radial-gradient(ellipse 22% 160% at 33% 100%, #ebedf4f2 0%, #ebedf400 60%),
-    radial-gradient(ellipse 30% 170% at 52% 100%, #fca29b80 0%, #fca29b00 62%),
-    radial-gradient(ellipse 55% 260% at 0% 100%, #8aa5fc 0%, #5e7cdc 30%, #5e7cdc00 68%),
-    linear-gradient(120deg, #2b3352 0%, #2f3546 45%, #362e33 100%);
 
   /* The welcome page's dusk scene: its fallback gradient, the glyphs drawn over it, and the
      dark page around it. The same in both themes; the scene itself is painted by a shader. */
@@ -570,8 +564,7 @@
    * follows the radius and needs no border. Brightest at the top center, like light from above.
    */
   .stroke-lit,
-  .stroke-bevel,
-  .stroke-aurora {
+  .stroke-bevel {
     /* The element must be positioned (relative, fixed, …); this doesn't set it, so it never
        overrides a dialog's fixed position. The ring sits above the element's own content (a
        sticky table header would hide it otherwise), inside its own stacking context. */
@@ -596,14 +589,6 @@
   }
   .stroke-bevel {
     --stroke: var(--stroke-bevel);
-  }
-  .stroke-aurora {
-    --stroke: var(--stroke-aurora);
-    &::after {
-      background-size: 140% 140%;
-      background-position: 50%;
-      animation: aurora-shimmer 9s ease-in-out infinite;
-    }
   }
   /* Raised pill buttons: a diagonal sheen from a light chip tone to the surface. */
   .fill-action {
@@ -647,20 +632,5 @@
   .scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: var(--border-strong) transparent;
-  }
-}
-
-@keyframes aurora-shimmer {
-  0%,
-  100% {
-    background-position: 38% 55%;
-  }
-  50% {
-    background-position: 62% 45%;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .stroke-aurora::after {
-    animation: none;
   }
 }

@@ -10,6 +10,8 @@ export interface OpenPaletteOptions {
 
 export interface CommandPaletteContextValue {
   openPalette: (options?: OpenPaletteOptions) => void;
+  /** Closes the bar; the conversation stays for the next ⌘K. */
+  closePalette: () => void;
 }
 
 export const CommandPaletteContext = createContext<CommandPaletteContextValue | null>(null);

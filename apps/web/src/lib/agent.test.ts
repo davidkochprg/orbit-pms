@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { agentErrorMessage, asProposal, asToolError, toolLabel } from './agent';
+import {
+  agentErrorMessage,
+  asProposal,
+  asToolError,
+  orbStateFor,
+  toolLabel,
+  toolResultSummary,
+} from './agent';
 
 describe('agent helpers', () => {
   it('recognises proposal tool output', () => {
@@ -27,5 +34,35 @@ describe('agent helpers', () => {
     expect(toolLabel('checkAvailability', false)).toBe('Checking availability');
     expect(toolLabel('checkAvailability', true)).toBe('Checked availability');
     expect(toolLabel('somethingNew', true)).toBe('Ran somethingNew');
+  });
+
+  it('sums up a finished step in a few words', () => {
+    expect(toolResultSummary('getArrivals', [{}, {}])).toBe('2 guests');
+    expect(toolResultSummary('searchBookings', [])).toBe('No bookings');
+    expect(toolResultSummary('quote', { total: 4500 })).toBe('4,500 CZK');
+    expect(toolResultSummary('getBill', { balance: -200 })).toBe('200 CZK owed back');
+    expect(toolResultSummary('getGuestBook', { partySize: 3, missing: 1 })).toBe('1 ID missing');
+    expect(
+      toolResultSummary('setRoomStatus', { done: true, roomName: '103', status: 'out_of_order' }),
+    ).toBe('Room 103 now out of order');
+    expect(
+      toolResultSummary('removeCharge', {
+        pendingActionId: 'act_1',
+        summary: 'Remove …',
+        status: 'awaiting_confirmation',
+      }),
+    ).toBe('Waiting for your confirmation');
+    expect(toolResultSummary('getBooking', { error: { code: 'not_found', message: 'Gone' } })).toBe(
+      'Gone',
+    );
+    expect(toolResultSummary('getBooking', { nothing: true })).toBe(null);
+  });
+
+  it('moves the orb by what the step does', () => {
+    expect(orbStateFor('getArrivals')).toBe('searching');
+    expect(orbStateFor('checkAvailability')).toBe('searching');
+    expect(orbStateFor('quote')).toBe('solving');
+    expect(orbStateFor('removeCharge')).toBe('weaving');
+    expect(orbStateFor('setRoomStatus')).toBe('weaving');
   });
 });

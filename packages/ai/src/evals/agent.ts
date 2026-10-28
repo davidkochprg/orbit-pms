@@ -203,6 +203,14 @@ function called(calls: EvalToolCall[], ...names: string[]): string[] {
     : [`never called ${names.join(' or ')}`];
 }
 
+/** The app turns `[[bk_1]]` into a chip; an ID without brackets would show as raw text. */
+function bareIds(answer: string): string[] {
+  const bare = answer
+    .replace(/\[\[(?:bk|rm|gst)_[A-Za-z0-9-]+\]\]/g, '')
+    .match(/\b(?:bk|rm|gst)_\w+/g);
+  return bare ? [`answer shows bare IDs ${bare.join(', ')}`] : [];
+}
+
 /** Problems unless the answer names each thing, by any of its names (a guest or their room). */
 function mentions(answer: string, ...things: string[][]): string[] {
   return things
@@ -238,8 +246,8 @@ export const agentFixtures: AgentFixture[] = [
     check: ({ hotel, calls, answer }) => [
       ...readOnly(hotel),
       ...called(calls, 'getDailyBrief', 'getGuestBook'),
-      ...mentions(answer, ['Anna', '104'], ['Dvořák', '201']),
-      ...(/bk_/.test(answer) ? ['answer shows booking IDs'] : []),
+      ...mentions(answer, ['Anna', '104', '[[bk_anna]]'], ['Dvořák', '201', '[[bk_jan]]']),
+      ...bareIds(answer),
       ...(/Dvorak/.test(answer) ? ['answer drops the diacritics in Dvořák'] : []),
     ],
   },
@@ -296,12 +304,25 @@ export const agentFixtures: AgentFixture[] = [
       proposed(hotel, 'update_guest', { guestId: 'gst_anna', email: 'anna.example@example.com' }),
   },
   {
+    id: 'arrivals-list',
+    prompt: 'Who arrives today?',
+    check: ({ hotel, calls, answer }) => [
+      ...readOnly(hotel),
+      ...called(calls, 'getArrivals', 'getDailyBrief', 'searchBookings'),
+      ...(/^\s*[-•]\s*\[\[bk_jan\]\]/m.test(answer)
+        ? []
+        : ['answer has no list item leading with [[bk_jan]]']),
+      ...bareIds(answer),
+    ],
+  },
+  {
     id: 'guest-book-question',
     prompt: 'Kdo je zapsaný v knize hostů pokoje 104?',
     check: ({ hotel, calls, answer }) => [
       ...readOnly(hotel),
       ...called(calls, 'getGuestBook'),
-      ...mentions(answer, ['Anna']),
+      ...mentions(answer, ['Anna', '[[bk_anna]]', '[[gst_anna]]']),
+      ...bareIds(answer),
     ],
   },
 ];

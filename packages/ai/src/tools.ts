@@ -335,7 +335,7 @@ export function createAgentTools({
     }),
     updateGuestBook: tool({
       description:
-        "Propose recording or correcting a person's guest-book details: nationality (two-letter code), dateOfBirth, documentType, documentNumber, address, or a companion's name. Send only what the staff member gave; never invent ID details. The main guest's name is changed with updateGuestProfile. The user must confirm.",
+        "Propose recording or correcting a person's guest-book details: nationality (two-letter code), dateOfBirth, documentType, documentNumber, address, or a companion's name. Send only what the staff member gave; never invent ID details. The country of an ID card or passport is the holder's nationality (a Czech ID card means CZ). The main guest's name is changed with updateGuestProfile. The user must confirm.",
       inputSchema: stayGuestPatchSchema.omit({ scanId: true }).extend(stayGuestRefSchema.shape),
       execute: (input) => propose({ kind: 'update_stay_guest', input }),
     }),

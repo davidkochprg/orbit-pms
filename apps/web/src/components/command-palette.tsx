@@ -1,5 +1,6 @@
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
+import { BorderBeam } from 'border-beam';
 import { Command as CommandPrimitive, defaultFilter } from 'cmdk';
 import {
   ArrowLeft,
@@ -38,6 +39,7 @@ import {
   type OpenPaletteOptions,
   type PaletteMode,
 } from '@/hooks/use-command-palette';
+import { useDarkMode } from '@/hooks/use-dark-mode';
 import { agentErrorMessage, suggestedQuestions } from '@/lib/agent';
 import { useDayOverview, useGuests, useHealth } from '@/lib/api';
 import { navItems } from '@/lib/nav';
@@ -56,6 +58,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [mode, setMode] = useState<PaletteMode>('search');
   const [text, setText] = useState('');
   const chat = useChat({ transport });
+  const dark = useDarkMode();
+  const working = chat.status === 'submitted' || chat.status === 'streaming';
 
   const openPalette = useCallback((options?: OpenPaletteOptions) => {
     setMode(options?.mode ?? 'search');
@@ -82,7 +86,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     void chat.sendMessage({ text: q });
   };
 
-  const value = useMemo(() => ({ openPalette }), [openPalette]);
+  const closePalette = useCallback(() => setOpen(false), []);
+  const value = useMemo(() => ({ openPalette, closePalette }), [openPalette, closePalette]);
 
   return (
     <CommandPaletteContext value={value}>
@@ -90,7 +95,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton={false}
-          className="stroke-aurora top-[12vh] flex max-h-[76vh] translate-y-0 flex-col gap-0 overflow-hidden rounded-card border-0 bg-popover p-0 shadow-floating ring-0 backdrop-blur-2xl sm:max-w-[640px]"
+          // A transparent shell: the panel is inside the beam, so its glow isn't clipped.
+          className="top-[12vh] block translate-y-0 gap-0 rounded-card border-0 bg-transparent p-0 shadow-none ring-0 sm:max-w-[640px]"
           onEscapeKeyDown={(e) => {
             // Like Raycast: Escape steps back from the agent to search before it closes.
             if (mode === 'agent') {
@@ -103,28 +109,41 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
           <DialogDescription className="sr-only">
             Search guests and pages, or ask the Orbit agent.
           </DialogDescription>
-          {mode === 'search' ? (
-            <SearchView
-              text={text}
-              onTextChange={setText}
-              onAsk={ask}
-              onShowThread={chat.messages.length > 0 ? () => setMode('agent') : undefined}
-              close={() => setOpen(false)}
-            />
-          ) : (
-            <AgentView
-              chat={chat}
-              text={text}
-              onTextChange={setText}
-              onAsk={ask}
-              onBack={() => setMode('search')}
-              onNew={() => {
-                void chat.stop();
-                chat.setMessages([]);
-                chat.clearError();
-              }}
-            />
-          )}
+          {/* The beam runs round the bar only while the agent is working. */}
+          <BorderBeam
+            active={working}
+            size="md"
+            theme={dark ? 'dark' : 'light'}
+            brightness={1.8}
+            glowSize={1.4}
+            borderRadius={14}
+            className="rounded-card"
+          >
+            <div className="relative flex max-h-[76vh] flex-col overflow-hidden rounded-card bg-popover shadow-floating backdrop-blur-2xl stroke-lit">
+              {mode === 'search' ? (
+                <SearchView
+                  text={text}
+                  onTextChange={setText}
+                  onAsk={ask}
+                  onShowThread={chat.messages.length > 0 ? () => setMode('agent') : undefined}
+                  close={() => setOpen(false)}
+                />
+              ) : (
+                <AgentView
+                  chat={chat}
+                  text={text}
+                  onTextChange={setText}
+                  onAsk={ask}
+                  onBack={() => setMode('search')}
+                  onNew={() => {
+                    void chat.stop();
+                    chat.setMessages([]);
+                    chat.clearError();
+                  }}
+                />
+              )}
+            </div>
+          </BorderBeam>
         </DialogContent>
       </Dialog>
     </CommandPaletteContext>
@@ -380,12 +399,7 @@ function AgentView({
             for your confirmation.
           </p>
         )}
-        <AgentThread messages={chat.messages} />
-        {chat.status === 'submitted' && (
-          <p className="mt-3 flex items-center gap-2 text-muted-foreground">
-            <Sparkles className="size-3.5 animate-pulse text-primary-text" /> Thinking…
-          </p>
-        )}
+        <AgentThread messages={chat.messages} status={chat.status} />
         {chat.error && <ErrorNotice message={agentErrorMessage(chat.error)} className="mt-3" />}
       </div>
 

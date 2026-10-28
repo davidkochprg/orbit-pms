@@ -72,6 +72,99 @@ export function toolLabel(name: string, done: boolean): string {
   return done ? `Ran ${name}` : `Running ${name}`;
 }
 
+/** The ThinkingOrb animations Orbit uses (see thinking-orbs). */
+export type AgentOrbState = 'working' | 'searching' | 'solving' | 'weaving' | 'composing';
+
+const orbStates: Record<string, AgentOrbState> = {
+  quote: 'solving',
+  getReport: 'solving',
+  getBill: 'solving',
+  setRoomStatus: 'weaving',
+  createHousekeepingTask: 'weaving',
+  setTaskStatus: 'weaving',
+};
+
+/** How the orb moves while a tool runs: looking things up, working figures out, or changing. */
+export function orbStateFor(toolName: string): AgentOrbState {
+  if (toolName in orbStates) return orbStates[toolName]!;
+  if (/^(create|confirm|cancel|check|move|change|update|add|record|remove)/.test(toolName)) {
+    return toolName === 'checkAvailability' ? 'searching' : 'weaving';
+  }
+  return 'searching';
+}
+
+const czk = (n: number) => `${new Intl.NumberFormat('en-GB').format(n)} CZK`;
+const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+type Obj = Record<string, unknown>;
+const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null;
+
+/** A few words about what a finished tool step found or did, e.g. "8 guests" or "9,500 CZK due". */
+export function toolResultSummary(toolName: string, output: unknown): string | null {
+  if (asProposal(output)) return 'Waiting for your confirmation';
+  const error = asToolError(output);
+  if (error) return error;
+  if (Array.isArray(output)) {
+    const noun: Record<string, [string, string]> = {
+      getArrivals: ['guest', 'guests'],
+      getDepartures: ['guest', 'guests'],
+      searchBookings: ['booking', 'bookings'],
+      checkAvailability: ['room free', 'rooms free'],
+      listRooms: ['room', 'rooms'],
+    };
+    const [one, many] = noun[toolName] ?? ['result', 'results'];
+    return output.length === 0 ? `No ${many}` : count(output.length, one, many);
+  }
+  if (!isObj(output)) return null;
+  switch (toolName) {
+    case 'quote':
+      return typeof output.total === 'number' ? czk(output.total) : null;
+    case 'getBill': {
+      const balance = output.balance;
+      if (typeof balance !== 'number') return null;
+      return balance > 0
+        ? `${czk(balance)} due`
+        : balance < 0
+          ? `${czk(-balance)} owed back`
+          : 'Paid in full';
+    }
+    case 'getBooking': {
+      const guest = isObj(output.guest) ? output.guest.name : null;
+      const room = isObj(output.room) ? output.room.name : null;
+      return typeof guest === 'string' && typeof room === 'string'
+        ? `${guest}, room ${room}`
+        : null;
+    }
+    case 'getGuestBook': {
+      const { partySize, missing } = output;
+      if (typeof partySize !== 'number' || typeof missing !== 'number') return null;
+      return missing === 0 ? 'Everyone registered' : `${count(missing, 'ID')} missing`;
+    }
+    case 'getDailyBrief': {
+      const arrivals = output.arrivals;
+      return typeof arrivals === 'number' ? `${count(arrivals, 'arrival')} today` : null;
+    }
+    case 'getReport': {
+      const occupancy = output.occupancy;
+      return typeof occupancy === 'number' ? `${Math.round(occupancy * 100)}% occupancy` : null;
+    }
+    case 'getHousekeeping':
+      return Array.isArray(output.rooms) ? count(output.rooms.length, 'room') : null;
+    case 'setRoomStatus':
+      return typeof output.roomName === 'string' && typeof output.status === 'string'
+        ? `Room ${output.roomName} now ${output.status.replaceAll('_', ' ')}`
+        : null;
+    case 'createHousekeepingTask':
+    case 'setTaskStatus': {
+      const task = isObj(output.task) ? output.task : null;
+      return task && typeof task.status === 'string'
+        ? `Task ${task.status.replaceAll('_', ' ')}`
+        : null;
+    }
+    default:
+      return null;
+  }
+}
+
 /** Starting points shown in the command bar before anything is typed. */
 export const suggestedQuestions = [
   'Who arrives today, and do any of them bring children?',
