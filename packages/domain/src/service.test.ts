@@ -115,6 +115,50 @@ describe('createHotelService', () => {
     expect((await repos.rooms.getRoom('rm_2'))?.status).toBe('dirty');
   });
 
+  it('locks a room before checking it for conflicts, so two changes cannot both book it', async () => {
+    const { repos, service } = setup();
+    const calls: string[] = [];
+    const rooms = { ...repos.rooms };
+    const bookings = { ...repos.bookings };
+    repos.rooms.lockRoom = (id) => {
+      calls.push(`lock ${id}`);
+      return rooms.lockRoom(id);
+    };
+    repos.bookings.listBookings = (filter) => {
+      if (filter?.roomId) calls.push(`read ${filter.roomId}`);
+      return bookings.listBookings(filter);
+    };
+    await service.moveBooking('arrival', 'rm_2', 'user');
+    await service.changeBookingDates(
+      'later',
+      { checkIn: '2026-05-12', checkOut: '2026-05-15' },
+      'user',
+    );
+    await service.createHold(
+      {
+        guest: { guestId: 'gst_test' },
+        roomId: 'rm_1',
+        checkIn: '2026-05-20',
+        checkOut: '2026-05-22',
+        adults: 2,
+        childAges: [],
+        addons: { wellness: false, dogs: 0, extraBeds: 0 },
+        source: 'phone',
+        notes: null,
+        inquiryId: null,
+      },
+      'user',
+    );
+    expect(calls).toEqual([
+      'lock rm_2',
+      'read rm_2',
+      'lock rm_2',
+      'read rm_2',
+      'lock rm_1',
+      'read rm_1',
+    ]);
+  });
+
   it('moves a booking and logs both rooms', async () => {
     const { repos, service } = setup();
     await service.moveBooking('arrival', 'rm_2', 'user');

@@ -27,6 +27,14 @@ describe('repositories (PGlite)', () => {
     expect(await repos.rooms.getRoom('nope')).toBeNull();
   });
 
+  it('locks a room inside a transaction', async () => {
+    const rooms = await repos.transaction(async (tx) => {
+      await tx.rooms.lockRoom('rm_a1');
+      return tx.rooms.listRooms();
+    });
+    expect(rooms).toHaveLength(50);
+  });
+
   it('round-trips bookings exactly', async () => {
     const all = await repos.bookings.listBookings();
     expect(all).toHaveLength(seed.bookings.length);

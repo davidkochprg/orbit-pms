@@ -34,6 +34,11 @@ export interface RoomRepository {
   listRoomTypes(): Promise<RoomType[]>;
   listRooms(): Promise<Room[]>;
   getRoom(id: string): Promise<Room | null>;
+  /**
+   * Locks the room until the transaction ends, so two changes that book it are checked one after
+   * the other instead of both passing the conflict check.
+   */
+  lockRoom(id: string): Promise<void>;
   setRoomStatus(id: string, status: RoomStatus): Promise<void>;
   createRoomType(roomType: RoomType): Promise<void>;
   /** Replaces a stored room type. */

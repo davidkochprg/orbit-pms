@@ -83,6 +83,9 @@ function roomRepository(db: Db): RoomRepository {
       const [row] = await db.select().from(rooms).where(eq(rooms.id, id));
       return row ?? null;
     },
+    async lockRoom(id) {
+      await db.select({ id: rooms.id }).from(rooms).where(eq(rooms.id, id)).for('update');
+    },
     async setRoomStatus(id, status) {
       await db.update(rooms).set({ status }).where(eq(rooms.id, id));
     },

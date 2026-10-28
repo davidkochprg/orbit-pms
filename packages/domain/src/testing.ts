@@ -81,6 +81,8 @@ export function createMemoryRepositories(
       listRoomTypes: () => Promise.resolve([...state.roomTypes]),
       listRooms: () => Promise.resolve([...state.rooms]),
       getRoom: (id) => Promise.resolve(state.rooms.find((r) => r.id === id) ?? null),
+      // In memory every step runs to completion, so there is nothing to lock.
+      lockRoom: () => Promise.resolve(),
       setRoomStatus: (id, status) => {
         state.rooms = state.rooms.map((r) => (r.id === id ? { ...r, status } : r));
         return Promise.resolve();

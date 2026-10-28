@@ -78,6 +78,15 @@ async function loadBooking(repos: Repositories, id: string): Promise<Booking> {
   return booking;
 }
 
+/**
+ * The room's bookings, read after locking the room: a change checked against them can't race
+ * another change to the same room into a double booking.
+ */
+async function lockedRoomBookings(tx: Repositories, roomId: string): Promise<Booking[]> {
+  await tx.rooms.lockRoom(roomId);
+  return tx.bookings.listBookings({ roomId });
+}
+
 async function loadRoom(repos: Repositories, id: string) {
   const room = await repos.rooms.getRoom(id);
   if (!room) throw new DomainError('not_found', `Room ${id} not found`);
@@ -112,7 +121,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
       const updated = applyAction(booking, action, {
         today: hotelToday(now),
         now,
-        roomBookings: await tx.bookings.listBookings({ roomId: booking.roomId }),
+        roomBookings: await lockedRoomBookings(tx, booking.roomId),
         roomName: room.name,
       });
       return {
@@ -137,7 +146,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
       const target = await loadRoom(tx, roomId);
       const updated = moveBooking(booking, {
         ...target,
-        roomBookings: await tx.bookings.listBookings({ roomId }),
+        roomBookings: await lockedRoomBookings(tx, roomId),
         now: clock(),
       });
       return {
@@ -159,7 +168,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
       const current = await loadRoom(tx, booking.roomId);
       const updated = changeDates(booking, range, {
         ...current,
-        roomBookings: await tx.bookings.listBookings({ roomId: booking.roomId }),
+        roomBookings: await lockedRoomBookings(tx, booking.roomId),
         now: clock(),
         pricing: await loadPricing(tx),
       });
@@ -192,7 +201,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         { checkIn: target.checkIn, checkOut: target.checkOut },
         {
           ...dest,
-          roomBookings: await tx.bookings.listBookings({ roomId: target.roomId }),
+          roomBookings: await lockedRoomBookings(tx, target.roomId),
           now: clock(),
           pricing: await loadPricing(tx),
         },
@@ -223,7 +232,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
       const target = await loadRoom(tx, patch.roomId ?? booking.roomId);
       const updated = updateBooking(booking, patch, {
         ...target,
-        roomBookings: await tx.bookings.listBookings({ roomId: target.room.id }),
+        roomBookings: await lockedRoomBookings(tx, target.room.id),
         now: clock(),
         pricing: await loadPricing(tx),
       });
@@ -268,7 +277,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
         ...target,
         id: newId('bk'),
         guestId,
-        roomBookings: await tx.bookings.listBookings({ roomId: input.roomId }),
+        roomBookings: await lockedRoomBookings(tx, input.roomId),
         now,
         today: hotelToday(now),
         pricing: await loadPricing(tx),
