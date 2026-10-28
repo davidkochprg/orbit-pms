@@ -57,7 +57,7 @@ export function BookingDrawer() {
 
   return (
     <Sheet open={bookingId !== null} onOpenChange={(open) => !open && close()}>
-      <SheetContent className="inset-y-2! right-2! h-auto! w-[calc(100%-1rem)] gap-0 overflow-hidden rounded-xl border-0! bg-background shadow-floating sm:max-w-[420px]">
+      <SheetContent className="inset-y-2! right-2! h-auto! w-[calc(100%-1rem)] gap-0 overflow-hidden rounded-card border-0! bg-background shadow-floating sm:max-w-[440px]">
         {detail.data ? (
           <BookingDetailView detail={detail.data} />
         ) : detail.isError ? (

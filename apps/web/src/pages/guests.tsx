@@ -22,6 +22,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGuests } from '@/lib/api';
 import { languageLabels } from '@/lib/format';
+import { cn, labelCaps } from '@/lib/utils';
 
 const features = tableFeatures({
   columnFilteringFeature,
@@ -88,7 +89,7 @@ export function GuestsPage() {
         meta={guests.data && `${rows.length}`}
         actions={
           <>
-            <label className="flex h-7 w-56 items-center gap-2 rounded-md border bg-background px-2 text-muted-foreground shadow-raised focus-within:ring-2 focus-within:ring-ring">
+            <label className="relative flex h-8 w-56 items-center gap-2 rounded-control bg-ink/4 px-3 text-muted-foreground ring-1 ring-ink/6 focus-within:ring-2 focus-within:ring-ring">
               <Search className="size-3.5 shrink-0" />
               <input
                 placeholder="Filter by name or email"
@@ -112,7 +113,7 @@ export function GuestsPage() {
           <EmptyState icon={Users} title="No guests match this filter" className="mt-16" />
         ) : (
           <table className="w-full text-sm">
-            <thead className="sticky top-0 z-10 bg-background">
+            <thead className="sticky top-0 z-10 bg-surface-sunken/90 backdrop-blur-md">
               {table.getHeaderGroups().map((group) => (
                 <tr key={group.id} className="border-b">
                   {group.headers.map((header) => {
@@ -120,11 +121,11 @@ export function GuestsPage() {
                     return (
                       <th
                         key={header.id}
-                        className="h-9 px-4 text-left text-xs font-medium text-muted-foreground first:pl-6"
+                        className={cn(labelCaps, 'h-10 px-4 text-left first:pl-6')}
                       >
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 hover:text-foreground"
+                          className="inline-flex items-center gap-1 uppercase hover:text-foreground"
                           onClick={header.column.getToggleSortingHandler()}
                         >
                           <table.FlexRender header={header} />

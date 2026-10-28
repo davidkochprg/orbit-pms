@@ -60,7 +60,7 @@ export function TeamSettings({ staff, currentId, readOnly }: Props) {
                   {member.email ?? 'No email'}
                 </span>
               </span>
-              <span className="shrink-0 rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium">
+              <span className="shrink-0 rounded-full border border-ink/7 bg-ink/4 px-2 py-0.5 text-xs">
                 {member.active ? staffRoleLabels[member.role] : 'Inactive'}
               </span>
               {!readOnly && (
@@ -154,7 +154,7 @@ function AddMember() {
           <div
             role="radiogroup"
             aria-label="Role"
-            className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1"
+            className="grid grid-cols-3 gap-1 rounded-[0.625rem] border border-ink/6 bg-ink/4 p-1"
           >
             {staffRoles.map((r) => (
               <button
@@ -165,7 +165,7 @@ function AddMember() {
                 onClick={() => setRole(r)}
                 className={cn(
                   'rounded-md px-3 py-1 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
-                  role === r && 'bg-background text-foreground shadow-raised',
+                  role === r && 'relative fill-action text-foreground shadow-action stroke-lit',
                 )}
               >
                 {staffRoleLabels[r]}

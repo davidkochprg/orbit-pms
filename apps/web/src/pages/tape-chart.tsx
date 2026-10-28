@@ -71,10 +71,10 @@ import { cn } from '@/lib/utils';
 type VisibleStatus = Exclude<BookingStatus, 'cancelled'>;
 
 const barStyles: Record<VisibleStatus, string> = {
-  hold: 'border border-dashed border-status-hold bg-surface-raised/70',
-  confirmed: 'bg-surface-raised shadow-raised',
-  checked_in: 'bg-surface-raised shadow-raised',
-  checked_out: 'bg-surface-raised/60 text-muted-foreground shadow-raised',
+  hold: 'border border-dashed border-status-hold/70 bg-bar-hold',
+  confirmed: 'bg-bar-confirmed stroke-lit shadow-[0_1px_2px_var(--shadow-soft)]',
+  checked_in: 'bg-bar-checked-in stroke-lit shadow-[0_1px_2px_var(--shadow-soft)]',
+  checked_out: 'bg-ink/5 text-muted-foreground',
 };
 
 /** Statuses whose bars can be dragged; the API still checks every rule. */
@@ -181,13 +181,13 @@ function TapeChart({ today }: { today: string }) {
               aria-label="Jump to date"
               value={start}
               onChange={(e) => isIsoDate(e.target.value) && goTo(e.target.value)}
-              className="h-7 rounded-md border bg-background px-2 text-xs text-muted-foreground shadow-raised outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="relative h-8 rounded-control fill-action px-3 font-mono text-xs text-muted-foreground shadow-action stroke-lit outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
-            <div className="flex items-center rounded-md border bg-background shadow-raised">
+            <div className="relative flex items-center rounded-control fill-action shadow-action stroke-lit">
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="rounded-r-none"
+                className="rounded-md"
                 aria-label={`Previous ${TAPE_DAYS} days`}
                 onClick={() => goTo(addDaysIso(start, -TAPE_DAYS))}
               >
@@ -196,7 +196,7 @@ function TapeChart({ today }: { today: string }) {
               <Button
                 variant="ghost"
                 size="sm"
-                className="rounded-none border-x"
+                className="rounded-md px-2"
                 onClick={() => goTo(today)}
               >
                 Today
@@ -204,7 +204,7 @@ function TapeChart({ today }: { today: string }) {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="rounded-l-none"
+                className="rounded-md"
                 aria-label={`Next ${TAPE_DAYS} days`}
                 onClick={() => goTo(addDaysIso(start, TAPE_DAYS))}
               >
@@ -268,7 +268,7 @@ function TapeChart({ today }: { today: string }) {
         )}
       </div>
 
-      <footer className="flex h-9 shrink-0 items-center gap-4 border-t px-4 text-xs text-muted-foreground">
+      <footer className="flex h-10 shrink-0 items-center gap-4 border-t bg-surface-sunken px-4 text-xs text-muted-foreground">
         <span className="hidden truncate md:inline">
           Click an empty night to book it. Drag a booking to move it, or its right edge to change
           the departure. Right-click for more.
@@ -306,7 +306,7 @@ function DayHeader({
             key={day}
             className={cn(
               'flex shrink-0 flex-col justify-center border-r border-grid-line px-2.5 last:border-r-0',
-              isWeekend(day) && 'bg-surface-sunken',
+              isWeekend(day) && 'bg-ink/[0.018]',
               isToday && 'bg-primary-soft',
             )}
             style={{ width: dayWidth }}
@@ -326,7 +326,10 @@ function DayHeader({
               </span>
             </span>
             <span
-              className={cn('text-sm font-medium tabular-nums', isToday && 'text-primary-text')}
+              className={cn(
+                '-ml-1.5 w-fit rounded-md px-1.5 text-sm font-medium tabular-nums',
+                isToday && 'bg-primary text-primary-foreground shadow-button',
+              )}
             >
               {date}
             </span>
@@ -379,7 +382,7 @@ function RoomGroupBlock({
               <RoomStatusDot status={room.status} />
               <span
                 className={cn(
-                  'truncate font-medium tabular-nums',
+                  'truncate font-mono text-[0.8125rem]',
                   room.status === 'out_of_order' && 'text-muted-foreground',
                 )}
               >
@@ -439,7 +442,7 @@ function RoomLane({
               onClick={() => !disabled && bookable(day) && onNew(room.id, day)}
               className={cn(
                 'h-full shrink-0 border-r border-grid-line last:border-r-0',
-                isWeekend(day) && 'bg-surface-sunken',
+                isWeekend(day) && 'bg-ink/[0.018]',
                 day === today && 'bg-primary-soft',
                 bookable(day) && 'cursor-cell hover:bg-accent',
               )}
@@ -549,8 +552,8 @@ function BookingBar({
           {...moveListeners}
           {...moveAttributes}
           className={cn(
-            'absolute top-[5px] bottom-[5px] flex items-center gap-1.5 overflow-hidden rounded-md pr-2 pl-3 text-left text-sm outline-none',
-            'transition-shadow hover:shadow-floating focus-visible:ring-2 focus-visible:ring-ring',
+            'absolute top-[6px] bottom-[6px] flex items-center gap-1.5 overflow-hidden rounded-lg pr-2 pl-3.5 text-left text-sm outline-none',
+            'transition-[box-shadow,filter] duration-150 ease-snap hover:shadow-floating focus-visible:ring-2 focus-visible:ring-ring',
             barStyles[booking.status],
             place.continuesBefore && 'rounded-l-none',
             place.continuesAfter && 'rounded-r-none',
@@ -567,12 +570,15 @@ function BookingBar({
         >
           <span
             aria-hidden
-            className={cn('absolute inset-y-0 left-0 w-[3px]', bookingStatusColor[booking.status])}
+            className={cn(
+              'absolute top-1.5 bottom-1.5 left-1.5 w-[3px] rounded-full',
+              bookingStatusColor[booking.status],
+            )}
           />
           {place.continuesBefore && (
             <ChevronLeft className="-ml-1 size-3.5 shrink-0 text-muted-foreground" />
           )}
-          <span className="truncate font-medium">{name}</span>
+          <span className="truncate">{name}</span>
           {icons.length > 0 && (
             <span className="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
               {icons.map(({ icon: Icon, label: iconLabel }) => (

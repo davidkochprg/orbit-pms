@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { PageBody, PageHeader } from '@/components/page-header';
-import { Section } from '@/components/section';
+import { Panel } from '@/components/panel';
 import { Segmented } from '@/components/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -47,7 +47,7 @@ export function ReportsPage() {
     <>
       <PageHeader title="Reports" meta={range && formatRange(range.from, range.to)} />
       <PageBody>
-        <div className="flex flex-col gap-8">
+        <div className="flex flex-col gap-5">
           <Segmented
             label="Period"
             value={period}
@@ -61,10 +61,10 @@ export function ReportsPage() {
             <div className="flex flex-col gap-6">
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
                 {[0, 1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-24" />
+                  <Skeleton key={i} className="h-28 rounded-card" />
                 ))}
               </div>
-              <Skeleton className="h-56" />
+              <Skeleton className="h-64 rounded-card" />
             </div>
           ) : (
             <ReportView report={report.data} previous={previous.data} period={period} />
@@ -87,55 +87,57 @@ function ReportView({
   const vs = `vs the ${report.nights} nights before`;
   const ahead = period === 'next30';
   return (
-    <div className="flex flex-col gap-10">
-      <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi
-          label="Occupancy"
-          value={`${percent(report.occupancy)}%`}
-          detail={`${report.roomNightsSold} of ${report.roomNightsAvailable} room nights`}
-          change={previous && pointChange(report.occupancy, previous.occupancy)}
-          vs={vs}
-        />
-        <Kpi
-          label="ADR"
-          value={formatCzk(report.adr)}
-          detail="Room revenue per room night sold"
-          change={previous && relativeChange(report.adr, previous.adr)}
-          vs={vs}
-        />
-        <Kpi
-          label="RevPAR"
-          value={formatCzk(report.revpar)}
-          detail="Room revenue per available room night"
-          change={previous && relativeChange(report.revpar, previous.revpar)}
-          vs={vs}
-        />
-        <Kpi
-          label="Room revenue"
-          value={formatCzk(report.roomRevenue)}
-          detail={ahead ? 'On the books' : 'Accommodation after discounts'}
-          change={previous && relativeChange(report.roomRevenue, previous.roomRevenue)}
-          vs={vs}
-        />
-      </dl>
+    <div className="flex flex-col gap-4">
+      <Panel title="Performance" contentClassName="p-0">
+        <dl className="grid grid-cols-2 lg:grid-cols-4">
+          <Kpi
+            label="Occupancy"
+            value={`${percent(report.occupancy)}%`}
+            detail={`${report.roomNightsSold} of ${report.roomNightsAvailable} room nights`}
+            change={previous && pointChange(report.occupancy, previous.occupancy)}
+            vs={vs}
+          />
+          <Kpi
+            label="ADR"
+            value={formatCzk(report.adr)}
+            detail="Room revenue per room night sold"
+            change={previous && relativeChange(report.adr, previous.adr)}
+            vs={vs}
+          />
+          <Kpi
+            label="RevPAR"
+            value={formatCzk(report.revpar)}
+            detail="Room revenue per available room night"
+            change={previous && relativeChange(report.revpar, previous.revpar)}
+            vs={vs}
+          />
+          <Kpi
+            label="Room revenue"
+            value={formatCzk(report.roomRevenue)}
+            detail={ahead ? 'On the books' : 'Accommodation after discounts'}
+            change={previous && relativeChange(report.roomRevenue, previous.roomRevenue)}
+            vs={vs}
+          />
+        </dl>
 
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4 xl:grid-cols-7">
-        <Figure label="Add-ons" value={formatCzk(report.addonRevenue)} />
-        <Figure label="Extras" value={formatCzk(report.extrasRevenue)} />
-        <Figure label="City tax" value={formatCzk(report.cityTax)} />
-        <Figure label="Guest nights" value={report.guestNights} />
-        <Figure label="Arrivals" value={report.arrivals} />
-        <Figure label="Average stay" value={`${report.averageStay} nights`} />
-        <Figure label="Cancellations" value={report.cancellations} />
-      </dl>
+        <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t px-5 py-4 sm:grid-cols-4 xl:grid-cols-7">
+          <Figure label="Add-ons" value={formatCzk(report.addonRevenue)} />
+          <Figure label="Extras" value={formatCzk(report.extrasRevenue)} />
+          <Figure label="City tax" value={formatCzk(report.cityTax)} />
+          <Figure label="Guest nights" value={report.guestNights} />
+          <Figure label="Arrivals" value={report.arrivals} />
+          <Figure label="Average stay" value={`${report.averageStay} nights`} />
+          <Figure label="Cancellations" value={report.cancellations} />
+        </dl>
+      </Panel>
 
-      <Section title="Occupancy by night">
+      <Panel title="Occupancy by night" contentClassName="px-4 pt-6 pb-3">
         <OccupancyChart days={report.days} />
-      </Section>
+      </Panel>
 
-      <div className="grid gap-x-10 gap-y-8 lg:grid-cols-2">
-        <Section title="By room type">
-          <ul className="flex flex-col gap-3">
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Panel title="By room type">
+          <ul className="flex flex-col gap-4 p-4">
             {report.byRoomType.map((t) => (
               <BarRow
                 key={t.roomTypeId}
@@ -146,12 +148,12 @@ function ReportView({
               />
             ))}
           </ul>
-        </Section>
-        <Section title="By source">
+        </Panel>
+        <Panel title="By source">
           {report.bySource.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No stays in this period.</p>
+            <p className="p-3.5 text-sm text-muted-foreground">No stays in this period.</p>
           ) : (
-            <ul className="flex flex-col gap-3">
+            <ul className="flex flex-col gap-4 p-4">
               {report.bySource.map((s) => (
                 <BarRow
                   key={s.source}
@@ -163,8 +165,8 @@ function ReportView({
               ))}
             </ul>
           )}
-        </Section>
-        <Section title="Payments received">
+        </Panel>
+        <Panel title="Payments received" contentClassName="p-0">
           <PropertyRows
             rows={[
               ...report.payments.map((p) => ({
@@ -178,7 +180,7 @@ function ReportView({
               },
             ]}
           />
-        </Section>
+        </Panel>
         <UnpaidDepartures report={report} />
       </div>
     </div>
@@ -219,13 +221,13 @@ function Kpi({
   vs: string;
 }) {
   return (
-    <div className="flex flex-col gap-1.5 rounded-lg bg-surface-raised p-3 shadow-raised">
-      <dt className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+    <div className="flex flex-col gap-2 border-border p-5 max-lg:odd:border-r max-lg:nth-[-n+2]:border-b lg:not-last:border-r">
+      <dt className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
         {label}
         {change && <ChangeBadge change={change} vs={vs} />}
       </dt>
       <dd className="flex flex-col gap-0.5">
-        <span className="text-xl font-semibold tracking-tight whitespace-nowrap tabular-nums sm:text-2xl">
+        <span className="text-xl font-semibold tracking-tight whitespace-nowrap tabular-nums sm:text-2xl 2xl:text-3xl">
           {value}
         </span>
         <span className="truncate text-xs text-muted-foreground">{detail}</span>
@@ -238,7 +240,7 @@ function Figure({ label, value }: { label: string; value: string | number }) {
   return (
     <div className="flex flex-col gap-0.5">
       <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="text-sm font-medium tabular-nums">{value}</dd>
+      <dd className="font-mono text-[0.8125rem]">{value}</dd>
     </div>
   );
 }
@@ -257,7 +259,7 @@ function OccupancyChart({ days }: { days: ReportDay[] }) {
             className="absolute inset-x-0 border-t border-dashed border-border"
             style={{ bottom: `${line * 100}%` }}
           >
-            <span className="absolute -top-2 right-0 bg-background pl-1 text-[10px] text-subtle-foreground">
+            <span className="absolute -top-2 right-0 bg-background pl-1 font-mono text-[10px] text-subtle-foreground">
               {line * 100}%
             </span>
           </div>
@@ -272,7 +274,7 @@ function OccupancyChart({ days }: { days: ReportDay[] }) {
                   className="group flex h-full min-w-0 flex-1 items-end outline-none"
                 >
                   <span
-                    className="w-full rounded-t-[4px] bg-primary group-hover:bg-primary/80 group-focus-visible:ring-2 group-focus-visible:ring-ring"
+                    className="w-full rounded-t-[5px] bg-linear-to-b from-primary to-accent-violet/70 opacity-75 shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-opacity duration-150 ease-snap group-hover:opacity-100 group-focus-visible:opacity-100 group-focus-visible:ring-2 group-focus-visible:ring-ring"
                     style={{
                       height: `${Math.max(percent(d.occupancy), d.roomsSold > 0 ? 1 : 0)}%`,
                     }}
@@ -341,9 +343,9 @@ function BarRow({
           {detail}
         </span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-primary-soft" aria-hidden>
+      <div className="h-1.5 overflow-hidden rounded-full bg-ink/6" aria-hidden>
         <div
-          className="h-full rounded-full bg-primary"
+          className="h-full rounded-full bg-linear-to-r from-accent-violet to-primary"
           style={{ width: `${Math.min(share * 100, 100)}%` }}
         />
       </div>
@@ -353,17 +355,17 @@ function BarRow({
 
 function PropertyRows({ rows }: { rows: { label: string; value: string; strong?: boolean }[] }) {
   return (
-    <div className="flex flex-col rounded-lg border">
+    <div className="flex flex-col">
       {rows.map((r) => (
         <div
           key={r.label}
           className={cn(
-            'flex justify-between gap-4 border-b px-3 py-2 last:border-b-0',
+            'flex justify-between gap-4 border-b px-4 py-2.5 last:border-b-0',
             r.strong && 'font-medium',
           )}
         >
           <span className={cn(!r.strong && 'text-muted-foreground')}>{r.label}</span>
-          <span className="tabular-nums">{r.value}</span>
+          <span className="font-mono text-[0.8125rem]">{r.value}</span>
         </div>
       ))}
     </div>
@@ -374,19 +376,19 @@ function UnpaidDepartures({ report }: { report: Report }) {
   const { open } = useBookingDrawer();
   const total = report.unpaidDepartures.reduce((sum, u) => sum + u.balance, 0);
   return (
-    <Section title="Left without paying" count={report.unpaidDepartures.length}>
+    <Panel title="Left without paying" count={report.unpaidDepartures.length}>
       {report.unpaidDepartures.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
+        <p className="p-3.5 text-sm text-muted-foreground">
           Every guest who left in this period has settled their bill.
         </p>
       ) : (
-        <ul className="-mx-2 flex flex-col">
+        <ul className="flex flex-col">
           {report.unpaidDepartures.map((u) => (
             <li key={u.bookingId}>
               <button
                 type="button"
                 onClick={() => open(u.bookingId)}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-1.5 text-left outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left outline-none transition-colors duration-150 ease-snap hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
               >
                 <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate">{u.guestName}</span>
@@ -394,17 +396,17 @@ function UnpaidDepartures({ report }: { report: Report }) {
                     Room {u.roomName}, left {formatDate(u.checkOut)}
                   </span>
                 </span>
-                <span className="font-medium tabular-nums">{formatCzk(u.balance)}</span>
+                <span className="font-mono text-[0.8125rem]">{formatCzk(u.balance)}</span>
                 <ChevronRight className="size-4 text-muted-foreground" />
               </button>
             </li>
           ))}
-          <li className="flex justify-between px-2 pt-2 text-sm text-muted-foreground">
+          <li className="flex justify-between border-t px-2.5 pt-2.5 pb-1 text-sm text-muted-foreground">
             <span>Total open</span>
             <span className="tabular-nums">{formatCzk(total)}</span>
           </li>
         </ul>
       )}
-    </Section>
+    </Panel>
   );
 }

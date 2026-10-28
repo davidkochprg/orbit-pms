@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Count } from '@/components/panel';
 import { cn } from '@/lib/utils';
 
 interface SectionProps {
@@ -16,9 +17,7 @@ export function Section({ title, count, actions, children, className }: SectionP
     <section className={cn('flex flex-col gap-2', className)}>
       <div className="flex h-6 items-center gap-2">
         <h2 className="text-sm font-medium">{title}</h2>
-        {count !== undefined && (
-          <span className="text-sm text-subtle-foreground tabular-nums">{count}</span>
-        )}
+        {count !== undefined && <Count value={count} />}
         {actions && <div className="ml-auto flex items-center gap-1">{actions}</div>}
       </div>
       {children}

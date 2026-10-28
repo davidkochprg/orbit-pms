@@ -87,7 +87,7 @@ export function BookingBill({ booking }: { booking: Booking }) {
 function FolioTable({ folio, onRemove }: { folio: Folio; onRemove?: (id: string) => void }) {
   const owed = folio.balance > 0;
   return (
-    <div className="flex flex-col rounded-lg border">
+    <div className="flex flex-col overflow-hidden rounded-control bg-surface-sunken ring-1 ring-ink/6 ring-inset">
       {folio.lines.length === 0 && (
         <p className="border-b px-3 py-2 text-muted-foreground">Nothing charged.</p>
       )}

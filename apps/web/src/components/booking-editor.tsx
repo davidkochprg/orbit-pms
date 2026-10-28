@@ -360,7 +360,7 @@ function StayFields({
             {form.childAges.map((age, i) => (
               <span
                 key={i}
-                className="inline-flex h-8 items-center gap-1 rounded-lg border pr-1 pl-2.5 text-sm tabular-nums"
+                className="inline-flex h-9 items-center gap-1 rounded-control border bg-background pr-1 pl-3 text-sm tabular-nums"
               >
                 {age}
                 <Button
@@ -472,7 +472,7 @@ function RoomPicker({
           role="radiogroup"
           aria-label="Room"
           className={cn(
-            'scrollbar-thin flex max-h-56 flex-col overflow-y-auto rounded-lg border',
+            'scrollbar-thin flex max-h-56 flex-col overflow-y-auto rounded-control border',
             loading && 'opacity-60',
           )}
         >
@@ -493,7 +493,7 @@ function RoomPicker({
                 <span className="flex size-4 shrink-0 items-center justify-center">
                   {selected && <Check className="size-4 text-primary-text" />}
                 </span>
-                <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums">
+                <span className="rounded-md border border-ink/7 bg-background px-1.5 py-0.5 font-mono text-xs">
                   {o.roomName}
                 </span>
                 <span className="min-w-0 flex-1 truncate text-muted-foreground">
@@ -560,7 +560,7 @@ function GuestFields({
       />
       {guest.mode === 'existing' ? (
         chosen ? (
-          <div className="flex items-center gap-3 rounded-lg border px-3 py-2">
+          <div className="flex items-center gap-3 rounded-control border px-3 py-2">
             <GuestAvatar name={chosen.name} size="md" />
             <span className="flex min-w-0 flex-1 flex-col">
               <span className="truncate font-medium">{chosen.name}</span>
@@ -579,7 +579,7 @@ function GuestFields({
           </div>
         ) : (
           <div className="flex flex-col gap-1">
-            <label className="flex h-8 items-center gap-2 rounded-lg border px-2.5 focus-within:ring-3 focus-within:ring-ring/50">
+            <label className="flex h-9 items-center gap-2 rounded-control border bg-background px-3 shadow-[inset_0_1px_2px_var(--shadow-soft)] focus-within:ring-3 focus-within:ring-ring/25">
               <Search className="size-4 text-muted-foreground" />
               <input
                 autoFocus

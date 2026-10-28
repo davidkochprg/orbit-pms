@@ -78,7 +78,7 @@ export function SettingsPage() {
       <div className="flex min-h-0 flex-1 flex-col md:flex-row">
         <nav
           aria-label="Settings sections"
-          className="flex shrink-0 gap-1 overflow-x-auto border-b px-3 py-2 md:w-48 md:flex-col md:border-r md:border-b-0 md:px-3 md:py-5"
+          className="flex shrink-0 gap-0.5 overflow-x-auto border-b bg-surface-sunken p-2 md:w-52 md:flex-col md:border-r md:border-b-0 md:p-3"
         >
           {settingsSections.map((s) => (
             <NavLink
@@ -90,8 +90,8 @@ export function SettingsPage() {
               }}
               className={({ isActive }) =>
                 cn(
-                  'shrink-0 rounded-md px-2 py-1.5 text-sm text-muted-foreground outline-none hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
-                  isActive && 'bg-accent font-medium text-foreground',
+                  'flex h-9 shrink-0 items-center rounded-lg px-2.5 text-sm text-muted-foreground outline-none transition-colors duration-150 ease-snap hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+                  isActive && 'bg-sidebar-accent text-foreground',
                 )
               }
             >
@@ -101,10 +101,10 @@ export function SettingsPage() {
         </nav>
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="scrollbar-thin min-h-0 flex-1 overflow-auto px-6 py-5">
+          <div className="scrollbar-thin min-h-0 flex-1 overflow-auto px-6 py-6 lg:px-10">
             <div className="mx-auto flex max-w-3xl flex-col gap-6">
               {readOnly && session.current && (
-                <p className="flex items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm text-muted-foreground">
+                <p className="flex items-center gap-2 rounded-control bg-surface-sunken px-3 py-2.5 text-sm text-muted-foreground">
                   <Lock className="size-4 shrink-0" />
                   Only managers can change settings. You are signed in as {session.current.name} (
                   {staffRoleLabels[session.current.role]}).

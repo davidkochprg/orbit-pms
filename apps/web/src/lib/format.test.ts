@@ -7,6 +7,7 @@ import {
   formatParty,
   formatRange,
   initials,
+  orbShift,
 } from './format';
 
 describe('format', () => {
@@ -36,5 +37,19 @@ describe('format', () => {
     expect(initials('Anna Maria von Berg')).toBe('AB');
     expect(initials('  cher ')).toBe('C');
     expect(initials('')).toBe('');
+  });
+});
+
+describe('orbShift', () => {
+  it('is stable per name and stays within ±36 degrees', () => {
+    expect(orbShift('Jana Nováková')).toBe(orbShift('Jana Nováková'));
+    for (const name of ['A', 'Guest B', 'Martina Kovářová', '']) {
+      expect(Math.abs(orbShift(name))).toBeLessThanOrEqual(36);
+    }
+  });
+
+  it('turns different names differently', () => {
+    const shifts = new Set(['Anna', 'Petr', 'Lucie', 'Jakub', 'Eva'].map(orbShift));
+    expect(shifts.size).toBeGreaterThan(1);
   });
 });

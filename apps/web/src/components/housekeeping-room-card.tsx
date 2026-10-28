@@ -43,15 +43,15 @@ export function HousekeepingRoomCard({
     <div
       {...props}
       className={cn(
-        'flex flex-col gap-2 rounded-lg bg-surface-raised p-3 shadow-raised outline-none',
-        urgent && 'ring-1 ring-warning/70',
+        'relative flex flex-col gap-2 rounded-stage bg-background p-3 shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit outline-none',
+        urgent && 'ring-1 ring-warning/60',
         busy && 'opacity-60',
         dragging && 'z-30 shadow-floating',
         className,
       )}
     >
       <div className="flex items-baseline gap-2">
-        <span className="text-base font-semibold tracking-tight tabular-nums">{room.name}</span>
+        <span className="font-mono text-[0.9375rem] font-medium">{room.name}</span>
         <span className="truncate text-xs text-muted-foreground">{roomTypeName}</span>
       </div>
 
@@ -78,7 +78,7 @@ export function HousekeepingRoomCard({
                 // Keep a tap on the checkbox from starting a drag.
                 onPointerDown={(e) => e.stopPropagation()}
                 onClick={() => onCompleteTask(task)}
-                className="group/check mt-px flex size-3.5 shrink-0 items-center justify-center rounded border border-border-strong bg-background hover:border-primary"
+                className="group/check mt-px flex size-3.5 shrink-0 items-center justify-center rounded-[4px] border border-border-strong bg-background hover:border-primary"
               >
                 <Check className="size-2.5 text-primary opacity-0 group-hover/check:opacity-100" />
               </button>

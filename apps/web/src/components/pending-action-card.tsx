@@ -19,7 +19,7 @@ export function PendingActionCard({ id, summary }: { id: string; summary: string
   const result = current && current.status !== 'pending' ? outcome[current.status] : null;
 
   return (
-    <div className="flex flex-col gap-2.5 rounded-lg border bg-surface-raised p-3 shadow-raised">
+    <div className="relative flex flex-col gap-2.5 rounded-control fill-panel p-3.5 shadow-[0_1px_2px_var(--shadow-soft),0_10px_30px_-18px_var(--shadow-deep)] stroke-lit">
       <p className="text-sm">{current?.summary ?? summary}</p>
       <div className="flex flex-wrap items-center gap-1.5">
         {current?.status === 'pending' && (

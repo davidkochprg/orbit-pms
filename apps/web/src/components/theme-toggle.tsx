@@ -38,7 +38,7 @@ export function ThemeToggle() {
         <div
           role="radiogroup"
           aria-label="Theme"
-          className="grid grid-cols-4 gap-1 rounded-lg bg-muted p-1"
+          className="grid grid-cols-4 gap-1 rounded-control border border-ink/6 bg-ink/4 p-1"
         >
           {themes.map(({ value, label, icon: Icon }) => (
             <button
@@ -49,7 +49,7 @@ export function ThemeToggle() {
               onClick={() => setTheme(value)}
               className={cn(
                 'flex flex-col items-center gap-1 rounded-md py-1.5 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
-                theme === value && 'bg-background text-foreground shadow-raised',
+                theme === value && 'relative fill-action text-foreground shadow-action stroke-lit',
               )}
             >
               <Icon className="size-4" />

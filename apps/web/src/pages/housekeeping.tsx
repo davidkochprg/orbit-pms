@@ -21,6 +21,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { HousekeepingNoteDialog, type NoteMode } from '@/components/housekeeping-note-dialog';
 import { HousekeepingRoomCard } from '@/components/housekeeping-room-card';
 import { PageHeader } from '@/components/page-header';
+import { Count } from '@/components/panel';
 import { StatusDot } from '@/components/status-dot';
 import { TaskDialog } from '@/components/task-dialog';
 import { Button } from '@/components/ui/button';
@@ -125,7 +126,7 @@ export function HousekeepingPage() {
         ) : !board.data ? (
           <div className="grid gap-3 lg:grid-cols-4">
             {boardColumns.map((c) => (
-              <Skeleton key={c} className="h-80" />
+              <Skeleton key={c} className="h-80 rounded-card" />
             ))}
           </div>
         ) : (
@@ -183,17 +184,19 @@ function Column({
     <section
       ref={setNodeRef}
       aria-label={roomStatusLabels[status]}
-      className={cn(
-        'flex w-[17rem] shrink-0 snap-start flex-col gap-2 rounded-xl bg-surface-sunken p-2 lg:w-auto',
-        isOver && 'bg-primary-soft ring-1 ring-primary/30',
-      )}
+      className="flex w-[17rem] shrink-0 snap-start flex-col rounded-card bg-surface-sunken p-1 ring-1 ring-ink/5 ring-inset lg:w-auto"
     >
-      <h2 className="flex items-center gap-2 px-1 pt-1 text-sm font-medium">
+      <h2 className="flex h-9 items-center gap-2 px-3 text-[0.8125rem] text-muted-foreground">
         <StatusDot className={roomStatusColor[status]} />
         {roomStatusLabels[status]}
-        <span className="text-subtle-foreground tabular-nums">{rooms.length}</span>
+        <Count value={rooms.length} />
       </h2>
-      <div className="flex flex-col gap-2">
+      <div
+        className={cn(
+          'flex flex-1 flex-col gap-1 rounded-stage transition-colors duration-150 ease-snap',
+          isOver && 'bg-primary-soft',
+        )}
+      >
         {rooms.map((item) => (
           <RoomContextMenu
             key={item.room.id}

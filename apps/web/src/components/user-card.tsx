@@ -29,11 +29,7 @@ export function UserCard() {
         title={`${current.name}, ${staffRoleLabels[current.role]}`}
         className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:px-0"
       >
-        <GuestAvatar
-          name={current.name}
-          size="md"
-          className="bg-primary-soft text-primary-text ring-primary/20"
-        />
+        <GuestAvatar name={current.name} size="md" />
         <span className="flex min-w-0 flex-1 flex-col leading-tight group-data-[collapsible=icon]:hidden">
           <span className="truncate text-sm font-medium">{current.name}</span>
           <span className="truncate text-xs text-muted-foreground">

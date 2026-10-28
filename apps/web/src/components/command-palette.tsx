@@ -90,7 +90,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton={false}
-          className="top-[12vh] flex max-h-[76vh] translate-y-0 flex-col gap-0 overflow-hidden rounded-2xl border-0 bg-popover p-0 shadow-floating ring-0 backdrop-blur-2xl sm:max-w-[640px]"
+          className="stroke-aurora top-[12vh] flex max-h-[76vh] translate-y-0 flex-col gap-0 overflow-hidden rounded-card border-0 bg-popover p-0 shadow-floating ring-0 backdrop-blur-2xl sm:max-w-[640px]"
           onEscapeKeyDown={(e) => {
             // Like Raycast: Escape steps back from the agent to search before it closes.
             if (mode === 'agent') {

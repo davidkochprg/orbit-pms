@@ -9,12 +9,12 @@ interface PageHeaderProps {
   actions?: ReactNode;
 }
 
-/** The title bar at the top of every page's content panel. */
+/** The title bar at the top of every page's main panel. */
 export function PageHeader({ title, meta, actions }: PageHeaderProps) {
   return (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b px-3">
+    <header className="flex h-13 shrink-0 items-center gap-2 border-b px-3">
       <SidebarTrigger className="text-muted-foreground" />
-      <h1 className="truncate text-sm font-semibold tracking-tight">{title}</h1>
+      <h1 className="truncate text-[0.9375rem] font-medium tracking-tight">{title}</h1>
       {meta && (
         <span className="hidden truncate text-sm text-muted-foreground sm:inline">{meta}</span>
       )}
@@ -26,7 +26,7 @@ export function PageHeader({ title, meta, actions }: PageHeaderProps) {
 /** The scrollable area under a page header. */
 export function PageBody({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={className ?? 'scrollbar-thin min-h-0 flex-1 overflow-auto px-6 py-5'}>
+    <div className={className ?? 'scrollbar-thin min-h-0 flex-1 overflow-auto px-6 py-6 lg:px-8'}>
       {children}
     </div>
   );

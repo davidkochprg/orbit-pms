@@ -19,3 +19,10 @@ describe('navItemFor', () => {
     expect(navItemFor('/settings/team')?.label).toBe('Settings');
   });
 });
+
+describe('nav groups', () => {
+  it('lists the front desk before the office', () => {
+    const groups = navItems.map((item) => item.group);
+    expect(groups.indexOf('office')).toBeGreaterThan(groups.lastIndexOf('desk'));
+  });
+});

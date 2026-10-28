@@ -1,6 +1,7 @@
-import { ArrowRight, Inbox, type LucideIcon, Mic, Orbit, Sparkles } from 'lucide-react';
+import { ArrowRight, Inbox, type LucideIcon, Mic, Sparkles } from 'lucide-react';
 import { useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { BrandMark } from '@/components/brand-mark';
 import { ErrorNotice } from '@/components/error-notice';
 import { WelcomeScene } from '@/components/welcome-scene';
 import { Button } from '@/components/ui/button';
@@ -67,9 +68,7 @@ export function WelcomePage() {
         <div className="flex flex-1 items-center justify-center px-6 pb-16">
           <div className="flex w-full max-w-sm flex-col gap-8">
             <div className="flex items-center gap-2.5">
-              <span className="flex size-8 items-center justify-center rounded-lg bg-foreground text-background">
-                <Orbit className="size-4.5" strokeWidth={2.25} />
-              </span>
+              <BrandMark size="lg" />
               <span className="text-lg font-semibold tracking-tight">Orbit</span>
             </div>
 

@@ -67,7 +67,7 @@ export function InboxPage() {
       <div className="flex min-h-0 flex-1">
         <aside
           className={cn(
-            'scrollbar-thin w-full shrink-0 overflow-y-auto border-r md:w-[22rem]',
+            'scrollbar-thin w-full shrink-0 overflow-y-auto border-r bg-surface-sunken md:w-[22rem]',
             id && 'hidden md:block',
           )}
         >
@@ -135,9 +135,11 @@ function MessageRow({ message: m, active }: { message: Inquiry; active: boolean 
         </span>
         <span className="line-clamp-2 text-muted-foreground">{snippet(m.rawText, 140)}</span>
         <span className="mt-1 flex gap-1.5 text-xs text-muted-foreground">
-          <span className="rounded border px-1.5">{channelLabel(m)}</span>
+          <span className="rounded-full border border-ink/7 bg-ink/4 px-2">{channelLabel(m)}</span>
           {!unread && (
-            <span className="rounded border px-1.5">{inquiryStatusLabels[m.status]}</span>
+            <span className="rounded-full border border-ink/7 bg-ink/4 px-2">
+              {inquiryStatusLabels[m.status]}
+            </span>
           )}
         </span>
       </Link>
@@ -167,7 +169,7 @@ function NewMessage() {
 
   return (
     <>
-      <Button variant="outline" size="sm" className="shadow-raised" onClick={() => setOpen(true)}>
+      <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
         <Plus /> Paste a message
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
@@ -242,7 +244,7 @@ function MessageDetail({ id }: { id: string }) {
 
       <MessageActions inquiry={m} />
 
-      <section className="flex flex-col gap-5 rounded-xl border bg-surface-sunken p-5">
+      <section className="flex flex-col gap-5 rounded-card bg-surface-sunken p-5 ring-1 ring-ink/5 ring-inset">
         <div className="flex items-center gap-2">
           <Sparkles className="size-4 text-primary-text" />
           <h3 className="font-medium">Prepared by Orbit</h3>
@@ -284,7 +286,7 @@ function MessageDetail({ id }: { id: string }) {
             {analysisFacts(m.parsed).map((f) => (
               <li
                 key={f}
-                className="rounded-md border bg-background px-2 py-0.5 text-xs text-muted-foreground"
+                className="rounded-full border border-ink/7 bg-ink/4 px-2.5 py-0.5 text-xs text-muted-foreground"
               >
                 {f}
               </li>
@@ -354,10 +356,10 @@ function Options({ inquiry, options }: { inquiry: Inquiry; options: StayOption[]
   const hold = useInboxHold(inquiry.id);
   return (
     <Section title="Available rooms" count={options.length}>
-      <ul className="flex flex-col overflow-hidden rounded-lg border bg-background">
+      <ul className="flex flex-col overflow-hidden rounded-xl bg-card shadow-card">
         {options.map((o) => (
           <li key={o.roomId} className="flex items-center gap-3 border-b px-3 py-2 last:border-b-0">
-            <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium tabular-nums">
+            <span className="rounded-md border border-ink/7 bg-background px-1.5 py-0.5 font-mono text-xs">
               {o.roomName}
             </span>
             <span className="min-w-0 flex-1 truncate text-muted-foreground">{o.roomTypeName}</span>

@@ -26,7 +26,7 @@ export function BookingList({
     return <EmptyState icon={emptyIcon} title={empty} className="py-8" />;
   }
   return (
-    <ul className="-mx-2 flex flex-col">
+    <ul className="flex flex-col">
       {rows.map((row) => {
         const { booking, guestName, roomName } = row;
         return (
@@ -35,11 +35,11 @@ export function BookingList({
               <button
                 type="button"
                 onClick={() => open(booking.id)}
-                className="flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left outline-none hover:bg-accent focus-visible:bg-accent"
+                className="flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left outline-none transition-colors duration-150 ease-snap hover:bg-accent focus-visible:bg-accent"
               >
                 <GuestAvatar name={guestName} size="md" />
                 <span className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate font-medium">{guestName}</span>
+                  <span className="truncate">{guestName}</span>
                   <span className="truncate text-xs text-muted-foreground">
                     {detail ? detail(row) : formatParty(booking.adults, booking.childAges)}
                   </span>
@@ -49,7 +49,7 @@ export function BookingList({
                   title={statusLabels[booking.status]}
                 >
                   <StatusDot className={bookingStatusColor[booking.status]} />
-                  <span className="rounded-md bg-muted px-1.5 py-0.5 font-medium text-foreground tabular-nums">
+                  <span className="min-w-10 rounded-md border border-ink/7 bg-background px-1.5 py-0.5 text-center font-mono text-[0.75rem] text-foreground">
                     {roomName}
                   </span>
                 </span>
