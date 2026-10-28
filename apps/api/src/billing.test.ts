@@ -60,13 +60,31 @@ describe('folio', () => {
     expect(added.status).toBe(201);
     expect(added.body.balance).toBe(before.body.balance + 120);
     const chargeId = added.body.lines.at(-1)!.chargeId!;
+    expect(added.body.lines.at(-1)).toMatchObject({ vatBracket: 'standard', vatRate: 21 });
+    const edited = await call<Folio>('PATCH', `/api/bookings/${leaving.id}/charges/${chargeId}`, {
+      quantity: 3,
+      vatBracket: 'reduced',
+    });
+    expect(edited.status).toBe(200);
+    expect(edited.body.lines.at(-1)).toMatchObject({ amount: 180, vatBracket: 'reduced' });
+    expect(edited.body.vat.find((v) => v.bracket === 'reduced')?.rate).toBe(12);
+    const empty = await call<ApiError>(
+      'PATCH',
+      `/api/bookings/${leaving.id}/charges/${chargeId}`,
+      {},
+    );
+    expect(empty.status).toBe(400);
     const removed = await call<Folio>('DELETE', `/api/bookings/${leaving.id}/charges/${chargeId}`);
     expect(removed.body.balance).toBe(before.body.balance);
     const audit = await call<AuditLogEntry[]>(
       'GET',
-      `/api/audit-log?subjectId=${leaving.id}&limit=2`,
+      `/api/audit-log?subjectId=${leaving.id}&limit=3`,
     );
-    expect(audit.body.map((e) => e.action)).toEqual(['folio.remove_charge', 'folio.charge']);
+    expect(audit.body.map((e) => e.action)).toEqual([
+      'folio.remove_charge',
+      'folio.update_charge',
+      'folio.charge',
+    ]);
   });
 
   it('settles the balance with a payment', async () => {

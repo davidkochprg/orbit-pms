@@ -99,11 +99,11 @@ A body that fails validation returns 400 `invalid_json`; malformed JSON returns 
 
 ### `GET /api/bookings/:id/folio`
 
-The booking's bill (`Folio`): `lines` (`{ kind: 'stay' | 'city_tax' | 'extra', label, quantity, unitPrice, amount, chargeId }`), `payments`, `charged`, `paid`, `balance` and `currency`. See [domain.md](domain.md#billing).
+The booking's bill (`Folio`): `lines` (`{ kind: 'stay' | 'city_tax' | 'extra', label, quantity, unitPrice, amount, vatBracket, vatRate, chargeId }`), `payments`, `charged`, `paid`, `balance`, `vat` (one `{ bracket, rate, gross, net, vat }` per bracket with charges) and `currency`. See [domain.md](domain.md#billing).
 
-### `POST /api/bookings/:id/charges`, `DELETE /api/bookings/:id/charges/:chargeId`
+### `POST /api/bookings/:id/charges`, `PATCH` and `DELETE /api/bookings/:id/charges/:chargeId`
 
-`POST` takes `{ label, quantity?, unitPrice }` (whole CZK, non-zero; negative for a discount) and returns `201` with the updated `Folio`. `DELETE` removes an extra and returns the `Folio`. Only on `confirmed` or `checked_in` bookings, otherwise `409 invalid_transition`.
+`POST` takes `{ label, quantity?, unitPrice, vatBracket? }` (whole CZK, non-zero; negative for a discount; `vatBracket` is `standard` (default), `reduced` or `none`) and returns `201` with the updated `Folio`. `PATCH` takes any of those fields (at least one) and returns the `Folio`. `DELETE` removes an extra and returns the `Folio`. Only on `confirmed` or `checked_in` bookings, otherwise `409 invalid_transition`.
 
 ### `POST /api/bookings/:id/payments`
 
