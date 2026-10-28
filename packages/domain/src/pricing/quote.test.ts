@@ -22,6 +22,7 @@ const config: PricingConfig = {
   extraBed: { perNight: 400 },
   dog: { perNight: 250 },
   cityTax: { perPersonPerNight: 50, minAge: 18 },
+  vat: { standard: 21, reduced: 12 },
 };
 
 const base = {

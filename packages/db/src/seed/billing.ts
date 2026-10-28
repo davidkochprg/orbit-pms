@@ -1,14 +1,20 @@
 import { addDays, buildFolio, nightsBetween, type PricingConfig } from '@orbit/domain';
-import type { Booking, Charge, IsoDate, Payment, PaymentMethod } from '@orbit/shared';
+import type { Booking, Charge, IsoDate, Payment, PaymentMethod, VatBracket } from '@orbit/shared';
 import { createRandom } from './random';
 
 /** Synthetic extras for the demo. The amounts are placeholders, like the rates. */
-const extras: { label: string; unitPrice: number; perAdult?: boolean; max?: number }[] = [
-  { label: 'Sauna', unitPrice: 150, perAdult: true },
-  { label: 'Minibar', unitPrice: 60, max: 4 },
-  { label: 'Dinner', unitPrice: 450, perAdult: true },
-  { label: 'Bike rental', unitPrice: 300, max: 2 },
-  { label: 'Late check-out', unitPrice: 400, max: 1 },
+const extras: {
+  label: string;
+  unitPrice: number;
+  vatBracket: VatBracket;
+  perAdult?: boolean;
+  max?: number;
+}[] = [
+  { label: 'Sauna', unitPrice: 150, vatBracket: 'standard', perAdult: true },
+  { label: 'Minibar', unitPrice: 60, vatBracket: 'standard', max: 4 },
+  { label: 'Dinner', unitPrice: 450, vatBracket: 'reduced', perAdult: true },
+  { label: 'Bike rental', unitPrice: 300, vatBracket: 'standard', max: 2 },
+  { label: 'Late check-out', unitPrice: 400, vatBracket: 'reduced', max: 1 },
 ];
 
 const settleMethods: PaymentMethod[] = ['card', 'card', 'card', 'cash', 'bank_transfer'];
@@ -38,6 +44,7 @@ export function buildBilling(
       quantity,
       unitPrice: extra.unitPrice,
       amount: quantity * extra.unitPrice,
+      vatBracket: extra.vatBracket,
       postedOn: day,
       createdAt: at(day),
     });

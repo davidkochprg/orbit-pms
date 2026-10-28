@@ -20,4 +20,6 @@ export const pricingConfig: PricingConfig = {
   extraBed: { perNight: 100 }, // TODO(David)
   dog: { perNight: 100 }, // TODO(David)
   cityTax: { perPersonPerNight: 50, minAge: 18 }, // TODO(David)
+  // Czech VAT since 2024: 21% standard, 12% reduced (accommodation, food).
+  vat: { standard: 21, reduced: 12 },
 };

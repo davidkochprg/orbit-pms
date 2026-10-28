@@ -13,7 +13,7 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 | Inquiry          | raw text, channel, received at, parsed extraction, `status`, linked booking                                                                                           |
 | HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes                                                         |
 | HotelProfile     | name, location, description, contact, `checkInFrom`, `checkOutBy`, `entries` (`policy` \| `amenity` \| `info`, title, details)                                        |
-| Charge           | booking, label, quantity, `unitPrice` (CZK, negative for a discount), amount, `postedOn`                                                                              |
+| Charge           | booking, label, quantity, `unitPrice` (CZK, negative for a discount), amount, `vatBracket` (`standard` \| `reduced` \| `none`), `postedOn`                            |
 | Payment          | booking, `kind` (`payment` \| `refund`), `method` (`cash` \| `card` \| `bank_transfer`), amount (positive CZK), note, `paidOn`                                        |
 | Registration     | booking, guest, `nationality` (ISO alpha-2), `dateOfBirth`, `documentType` (`id_card` \| `passport`), `documentNumber`, address, `registeredAt`                       |
 | StaffMember      | name, email, `role` (`manager` \| `receptionist` \| `housekeeping`), `active`                                                                                         |
@@ -134,10 +134,12 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 
 `charged` is the sum of the lines, `paid` is payments minus refunds, and `balance = charged - paid` (negative: the guest is owed money).
 
-- `addCharge` / `removeCharge` need a `confirmed` or `checked_in` booking (`invalid_transition`): a hold isn't a sale yet, and a checked-out bill is closed. A charge is posted on the hotel's today.
+**VAT.** Prices include VAT. Every line carries a `vatBracket` and its `vatRate` from the rates' `vat` (`standard` 21 %, `reduced` 12 %, the Czech rates since 2024). Stay lines take their bracket from `stayVatBrackets`: accommodation, child and long-stay discounts and extra beds are `reduced`; wellness and dogs `standard` (to be confirmed). City tax is `none`, outside VAT. Extras carry the bracket staff chose, `standard` by default. `vatSummary` gives one line per bracket with charges: `gross` (the bracket's total), `vat = round(gross × rate / (100 + rate))` and `net = gross − vat`, rounded once per bracket in whole CZK, half away from zero so a discount's VAT mirrors a charge's.
+
+- `addCharge` / `updateCharge` / `removeCharge` need a `confirmed` or `checked_in` booking (`invalid_transition`): a hold isn't a sale yet, and a checked-out bill is closed. A charge is posted on the hotel's today. `updateCharge` changes the label, quantity, unit price or VAT bracket in place and recomputes the amount.
 - `recordPayment` takes payments in any status except `cancelled`, where only refunds are possible. A refund can't exceed what was paid (`invalid_input`).
 - `previewCharge` / `previewPayment` run the same checks without saving and return the balance after, for agent proposals.
-- Audited on the booking as `folio.charge`, `folio.remove_charge`, `folio.payment` and `folio.refund`.
+- Audited on the booking as `folio.charge`, `folio.update_charge` (with the changed fields), `folio.remove_charge`, `folio.payment` and `folio.refund`.
 
 ## Reports
 
@@ -156,6 +158,7 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 `createRatesService` (`rates.ts`) keeps the rates (the `PricingConfig` that `quote()` reads), room types and rooms. Anyone may read them; every change needs an active manager (`forbidden`) and is audited with `by` in the payload.
 
 - The rates include `cityTax` (`perPersonPerNight`, `minAge`), billed on the folio. Rates saved before it existed read it as 0.
+- The rates include `vat` (`standard`, `reduced`, in percent); both 0 for a hotel that is not a VAT payer. Rates saved before it existed read the Czech rates, 21 and 12.
 - Until rates are saved, `getPricing()` returns the defaults from `pricing/config.ts` (placeholders). The demo seed saves those defaults.
 - `updatePricing(config, by)` replaces the rates. Season days must be real `MM-DD` days (29 February counts) and season names unique, child tiers must go up in age, and there is one long-stay tier per length (`invalid_input`). Audited as `settings.pricing` with the changed fields; a save that changes nothing writes nothing.
 - `createRoomType` / `updateRoomType` set the name, capacity, base price and description (`room_type.create`, `room_type.update`; a price change logs the old and new base price).

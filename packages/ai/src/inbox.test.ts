@@ -21,6 +21,7 @@ const pricing: PricingConfig = {
   extraBed: { perNight: 0 },
   dog: { perNight: 0 },
   cityTax: { perPersonPerNight: 0, minAge: 18 },
+  vat: { standard: 21, reduced: 12 },
 };
 const usageTokens = {
   inputTokens: { total: 800, noCache: 300, cacheRead: 500, cacheWrite: undefined },

@@ -238,6 +238,10 @@ export function createMemoryRepositories(
         state.charges.push(charge);
         return Promise.resolve();
       },
+      updateCharge: (charge) => {
+        state.charges = state.charges.map((c) => (c.id === charge.id ? charge : c));
+        return Promise.resolve();
+      },
       deleteCharge: (id) => {
         state.charges = state.charges.filter((c) => c.id !== id);
         return Promise.resolve();

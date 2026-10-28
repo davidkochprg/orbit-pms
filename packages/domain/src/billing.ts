@@ -1,13 +1,18 @@
-import type {
-  AuditActor,
-  Booking,
-  Charge,
-  Folio,
-  FolioLine,
-  NewChargeBody,
-  NewPaymentBody,
-  Payment,
-  PricingConfig,
+import {
+  type AuditActor,
+  type Booking,
+  type Charge,
+  type ChargePatch,
+  type Folio,
+  type FolioLine,
+  type NewChargeBody,
+  type NewPaymentBody,
+  type Payment,
+  type PricingConfig,
+  type QuoteLineKind,
+  type VatBracket,
+  vatBrackets,
+  type VatSummaryLine,
 } from '@orbit/shared';
 import { hotelToday, nightsBetween } from './dates';
 import { DomainError } from './errors';
@@ -19,6 +24,42 @@ function plural(n: number, word: string): string {
 }
 
 const sum = (amounts: number[]) => amounts.reduce((a, b) => a + b, 0);
+
+/**
+ * The VAT bracket of each part of the stay. Accommodation and what belongs to it (discounts, extra
+ * beds) is reduced-rate in Czechia.
+ * TODO(David): confirm wellness and dogs are billed at the standard rate.
+ */
+export const stayVatBrackets: Record<QuoteLineKind, VatBracket> = {
+  accommodation: 'reduced',
+  child_discount: 'reduced',
+  long_stay_discount: 'reduced',
+  extra_bed: 'reduced',
+  wellness: 'standard',
+  dog: 'standard',
+};
+
+export function vatRate(bracket: VatBracket, pricing: PricingConfig): number {
+  return bracket === 'none' ? 0 : pricing.vat[bracket];
+}
+
+/** Rounds half away from zero, so a discount's VAT mirrors a charge's. */
+const roundCzk = (n: number) => Math.sign(n) * Math.round(Math.abs(n));
+
+/**
+ * VAT per bracket, worked out from the VAT-inclusive total of each bracket (not per line), so the
+ * rounding happens once per bracket. Brackets with nothing charged are left out.
+ */
+export function vatSummary(lines: FolioLine[]): VatSummaryLine[] {
+  return vatBrackets.flatMap((bracket) => {
+    const inBracket = lines.filter((l) => l.vatBracket === bracket);
+    if (inBracket.length === 0) return [];
+    const rate = inBracket[0]!.vatRate;
+    const gross = sum(inBracket.map((l) => l.amount));
+    const vat = roundCzk((gross * rate) / (100 + rate));
+    return [{ bracket, rate, gross, net: gross - vat, vat }];
+  });
+}
 
 /** Guests who pay city tax: every adult, and children from the tax's minimum age. */
 export function cityTaxPayers(booking: Pick<Booking, 'adults' | 'childAges'>, minAge: number) {
@@ -37,6 +78,8 @@ export function cityTaxLine(booking: Booking, pricing: PricingConfig): FolioLine
     quantity: payers * nights,
     unitPrice: perPersonPerNight,
     amount: payers * nights * perPersonPerNight,
+    vatBracket: 'none',
+    vatRate: 0,
     chargeId: null,
   };
 }
@@ -44,7 +87,7 @@ export function cityTaxLine(booking: Booking, pricing: PricingConfig): FolioLine
 /**
  * A booking's bill. The stay is billed verbatim from the price it was booked at, then city tax at
  * the current rate, then extras. A cancelled booking bills only its extras, so whatever was paid
- * shows as owed back.
+ * shows as owed back. Every line carries its VAT bracket at the current rates.
  */
 export function buildFolio(
   booking: Booking,
@@ -56,7 +99,17 @@ export function buildFolio(
   if (booking.status !== 'cancelled') {
     for (const line of booking.priceSnapshot?.lines ?? []) {
       const { label, quantity, unitPrice, amount } = line;
-      lines.push({ kind: 'stay', label, quantity, unitPrice, amount, chargeId: null });
+      const vatBracket = stayVatBrackets[line.kind];
+      lines.push({
+        kind: 'stay',
+        label,
+        quantity,
+        unitPrice,
+        amount,
+        vatBracket,
+        vatRate: vatRate(vatBracket, pricing),
+        chargeId: null,
+      });
     }
     const tax = cityTaxLine(booking, pricing);
     if (tax) lines.push(tax);
@@ -68,6 +121,8 @@ export function buildFolio(
       quantity: c.quantity,
       unitPrice: c.unitPrice,
       amount: c.amount,
+      vatBracket: c.vatBracket,
+      vatRate: vatRate(c.vatBracket, pricing),
       chargeId: c.id,
     });
   }
@@ -80,6 +135,7 @@ export function buildFolio(
     charged,
     paid,
     balance: charged - paid,
+    vat: vatSummary(lines),
     currency: 'CZK',
   };
 }
@@ -130,6 +186,15 @@ export function createBillingService({ repos, pricing, clock, newId }: BillingDe
     return booking;
   }
 
+  async function loadCharge(r: Repositories, bookingId: string, chargeId: string) {
+    const booking = await loadBooking(r, bookingId);
+    const charge = await r.billing.getCharge(chargeId);
+    if (!charge || charge.bookingId !== bookingId) {
+      throw new DomainError('not_found', `Charge ${chargeId} not found on this booking`);
+    }
+    return { booking, charge };
+  }
+
   async function folioOf(r: Repositories, booking: Booking): Promise<Folio> {
     return buildFolio(
       booking,
@@ -148,6 +213,7 @@ export function createBillingService({ repos, pricing, clock, newId }: BillingDe
       quantity: body.quantity,
       unitPrice: body.unitPrice,
       amount: body.quantity * body.unitPrice,
+      vatBracket: body.vatBracket,
       postedOn: hotelToday(now),
       createdAt: now.toISOString(),
     };
@@ -203,13 +269,45 @@ export function createBillingService({ repos, pricing, clock, newId }: BillingDe
       });
     },
 
+    /** Corrects an extra in place: what it is, how many, the price or its VAT bracket. */
+    async updateCharge(
+      bookingId: string,
+      chargeId: string,
+      patch: ChargePatch,
+      actor: AuditActor,
+    ): Promise<Folio> {
+      return repos.transaction(async (tx) => {
+        const { booking, charge } = await loadCharge(tx, bookingId, chargeId);
+        assertCanCharge(booking);
+        const quantity = patch.quantity ?? charge.quantity;
+        const unitPrice = patch.unitPrice ?? charge.unitPrice;
+        const updated: Charge = {
+          ...charge,
+          label: patch.label ?? charge.label,
+          quantity,
+          unitPrice,
+          amount: quantity * unitPrice,
+          vatBracket: patch.vatBracket ?? charge.vatBracket,
+        };
+        await tx.billing.updateCharge(updated);
+        await tx.audit.append({
+          actor,
+          action: 'folio.update_charge',
+          subjectId: bookingId,
+          payload: {
+            chargeId,
+            label: updated.label,
+            amount: updated.amount,
+            changed: Object.keys(patch),
+          },
+        });
+        return folioOf(tx, booking);
+      });
+    },
+
     async removeCharge(bookingId: string, chargeId: string, actor: AuditActor): Promise<Folio> {
       return repos.transaction(async (tx) => {
-        const booking = await loadBooking(tx, bookingId);
-        const charge = await tx.billing.getCharge(chargeId);
-        if (!charge || charge.bookingId !== bookingId) {
-          throw new DomainError('not_found', `Charge ${chargeId} not found on this booking`);
-        }
+        const { booking, charge } = await loadCharge(tx, bookingId, chargeId);
         assertCanCharge(booking);
         await tx.billing.deleteCharge(chargeId);
         await tx.audit.append({

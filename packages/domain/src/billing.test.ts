@@ -52,6 +52,7 @@ function charge(overrides: Partial<Charge> = {}): Charge {
     quantity: 2,
     unitPrice: 150,
     amount: 300,
+    vatBracket: 'standard',
     postedOn: '2026-05-11',
     createdAt: now.toISOString(),
     ...overrides,
@@ -86,6 +87,8 @@ describe('cityTaxPayers and cityTaxLine', () => {
       quantity: 6,
       unitPrice: 50,
       amount: 300,
+      vatBracket: 'none',
+      vatRate: 0,
       chargeId: null,
     });
   });
@@ -119,6 +122,42 @@ describe('buildFolio', () => {
     const folio = buildFolio({ ...stay, status: 'cancelled' }, [], [payment()], pricing);
     expect(folio.lines).toEqual([]);
     expect(folio.balance).toBe(-2000);
+  });
+
+  it('puts accommodation in the reduced bracket and sums VAT per bracket', () => {
+    const folio = buildFolio(stay, [charge()], [], pricing);
+    expect(folio.lines.map((l) => [l.vatBracket, l.vatRate])).toEqual([
+      ['reduced', 12],
+      ['reduced', 12],
+      ['none', 0],
+      ['standard', 21],
+    ]);
+    // 7500 at 12%: 7500 × 12 / 112 = 803.57 → 804. 300 at 21%: 52.07 → 52.
+    expect(folio.vat).toEqual([
+      { bracket: 'standard', rate: 21, gross: 300, net: 248, vat: 52 },
+      { bracket: 'reduced', rate: 12, gross: 7500, net: 6696, vat: 804 },
+      { bracket: 'none', rate: 0, gross: 300, net: 300, vat: 0 },
+    ]);
+  });
+
+  it('rounds the VAT of a discount like a charge, and leaves empty brackets out', () => {
+    const discount = charge({ quantity: 1, unitPrice: -150, amount: -150 });
+    const folio = buildFolio({ ...stay, priceSnapshot: null }, [discount], [], {
+      ...pricing,
+      cityTax: { perPersonPerNight: 0, minAge: 18 },
+    });
+    // -150 × 21 / 121 = -26.03 → -26.
+    expect(folio.vat).toEqual([
+      { bracket: 'standard', rate: 21, gross: -150, net: -124, vat: -26 },
+    ]);
+  });
+
+  it('has no VAT when the hotel is not a VAT payer', () => {
+    const folio = buildFolio(stay, [charge()], [], {
+      ...pricing,
+      vat: { standard: 0, reduced: 0 },
+    });
+    expect(folio.vat.every((v) => v.vat === 0 && v.net === v.gross)).toBe(true);
   });
 
   it('handles a booking without a recorded price', () => {
@@ -180,7 +219,7 @@ describe('createBillingService', () => {
     const { repos, billing } = setup();
     const folio = await billing.addCharge(
       'bk_1',
-      { label: 'Minibar', quantity: 3, unitPrice: 60 },
+      { label: 'Minibar', quantity: 3, unitPrice: 60, vatBracket: 'standard' },
       'user',
     );
     expect(folio.lines.at(-1)).toMatchObject({ label: 'Minibar', amount: 180 });
@@ -197,7 +236,7 @@ describe('createBillingService', () => {
     const { repos, billing } = setup();
     const added = await billing.addCharge(
       'bk_1',
-      { label: 'Sauna', quantity: 1, unitPrice: 150 },
+      { label: 'Sauna', quantity: 1, unitPrice: 150, vatBracket: 'standard' },
       'user',
     );
     const chargeId = added.lines.at(-1)!.chargeId!;
@@ -207,6 +246,53 @@ describe('createBillingService', () => {
     const folio = await billing.removeCharge('bk_1', chargeId, 'user');
     expect(folio.lines.some((l) => l.kind === 'extra')).toBe(false);
     expect(repos.state.audit.map((e) => e.action)).toEqual(['folio.charge', 'folio.remove_charge']);
+  });
+
+  it('edits a charge in place, recomputing the amount, and audits what changed', async () => {
+    const { repos, billing } = setup();
+    const added = await billing.addCharge(
+      'bk_1',
+      { label: 'Wine', quantity: 1, unitPrice: 300, vatBracket: 'standard' },
+      'user',
+    );
+    const chargeId = added.lines.at(-1)!.chargeId!;
+    const folio = await billing.updateCharge(
+      'bk_1',
+      chargeId,
+      { quantity: 2, vatBracket: 'reduced' },
+      'user',
+    );
+    expect(folio.lines.at(-1)).toMatchObject({
+      label: 'Wine',
+      quantity: 2,
+      amount: 600,
+      vatBracket: 'reduced',
+      vatRate: 12,
+    });
+    expect(repos.state.charges[0]).toMatchObject({ amount: 600, vatBracket: 'reduced' });
+    expect(repos.state.audit.at(-1)).toMatchObject({
+      action: 'folio.update_charge',
+      payload: { chargeId, amount: 600, changed: ['quantity', 'vatBracket'] },
+    });
+  });
+
+  it('refuses to edit a charge of another booking or a closed bill', async () => {
+    const { repos, billing } = setup();
+    const added = await billing.addCharge(
+      'bk_1',
+      { label: 'Wine', quantity: 1, unitPrice: 300, vatBracket: 'standard' },
+      'user',
+    );
+    const chargeId = added.lines.at(-1)!.chargeId!;
+    await expect(
+      billing.updateCharge('bk_hold', chargeId, { quantity: 2 }, 'user'),
+    ).rejects.toMatchObject({ code: 'not_found' });
+    repos.state.bookings = repos.state.bookings.map((b) =>
+      b.id === 'bk_1' ? { ...b, status: 'checked_out' } : b,
+    );
+    await expect(
+      billing.updateCharge('bk_1', chargeId, { quantity: 2 }, 'user'),
+    ).rejects.toMatchObject({ code: 'invalid_transition' });
   });
 
   it('records payments and refunds and keeps the balance', async () => {
@@ -230,7 +316,12 @@ describe('createBillingService', () => {
 
   it('previews a charge and a payment with the balance after, saving nothing', async () => {
     const { repos, billing } = setup();
-    const c = await billing.previewCharge('bk_1', { label: 'Dinner', quantity: 2, unitPrice: 400 });
+    const c = await billing.previewCharge('bk_1', {
+      label: 'Dinner',
+      quantity: 2,
+      unitPrice: 400,
+      vatBracket: 'standard',
+    });
     expect(c.balanceAfter).toBe(7800 + 800);
     const p = await billing.previewPayment('bk_1', {
       kind: 'payment',
@@ -246,7 +337,11 @@ describe('createBillingService', () => {
   it('refuses charges on a hold and leaves no trace', async () => {
     const { repos, billing } = setup();
     await expect(
-      billing.addCharge('bk_hold', { label: 'Sauna', quantity: 1, unitPrice: 150 }, 'user'),
+      billing.addCharge(
+        'bk_hold',
+        { label: 'Sauna', quantity: 1, unitPrice: 150, vatBracket: 'standard' },
+        'user',
+      ),
     ).rejects.toMatchObject({ code: 'invalid_transition' });
     expect(repos.state.charges).toEqual([]);
     expect(repos.state.audit).toEqual([]);

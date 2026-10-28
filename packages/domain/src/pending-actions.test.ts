@@ -181,7 +181,13 @@ describe('pending actions', () => {
     const { repos, actions } = setup();
     const proposed = await actions.propose({
       kind: 'add_charge',
-      input: { bookingId: 'bk_a', label: 'Sauna', quantity: 2, unitPrice: 150 },
+      input: {
+        bookingId: 'bk_a',
+        label: 'Sauna',
+        quantity: 2,
+        unitPrice: 150,
+        vatBracket: 'standard',
+      },
     });
     expect(proposed.summary).toBe(
       'Add 2 × Sauna at 150 CZK (300 CZK) to the bill of Tomáš Novák, room 1; balance then 500 CZK',
@@ -217,7 +223,13 @@ describe('pending actions', () => {
     await expect(
       actions.propose({
         kind: 'add_charge',
-        input: { bookingId: 'bk_h', label: 'Sauna', quantity: 1, unitPrice: 150 },
+        input: {
+          bookingId: 'bk_h',
+          label: 'Sauna',
+          quantity: 1,
+          unitPrice: 150,
+          vatBracket: 'standard',
+        },
       }),
     ).rejects.toMatchObject({ code: 'invalid_transition' });
   });

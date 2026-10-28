@@ -21,6 +21,7 @@ import {
   type PricingConfig,
   type Quote,
   type QuoteAddons,
+  vatBrackets,
 } from '@orbit/shared';
 import type { AiFeature } from '@orbit/ai';
 import { sql } from 'drizzle-orm';
@@ -53,6 +54,7 @@ export const staffRole = pgEnum('staff_role', staffRoles);
 export const paymentKind = pgEnum('payment_kind', paymentKinds);
 export const documentType = pgEnum('document_type', documentTypes);
 export const paymentMethod = pgEnum('payment_method', paymentMethods);
+export const vatBracket = pgEnum('vat_bracket', vatBrackets);
 
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
@@ -206,6 +208,7 @@ export const charges = pgTable(
     /** Whole CZK; negative for a discount. */
     unitPrice: integer('unit_price').notNull(),
     amount: integer('amount').notNull(),
+    vatBracket: vatBracket('vat_bracket').notNull().default('standard'),
     postedOn: date('posted_on', { mode: 'string' }).notNull(),
     createdAt: createdAt(),
   },

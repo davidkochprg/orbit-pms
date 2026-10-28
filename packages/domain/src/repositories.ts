@@ -131,6 +131,8 @@ export interface BillingRepository {
   listCharges(filter?: BillingFilter): Promise<Charge[]>;
   getCharge(id: string): Promise<Charge | null>;
   createCharge(charge: Charge): Promise<void>;
+  /** Replaces a stored charge. */
+  updateCharge(charge: Charge): Promise<void>;
   deleteCharge(id: string): Promise<void>;
   /** Oldest first. */
   listPayments(filter?: BillingFilter): Promise<Payment[]>;

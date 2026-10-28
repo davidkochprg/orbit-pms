@@ -102,7 +102,7 @@ describe('agent tools', () => {
   it('proposes a charge and a payment instead of posting them', async () => {
     const { tools, repos } = setup();
     const charge = await tools.addCharge.execute(
-      { bookingId: 'bk_1', label: 'Sauna', quantity: 2, unitPrice: 150 },
+      { bookingId: 'bk_1', label: 'Sauna', quantity: 2, unitPrice: 150, vatBracket: 'standard' },
       callOptions,
     );
     expect(charge).toMatchObject({

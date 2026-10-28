@@ -370,6 +370,9 @@ function billingRepository(db: Db): BillingRepository {
     async createCharge(charge) {
       await db.insert(charges).values({ ...charge, createdAt: new Date(charge.createdAt) });
     },
+    async updateCharge({ id, createdAt: _createdAt, ...charge }) {
+      await db.update(charges).set(charge).where(eq(charges.id, id));
+    },
     async deleteCharge(id) {
       await db.delete(charges).where(eq(charges.id, id));
     },

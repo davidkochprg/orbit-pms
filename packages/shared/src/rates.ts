@@ -64,6 +64,17 @@ export const pricingConfigSchema = z.object({
       minAge: z.number().int().min(0).max(18),
     })
     .default({ perPersonPerNight: 0, minAge: 18 }),
+  /**
+   * VAT rates in percent; prices include VAT. Accommodation is billed at the reduced rate. Set
+   * both to 0 for a hotel that is not a VAT payer. Rates saved before it existed read as the Czech
+   * rates.
+   */
+  vat: z
+    .object({
+      standard: z.number().int().min(0).max(50),
+      reduced: z.number().int().min(0).max(50),
+    })
+    .default({ standard: 21, reduced: 12 }),
 });
 export type PricingConfig = z.infer<typeof pricingConfigSchema>;
 

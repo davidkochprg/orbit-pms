@@ -97,6 +97,7 @@ const charge: Charge = {
   quantity: 1,
   unitPrice: 150,
   amount: 150,
+  vatBracket: 'standard',
   postedOn: '2026-05-02',
   createdAt: '2026-05-02T10:00:00.000Z',
 };

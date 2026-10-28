@@ -278,11 +278,15 @@ describe('billing (PGlite)', () => {
       quantity: 2,
       unitPrice: -50,
       amount: -100,
+      vatBracket: 'reduced' as const,
       postedOn: '2026-10-27',
       createdAt: '2026-10-27T09:00:00.000Z',
     };
     await repos.billing.createCharge(charge);
     expect(await repos.billing.getCharge('chg_test')).toEqual(charge);
+    const edited = { ...charge, quantity: 3, amount: -150, vatBracket: 'none' as const };
+    await repos.billing.updateCharge(edited);
+    expect(await repos.billing.getCharge('chg_test')).toEqual(edited);
     await repos.billing.deleteCharge('chg_test');
     expect(await repos.billing.getCharge('chg_test')).toBeNull();
     const payment = {
