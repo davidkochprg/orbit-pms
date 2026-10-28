@@ -244,6 +244,13 @@ describe('createRegistrationService', () => {
     expect(repos.state.audit[0]?.payload).toMatchObject({ scanned: true });
   });
 
+  it("leaves another booking's scan alone", async () => {
+    const { repos, service } = setup();
+    await service.updateGuest('past', 'sg_past', { nationality: 'DE', scanId: 'scan_1' }, 'user');
+    expect(repos.state.idScans.map((s) => s.id)).toEqual(['scan_1']);
+    expect(repos.state.audit[0]?.payload).not.toHaveProperty('scanned');
+  });
+
   it("suggests the guest's details from an earlier stay to prefill", async () => {
     const { repos, service } = setup();
     expect((await service.getGuestBook('now')).previous).toBe(null);

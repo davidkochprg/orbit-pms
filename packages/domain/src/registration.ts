@@ -130,6 +130,15 @@ function hasIdentity(fields: Partial<IdentityFields>): boolean {
   return identityKeys.some((k) => fields[k] !== undefined);
 }
 
+/** Deletes the scan that values came from, if it belongs to this booking. True if it did. */
+async function discardScan(r: Repositories, bookingId: string, scanId: string | undefined) {
+  if (!scanId) return false;
+  const scan = await r.idScans.get(scanId);
+  if (scan?.bookingId !== bookingId) return false;
+  await r.idScans.delete(scanId);
+  return true;
+}
+
 export interface RegistrationDeps {
   repos: Repositories;
   policy: HotelPolicy;
@@ -194,7 +203,7 @@ export function createRegistrationService({ repos, policy, clock, newId }: Regis
           createdAt: now.toISOString(),
         };
         await tx.stayGuests.save(added);
-        if (scanId) await tx.idScans.delete(scanId);
+        const scanned = await discardScan(tx, bookingId, scanId);
         await tx.audit.append({
           actor,
           action: 'booking.add_guest',
@@ -202,7 +211,7 @@ export function createRegistrationService({ repos, policy, clock, newId }: Regis
           payload: {
             stayGuestId: added.id,
             fields: identityKeys.filter((k) => fields[k]),
-            ...(scanId && { scanned: true }),
+            ...(scanned && { scanned: true }),
           },
         });
         return bookOf(tx, booking, guest);
@@ -211,7 +220,7 @@ export function createRegistrationService({ repos, policy, clock, newId }: Regis
 
     /**
      * Changes a person's name or ID details. The main guest's name lives in their profile. Values
-     * from a scan (`scanId`) discard that scan in the same transaction.
+     * from one of the booking's scans (`scanId`) discard that scan in the same transaction.
      */
     async updateGuest(
       bookingId: string,
@@ -246,7 +255,7 @@ export function createRegistrationService({ repos, policy, clock, newId }: Regis
           registeredAt: hasIdentity(fields) ? now.toISOString() : current.registeredAt,
         };
         await tx.stayGuests.save(updated);
-        if (scanId) await tx.idScans.delete(scanId);
+        const scanned = await discardScan(tx, bookingId, scanId);
         await tx.audit.append({
           actor,
           action: 'booking.update_guest',
@@ -254,7 +263,7 @@ export function createRegistrationService({ repos, policy, clock, newId }: Regis
           payload: {
             stayGuestId,
             fields: Object.keys(fields),
-            ...(scanId && { scanned: true }),
+            ...(scanned && { scanned: true }),
           },
         });
         return bookOf(tx, booking, guest);
