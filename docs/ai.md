@@ -53,7 +53,7 @@ Defined in `packages/ai/src/tools.ts` with zod input schemas from `packages/shar
 | `updateBooking`                   | Party, add-ons, source, notes, and room and dates, in one step; re-priced when the stay changes                              | proposal    |
 | `getReport`                       | Occupancy, ADR, RevPAR, revenue, sources, room types, payments and unpaid departures for a period (without the daily series) | none        |
 | `getBill`                         | A booking's bill: stay lines, city tax, extras, payments, balance                                                            | none        |
-| `addCharge`                       | Post an extra at the price the staff member gives; the summary shows the balance after                                       | proposal    |
+| `addCharge`                       | Post an extra at the price and VAT bracket the staff member gives; the summary shows the balance after                       | proposal    |
 | `recordPayment`                   | Payment or refund by cash, card or bank transfer; the summary shows the balance after                                        | proposal    |
 
 ## Approval pattern

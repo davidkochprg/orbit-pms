@@ -213,7 +213,7 @@ export function createAgentTools({ hotel, billing, reports, actions, listRooms }
     }),
     addCharge: tool({
       description:
-        "Propose posting an extra to a confirmed or in-house booking's bill, e.g. sauna, minibar or dinner, at the unit price the staff member gives. Never invent a price: ask if none was given. The user must confirm.",
+        "Propose posting an extra to a confirmed or in-house booking's bill, e.g. sauna, minibar or dinner, at the unit price the staff member gives. Never invent a price: ask if none was given. VAT bracket: reduced for food and accommodation, none for items outside VAT, otherwise standard. The user must confirm.",
       inputSchema: newChargeBodySchema.extend(bookingIdSchema.shape),
       execute: (input) => propose({ kind: 'add_charge', input }),
     }),
