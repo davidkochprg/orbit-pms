@@ -1,10 +1,12 @@
 import { serve } from '@hono/node-server';
 import { createDb, createRepositories, createUsageStore } from '@orbit/db';
+import { setHotelTimeZone } from '@orbit/domain';
 import { createAi } from './ai';
 import { createApp } from './app';
 import { parseEnv } from './env';
 
 const env = parseEnv(process.env);
+setHotelTimeZone(env.HOTEL_TIMEZONE);
 const db = createDb(env.DATABASE_URL);
 const ai = createAi(env);
 const app = createApp({

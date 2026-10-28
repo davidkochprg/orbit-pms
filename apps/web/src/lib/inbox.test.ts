@@ -42,7 +42,7 @@ describe('inbox display helpers', () => {
     ).toEqual([
       'Booking request',
       'German',
-      'Fri 6 Nov – Tue 10 Nov',
+      'Fri, Nov 6 – Tue, Nov 10',
       '2 adults, 2 children (4, 8)',
       'Apartment',
       'Dog',

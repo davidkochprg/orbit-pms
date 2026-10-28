@@ -10,7 +10,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { activityDetail, activityLabel } from '@/lib/activity';
 import { useActivity } from '@/lib/api';
-import { formatLongDate } from '@/lib/format';
+import { displayRegion, formatLongDate } from '@/lib/format';
 
 type Filter = 'all' | AuditActor;
 
@@ -20,12 +20,21 @@ const filters: { value: Filter; label: string }[] = [
   { value: 'agent', label: 'Orbit' },
 ];
 
-const time = new Intl.DateTimeFormat('en-GB', {
-  hour: '2-digit',
-  minute: '2-digit',
-  timeZone: 'Europe/Prague',
-});
-const day = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Prague' });
+/** The time of day in the hotel's time zone and clock: "3:30 PM" or "15:30". */
+const time = {
+  format: (d: Date) =>
+    new Intl.DateTimeFormat(displayRegion().usDates ? 'en-US' : 'en-GB', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: displayRegion().usDates,
+      timeZone: displayRegion().timeZone,
+    }).format(d),
+};
+/** The hotel day an entry belongs to, as `YYYY-MM-DD`. */
+const day = {
+  format: (d: Date) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: displayRegion().timeZone }).format(d),
+};
 
 /** Every change by staff or the agent, newest first, grouped by hotel day. */
 export function ActivityPage() {

@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isoDateSchema } from './dates';
-import { czkSchema } from './quote';
+import { currencySchema, moneySchema } from './quote';
+import { taxModeSchema } from './rates';
 
 export const paymentMethods = ['cash', 'card', 'bank_transfer'] as const;
 export const paymentMethodSchema = z.enum(paymentMethods);
@@ -25,9 +26,9 @@ export const chargeSchema = z.object({
   bookingId: z.string(),
   label: z.string(),
   quantity: z.number().int().positive(),
-  /** Whole CZK; negative for a manual discount. */
-  unitPrice: czkSchema,
-  amount: czkSchema,
+  /** Whole units of the hotel's currency; negative for a manual discount. */
+  unitPrice: moneySchema,
+  amount: moneySchema,
   vatBracket: vatBracketSchema,
   /** The hotel day it was posted. */
   postedOn: isoDateSchema,
@@ -40,7 +41,7 @@ export const paymentSchema = z.object({
   bookingId: z.string(),
   kind: paymentKindSchema,
   method: paymentMethodSchema,
-  amount: czkSchema.positive(),
+  amount: moneySchema.positive(),
   note: z.string().nullable(),
   /** The hotel day it was received or paid back. */
   paidOn: isoDateSchema,
@@ -51,10 +52,12 @@ export type Payment = z.infer<typeof paymentSchema>;
 const chargeFields = {
   label: z.string().trim().min(1).max(80).describe('What it is, e.g. "Sauna" or "Minibar".'),
   quantity: z.number().int().min(1).max(99),
-  unitPrice: czkSchema
+  unitPrice: moneySchema
     .refine((n) => n !== 0, 'A charge needs an amount')
     .refine((n) => Math.abs(n) <= 1_000_000, 'Too large')
-    .describe('Whole CZK per unit, as the guest or staff stated it. Negative for a discount.'),
+    .describe(
+      "Whole units of the hotel's currency per unit, as the guest or staff stated it. Negative for a discount.",
+    ),
   vatBracket: vatBracketSchema.describe(
     'VAT bracket: "standard" for most goods and services, "reduced" for food and accommodation, "none" for items outside VAT.',
   ),
@@ -77,12 +80,16 @@ export type ChargePatch = z.infer<typeof chargePatchSchema>;
 export const newPaymentBodySchema = z.object({
   kind: paymentKindSchema.default('payment'),
   method: paymentMethodSchema,
-  amount: czkSchema.positive().max(10_000_000).describe('Whole CZK, always positive.'),
+  amount: moneySchema
+    .positive()
+    .max(10_000_000)
+    .describe("Whole units of the hotel's currency, always positive."),
   note: z.string().trim().max(200).nullable().default(null),
 });
 export type NewPaymentBody = z.infer<typeof newPaymentBodySchema>;
 
-export const folioLineKinds = ['stay', 'city_tax', 'extra'] as const;
+/** `tax`: a tax added on top of the other lines, when prices don't include it. */
+export const folioLineKinds = ['stay', 'city_tax', 'extra', 'tax'] as const;
 export const folioLineKindSchema = z.enum(folioLineKinds);
 export type FolioLineKind = z.infer<typeof folioLineKindSchema>;
 
@@ -90,23 +97,25 @@ export const folioLineSchema = z.object({
   kind: folioLineKindSchema,
   label: z.string(),
   quantity: z.number().int(),
-  unitPrice: czkSchema,
-  amount: czkSchema,
+  unitPrice: moneySchema,
+  amount: moneySchema,
   vatBracket: vatBracketSchema,
-  /** Percent of the bracket, e.g. 12. */
-  vatRate: z.number().int().nonnegative(),
+  /** Percent of the bracket, e.g. 12 or 9.25. */
+  vatRate: z.number().nonnegative(),
   /** Set for extras, so one can be edited or removed. */
   chargeId: z.string().nullable(),
 });
 export type FolioLine = z.infer<typeof folioLineSchema>;
 
-/** The VAT in one bracket of a bill. `gross = net + vat`, rounded to whole CZK per bracket. */
+/** The tax in one bracket of a bill. `gross = net + vat`, rounded to whole units per bracket. */
 export const vatSummaryLineSchema = z.object({
   bracket: vatBracketSchema,
-  rate: z.number().int().nonnegative(),
-  gross: czkSchema,
-  net: czkSchema,
-  vat: czkSchema,
+  /** What the bracket's tax is called, e.g. "VAT" or "Occupancy tax"; null outside tax. */
+  label: z.string().nullable(),
+  rate: z.number().nonnegative(),
+  gross: moneySchema,
+  net: moneySchema,
+  vat: moneySchema,
 });
 export type VatSummaryLine = z.infer<typeof vatSummaryLineSchema>;
 
@@ -116,13 +125,15 @@ export const folioSchema = z.object({
   lines: z.array(folioLineSchema),
   payments: z.array(paymentSchema),
   /** Sum of the lines. */
-  charged: czkSchema,
+  charged: moneySchema,
   /** Payments minus refunds. */
-  paid: czkSchema,
+  paid: moneySchema,
   /** `charged - paid`; negative when the guest is owed money. */
-  balance: czkSchema,
+  balance: moneySchema,
   /** One line per bracket with charges, standard first. */
   vat: z.array(vatSummaryLineSchema),
-  currency: z.literal('CZK'),
+  /** Whether the stay and extras include tax, or the `tax` lines add it on top. */
+  taxMode: taxModeSchema,
+  currency: currencySchema,
 });
 export type Folio = z.infer<typeof folioSchema>;

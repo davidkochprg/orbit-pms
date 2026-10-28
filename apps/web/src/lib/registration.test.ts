@@ -9,15 +9,20 @@ import {
 
 describe('needsAddress', () => {
   it('asks guests from abroad for an address', () => {
-    expect(needsAddress('DE')).toBe(true);
-    expect(needsAddress(' pl ')).toBe(true);
-    expect(needsAddress('CZ')).toBe(false);
-    expect(needsAddress('cz')).toBe(false);
+    expect(needsAddress('DE', 'CZ')).toBe(true);
+    expect(needsAddress(' pl ', 'CZ')).toBe(true);
+    expect(needsAddress('CZ', 'CZ')).toBe(false);
+    expect(needsAddress('cz', 'CZ')).toBe(false);
   });
 
   it('waits for a complete code', () => {
-    expect(needsAddress('')).toBe(false);
-    expect(needsAddress('D')).toBe(false);
+    expect(needsAddress('', 'CZ')).toBe(false);
+    expect(needsAddress('D', 'CZ')).toBe(false);
+  });
+});
+describe('needsAddress in the US', () => {
+  it('never asks for a home address, which the US guest book does not record', () => {
+    expect(needsAddress('DE', 'US')).toBe(false);
   });
 });
 
@@ -45,7 +50,7 @@ describe('missingSummary', () => {
 describe('countryName', () => {
   it('names known countries and falls back to the code', () => {
     expect(countryName('DE')).toBe('Germany');
-    expect(countryName('FR')).toBe('FR');
+    expect(countryName('BR')).toBe('BR');
     expect(countryName(null)).toBe(null);
   });
 });

@@ -24,14 +24,14 @@ describe('activityDetail', () => {
 
   it('summarises money, status and changed fields', () => {
     expect(activityDetail('folio.payment', { amount: 4500, method: 'bank_transfer' })).toBe(
-      '4,500 CZK by bank transfer',
+      '$4,500 by bank transfer',
     );
-    expect(activityDetail('folio.charge', { label: 'Sauna', amount: 300 })).toBe('Sauna, 300 CZK');
+    expect(activityDetail('folio.charge', { label: 'Sauna', amount: 300 })).toBe('Sauna, $300');
     expect(activityDetail('room.status', { from: 'dirty', to: 'out_of_order' })).toBe(
       'dirty → out of order',
     );
     expect(activityDetail('booking.change_dates', { total: { from: 2000, to: 3000 } })).toBe(
-      'Total 2,000 CZK → 3,000 CZK',
+      'Total $2,000 → $3,000',
     );
     expect(activityDetail('settings.pricing', { by: 'x', changed: ['cityTax', 'dog'] })).toBe(
       'Changed city tax, dog',

@@ -1,7 +1,7 @@
 import type { Guest, HousekeepingTask, Inquiry, InquiryStatus, StayGuest } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { briefBookingRange, buildDailyBrief, findGaps } from './brief';
-import { hotelPolicy } from './policy';
+import { guestBookRulesFor } from './policy';
 import { conversation } from './testing';
 import { booking, room } from './test-fixtures';
 
@@ -39,7 +39,7 @@ const empty = {
   tasks: [],
   inquiries: [],
   stayGuests: [] as StayGuest[],
-  policy: hotelPolicy,
+  rules: guestBookRulesFor('CZ'),
 };
 
 function entry(bookingId: string, overrides: Partial<StayGuest> = {}): StayGuest {

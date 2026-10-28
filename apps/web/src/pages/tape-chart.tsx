@@ -84,7 +84,7 @@ const movable: BookingStatus[] = ['hold', 'confirmed', 'checked_in'];
 const ICONS_MIN_WIDTH = 150;
 
 export function TapeChartPage() {
-  // Today comes from the API, so it is the hotel's date (Europe/Prague), not the browser's.
+  // Today comes from the API, so it is the hotel's date in its time zone, not the browser's.
   const day = useDayOverview();
   const today = day.data?.date;
   if (day.isError) {

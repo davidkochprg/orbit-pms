@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { languageSchema } from './enums';
 
 /** What an entry in the hotel profile describes: a rule, a facility, or anything else guests ask. */
 export const hotelInfoCategories = ['policy', 'amenity', 'info'] as const;
@@ -46,5 +47,17 @@ export const hotelProfileSchema = z.object({
   checkInFrom: timeOfDaySchema,
   checkOutBy: timeOfDaySchema,
   entries: z.array(hotelInfoEntrySchema).max(100),
+  /**
+   * ISO 3166 alpha-2 country the hotel is in. It sets the guest-book rules. Profiles saved before
+   * it existed read as Czechia.
+   */
+  country: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z]{2}$/, 'Use a two-letter country code like US')
+    .default('CZ'),
+  /** The language the hotel works in: new staff and guests without one start with it. */
+  language: languageSchema.default('cs'),
 });
 export type HotelProfile = z.infer<typeof hotelProfileSchema>;

@@ -15,14 +15,20 @@ import { apartment, booking, double, room } from './test-fixtures';
 const now = new Date('2026-05-10T08:00:00Z');
 const today = '2026-05-10';
 const pricing: PricingConfig = {
+  currency: 'CZK',
+  pricingBasis: 'per_person',
   seasons: [],
   childDiscounts: [],
   longStay: [],
   wellness: { perPersonPerNight: 0, minAge: 0 },
   extraBed: { perNight: 0 },
   dog: { perNight: 0 },
-  cityTax: { perPersonPerNight: 0, minAge: 18 },
-  vat: { standard: 21, reduced: 12 },
+  cityTax: { label: 'City tax', perPersonPerNight: 0, minAge: 18 },
+  tax: {
+    mode: 'inclusive',
+    standard: { label: 'VAT', rate: 21 },
+    reduced: { label: 'VAT', rate: 12 },
+  },
 };
 
 function expectCode(fn: () => unknown, code: DomainError['code']) {

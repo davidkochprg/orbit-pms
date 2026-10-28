@@ -14,6 +14,8 @@ export const emptyHotelProfile: HotelProfile = {
   checkInFrom: '15:00',
   checkOutBy: '10:00',
   entries: [],
+  country: 'US',
+  language: 'en',
 };
 
 /**

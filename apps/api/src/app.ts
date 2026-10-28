@@ -22,6 +22,7 @@ import {
   createRegistrationService,
   createSettingsService,
   createStaffService,
+  getHotelTimeZone,
   hotelPolicy,
   hotelToday,
   pricingConfig,
@@ -83,7 +84,7 @@ export function createApp({
   });
   const billing = createBillingService({ repos, pricing: pricingConfig, clock, newId });
   const reports = createReportService({ repos, pricing: pricingConfig });
-  const registrations = createRegistrationService({ repos, policy: hotelPolicy, clock, newId });
+  const registrations = createRegistrationService({ repos, clock, newId });
   const scans = createIdScanService({ repos, policy: hotelPolicy, clock, newToken: newScanToken });
   const guests = createGuestService({ repos, newId });
   const housekeeping = createHousekeepingService({ repos, clock, newId });
@@ -102,6 +103,7 @@ export function createApp({
   const hotelContext = async (): Promise<HotelContext> => ({
     profile: await settings.getProfile(),
     policy: hotelPolicy,
+    pricing: await rates.getPricing(),
   });
   const inbox = createInboxService({ repos, hotel, clock, newId });
   const limiter = createAiLimiter(limits, clock);
@@ -146,6 +148,7 @@ export function createApp({
     c.json<Health>({
       status: 'ok',
       ai: { configured: ai !== null, voice: ai?.transcription != null, vision: ai?.vision != null },
+      hotel: { timezone: getHotelTimeZone() },
     }),
   );
   app.route('/api', roomRoutes(repos));

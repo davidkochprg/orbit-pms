@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingAction, useFolio, useGuestBook } from '@/lib/api';
-import { formatCzk, formatParty, formatRange } from '@/lib/format';
+import { formatMoney, formatParty, formatRange } from '@/lib/format';
 import { keepOpenWhileEditing } from '@/lib/inline-edit';
 import { guestBookProgress } from '@/lib/registration';
 import { cn } from '@/lib/utils';
@@ -129,12 +129,12 @@ function Flow({ detail, onDone }: { detail: BookingDetail; onDone: () => void })
                 ok={folio.data.balance <= 0}
                 title={
                   folio.data.balance > 0
-                    ? `${formatCzk(folio.data.balance)} still due`
+                    ? `${formatMoney(folio.data.balance)} still due`
                     : folio.data.balance < 0
-                      ? `${formatCzk(-folio.data.balance)} owed to the guest`
+                      ? `${formatMoney(-folio.data.balance)} owed to the guest`
                       : 'Paid in full'
                 }
-                detail={`${formatCzk(folio.data.charged)} charged, ${formatCzk(folio.data.paid)} paid so far. Many guests settle at check-out.`}
+                detail={`${formatMoney(folio.data.charged)} charged, ${formatMoney(folio.data.paid)} paid so far. Many guests settle at check-out.`}
               />
               {folio.data.balance > 0 && (
                 <Button variant="outline" className="self-start" onClick={() => setPaying(true)}>
@@ -181,7 +181,7 @@ function Flow({ detail, onDone }: { detail: BookingDetail; onDone: () => void })
               <SummaryRow
                 ok={folio.data.balance <= 0}
                 title={
-                  folio.data.balance > 0 ? `${formatCzk(folio.data.balance)} due` : 'Bill settled'
+                  folio.data.balance > 0 ? `${formatMoney(folio.data.balance)} due` : 'Bill settled'
                 }
                 detail={folio.data.balance > 0 ? 'Collected at check-out.' : 'Nothing to collect.'}
               />

@@ -44,6 +44,8 @@ export interface ToolDeps {
   listRooms: () => Promise<
     { id: string; name: string; kind: string; roomTypeId: string; status: string }[]
   >;
+  /** Room type names, so "a King room" can be matched to its rooms. */
+  listRoomTypes: () => Promise<{ id: string; name: string }[]>;
 }
 
 export interface ToolError {
@@ -182,15 +184,23 @@ export function createAgentTools({
   housekeeping,
   registrations,
   listRooms,
+  listRoomTypes,
 }: ToolDeps) {
   const propose = (input: PendingActionInput) =>
     safely(async () => toProposal(await actions.propose(input)));
 
   return {
     listRooms: tool({
-      description: 'List all rooms with their IDs, names, kind, room type and housekeeping status.',
+      description:
+        'List all rooms with their IDs, names, kind, room type (ID and name) and housekeeping status.',
       inputSchema: z.object({}),
-      execute: () => listRooms(),
+      execute: async () => {
+        const types = new Map((await listRoomTypes()).map((t) => [t.id, t.name]));
+        return (await listRooms()).map((r) => ({
+          ...r,
+          roomTypeName: types.get(r.roomTypeId) ?? r.roomTypeId,
+        }));
+      },
     }),
     searchBookings: tool({
       description: 'Find bookings by guest name, room name, date range and/or status.',

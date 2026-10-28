@@ -6,15 +6,15 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 
 | Entity           | Key fields                                                                                                                                                                                                      |
 | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| RoomType         | name, `maxAdults`, `maxChildren`, `basePrice` (adult rate per person per night, CZK), description                                                                                                               |
+| RoomType         | name, `maxAdults`, `maxChildren`, `basePrice` (per room or per adult per night, see `pricingBasis`), description                                                                                                |
 | Room             | name, room type, `kind` (`room` \| `apartment`), floor, `status` (`clean` \| `dirty` \| `inspected` \| `out_of_order`)                                                                                          |
 | Guest            | name, email, phone, `language` (`cs` \| `de` \| `en` \| `pl`), notes                                                                                                                                            |
 | Booking          | guest, room, `checkIn`, `checkOut`, adults, `childAges`, `status`, `holdExpiresAt`, `source`, `addons` (wellness, dogs, extra beds), `priceSnapshot` (a quote), notes                                           |
 | Inquiry          | a conversation: channel, guest, messages (in or out), unread, archived, parsed extraction, `status`, linked booking                                                                                             |
 | HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes                                                                                                   |
 | HotelProfile     | name, location, description, contact, `checkInFrom`, `checkOutBy`, `entries` (`policy` \| `amenity` \| `info`, title, details)                                                                                  |
-| Charge           | booking, label, quantity, `unitPrice` (CZK, negative for a discount), amount, `vatBracket` (`standard` \| `reduced` \| `none`), `postedOn`                                                                      |
-| Payment          | booking, `kind` (`payment` \| `refund`), `method` (`cash` \| `card` \| `bank_transfer`), amount (positive CZK), note, `paidOn`                                                                                  |
+| Charge           | booking, label, quantity, `unitPrice` (negative for a discount), amount, `vatBracket` (`standard` \| `reduced` \| `none`), `postedOn`                                                                           |
+| Payment          | booking, `kind` (`payment` \| `refund`), `method` (`cash` \| `card` \| `bank_transfer`), amount (positive), note, `paidOn`                                                                                      |
 | StayGuest        | booking, guest profile (main guest only), name, `nationality` (ISO alpha-2), `dateOfBirth`, `documentType` (`id_card` \| `passport`), `documentNumber`, address, `registeredAt`, each ID field null until known |
 | IdScan           | booking, stay guest (or none, for a companion still to add), `status` (`waiting` \| `reading` \| `done` \| `failed`), checked result, error, `readingSince`, `expiresAt`                                        |
 | StaffMember      | name, email, `role` (`manager` \| `receptionist` \| `housekeeping`), `active`                                                                                                                                   |
@@ -126,13 +126,12 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 
 `createRegistrationService` (`registration.ts`) keeps the guest book: one entry per person staying in the room (`StayGuest`). The main guest's entry has the fixed ID `sg_<bookingId>` and takes its name from their profile; it exists in the book before anything is recorded. Companions are added by name, with ID details if known.
 
-`missingFields(person, today, policy)` lists what an entry still needs:
+What an entry needs depends on the country in the hotel profile (`guestBookRulesFor`, [ADR 0013](decisions/0013-configurable-region-us-demo.md)). `missingFields(person, today, rules, primary)` lists it:
 
-- nationality and date of birth, always;
-- document type and number, from `idDocumentMinAge` (15: Czech ID cards are compulsory from 15) or when the age is unknown;
-- a home address when the nationality is not the hotel's `homeCountry` (`CZ`).
+- **US**: only the guest who booked needs an entry, with an ID document (type and number). Companions may be listed but need nothing.
+- **Elsewhere** (the Czech rules): everyone in the room, with nationality and date of birth; a document type and number from 15 (Czech ID cards are compulsory then) or when the age is unknown; and a home address when the nationality is not the hotel's country.
 
-`buildGuestBook` returns everyone (main guest first, then companions in the order they were added), the party size (adults plus children) and `missing`: people with an incomplete entry plus people the party counts that nobody added yet. `BookingDetail.missingIds` is the same number. `extra` counts people listed beyond the party, which happens when the party is made smaller after companions were added; the inspector and the check-in flow warn about it.
+`buildGuestBook` returns everyone (main guest first, then companions in the order they were added), the party size (adults plus children) and `missing`: people with an incomplete entry, plus, where everyone is recorded, people the party counts that nobody added yet. `BookingDetail.missingIds` is the same number. `extra` counts people listed beyond the party, which happens when the party is made smaller after companions were added; the inspector and the check-in flow warn about it.
 
 - `getGuestBook(bookingId)` also returns the main guest's details from their latest earlier stay, to prefill.
 - `addGuest(bookingId, body, actor)` adds a companion, up to the party size (`over_capacity`).
@@ -165,9 +164,9 @@ An unknown, expired or already saved scan is `not_found`.
 
 `charged` is the sum of the lines, `paid` is payments minus refunds, and `balance = charged - paid` (negative: the guest is owed money).
 
-**VAT.** Prices include VAT. Every line carries a `vatBracket` and its `vatRate` from the rates' `vat` (`standard` 21 %, `reduced` 12 %, the Czech rates since 2024). Stay lines take their bracket from `stayVatBrackets`: accommodation, child and long-stay discounts and extra beds are `reduced`; wellness and dogs `standard` (to be confirmed). City tax is `none`, outside VAT. Extras carry the bracket staff chose, `standard` by default. `vatSummary` gives one line per bracket with charges: `gross` (the bracket's total), `vat = round(gross × rate / (100 + rate))` and `net = gross − vat`, rounded once per bracket in whole CZK, half away from zero so a discount's VAT mirrors a charge's.
+**Tax.** Every line carries a `vatBracket` and its `vatRate` from the rates' `tax`: `reduced` is the lodging bracket (accommodation, child and long-stay discounts, extra beds: the Czech reduced VAT, or a US occupancy tax), `standard` everything else (wellness and dogs, to be confirmed for Czechia, and extras by default: standard VAT, or a US sales tax), `none` outside tax (city tax). Each bracket has a name and a rate with up to two decimals. With `tax.mode` `inclusive` (VAT) the prices include tax and `vatSummary` takes it out of each bracket's total: `vat = round(gross × rate / (100 + rate))`, `net = gross − vat`. With `exclusive` (US) the prices are before tax: `vat = round(net × rate / 100)`, `gross = net + vat`, and the bill adds one `tax` line per bracket, e.g. "Occupancy tax 12%". Either way the rounding happens once per bracket in whole units, half away from zero so a discount's tax mirrors a charge's. The folio states its `taxMode` and `currency`.
 
-- `addCharge` / `updateCharge` / `removeCharge` need a `confirmed` or `checked_in` booking (`invalid_transition`): a hold isn't a sale yet, and a checked-out bill is closed. A charge is posted on the hotel's today. `updateCharge` changes the label, quantity, unit price or VAT bracket in place and recomputes the amount.
+- `addCharge` / `updateCharge` / `removeCharge` need a `confirmed` or `checked_in` booking (`invalid_transition`): a hold isn't a sale yet, and a checked-out bill is closed. A charge is posted on the hotel's today. `updateCharge` changes the label, quantity, unit price or tax bracket in place and recomputes the amount. Previews give the balance after the change with its taxes.
 - `recordPayment` takes payments in any status except `cancelled`, where only refunds are possible. A refund can't exceed what was paid (`invalid_input`).
 - `previewCharge` / `previewPayment` run the same checks without saving and return the balance after, for agent proposals.
 - Audited on the booking as `folio.charge`, `folio.update_charge` (with the changed fields), `folio.remove_charge`, `folio.payment` and `folio.refund`.
@@ -178,8 +177,8 @@ An unknown, expired or already saved scan is `not_found`.
 
 - **Sold** stays are `confirmed`, `checked_in` and `checked_out`; holds and cancellations don't count.
 - **Room nights**: available = rooms × nights; sold = nights of sold stays inside the period. Occupancy = sold / available, as a fraction.
-- **Revenue** comes from each booking's `priceSnapshot`, spread evenly over its nights in whole CZK so the nightly shares add up exactly (`nightlyShare`). A stay that crosses the period's edge counts only its nights inside. Room revenue is accommodation after child and long-stay discounts; add-on revenue is wellness, extra beds and dogs. Extras are the charges posted in the period. City tax is reported apart: it is collected for the town.
-- **ADR** = room revenue / room nights sold; **RevPAR** = room revenue / room nights available. Both rounded to whole CZK.
+- **Revenue** comes from each booking's `priceSnapshot`, spread evenly over its nights in whole units so the nightly shares add up exactly (`nightlyShare`). A stay that crosses the period's edge counts only its nights inside. Room revenue is accommodation after child and long-stay discounts; add-on revenue is wellness, extra beds and dogs. Extras are the charges posted in the period. City tax is reported apart: it is collected for the town.
+- **ADR** = room revenue / room nights sold; **RevPAR** = room revenue / room nights available. Both rounded to whole units.
 - Guest nights, arrivals in the period and their average stay, and cancellations with a night in the period.
 - Room nights and room revenue by booking source and by room type (with each type's occupancy), payments minus refunds by method on days in the period, departed guests (check-out inside the period) who still owe, and a daily series of rooms sold, occupancy and room revenue.
 - `previousPeriod(query)` is the same length right before, for comparisons.
@@ -188,9 +187,9 @@ An unknown, expired or already saved scan is `not_found`.
 
 `createRatesService` (`rates.ts`) keeps the rates (the `PricingConfig` that `quote()` reads), room types and rooms. Anyone may read them; every change needs an active manager (`forbidden`) and is audited with `by` in the payload.
 
-- The rates include `cityTax` (`perPersonPerNight`, `minAge`), billed on the folio. Rates saved before it existed read it as 0.
-- The rates include `vat` (`standard`, `reduced`, in percent); both 0 for a hotel that is not a VAT payer. Rates saved before it existed read the Czech rates, 21 and 12.
-- Until rates are saved, `getPricing()` returns the defaults from `pricing/config.ts` (placeholders). The demo seed saves those defaults.
+- The rates include `currency` (`USD`, `EUR` or `CZK`; amounts are never converted), `pricingBasis` (`per_room` or `per_person`) and `tax` (`mode` `inclusive` or `exclusive`, and a `label` and `rate` for the `standard` and `reduced` brackets). Rates saved before these existed read as CZK, per person, with Czech VAT included (21 and 12).
+- The rates include `cityTax` (`label`, `perPersonPerNight`, `minAge`), billed on the folio, e.g. "City tax" or "Tourism fee". Rates saved before it existed read it as 0.
+- Until rates are saved, `getPricing()` returns the Czech defaults from `pricing/config.ts` (placeholders). The demo seed saves the US lodge's `usDemoPricing` (or the Czech defaults with `SEED_REGION=cz`).
 - `updatePricing(config, by)` replaces the rates. Season days must be real `MM-DD` days (29 February counts) and season names unique, child tiers must go up in age, and there is one long-stay tier per length (`invalid_input`). Audited as `settings.pricing` with the changed fields; a save that changes nothing writes nothing.
 - `createRoomType` / `updateRoomType` set the name, capacity, base price and description (`room_type.create`, `room_type.update`; a price change logs the old and new base price).
 - `createRoom` / `updateRoom` set the name, room type, kind and floor. Room names are unique, ignoring case (`conflict`), and the room type must exist (`not_found`). New rooms start `clean`; an edit keeps the housekeeping status (`room.create`, `room.update`).
@@ -219,9 +218,9 @@ An unknown, expired or already saved scan is `not_found`.
 
 `quote(input, pricing)` returns a line-item breakdown whose amounts sum to `total`. The rates are edited in Settings → Rates ([Rates and rooms](#rates-and-rooms)); the defaults in `packages/domain/src/pricing/config.ts` and the seeded base prices **are placeholders until replaced with real prices.**
 
-1. **Accommodation** is per person per night: `basePrice × season multiplier`, rounded to whole CZK. One line per season the stay touches.
+1. **Accommodation**: `basePrice × season multiplier`, rounded to whole units, per guest per night (`per_person`) or per room per night (`per_room`). One line per season the stay touches. Taxes are not part of a quote: they are included in the prices or added on the bill.
 2. **Seasons** are `MM-DD` ranges, inclusive of both nights, and may wrap the new year (`12-20` → `03-15`). The first matching season wins; other nights use multiplier 1.
-3. **Child discounts**: each child gets the first tier with `age ≤ maxAge`; the discount is a fraction of that night's adult rate (1 = free). Older children pay the adult rate.
+3. **Child discounts** (per-person rates only): each child gets the first tier with `age ≤ maxAge`; the discount is a fraction of that night's adult rate (1 = free). Older children pay the adult rate.
 4. **Long stay**: the tier with the highest `minNights` the stay reaches takes a fraction off accommodation, after child discounts. Add-ons are not discounted.
 5. **Add-ons**: wellness (per eligible guest per night, from `wellness.minAge`), extra bed (per bed per night), dog (per dog per night).
 6. Parties that don't fit the room type (counting extra beds) throw `over_capacity`.
@@ -229,7 +228,7 @@ An unknown, expired or already saved scan is `not_found`.
 ## Conventions
 
 - Stays are half-open date ranges `[checkIn, checkOut)`. Dates are stored as `YYYY-MM-DD`.
-- Hotel timezone is `Europe/Prague`. `hotelToday(now)` gives the hotel's calendar date.
-- Money is integer whole CZK. No floats.
+- The hotel time zone is set at startup with `setHotelTimeZone` (`HOTEL_TIMEZONE`; default `America/Los_Angeles`). `hotelToday(now)` gives the hotel's calendar date.
+- Money is integer whole units of the rates' `currency`. No floats. `formatMoney` writes "$1,250" or "12 500 CZK".
 - Domain functions take `now` as an argument instead of reading the clock.
 - I/O goes through repository interfaces (`packages/domain/src/repositories.ts`) implemented in `packages/db`.

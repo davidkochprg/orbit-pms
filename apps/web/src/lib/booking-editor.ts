@@ -53,7 +53,12 @@ export const sourceLabels: Record<BookingSource, string> = {
   ota: 'OTA',
 };
 
-export function newBookingForm(today: string, prefill: NewBookingPrefill = {}): BookingForm {
+/** A new booking's form; a new guest starts in the hotel's working `language`. */
+export function newBookingForm(
+  today: string,
+  prefill: NewBookingPrefill = {},
+  language: Language = 'en',
+): BookingForm {
   const checkIn = prefill.checkIn ?? today;
   return {
     checkIn,
@@ -70,7 +75,7 @@ export function newBookingForm(today: string, prefill: NewBookingPrefill = {}): 
       ? { mode: 'new', ...prefill.newGuest, phone: '' }
       : prefill.guestId
         ? { mode: 'existing', guestId: prefill.guestId }
-        : { mode: 'new', name: '', email: '', phone: '', language: 'cs' },
+        : { mode: 'new', name: '', email: '', phone: '', language },
     inquiryId: prefill.inquiryId ?? null,
   };
 }

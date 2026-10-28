@@ -1,7 +1,10 @@
 import type { StaffMember } from '@orbit/shared';
 
-/** The demo team: synthetic people on example.com. The first manager is who the demo signs in as. */
-export const seedStaff: StaffMember[] = [
+/**
+ * The Czech guesthouse's team: synthetic people on example.com, reading Czech. The first manager
+ * is who the demo signs in as.
+ */
+export const czechStaff: StaffMember[] = [
   {
     id: 'stf_martina',
     name: 'Martina Kovářová',
@@ -43,3 +46,19 @@ export const seedStaff: StaffMember[] = [
     active: false,
   },
 ];
+
+/** The US demo lodge's team: synthetic people on example.com, reading English. */
+export const usStaff: StaffMember[] = [
+  ['stf_jordan', 'Jordan Lee', 'manager', true],
+  ['stf_sam', 'Sam Rivera', 'receptionist', true],
+  ['stf_taylor', 'Taylor Brooks', 'receptionist', true],
+  ['stf_morgan', 'Morgan Ellis', 'housekeeping', true],
+  ['stf_casey', 'Casey Nguyen', 'receptionist', false],
+].map(([id, name, role, active]) => ({
+  id: id as string,
+  name: name as string,
+  email: `${(id as string).slice(4)}@example.com`,
+  role: role as StaffMember['role'],
+  language: 'en' as const,
+  active: active as boolean,
+}));

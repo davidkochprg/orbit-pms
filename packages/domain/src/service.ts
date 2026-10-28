@@ -41,7 +41,7 @@ import { addonsForWishes, pickOptions, roomKindForWishes, stayRequest } from './
 import type { HotelPolicy } from './policy';
 import { type PricingConfig, quote } from './pricing';
 import { currentPricing } from './rates';
-import { buildGuestBook } from './registration';
+import { buildGuestBook, currentGuestBookRules } from './registration';
 import type { NewAuditEntry, Repositories } from './repositories';
 import { containsText } from './text';
 
@@ -326,7 +326,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
       await repos.stayGuests.listByBooking(id),
       null,
       today,
-      policy,
+      await currentGuestBookRules(repos),
     );
     return {
       booking,
@@ -384,7 +384,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
       tasks,
       inquiries,
       stayGuests,
-      policy,
+      rules: await currentGuestBookRules(repos),
     });
   }
 

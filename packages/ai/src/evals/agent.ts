@@ -8,7 +8,7 @@ import {
   createRegistrationService,
   createReportService,
   hotelPolicy,
-  pricingConfig,
+  usDemoPricing,
 } from '@orbit/domain';
 import { createMemoryRepositories } from '@orbit/domain/testing';
 import type { Booking, IsoDate, PendingActionInput, RoomType } from '@orbit/shared';
@@ -50,8 +50,8 @@ const stay: Omit<Booking, 'id' | 'guestId' | 'roomId' | 'checkIn' | 'checkOut' |
 };
 
 /**
- * A four-room hotel for agent evals, with dates relative to `today`: Anna Example in 104 since
- * yesterday with two extras on her bill and her companion not yet in the guest book, Jan Dvořák
+ * A four-room US inn for agent evals, on the demo's rates, with dates relative to `today`: Anna
+ * Example in 104 since yesterday with two extras on her bill and her ID recorded, Jan Dvořák
  * arriving in 201 today without an ID recorded, room 101 dirty and 202 free.
  */
 export function buildAgentEvalHotel(today: IsoDate) {
@@ -140,13 +140,13 @@ export function buildAgentEvalHotel(today: IsoDate) {
   const newId = (prefix: string) => `${prefix}_eval${++n}`;
   const hotel = createHotelService({
     repos,
-    pricing: pricingConfig,
+    pricing: usDemoPricing,
     policy: hotelPolicy,
     clock,
     newId,
   });
-  const billing = createBillingService({ repos, pricing: pricingConfig, clock, newId });
-  const registrations = createRegistrationService({ repos, policy: hotelPolicy, clock, newId });
+  const billing = createBillingService({ repos, pricing: usDemoPricing, clock, newId });
+  const registrations = createRegistrationService({ repos, clock, newId });
   const actions = createPendingActionService({
     repos,
     hotel,
@@ -159,11 +159,12 @@ export function buildAgentEvalHotel(today: IsoDate) {
   const tools = createAgentTools({
     hotel,
     billing,
-    reports: createReportService({ repos, pricing: pricingConfig }),
+    reports: createReportService({ repos, pricing: usDemoPricing }),
     actions,
     housekeeping: createHousekeepingService({ repos, clock, newId }),
     registrations,
     listRooms: () => repos.rooms.listRooms(),
+    listRoomTypes: () => repos.rooms.listRoomTypes(),
   });
   return { repos, tools };
 }
@@ -246,7 +247,9 @@ export const agentFixtures: AgentFixture[] = [
     check: ({ hotel, calls, answer }) => [
       ...readOnly(hotel),
       ...called(calls, 'getDailyBrief', 'getGuestBook'),
-      ...mentions(answer, ['Anna', '104', '[[bk_anna]]'], ['Dvořák', '201', '[[bk_jan]]']),
+      ...mentions(answer, ['Dvořák', '201', '[[bk_jan]]']),
+      // In the US only the guest who booked shows an ID, and Anna's is recorded.
+      ...(/Anna|\[\[bk_anna\]\]/.test(answer) ? ['answer lists Anna, whose ID is recorded'] : []),
       ...bareIds(answer),
       ...(/Dvorak/.test(answer) ? ['answer drops the diacritics in Dvořák'] : []),
     ],

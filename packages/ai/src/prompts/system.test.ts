@@ -1,7 +1,7 @@
-import { hotelPolicy } from '@orbit/domain';
+import { hotelPolicy, pricingConfig, usDemoPricing } from '@orbit/domain';
 import type { HotelProfile } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
-import { enforcedRules, hotelFacts } from './hotel';
+import { enforcedRules, hotelFacts, pricesSentence, timeOfDay } from './hotel';
 import { buildSystemPrompt } from './system';
 
 const profile: HotelProfile = {
@@ -13,13 +13,15 @@ const profile: HotelProfile = {
   website: null,
   checkInFrom: '14:00',
   checkOutBy: '11:00',
+  country: 'CZ',
+  language: 'cs',
   entries: [
     { id: 'quiet', category: 'policy', title: 'Quiet hours', details: 'From 22:00.' },
     { id: 'sauna', category: 'amenity', title: 'Sauna', details: 'Open 16:00 to 21:00.' },
     { id: 'bus', category: 'info', title: 'Bus', details: 'Stop 200 m from the house.' },
   ],
 };
-const hotel = { profile, policy: hotelPolicy };
+const hotel = { profile, policy: hotelPolicy, pricing: pricingConfig };
 
 describe('hotelFacts', () => {
   const facts = hotelFacts(hotel);
@@ -49,6 +51,26 @@ describe('hotelFacts', () => {
       'Dogs may stay only in apartments.',
     );
     expect(enforcedRules({ holdHours: 24, dogsAllowedIn: [] })[1]).toBe('Dogs are not allowed.');
+  });
+});
+
+describe('timeOfDay', () => {
+  it('writes times as guests in the hotel country do', () => {
+    expect(timeOfDay('15:00', 'US')).toBe('3 PM');
+    expect(timeOfDay('07:30', 'US')).toBe('7:30 AM');
+    expect(timeOfDay('12:00', 'US')).toBe('12 PM');
+    expect(timeOfDay('15:00', 'CZ')).toBe('15:00');
+  });
+});
+
+describe('pricesSentence', () => {
+  it('states the currency, the basis and whether tax is included or added', () => {
+    expect(pricesSentence(pricingConfig)).toBe(
+      'Prices are in whole Czech crowns (CZK), per person per night, including VAT 12% on accommodation and VAT 21% on everything else.',
+    );
+    expect(pricesSentence(usDemoPricing)).toBe(
+      'Prices are in whole US dollars, per room per night, before tax: the bill adds Occupancy tax 12% on accommodation and Sales tax 8.75% on everything else.',
+    );
   });
 });
 

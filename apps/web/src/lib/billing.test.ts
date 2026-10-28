@@ -20,8 +20,8 @@ describe('balanceLabel', () => {
 });
 
 describe('vatRateLabel', () => {
-  it('shows the rate, or that a line is outside VAT', () => {
+  it('shows the rate, or that a line is outside tax', () => {
     expect(vatRateLabel('reduced', 12)).toBe('12%');
-    expect(vatRateLabel('none', 0)).toBe('No VAT');
+    expect(vatRateLabel('none', 0)).toBe('No tax');
   });
 });

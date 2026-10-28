@@ -79,7 +79,7 @@ describe('attentionItems', () => {
     const lapsed = attentionItems({ ...brief, holds: [{ ...brief.holds[0]!, expired: true }] });
     expect(lapsed.find((i) => i.kind === 'hold')).toMatchObject({
       title: 'Hold for Guest B lapsed',
-      detail: 'Room 201, arrives Fri 30 Oct',
+      detail: 'Room 201, arrives Fri, Oct 30',
     });
   });
 });
@@ -91,7 +91,7 @@ describe('gapItems', () => {
         id: 'gap:rm_105:2026-10-28',
         kind: 'gap',
         title: 'Room 105, 1 night',
-        detail: 'Night of Wed 28 Oct',
+        detail: 'Night of Wed, Oct 28',
         target: { path: '/tape-chart?from=2026-10-28' },
       },
     ]);

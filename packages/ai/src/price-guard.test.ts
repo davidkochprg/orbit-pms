@@ -34,6 +34,16 @@ describe('amountsInText', () => {
     expect(amountsInText('Razem 4 000 CZK oraz 1200,- Kč')).toEqual([4000, 1200]);
   });
 
+  it('reads dollars, with or without zero cents', () => {
+    expect(amountsInText('Your total is $1,250 plus tax.')).toEqual([1250]);
+    expect(
+      amountsInText('That comes to $1,250.00, or 980 USD for the shorter stay.').sort(
+        (a, b) => a - b,
+      ),
+    ).toEqual([980, 1250]);
+    expect(amountsInText('Rooms from US$ 159 a night')).toEqual([159]);
+  });
+
   it('ignores numbers that are not money', () => {
     expect(amountsInText('Check-in from 15:00, 2 adults, room 104, 6 November')).toEqual([]);
   });

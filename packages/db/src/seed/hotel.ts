@@ -1,10 +1,12 @@
 import type { HotelProfile } from '@orbit/shared';
 
 /**
- * The demo property: synthetic, with contact details on reserved example domains. Amounts are
+ * The Czech guesthouse: synthetic, with contact details on reserved example domains. Amounts are
  * left out on purpose; prices come from `quote()`.
  */
-export const seedHotelProfile: HotelProfile = {
+export const czechHotelProfile: HotelProfile = {
+  country: 'CZ',
+  language: 'cs',
   name: 'Orbit Demo Penzion',
   location: 'Jizera Mountains, Czech Republic',
   description:
@@ -118,6 +120,132 @@ export const seedHotelProfile: HotelProfile = {
       title: 'Hiking and skiing',
       details:
         'Marked hiking and cycling trails start at the door. Cross-country ski trails and a small ski area are a 10-minute walk away. Free maps at reception.',
+    },
+  ],
+};
+
+/**
+ * The US demo lodge: a fictional mountain inn in the Sierra Nevada, on Pacific time, with contact
+ * details on reserved example domains. Amounts are left out on purpose; prices come from
+ * `quote()`.
+ */
+export const usHotelProfile: HotelProfile = {
+  country: 'US',
+  language: 'en',
+  name: 'Orbit Demo Lodge',
+  location: 'Sierra Nevada, California',
+  description:
+    'A family-run mountain lodge with 44 rooms and 6 cabin suites at the edge of the forest, popular with families, hikers and skiers.',
+  phone: null,
+  email: 'frontdesk@example.com',
+  website: 'https://example.com',
+  checkInFrom: '15:00',
+  checkOutBy: '11:00',
+  entries: [
+    {
+      id: 'pets',
+      category: 'policy',
+      title: 'Dogs',
+      details:
+        'Dogs are welcome in the cabin suites for a nightly fee. They may not enter the breakfast room or the spa.',
+    },
+    {
+      id: 'children',
+      category: 'policy',
+      title: 'Kids',
+      details:
+        'Kids of every age are welcome and stay free in their parents’ room. Cribs and high chairs are free on request.',
+    },
+    {
+      id: 'cancellation',
+      category: 'policy',
+      title: 'Cancellation',
+      details:
+        'Free cancellation up to 72 hours before arrival. Later cancellations and no-shows are charged the first night.',
+    },
+    {
+      id: 'payment',
+      category: 'policy',
+      title: 'Payment',
+      details:
+        'A credit card is needed to hold a reservation. Room rates are before the occupancy tax, which is added at check-out.',
+    },
+    {
+      id: 'quiet-hours',
+      category: 'policy',
+      title: 'Quiet hours',
+      details: 'From 10 PM to 7 AM.',
+    },
+    {
+      id: 'smoking',
+      category: 'policy',
+      title: 'Smoking',
+      details: 'The whole lodge is non-smoking, including vaping.',
+    },
+    {
+      id: 'late-checkout',
+      category: 'policy',
+      title: 'Late check-out',
+      details:
+        'Until 1 PM on request for a fee, if the room is not needed for an arrival that day.',
+    },
+    {
+      id: 'breakfast',
+      category: 'amenity',
+      title: 'Breakfast',
+      details: 'Continental breakfast from 7 to 10 AM in the lodge room, included in every stay.',
+    },
+    {
+      id: 'wellness',
+      category: 'amenity',
+      title: 'Spa',
+      details:
+        'Sauna and outdoor hot tub, open 4 to 9 PM. Spa access is booked per guest per night as an add-on.',
+    },
+    {
+      id: 'parking',
+      category: 'amenity',
+      title: 'Parking',
+      details: 'Free self-parking for about 40 cars, with four EV chargers.',
+    },
+    {
+      id: 'wifi',
+      category: 'amenity',
+      title: 'Wi-Fi',
+      details: 'Free Wi-Fi in every room and the common areas.',
+    },
+    {
+      id: 'ski-room',
+      category: 'amenity',
+      title: 'Ski and bike room',
+      details: 'Heated storage for skis and bikes, with boot dryers.',
+    },
+    {
+      id: 'playroom',
+      category: 'amenity',
+      title: 'For kids',
+      details: 'A game room with toys and board games, and a playground by the creek.',
+    },
+    {
+      id: 'reception',
+      category: 'info',
+      title: 'Front desk hours',
+      details:
+        'The front desk is open from 7 AM to 10 PM. Guests arriving later get a door code by email on the day of arrival.',
+    },
+    {
+      id: 'getting-here',
+      category: 'info',
+      title: 'Getting here',
+      details:
+        'About an hour by car from Reno–Tahoe International Airport. Chains may be required on mountain roads in winter.',
+    },
+    {
+      id: 'outdoors',
+      category: 'info',
+      title: 'Hiking and skiing',
+      details:
+        'Hiking and biking trails start at the door. Cross-country trails and a small ski area are a 10-minute walk away. Free maps at the front desk.',
     },
   ],
 };

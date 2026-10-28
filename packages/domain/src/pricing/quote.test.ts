@@ -6,6 +6,8 @@ import { childTier, quote, seasonFor } from './quote';
 
 // Fixed test config so tests don't depend on the placeholder values in config.ts.
 const config: PricingConfig = {
+  currency: 'CZK',
+  pricingBasis: 'per_person',
   seasons: [
     { name: 'christmas', from: '12-24', to: '12-26', multiplier: 2 },
     { name: 'winter_peak', from: '12-20', to: '03-15', multiplier: 1.5 },
@@ -21,8 +23,12 @@ const config: PricingConfig = {
   wellness: { perPersonPerNight: 300, minAge: 6 },
   extraBed: { perNight: 400 },
   dog: { perNight: 250 },
-  cityTax: { perPersonPerNight: 50, minAge: 18 },
-  vat: { standard: 21, reduced: 12 },
+  cityTax: { label: 'City tax', perPersonPerNight: 50, minAge: 18 },
+  tax: {
+    mode: 'inclusive',
+    standard: { label: 'VAT', rate: 21 },
+    reduced: { label: 'VAT', rate: 12 },
+  },
 };
 
 const base = {
@@ -215,5 +221,26 @@ describe('quote labels', () => {
     expect(q.lines.find((l) => l.kind === 'child_discount')?.label).toBe(
       'Child discount 50% (age ≤ 11), 2 children × 2 nights (standard)',
     );
+  });
+
+  it('prices the room, not each guest, with per-room rates, in their currency', () => {
+    const perRoom: PricingConfig = { ...config, currency: 'USD', pricingBasis: 'per_room' };
+    const q = quote(
+      {
+        roomType: double,
+        checkIn: '2026-05-04',
+        checkOut: '2026-05-06',
+        adults: 2,
+        childAges: [1],
+        addons: { wellness: true },
+      },
+      perRoom,
+    );
+    expect(q.currency).toBe('USD');
+    expect(q.lines.map((l) => [l.kind, l.label, l.quantity, l.unitPrice])).toEqual([
+      ['accommodation', 'Room, 2 nights (standard)', 2, double.basePrice],
+      // Wellness stays per person; the baby is under its minimum age.
+      ['wellness', 'Wellness, 2 guests × 2 nights', 4, config.wellness.perPersonPerNight],
+    ]);
   });
 });

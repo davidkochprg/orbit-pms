@@ -4,7 +4,7 @@ import { DomainError } from './errors';
 import { hotelPolicy } from './policy';
 import { pricingConfig } from './pricing';
 import { createHotelService } from './service';
-import { booking, double, room } from './test-fixtures';
+import { booking, czechProfile, double, room } from './test-fixtures';
 import { createMemoryRepositories } from './testing';
 
 const now = new Date('2026-05-10T08:00:00Z');
@@ -36,6 +36,7 @@ function registration(bookingId: string): StayGuest {
 function setup() {
   const repos = createMemoryRepositories(
     {
+      profile: czechProfile,
       roomTypes: [double],
       rooms: [room('rm_1', { name: '1' }), room('rm_2', { name: '2' })],
       guests: [guest],

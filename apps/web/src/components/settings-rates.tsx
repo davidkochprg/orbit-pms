@@ -1,11 +1,21 @@
-import type { PricingConfig } from '@orbit/shared';
+import {
+  type Currency,
+  currencies,
+  type PricingBasis,
+  type PricingConfig,
+  type TaxMode,
+  type VatBracket,
+} from '@orbit/shared';
 import { Plus, Trash2 } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { Link } from 'react-router';
 import { FormField } from '@/components/form-field';
 import { Section } from '@/components/section';
+import { Segmented } from '@/components/segmented';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { NativeSelect } from '@/components/ui/native-select';
+import { currencyMark } from '@/lib/format';
 import { fromPercent, fromSurcharge, newSeason, toPercent, toSurcharge } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 
@@ -34,6 +44,97 @@ export function RatesSettings({ pricing, onChange, readOnly }: Props) {
         </Link>
         .
       </p>
+
+      <Section title="Currency and taxes">
+        <Hint>
+          How prices are stated. In the US, rates are per room and taxes go on top of them; in
+          Europe, prices usually include VAT. Changing the currency doesn&apos;t convert any amount.
+        </Hint>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label="Currency" htmlFor="currency">
+            <NativeSelect
+              id="currency"
+              value={pricing.currency}
+              disabled={readOnly}
+              onChange={(e) => set('currency', e.target.value as Currency)}
+            >
+              {currencies.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormField>
+          <div className="flex flex-col gap-1.5">
+            <span className="text-xs font-medium text-muted-foreground">Base prices are</span>
+            <Segmented<PricingBasis>
+              label="Base prices are"
+              value={pricing.pricingBasis}
+              disabled={readOnly}
+              options={[
+                { value: 'per_room', label: 'Per room' },
+                { value: 'per_person', label: 'Per person' },
+              ]}
+              onChange={(v) => set('pricingBasis', v)}
+            />
+          </div>
+          <div className="flex flex-col gap-1.5 sm:col-span-2">
+            <span className="text-xs font-medium text-muted-foreground">Taxes</span>
+            <Segmented<TaxMode>
+              label="Taxes"
+              value={pricing.tax.mode}
+              disabled={readOnly}
+              options={[
+                { value: 'exclusive', label: 'Added on top of prices' },
+                { value: 'inclusive', label: 'Included in prices' },
+              ]}
+              onChange={(mode) => set('tax', { ...pricing.tax, mode })}
+            />
+          </div>
+          {(
+            [
+              [
+                'reduced',
+                'Lodging tax',
+                'Accommodation and extra beds, e.g. an occupancy tax or reduced VAT.',
+              ],
+              ['standard', 'Other tax', 'Most extras, e.g. a sales tax or standard VAT.'],
+            ] as [Exclude<VatBracket, 'none'>, string, string][]
+          ).map(([bracket, title, hint]) => (
+            <FormField key={bracket} label={title} htmlFor={`tax-${bracket}`} hint={hint}>
+              <div className="grid grid-cols-[1fr_7.5rem] gap-2">
+                <Input
+                  id={`tax-${bracket}`}
+                  aria-label={`${title} name`}
+                  value={pricing.tax[bracket].label}
+                  disabled={readOnly}
+                  onChange={(e) =>
+                    set('tax', {
+                      ...pricing.tax,
+                      [bracket]: { ...pricing.tax[bracket], label: e.target.value },
+                    })
+                  }
+                />
+                <NumberInput
+                  aria-label={`${title} rate`}
+                  min={0}
+                  max={50}
+                  step={0.01}
+                  suffix="%"
+                  value={pricing.tax[bracket].rate}
+                  disabled={readOnly}
+                  onValue={(v) =>
+                    set('tax', {
+                      ...pricing.tax,
+                      [bracket]: { ...pricing.tax[bracket], rate: Math.round(v * 100) / 100 },
+                    })
+                  }
+                />
+              </div>
+            </FormField>
+          ))}
+        </div>
+      </Section>
 
       <Section
         title="Seasons"
@@ -109,75 +210,77 @@ export function RatesSettings({ pricing, onChange, readOnly }: Props) {
         </Rows>
       </Section>
 
-      <Section
-        title="Child discounts"
-        count={pricing.childDiscounts.length}
-        actions={
-          !readOnly && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                const last = pricing.childDiscounts.at(-1);
-                set('childDiscounts', [
-                  ...pricing.childDiscounts,
-                  { maxAge: Math.min((last?.maxAge ?? -1) + 1, 17), discount: 0.25 },
-                ]);
-              }}
-            >
-              <Plus /> Add
-            </Button>
-          )
-        }
-      >
-        <Hint>
-          Off the adult rate, for each child up to and including the age. List the youngest tier
-          first; older children pay the adult rate.
-        </Hint>
-        <Rows
-          header={['Up to age', 'Discount %']}
-          columns="grid-cols-[1fr_1fr_2rem] sm:grid-cols-[7rem_7rem_2rem]"
-          empty="No child discounts: children pay the adult rate."
+      {pricing.pricingBasis === 'per_person' && (
+        <Section
+          title="Child discounts"
+          count={pricing.childDiscounts.length}
+          actions={
+            !readOnly && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const last = pricing.childDiscounts.at(-1);
+                  set('childDiscounts', [
+                    ...pricing.childDiscounts,
+                    { maxAge: Math.min((last?.maxAge ?? -1) + 1, 17), discount: 0.25 },
+                  ]);
+                }}
+              >
+                <Plus /> Add
+              </Button>
+            )
+          }
         >
-          {pricing.childDiscounts.map((tier, i) => (
-            <Row
-              key={i}
-              columns="grid-cols-[1fr_1fr_2rem] sm:grid-cols-[7rem_7rem_2rem]"
-              onRemove={
-                readOnly
-                  ? undefined
-                  : () => set('childDiscounts', removeAt(pricing.childDiscounts, i))
-              }
-              removeLabel={`Remove the tier up to age ${tier.maxAge}`}
-            >
-              <NumberInput
-                aria-label="Up to age"
-                min={0}
-                max={17}
-                value={tier.maxAge}
-                onValue={(v) =>
-                  set(
-                    'childDiscounts',
-                    replaceAt(pricing.childDiscounts, i, { ...tier, maxAge: Math.round(v) }),
-                  )
+          <Hint>
+            Off the adult rate, for each child up to and including the age. List the youngest tier
+            first; older children pay the adult rate.
+          </Hint>
+          <Rows
+            header={['Up to age', 'Discount %']}
+            columns="grid-cols-[1fr_1fr_2rem] sm:grid-cols-[7rem_7rem_2rem]"
+            empty="No child discounts: children pay the adult rate."
+          >
+            {pricing.childDiscounts.map((tier, i) => (
+              <Row
+                key={i}
+                columns="grid-cols-[1fr_1fr_2rem] sm:grid-cols-[7rem_7rem_2rem]"
+                onRemove={
+                  readOnly
+                    ? undefined
+                    : () => set('childDiscounts', removeAt(pricing.childDiscounts, i))
                 }
-              />
-              <NumberInput
-                aria-label="Discount in percent"
-                min={0}
-                max={100}
-                value={toPercent(tier.discount)}
-                onValue={(v) =>
-                  set(
-                    'childDiscounts',
-                    replaceAt(pricing.childDiscounts, i, { ...tier, discount: fromPercent(v) }),
-                  )
-                }
-              />
-            </Row>
-          ))}
-        </Rows>
-      </Section>
+                removeLabel={`Remove the tier up to age ${tier.maxAge}`}
+              >
+                <NumberInput
+                  aria-label="Up to age"
+                  min={0}
+                  max={17}
+                  value={tier.maxAge}
+                  onValue={(v) =>
+                    set(
+                      'childDiscounts',
+                      replaceAt(pricing.childDiscounts, i, { ...tier, maxAge: Math.round(v) }),
+                    )
+                  }
+                />
+                <NumberInput
+                  aria-label="Discount in percent"
+                  min={0}
+                  max={100}
+                  value={toPercent(tier.discount)}
+                  onValue={(v) =>
+                    set(
+                      'childDiscounts',
+                      replaceAt(pricing.childDiscounts, i, { ...tier, discount: fromPercent(v) }),
+                    )
+                  }
+                />
+              </Row>
+            ))}
+          </Rows>
+        </Section>
+      )}
 
       <Section
         title="Long stays"
@@ -242,13 +345,13 @@ export function RatesSettings({ pricing, onChange, readOnly }: Props) {
       </Section>
 
       <Section title="Add-ons">
-        <Hint>Whole CZK, per night of the stay.</Hint>
+        <Hint>Whole {pricing.currency}, per night of the stay.</Hint>
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Wellness, per guest per night" htmlFor="wellness-price">
             <NumberInput
               id="wellness-price"
               min={0}
-              suffix="CZK"
+              suffix={currencyMark(pricing.currency)}
               value={pricing.wellness.perPersonPerNight}
               onValue={(v) =>
                 set('wellness', { ...pricing.wellness, perPersonPerNight: Math.round(v) })
@@ -272,7 +375,7 @@ export function RatesSettings({ pricing, onChange, readOnly }: Props) {
             <NumberInput
               id="extra-bed-price"
               min={0}
-              suffix="CZK"
+              suffix={currencyMark(pricing.currency)}
               value={pricing.extraBed.perNight}
               onValue={(v) => set('extraBed', { perNight: Math.round(v) })}
             />
@@ -281,7 +384,7 @@ export function RatesSettings({ pricing, onChange, readOnly }: Props) {
             <NumberInput
               id="dog-price"
               min={0}
-              suffix="CZK"
+              suffix={currencyMark(pricing.currency)}
               value={pricing.dog.perNight}
               onValue={(v) => set('dog', { perNight: Math.round(v) })}
             />
@@ -289,17 +392,25 @@ export function RatesSettings({ pricing, onChange, readOnly }: Props) {
         </div>
       </Section>
 
-      <Section title="City tax">
+      <Section title={pricing.cityTax.label}>
         <Hint>
-          The local tourist tax, added to each bill per paying guest per night rather than to the
-          quoted price. Adults always pay it.
+          A local tax or fee per paying guest per night, added to each bill rather than to the
+          quoted price. Adults always pay it. Set it to 0 if there is none.
         </Hint>
         <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label="Name on the bill" htmlFor="city-tax-label" className="sm:col-span-2">
+            <Input
+              id="city-tax-label"
+              value={pricing.cityTax.label}
+              disabled={readOnly}
+              onChange={(e) => set('cityTax', { ...pricing.cityTax, label: e.target.value })}
+            />
+          </FormField>
           <FormField label="Per guest per night" htmlFor="city-tax-price">
             <NumberInput
               id="city-tax-price"
               min={0}
-              suffix="CZK"
+              suffix={currencyMark(pricing.currency)}
               value={pricing.cityTax.perPersonPerNight}
               onValue={(v) =>
                 set('cityTax', { ...pricing.cityTax, perPersonPerNight: Math.round(v) })
@@ -317,36 +428,6 @@ export function RatesSettings({ pricing, onChange, readOnly }: Props) {
               max={18}
               value={pricing.cityTax.minAge}
               onValue={(v) => set('cityTax', { ...pricing.cityTax, minAge: Math.round(v) })}
-            />
-          </FormField>
-        </div>
-      </Section>
-
-      <Section title="VAT">
-        <Hint>
-          Prices include VAT. Accommodation, extra beds and food are billed at the reduced rate,
-          most other extras at the standard rate, and city tax without VAT. Set both to 0 if the
-          hotel is not a VAT payer.
-        </Hint>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Standard rate" htmlFor="vat-standard">
-            <NumberInput
-              id="vat-standard"
-              min={0}
-              max={50}
-              suffix="%"
-              value={pricing.vat.standard}
-              onValue={(v) => set('vat', { ...pricing.vat, standard: Math.round(v) })}
-            />
-          </FormField>
-          <FormField label="Reduced rate" htmlFor="vat-reduced">
-            <NumberInput
-              id="vat-reduced"
-              min={0}
-              max={50}
-              suffix="%"
-              value={pricing.vat.reduced}
-              onValue={(v) => set('vat', { ...pricing.vat, reduced: Math.round(v) })}
             />
           </FormField>
         </div>

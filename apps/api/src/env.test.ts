@@ -9,6 +9,7 @@ describe('parseEnv', () => {
       AI_DAILY_TOKEN_BUDGET: 2_000_000,
       AI_RATE_LIMIT_PER_HOUR: 20,
       AI_MONTHLY_BUDGET_USD: 100,
+      HOTEL_TIMEZONE: 'America/Los_Angeles',
     });
   });
 

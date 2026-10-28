@@ -32,8 +32,14 @@ import {
   useRemoveCharge,
   useUpdateCharge,
 } from '@/lib/api';
-import { balanceLabel, canCharge, vatBracketLabels, vatRateLabel } from '@/lib/billing';
-import { formatCzk, formatDate, paymentMethodLabels } from '@/lib/format';
+import {
+  balanceLabel,
+  bracketLabel,
+  canCharge,
+  vatBracketLabels,
+  vatRateLabel,
+} from '@/lib/billing';
+import { currencyMark, formatDate, formatMoney, paymentMethodLabels } from '@/lib/format';
 import { INLINE_EDITOR } from '@/lib/inline-edit';
 import { cn } from '@/lib/utils';
 
@@ -45,23 +51,20 @@ const methods: { value: PaymentMethod; label: string }[] = [
 
 const brackets: VatBracket[] = ['standard', 'reduced', 'none'];
 
-type VatRates = PricingConfig['vat'] | undefined;
+type VatRates = PricingConfig['tax'] | undefined;
 
-/** "Standard (21%)" for the VAT select, with the current rates once loaded. */
+/** "Sales tax (8.75%)" for the tax select, with the hotel's tax names and rates once loaded. */
 function bracketOptions(rates: VatRates) {
-  return brackets.map((b) => ({
-    value: b,
-    label: b === 'none' || !rates ? vatBracketLabels[b] : `${vatBracketLabels[b]} (${rates[b]}%)`,
-  }));
+  return brackets.map((b) => ({ value: b, label: bracketLabel(b, rates) }));
 }
 
 /**
- * The booking's bill: totals, the stay, city tax and extras with their VAT, payments, and the VAT
+ * The booking's bill: totals, the stay, city tax and extras with their tax, payments, and the tax
  * recap per bracket. Extras are added and corrected in place.
  */
 export function BookingBill({ booking }: { booking: Booking }) {
   const folio = useFolio(booking.id);
-  const rates = usePricing().data?.vat;
+  const rates = usePricing().data?.tax;
   const [paying, setPaying] = useState(false);
 
   if (folio.isError) return <ErrorNotice message={folio.error.message} />;
@@ -71,6 +74,8 @@ export function BookingBill({ booking }: { booking: Booking }) {
   const stay = bill.lines.filter((l) => l.kind === 'stay');
   const tax = bill.lines.filter((l) => l.kind === 'city_tax');
   const extras = bill.lines.filter((l) => l.kind === 'extra');
+  // Taxes added on top of the prices, one line per bracket.
+  const taxes = bill.lines.filter((l) => l.kind === 'tax');
 
   return (
     <div className="flex flex-col gap-4">
@@ -107,9 +112,20 @@ export function BookingBill({ booking }: { booking: Booking }) {
           )}
           {chargeable && <NewExtraRow bookingId={booking.id} rates={rates} />}
         </Group>
+        {taxes.length > 0 && (
+          <Group title="Taxes">
+            {taxes.map((l) => (
+              <div key={l.label} className={cn(lineGrid, 'py-1.5')}>
+                <span className="min-w-0 text-muted-foreground">{l.label}</span>
+                <span />
+                <span className="text-right font-mono tabular-nums">{formatMoney(l.amount)}</span>
+              </div>
+            ))}
+          </Group>
+        )}
         <div className="flex items-baseline justify-between gap-4 border-t px-3 py-2.5 font-medium">
           <span>Total</span>
-          <span className="font-mono tabular-nums">{formatCzk(bill.charged)}</span>
+          <span className="font-mono tabular-nums">{formatMoney(bill.charged)}</span>
         </div>
       </div>
 
@@ -159,7 +175,7 @@ function Totals({ folio }: { folio: Folio }) {
           className="flex flex-col gap-0.5 rounded-stage px-3 py-2 last:bg-background last:stroke-lit last:shadow-[0_1px_2px_var(--shadow-soft)]"
         >
           <dt className="text-xs text-muted-foreground">{c.label}</dt>
-          <dd className={cn('font-mono text-base tabular-nums', c.tone)}>{formatCzk(c.value)}</dd>
+          <dd className={cn('font-mono text-base tabular-nums', c.tone)}>{formatMoney(c.value)}</dd>
         </div>
       ))}
     </dl>
@@ -177,7 +193,7 @@ function TableHead() {
       )}
     >
       <span>Item</span>
-      <span className="text-right">VAT</span>
+      <span className="text-right">Tax</span>
       <span className="text-right">Amount</span>
     </div>
   );
@@ -194,7 +210,7 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
 
 function lineLabel(line: FolioLine) {
   return line.kind === 'extra' && line.quantity > 1
-    ? `${line.label}, ${line.quantity} × ${formatCzk(line.unitPrice)}`
+    ? `${line.label}, ${line.quantity} × ${formatMoney(line.unitPrice)}`
     : line.label;
 }
 
@@ -211,7 +227,7 @@ function LineRow({ line }: { line: FolioLine }) {
     <div className={cn(lineGrid, 'py-1.5')}>
       <span className="min-w-0 text-muted-foreground">{lineLabel(line)}</span>
       <VatChip line={line} />
-      <span className="text-right font-mono tabular-nums">{formatCzk(line.amount)}</span>
+      <span className="text-right font-mono tabular-nums">{formatMoney(line.amount)}</span>
     </div>
   );
 }
@@ -261,7 +277,7 @@ function ExtraRow({
     >
       <span className="min-w-0">{lineLabel(line)}</span>
       <VatChip line={line} />
-      <span className="text-right font-mono tabular-nums">{formatCzk(line.amount)}</span>
+      <span className="text-right font-mono tabular-nums">{formatMoney(line.amount)}</span>
     </button>
   );
 }
@@ -370,11 +386,11 @@ function ExtraEditor({
           className="h-8 text-right tabular-nums"
         />
         <Input
-          aria-label="Price each, CZK"
+          aria-label={`Price each, ${currencyMark()}`}
           type="number"
           inputMode="numeric"
           step={1}
-          placeholder="CZK each"
+          placeholder={`${currencyMark()} each`}
           value={unitPrice}
           onChange={(e) => setUnitPrice(e.target.value)}
           className="h-8 text-right tabular-nums"
@@ -382,7 +398,7 @@ function ExtraEditor({
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <NativeSelect
-          aria-label="VAT bracket"
+          aria-label="Tax"
           value={vatBracket}
           onChange={(e) => setVatBracket(e.target.value as VatBracket)}
           className="h-8 w-44"
@@ -394,7 +410,7 @@ function ExtraEditor({
           ))}
         </NativeSelect>
         <span className="text-xs text-muted-foreground tabular-nums">
-          {valid && `= ${formatCzk(qty * price)}`}
+          {valid && `= ${formatMoney(qty * price)}`}
         </span>
         <div className="ml-auto flex items-center gap-1">
           {onRemove && (
@@ -457,7 +473,7 @@ function Payments({
                 </span>
               </span>
               <span className="shrink-0 font-mono tabular-nums">
-                {formatCzk(p.kind === 'refund' ? p.amount : -p.amount)}
+                {formatMoney(p.kind === 'refund' ? p.amount : -p.amount)}
               </span>
             </li>
           ))}
@@ -470,13 +486,16 @@ function Payments({
 function VatRecap({ folio }: { folio: Folio }) {
   return (
     <div className="flex flex-col gap-1.5">
-      <h3 className="text-xs font-medium text-muted-foreground">VAT recap · prices include VAT</h3>
+      <h3 className="text-xs font-medium text-muted-foreground">
+        Tax recap ·{' '}
+        {folio.taxMode === 'inclusive' ? 'prices include tax' : 'tax added to the prices'}
+      </h3>
       <table className="w-full text-sm">
         <thead className="text-[0.6875rem] tracking-wide text-subtle-foreground uppercase">
           <tr>
             <th className="py-1 text-left font-normal">Rate</th>
             <th className="py-1 text-right font-normal">Net</th>
-            <th className="py-1 text-right font-normal">VAT</th>
+            <th className="py-1 text-right font-normal">Tax</th>
             <th className="py-1 text-right font-normal">Total</th>
           </tr>
         </thead>
@@ -484,17 +503,14 @@ function VatRecap({ folio }: { folio: Folio }) {
           {folio.vat.map((v) => (
             <tr key={v.bracket} className="border-t">
               <td className="py-1 font-sans">
-                {vatRateLabel(v.bracket, v.rate)}
+                {v.label ?? vatBracketLabels.none}
                 {v.bracket !== 'none' && (
-                  <span className="text-muted-foreground">
-                    {' '}
-                    {vatBracketLabels[v.bracket].toLowerCase()}
-                  </span>
+                  <span className="text-muted-foreground"> {vatRateLabel(v.bracket, v.rate)}</span>
                 )}
               </td>
-              <td className="py-1 text-right">{formatCzk(v.net)}</td>
-              <td className="py-1 text-right">{formatCzk(v.vat)}</td>
-              <td className="py-1 text-right">{formatCzk(v.gross)}</td>
+              <td className="py-1 text-right">{formatMoney(v.net)}</td>
+              <td className="py-1 text-right">{formatMoney(v.vat)}</td>
+              <td className="py-1 text-right">{formatMoney(v.gross)}</td>
             </tr>
           ))}
         </tbody>
@@ -543,9 +559,9 @@ export function PaymentForm({
         <DialogTitle>{kind === 'refund' ? 'Refund' : 'Take a payment'}</DialogTitle>
         <DialogDescription>
           {balance > 0
-            ? `${formatCzk(balance)} is due.`
+            ? `${formatMoney(balance)} is due.`
             : balance < 0
-              ? `${formatCzk(-balance)} is owed to the guest.`
+              ? `${formatMoney(-balance)} is owed to the guest.`
               : 'The bill is paid in full.'}
         </DialogDescription>
       </DialogHeader>
@@ -561,7 +577,7 @@ export function PaymentForm({
         />
       )}
       <Segmented label="Method" value={method} options={methods} onChange={setMethod} />
-      <FormField label="Amount, CZK" htmlFor="payment-amount">
+      <FormField label={`Amount, ${currencyMark()}`} htmlFor="payment-amount">
         <Input
           id="payment-amount"
           type="number"

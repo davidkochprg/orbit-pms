@@ -2,7 +2,27 @@ import type { IsoDate } from '@orbit/shared';
 import { addDays as addDaysFns, differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { DomainError } from './errors';
 
-export const HOTEL_TIMEZONE = 'Europe/Prague';
+/** The demo inn's time zone; a deployment sets its own with `setHotelTimeZone`. */
+export const DEFAULT_HOTEL_TIMEZONE = 'America/Los_Angeles';
+
+let hotelTimeZone = DEFAULT_HOTEL_TIMEZONE;
+
+/**
+ * Sets the hotel's IANA time zone, which decides what "today" is everywhere. A hotel doesn't
+ * move, so it is configured once at startup (`HOTEL_TIMEZONE`), not per request.
+ */
+export function setHotelTimeZone(timeZone: string): void {
+  try {
+    new Intl.DateTimeFormat('en-CA', { timeZone });
+  } catch {
+    throw new DomainError('invalid_input', `Unknown time zone ${timeZone}`);
+  }
+  hotelTimeZone = timeZone;
+}
+
+export function getHotelTimeZone(): string {
+  return hotelTimeZone;
+}
 
 /** A stay as a half-open range of nights: `[checkIn, checkOut)`. */
 export interface DateRange {
@@ -49,9 +69,9 @@ export function rangesOverlap(a: DateRange, b: DateRange): boolean {
 }
 
 /** The current calendar date at the hotel. */
-export function hotelToday(now: Date): IsoDate {
+export function hotelToday(now: Date, timeZone: string = hotelTimeZone): IsoDate {
   return new Intl.DateTimeFormat('en-CA', {
-    timeZone: HOTEL_TIMEZONE,
+    timeZone,
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',

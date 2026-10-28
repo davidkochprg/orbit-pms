@@ -2,6 +2,19 @@ import { describe, expect, it } from 'vitest';
 import { callOptions, setup } from './test-setup';
 
 describe('agent tools', () => {
+  it('lists rooms with their type names, so a type the guest names can be found', async () => {
+    const { tools } = setup();
+    expect(await tools.listRooms.execute({}, callOptions)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'rm_104',
+          roomTypeId: 'rt_double',
+          roomTypeName: 'Double room',
+        }),
+      ]),
+    );
+  });
+
   it('finds a booking by guest name without accents', async () => {
     const { tools } = setup();
     const result = await tools.searchBookings.execute({ guestName: 'novak' }, callOptions);

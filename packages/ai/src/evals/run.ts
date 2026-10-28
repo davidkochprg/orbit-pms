@@ -1,5 +1,11 @@
 import { readFile } from 'node:fs/promises';
-import { emptyHotelProfile, HOTEL_TIMEZONE, hotelPolicy, hotelToday } from '@orbit/domain';
+import {
+  emptyHotelProfile,
+  getHotelTimeZone,
+  hotelPolicy,
+  hotelToday,
+  usDemoPricing,
+} from '@orbit/domain';
 import { conversation } from '@orbit/domain/testing';
 import { runAgent } from '../agent';
 import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from '../cost';
@@ -190,9 +196,13 @@ const agentOk = await suite(
       const result = runAgent({
         model: provider.agent,
         system: buildSystemPrompt({
-          hotel: { profile: { ...emptyHotelProfile, name: 'Eval Lodge' }, policy: hotelPolicy },
+          hotel: {
+            profile: { ...emptyHotelProfile, name: 'Eval Lodge' },
+            policy: hotelPolicy,
+            pricing: usDemoPricing,
+          },
           today,
-          timezone: HOTEL_TIMEZONE,
+          timezone: getHotelTimeZone(),
         }),
         messages: [{ role: 'user', content: f.prompt }],
         tools: hotel.tools,

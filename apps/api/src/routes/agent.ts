@@ -9,7 +9,7 @@ import {
 } from '@orbit/ai';
 import {
   type BillingService,
-  HOTEL_TIMEZONE,
+  getHotelTimeZone,
   hotelToday,
   type HotelService,
   type HousekeepingService,
@@ -76,6 +76,7 @@ export function agentRoutes({
     housekeeping,
     registrations,
     listRooms: () => repos.rooms.listRooms(),
+    listRoomTypes: () => repos.rooms.listRoomTypes(),
   });
 
   return new Hono().post('/agent', validate('json', agentRequestSchema), async (c) => {
@@ -103,7 +104,7 @@ export function agentRoutes({
       system: buildSystemPrompt({
         hotel: await hotelContext(),
         today: hotelToday(clock()),
-        timezone: HOTEL_TIMEZONE,
+        timezone: getHotelTimeZone(),
       }),
       messages: await convertToModelMessages(messages.slice(-MAX_HISTORY), { tools }),
       tools,

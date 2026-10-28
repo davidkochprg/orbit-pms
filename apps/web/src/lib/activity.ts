@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { formatCzk } from '@/lib/format';
+import { formatMoney } from '@/lib/format';
 
 /** Plain-language names for audit actions, shared by the inspector and the activity page. */
 export const activityLabels: Record<string, string> = {
@@ -69,7 +69,7 @@ const fieldWords = (fields: string[]) =>
 export function activityDetail(action: string, payload: unknown): string | null {
   if (action === 'folio.payment' || action === 'folio.refund') {
     const p = paymentPayload.safeParse(payload);
-    return p.success ? `${formatCzk(p.data.amount)} by ${words(p.data.method)}` : null;
+    return p.success ? `${formatMoney(p.data.amount)} by ${words(p.data.method)}` : null;
   }
   if (
     action === 'folio.charge' ||
@@ -77,7 +77,7 @@ export function activityDetail(action: string, payload: unknown): string | null 
     action === 'folio.update_charge'
   ) {
     const p = amountPayload.safeParse(payload);
-    return p.success ? `${p.data.label ?? 'Charge'}, ${formatCzk(p.data.amount)}` : null;
+    return p.success ? `${p.data.label ?? 'Charge'}, ${formatMoney(p.data.amount)}` : null;
   }
   if (action === 'booking.add_guest' || action === 'booking.update_guest') {
     const p = guestBookPayload.safeParse(payload);
@@ -92,7 +92,7 @@ export function activityDetail(action: string, payload: unknown): string | null 
   const total = totalPayload.safeParse(payload);
   if (total.success && total.data.total.from !== total.data.total.to) {
     const { from, to } = total.data.total;
-    return `Total ${from === null ? '–' : formatCzk(from)} → ${to === null ? '–' : formatCzk(to)}`;
+    return `Total ${from === null ? '–' : formatMoney(from)} → ${to === null ? '–' : formatMoney(to)}`;
   }
   const changed = changedPayload.safeParse(payload);
   if (changed.success && changed.data.changed.length > 0) {

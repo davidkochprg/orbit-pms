@@ -51,7 +51,7 @@ import {
 } from '@/lib/api';
 import {
   actionLabels,
-  formatCzk,
+  formatMoney,
   formatDateTime,
   formatParty,
   formatRange,
@@ -159,7 +159,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
           <Chip>{formatParty(booking.adults, booking.childAges)}</Chip>
           {balance !== undefined && balance !== 0 && (
             <Chip tone={balance > 0 ? 'warning' : undefined} onClick={() => setTab('bill')}>
-              {balance > 0 ? `${formatCzk(balance)} due` : `${formatCzk(-balance)} owed back`}
+              {balance > 0 ? `${formatMoney(balance)} due` : `${formatMoney(-balance)} owed back`}
             </Chip>
           )}
           {flagIds && (
@@ -302,7 +302,9 @@ function StaySection({ detail, onEditStay }: { detail: BookingDetail; onEditStay
         <Property label="Add-ons">{addonText(booking.addons) || '–'}</Property>
         {booking.priceSnapshot && (
           <Property label="Stay price">
-            <span className="font-mono tabular-nums">{formatCzk(booking.priceSnapshot.total)}</span>
+            <span className="font-mono tabular-nums">
+              {formatMoney(booking.priceSnapshot.total)}
+            </span>
           </Property>
         )}
         <Property label="Source">
@@ -517,7 +519,7 @@ function CheckOutDialog({
         ) : (
           <>
             <DialogHeader>
-              <DialogTitle>{formatCzk(balance)} is still due</DialogTitle>
+              <DialogTitle>{formatMoney(balance)} is still due</DialogTitle>
               <DialogDescription>
                 Take the payment and check the guest out, or check out now and settle the bill
                 later.

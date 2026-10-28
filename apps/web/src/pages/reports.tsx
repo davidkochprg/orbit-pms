@@ -9,8 +9,8 @@ import { Segmented } from '@/components/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
-import { useDayOverview, useReport } from '@/lib/api';
-import { formatCzk, formatDate, formatRange, paymentMethodLabels } from '@/lib/format';
+import { useDayOverview, usePricing, useReport } from '@/lib/api';
+import { formatMoney, formatDate, formatRange, paymentMethodLabels } from '@/lib/format';
 import {
   type Change,
   comparisonRange,
@@ -36,7 +36,7 @@ export function ReportsPage() {
   const [params, setParams] = useSearchParams();
   const raw = params.get('period');
   const period: ReportPeriod = isReportPeriod(raw) ? raw : 'last30';
-  // Today comes from the API, so it is the hotel's date (Europe/Prague), not the browser's.
+  // Today comes from the API, so it is the hotel's date in its time zone, not the browser's.
   const today = useDayOverview().data?.date;
   const range = useMemo(() => (today ? periodRange(period, today) : null), [period, today]);
   const previousRange = useMemo(() => range && comparisonRange(range), [range]);
@@ -85,6 +85,7 @@ function ReportView({
   period: ReportPeriod;
 }) {
   const vs = `vs the ${report.nights} nights before`;
+  const cityTaxLabel = usePricing().data?.cityTax.label ?? 'City tax';
   const ahead = period === 'next30';
   return (
     <div className="flex flex-col gap-4">
@@ -99,21 +100,21 @@ function ReportView({
           />
           <Kpi
             label="ADR"
-            value={formatCzk(report.adr)}
+            value={formatMoney(report.adr)}
             detail="Room revenue per room night sold"
             change={previous && relativeChange(report.adr, previous.adr)}
             vs={vs}
           />
           <Kpi
             label="RevPAR"
-            value={formatCzk(report.revpar)}
+            value={formatMoney(report.revpar)}
             detail="Room revenue per available room night"
             change={previous && relativeChange(report.revpar, previous.revpar)}
             vs={vs}
           />
           <Kpi
             label="Room revenue"
-            value={formatCzk(report.roomRevenue)}
+            value={formatMoney(report.roomRevenue)}
             detail={ahead ? 'On the books' : 'Accommodation after discounts'}
             change={previous && relativeChange(report.roomRevenue, previous.roomRevenue)}
             vs={vs}
@@ -121,9 +122,9 @@ function ReportView({
         </dl>
 
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t px-5 py-4 sm:grid-cols-4 xl:grid-cols-7">
-          <Figure label="Add-ons" value={formatCzk(report.addonRevenue)} />
-          <Figure label="Extras" value={formatCzk(report.extrasRevenue)} />
-          <Figure label="City tax" value={formatCzk(report.cityTax)} />
+          <Figure label="Add-ons" value={formatMoney(report.addonRevenue)} />
+          <Figure label="Extras" value={formatMoney(report.extrasRevenue)} />
+          <Figure label={cityTaxLabel} value={formatMoney(report.cityTax)} />
           <Figure label="Guest nights" value={report.guestNights} />
           <Figure label="Arrivals" value={report.arrivals} />
           <Figure label="Average stay" value={`${report.averageStay} nights`} />
@@ -144,7 +145,7 @@ function ReportView({
                 label={t.roomTypeName}
                 share={t.occupancy}
                 value={`${percent(t.occupancy)}%`}
-                detail={formatCzk(t.roomRevenue)}
+                detail={formatMoney(t.roomRevenue)}
               />
             ))}
           </ul>
@@ -160,7 +161,7 @@ function ReportView({
                   label={sourceLabels[s.source]}
                   share={s.roomNights / Math.max(report.roomNightsSold, 1)}
                   value={`${s.roomNights} nights`}
-                  detail={formatCzk(s.roomRevenue)}
+                  detail={formatMoney(s.roomRevenue)}
                 />
               ))}
             </ul>
@@ -171,11 +172,11 @@ function ReportView({
             rows={[
               ...report.payments.map((p) => ({
                 label: paymentMethodLabels[p.method],
-                value: formatCzk(p.amount),
+                value: formatMoney(p.amount),
               })),
               {
                 label: 'Total',
-                value: formatCzk(report.payments.reduce((sum, p) => sum + p.amount, 0)),
+                value: formatMoney(report.payments.reduce((sum, p) => sum + p.amount, 0)),
                 strong: true,
               },
             ]}
@@ -284,7 +285,7 @@ function OccupancyChart({ days }: { days: ReportDay[] }) {
               <TooltipContent side="top" className="flex flex-col gap-0.5">
                 <span className="font-medium">{formatDate(d.date)}</span>
                 <span className="tabular-nums">
-                  {percent(d.occupancy)}% · {d.roomsSold} rooms · {formatCzk(d.roomRevenue)}
+                  {percent(d.occupancy)}% · {d.roomsSold} rooms · {formatMoney(d.roomRevenue)}
                 </span>
               </TooltipContent>
             </Tooltip>
@@ -314,7 +315,7 @@ function OccupancyChart({ days }: { days: ReportDay[] }) {
               <td>{formatDate(d.date)}</td>
               <td>{percent(d.occupancy)}%</td>
               <td>{d.roomsSold}</td>
-              <td>{formatCzk(d.roomRevenue)}</td>
+              <td>{formatMoney(d.roomRevenue)}</td>
             </tr>
           ))}
         </tbody>
@@ -396,14 +397,14 @@ function UnpaidDepartures({ report }: { report: Report }) {
                     Room {u.roomName}, left {formatDate(u.checkOut)}
                   </span>
                 </span>
-                <span className="font-mono text-[0.8125rem]">{formatCzk(u.balance)}</span>
+                <span className="font-mono text-[0.8125rem]">{formatMoney(u.balance)}</span>
                 <ChevronRight className="size-4 text-muted-foreground" />
               </button>
             </li>
           ))}
           <li className="flex justify-between border-t px-2.5 pt-2.5 pb-1 text-sm text-muted-foreground">
             <span>Total open</span>
-            <span className="tabular-nums">{formatCzk(total)}</span>
+            <span className="tabular-nums">{formatMoney(total)}</span>
           </li>
         </ul>
       )}

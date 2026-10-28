@@ -8,6 +8,8 @@ An AI-native property management system for small hotels: anything you can click
 
 I'm the assistant manager at a small wellness guesthouse in the Jizera Mountains in Czechia. A day at the front desk of a place like ours means guest emails in Czech, German, Polish and English, Booking.com messages, per-person prices with child discounts and wellness add-ons, and housekeeping updates passed along by phone or in the corridor. Most hotel software leaves all of that to the person at the desk, and where AI shows up, it's usually a chat window on the side.
 
+The demo runs as a fictional US mountain lodge on Pacific time: room rates in dollars, occupancy and sales tax added on the bill, US dates and an English-speaking team, with guests writing in from all over. The same app runs a Czech guesthouse in crowns, per person, with VAT included: currency, taxes, guest-book rules and time zone are settings ([ADR 0013](docs/decisions/0013-configurable-region-us-demo.md)).
+
 Orbit is built the other way round. One set of hotel rules (availability, pricing, the booking lifecycle, housekeeping) runs everything. The screens call those rules, and so does an agent running on Meta's models, so the agent can do anything the UI can and never invents a price.
 
 ## What it does
@@ -22,7 +24,7 @@ Press <kbd>⌘K</kbd> and type what you need: "is a family room free from Friday
 
 Email, web forms, phone notes and Booking.com messages land in one mail client: conversations with their history, folders, channel filters and search. Opening a message costs nothing. When staff click "Prepare a reply", Orbit reads the conversation, pulls out the dates, party, children's ages and wishes, finds free rooms, prices them with the real pricing rules, and drafts a reply in the guest's language, shown side by side with the receptionist's own language. Either side can be edited and translated into the other. A price guard checks every amount in the draft and its translation against the quote, so a wrong price never reaches a guest. One click puts a hold on the room.
 
-![A German family's apartment request: the message translated into Czech, a priced apartment with a Hold button, and the German draft beside its Czech version](docs/images/inbox.png)
+![A German family's apartment request: the message translated, a priced apartment with a Hold button, and the German draft beside the receptionist's version](docs/images/inbox.png)
 
 ### Housekeeping by voice
 

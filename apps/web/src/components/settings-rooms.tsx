@@ -20,7 +20,7 @@ import { NativeSelect } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useRooms, useRoomTypes, useSaveRoom, useSaveRoomType } from '@/lib/api';
-import { formatCzk } from '@/lib/format';
+import { displayRegion, formatMoney } from '@/lib/format';
 
 interface Props {
   readOnly: boolean;
@@ -40,6 +40,11 @@ function capacity(t: RoomType): string {
 }
 
 /** Room types with their base prices, and the rooms. Changes save right away. */
+
+/** "per room" or "per adult", as the hotel's rates are set up. */
+function basisText(): string {
+  return displayRegion().perRoom ? 'per room' : 'per adult';
+}
 export function RoomSettings({ readOnly }: Props) {
   const roomTypes = useRoomTypes();
   const rooms = useRooms();
@@ -67,8 +72,8 @@ export function RoomSettings({ readOnly }: Props) {
         }
       >
         <p className="-mt-1 max-w-prose text-sm text-muted-foreground">
-          The base price is the adult rate per person per night, before season surcharges. New
-          quotes use it as soon as you save.
+          The base price is the rate {basisText()} per night, before season surcharges. New quotes
+          use it as soon as you save.
         </p>
         <ul className="-mx-2 flex flex-col">
           {types.map((t) => (
@@ -79,7 +84,7 @@ export function RoomSettings({ readOnly }: Props) {
                   {capacity(t)} · {rooms.data.filter((r) => r.roomTypeId === t.id).length} rooms
                 </span>
               </span>
-              <span className="shrink-0 text-sm tabular-nums">{formatCzk(t.basePrice)}</span>
+              <span className="shrink-0 text-sm tabular-nums">{formatMoney(t.basePrice)}</span>
               {!readOnly && (
                 <Button
                   variant="ghost"
@@ -195,7 +200,7 @@ function RoomTypeForm({ roomType, onDone }: { roomType: RoomType | null; onDone:
       <FormField
         label="Base price"
         htmlFor="type-price"
-        hint="Adult rate per person per night, whole CZK."
+        hint={`The rate ${basisText()} per night, whole ${displayRegion().currency}.`}
       >
         <Input
           id="type-price"

@@ -1,11 +1,4 @@
-import {
-  addDays,
-  blocksRoom,
-  findConflicts,
-  fitsRoomType,
-  pricingConfig,
-  rangesOverlap,
-} from '@orbit/domain';
+import { addDays, blocksRoom, findConflicts, fitsRoomType, rangesOverlap } from '@orbit/domain';
 import { applySeed, buildSeed, createDb, createRepositories, createUsageStore } from '@orbit/db';
 import type {
   ApiError,
@@ -32,7 +25,7 @@ const DB_SETUP_TIMEOUT = 60_000;
 const today = '2026-10-27';
 const now = new Date('2026-10-27T08:00:00Z');
 const handle = createDb('memory://');
-const seed = buildSeed(today, now, pricingConfig);
+const seed = buildSeed(today, now, 'cz');
 const app = createApp({
   repos: createRepositories(handle.db),
   ai: null,
@@ -66,10 +59,14 @@ const departure = seed.bookings.find((b) => b.checkOut === today && b.status ===
 const hold = seed.bookings.find((b) => b.status === 'hold')!;
 
 describe('GET /health', () => {
-  it('reports ok and whether AI is configured', async () => {
+  it("reports ok, whether AI is configured, and the hotel's time zone", async () => {
     expect(await get<Health>('/health')).toEqual({
       status: 200,
-      body: { status: 'ok', ai: { configured: false, voice: false, vision: false } },
+      body: {
+        status: 'ok',
+        ai: { configured: false, voice: false, vision: false },
+        hotel: { timezone: 'America/Los_Angeles' },
+      },
     });
   });
 });

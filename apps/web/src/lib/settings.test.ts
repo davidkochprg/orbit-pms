@@ -42,6 +42,8 @@ describe('newEntry', () => {
 
 describe('sameSettings', () => {
   const profile: HotelProfile = {
+    country: 'US',
+    language: 'en',
     name: 'A',
     location: 'B',
     description: null,

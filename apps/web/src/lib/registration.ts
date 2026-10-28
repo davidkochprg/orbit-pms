@@ -2,6 +2,9 @@ import type { DocumentType, GuestBook, RegistrationField } from '@orbit/shared';
 
 /** Suggestions for the nationality field; any two-letter code is accepted. */
 export const countryOptions: { code: string; name: string }[] = [
+  { code: 'US', name: 'United States' },
+  { code: 'CA', name: 'Canada' },
+  { code: 'MX', name: 'Mexico' },
   { code: 'CZ', name: 'Czechia' },
   { code: 'SK', name: 'Slovakia' },
   { code: 'DE', name: 'Germany' },
@@ -12,13 +15,21 @@ export const countryOptions: { code: string; name: string }[] = [
   { code: 'DK', name: 'Denmark' },
   { code: 'HU', name: 'Hungary' },
   { code: 'UA', name: 'Ukraine' },
-  { code: 'US', name: 'United States' },
+  { code: 'FR', name: 'France' },
+  { code: 'IT', name: 'Italy' },
+  { code: 'ES', name: 'Spain' },
+  { code: 'JP', name: 'Japan' },
+  { code: 'AU', name: 'Australia' },
 ];
 
-/** The hotel is in Czechia: guests from abroad also give a home address. */
-export function needsAddress(nationality: string): boolean {
+/**
+ * Whether a guest of this nationality gives a home address: guests from abroad do, except in the
+ * US, where the guest book doesn't record it (the domain's guest-book rules decide; this is the
+ * hint while typing).
+ */
+export function needsAddress(nationality: string, hotelCountry: string): boolean {
   const code = nationality.trim().toUpperCase();
-  return /^[A-Z]{2}$/.test(code) && code !== 'CZ';
+  return hotelCountry !== 'US' && /^[A-Z]{2}$/.test(code) && code !== hotelCountry;
 }
 
 export const registrationFieldLabels: Record<RegistrationField, string> = {

@@ -1,6 +1,9 @@
 import type { Guest, IdentityFields, StayGuest } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
-import { hotelPolicy } from './policy';
+import { guestBookRulesFor } from './policy';
+
+const czech = guestBookRulesFor('CZ');
+const us = guestBookRulesFor('US');
 import {
   ageOn,
   buildGuestBook,
@@ -8,7 +11,7 @@ import {
   missingFields,
   primaryStayGuestId,
 } from './registration';
-import { booking } from './test-fixtures';
+import { booking, czechProfile } from './test-fixtures';
 import { createMemoryRepositories } from './testing';
 
 const now = new Date('2026-05-10T08:00:00Z');
@@ -60,11 +63,11 @@ describe('ageOn', () => {
 
 describe('missingFields', () => {
   it('is empty for a complete entry', () => {
-    expect(missingFields(german, today, hotelPolicy)).toEqual([]);
+    expect(missingFields(german, today, czech, true)).toEqual([]);
   });
 
   it('lists everything for a blank entry, except an address it cannot know is needed', () => {
-    expect(missingFields(blank, today, hotelPolicy)).toEqual([
+    expect(missingFields(blank, today, czech, true)).toEqual([
       'nationality',
       'dateOfBirth',
       'documentType',
@@ -73,19 +76,27 @@ describe('missingFields', () => {
   });
 
   it('needs a home address only from guests from abroad', () => {
-    expect(missingFields({ ...german, address: null }, today, hotelPolicy)).toEqual(['address']);
+    expect(missingFields({ ...german, address: null }, today, czech, true)).toEqual(['address']);
     expect(
-      missingFields({ ...german, nationality: 'CZ', address: null }, today, hotelPolicy),
+      missingFields({ ...german, nationality: 'CZ', address: null }, today, czech, true),
     ).toEqual([]);
   });
 
   it('needs no ID document under the minimum age, from the birthday on it does', () => {
     const child = { ...german, documentType: null, documentNumber: null };
-    expect(missingFields({ ...child, dateOfBirth: '2011-05-11' }, today, hotelPolicy)).toEqual([]);
-    expect(missingFields({ ...child, dateOfBirth: '2011-05-10' }, today, hotelPolicy)).toEqual([
+    expect(missingFields({ ...child, dateOfBirth: '2011-05-11' }, today, czech, true)).toEqual([]);
+    expect(missingFields({ ...child, dateOfBirth: '2011-05-10' }, today, czech, true)).toEqual([
       'documentType',
       'documentNumber',
     ]);
+  });
+});
+
+describe('missingFields in the US', () => {
+  it("needs only the main guest's ID document", () => {
+    expect(missingFields(blank, today, us, true)).toEqual(['documentType', 'documentNumber']);
+    expect(missingFields(blank, today, us, false)).toEqual([]);
+    expect(missingFields({ ...german, address: null }, today, us, true)).toEqual([]);
   });
 });
 
@@ -93,7 +104,7 @@ describe('buildGuestBook', () => {
   const stay = booking({ id: 'bk', roomId: 'rm_1', guestId: 'g', adults: 2, childAges: [4] });
 
   it('starts with the main guest from their profile and counts people not added yet', () => {
-    const book = buildGuestBook(stay, guest, [], null, today, hotelPolicy);
+    const book = buildGuestBook(stay, guest, [], null, today, czech);
     expect(book.guests).toEqual([
       expect.objectContaining({
         id: primaryStayGuestId('bk'),
@@ -104,6 +115,13 @@ describe('buildGuestBook', () => {
       }),
     ]);
     expect(book).toMatchObject({ partySize: 3, missing: 3, extra: 0 });
+  });
+
+  it('counts only the main guest in the US, where companions are not recorded', () => {
+    expect(buildGuestBook(stay, guest, [], null, today, us)).toMatchObject({
+      partySize: 3,
+      missing: 1,
+    });
   });
 
   it("takes the main guest's name from the profile, and lists companions oldest first", () => {
@@ -128,7 +146,7 @@ describe('buildGuestBook', () => {
       ],
       null,
       today,
-      hotelPolicy,
+      czech,
     );
     expect(book.guests.map((g) => [g.id, g.name, g.primary])).toEqual([
       ['sg_bk', 'Test Guest', true],
@@ -148,7 +166,7 @@ describe('buildGuestBook', () => {
       ],
       null,
       today,
-      hotelPolicy,
+      czech,
     );
     expect(book).toMatchObject({ partySize: 1, extra: 2 });
     expect(book.guests).toHaveLength(3);
@@ -159,6 +177,7 @@ describe('createRegistrationService', () => {
   function setup() {
     const repos = createMemoryRepositories(
       {
+        profile: czechProfile,
         guests: [guest],
         bookings: [
           booking({
@@ -191,7 +210,6 @@ describe('createRegistrationService', () => {
     let n = 0;
     const service = createRegistrationService({
       repos,
-      policy: hotelPolicy,
       clock: () => now,
       newId: (prefix) => `${prefix}_${++n}`,
     });

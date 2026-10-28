@@ -39,8 +39,8 @@ describe('agent helpers', () => {
   it('sums up a finished step in a few words', () => {
     expect(toolResultSummary('getArrivals', [{}, {}])).toBe('2 guests');
     expect(toolResultSummary('searchBookings', [])).toBe('No bookings');
-    expect(toolResultSummary('quote', { total: 4500 })).toBe('4,500 CZK');
-    expect(toolResultSummary('getBill', { balance: -200 })).toBe('200 CZK owed back');
+    expect(toolResultSummary('quote', { total: 4500 })).toBe('$4,500');
+    expect(toolResultSummary('getBill', { balance: -200 })).toBe('$200 owed back');
     expect(toolResultSummary('getGuestBook', { partySize: 3, missing: 1 })).toBe('1 ID missing');
     expect(
       toolResultSummary('setRoomStatus', { done: true, roomName: '103', status: 'out_of_order' }),

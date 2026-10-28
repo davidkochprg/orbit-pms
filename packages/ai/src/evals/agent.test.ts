@@ -3,14 +3,11 @@ import { callOptions } from '../test-setup';
 import { agentFixtures, buildAgentEvalHotel } from './agent';
 
 describe('agent eval fixtures', () => {
-  it('builds a hotel where two stays still need IDs', async () => {
+  it("builds a US inn where only the arriving guest's ID is missing", async () => {
     const hotel = buildAgentEvalHotel('2026-05-10');
     const brief = await hotel.tools.getDailyBrief.execute({}, callOptions);
     expect(brief).toMatchObject({
-      missingIds: [
-        expect.objectContaining({ missing: 1, arriving: false }),
-        expect.objectContaining({ missing: 1, arriving: true }),
-      ],
+      missingIds: [expect.objectContaining({ missing: 1, arriving: true })],
     });
   });
 

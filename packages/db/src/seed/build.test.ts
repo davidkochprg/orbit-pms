@@ -21,7 +21,7 @@ import { buildSeed } from './build';
 
 const today = '2026-10-27';
 const now = new Date('2026-10-27T08:00:00Z');
-const seed = buildSeed(today, now, pricingConfig);
+const seed = buildSeed(today, now, 'cz');
 
 describe('buildSeed', () => {
   it('has fifty rooms of six types, including six apartments', () => {
@@ -222,9 +222,9 @@ describe('buildSeed', () => {
   });
 
   it('is deterministic and shifts with today', () => {
-    const later = buildSeed('2027-01-10', new Date('2027-01-10T08:00:00Z'), pricingConfig);
+    const later = buildSeed('2027-01-10', new Date('2027-01-10T08:00:00Z'), 'cz');
     expect(later.bookings.length).toBe(seed.bookings.length);
-    expect(buildSeed(today, now, pricingConfig)).toEqual(seed);
+    expect(buildSeed(today, now, 'cz')).toEqual(seed);
   });
 });
 
@@ -240,5 +240,35 @@ describe('buildSeed room statuses', () => {
       const status = seed.rooms.find((r) => r.id === a.roomId)?.status;
       expect(status).toBe(departing.has(a.roomId) ? 'dirty' : 'inspected');
     }
+  });
+});
+
+describe('buildSeed for the US demo lodge', () => {
+  const us = buildSeed(today, now, 'us');
+
+  it('prices per room in dollars, with taxes added on the bill', () => {
+    expect(us.pricing).toMatchObject({ currency: 'USD', pricingBasis: 'per_room' });
+    expect(us.pricing.tax.mode).toBe('exclusive');
+    const priced = us.bookings.find((b) => b.priceSnapshot)!;
+    expect(priced.priceSnapshot).toMatchObject({ currency: 'USD' });
+    expect(priced.priceSnapshot!.lines[0]!.label).toMatch(/^Room, \d+ nights?/);
+    const stayed = us.bookings.find((b) => b.status === 'checked_out')!;
+    const folio = buildFolio(
+      stayed,
+      us.charges.filter((c) => c.bookingId === stayed.id),
+      us.payments.filter((p) => p.bookingId === stayed.id),
+      us.pricing,
+    );
+    expect(folio.lines.some((l) => l.kind === 'tax')).toBe(true);
+    expect(folio.balance).toBe(0);
+  });
+
+  it('is an English-speaking US lodge with multinational guests', () => {
+    expect(us.hotelProfile).toMatchObject({ country: 'US', language: 'en' });
+    expect(us.staff.every((s) => s.language === 'en')).toBe(true);
+    expect(new Set(us.guests.map((g) => g.language))).toEqual(new Set(['cs', 'de', 'en', 'pl']));
+    const authors = us.inquiries.flatMap((i) => i.messages.map((m) => m.author)).filter(Boolean);
+    expect(authors.every((a) => us.staff.some((s) => s.name === a))).toBe(true);
+    expect(JSON.stringify(us.hotelProfile)).not.toMatch(/CZK|Prague|Czech/);
   });
 });

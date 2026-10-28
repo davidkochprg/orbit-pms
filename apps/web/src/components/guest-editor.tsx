@@ -15,7 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
-import { useCreateGuest, useUpdateGuest } from '@/lib/api';
+import { useCreateGuest, useHotelProfile, useUpdateGuest } from '@/lib/api';
 import { languageLabels } from '@/lib/format';
 
 interface GuestEditorProps {
@@ -40,7 +40,8 @@ function GuestForm({ guest, onDone }: { guest: Guest | undefined; onDone: () => 
   const [name, setName] = useState(guest?.name ?? '');
   const [email, setEmail] = useState(guest?.email ?? '');
   const [phone, setPhone] = useState(guest?.phone ?? '');
-  const [language, setLanguage] = useState<Language>(guest?.language ?? 'cs');
+  const hotelLanguage = useHotelProfile().data?.language ?? 'en';
+  const [language, setLanguage] = useState<Language>(guest?.language ?? hotelLanguage);
   const [notes, setNotes] = useState(guest?.notes ?? '');
   const create = useCreateGuest();
   const update = useUpdateGuest();

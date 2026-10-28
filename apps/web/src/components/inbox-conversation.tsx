@@ -46,7 +46,7 @@ import {
   useTranslateMessage,
   useTranslateText,
 } from '@/lib/api';
-import { formatCzk, formatDateTime, languageLabels } from '@/lib/format';
+import { formatMoney, formatDateTime, languageLabels } from '@/lib/format';
 import {
   analysisFacts,
   bookingPrefillFor,
@@ -418,7 +418,7 @@ function Options({ inquiry, options }: { inquiry: Inquiry; options: StayOption[]
             <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
               {o.roomTypeName} · {o.quote.nights} {o.quote.nights === 1 ? 'night' : 'nights'}
             </span>
-            <span className="font-mono text-sm tabular-nums">{formatCzk(o.quote.total)}</span>
+            <span className="font-mono text-sm tabular-nums">{formatMoney(o.quote.total)}</span>
             {!inquiry.bookingId && (
               <Button
                 size="xs"

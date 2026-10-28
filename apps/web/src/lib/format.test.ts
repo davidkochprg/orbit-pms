@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
-  formatCzk,
+  formatDateTime,
+  formatMoney,
+  formatTimeOfDay,
+  setDisplayRegion,
   formatDate,
   formatDayHeader,
   formatFullDate,
@@ -11,16 +14,47 @@ import {
   orbShift,
 } from './format';
 
+const us = {
+  currency: 'USD',
+  usDates: true,
+  timeZone: 'America/Los_Angeles',
+  perRoom: true,
+} as const;
+const czech = {
+  currency: 'CZK',
+  usDates: false,
+  timeZone: 'Europe/Prague',
+  perRoom: false,
+} as const;
+
 describe('format', () => {
-  it('formats dates without timezone shifts', () => {
+  afterEach(() => setDisplayRegion(us));
+
+  it('formats dates US style without timezone shifts, or European style', () => {
+    expect(formatDate('2026-10-27')).toBe('Tue, Oct 27');
+    expect(formatFullDate('1985-03-14')).toBe('Mar 14, 1985');
+    expect(formatRange('2026-12-31', '2027-01-02')).toBe('Thu, Dec 31 – Sat, Jan 2');
+    setDisplayRegion(czech);
     expect(formatDate('2026-10-27')).toBe('Tue 27 Oct');
     expect(formatFullDate('1985-03-14')).toBe('14 Mar 1985');
-    expect(formatRange('2026-12-31', '2027-01-02')).toBe('Thu 31 Dec – Sat 2 Jan');
   });
 
-  it('formats whole CZK with separators', () => {
-    expect(formatCzk(12500)).toBe('12,500 CZK');
-    expect(formatCzk(-1250)).toBe('-1,250 CZK');
+  it("formats whole amounts in the hotel's currency", () => {
+    expect(formatMoney(12500)).toBe('$12,500');
+    expect(formatMoney(-150)).toBe('-$150');
+    setDisplayRegion(czech);
+    expect(formatMoney(12500)).toBe('12,500 CZK');
+    expect(formatMoney(-1250)).toBe('-1,250 CZK');
+    expect(formatMoney(980, 'EUR')).toBe('980 EUR');
+  });
+
+  it("shows times in the hotel's time zone and clock", () => {
+    // 22:30 UTC is 3:30 PM in California and 23:30 in Prague.
+    expect(formatDateTime('2026-10-27T22:30:00Z')).toBe('Oct 27, 3:30 PM');
+    expect(formatTimeOfDay('15:00')).toBe('3 PM');
+    setDisplayRegion(czech);
+    expect(formatDateTime('2026-10-27T22:30:00Z')).toBe('27 Oct, 23:30');
+    expect(formatTimeOfDay('15:00')).toBe('15:00');
   });
 
   it('describes the party', () => {
@@ -30,8 +64,8 @@ describe('format', () => {
   });
 
   it('formats headers and long dates', () => {
-    expect(formatDayHeader('2026-10-27')).toEqual({ weekday: 'Tue', day: '27 Oct' });
-    expect(formatLongDate('2026-10-27')).toBe('Tuesday, 27 October');
+    expect(formatDayHeader('2026-10-27')).toEqual({ weekday: 'Tue', day: 'Oct 27' });
+    expect(formatLongDate('2026-10-27')).toBe('Tuesday, October 27');
   });
 
   it('builds avatar initials', () => {

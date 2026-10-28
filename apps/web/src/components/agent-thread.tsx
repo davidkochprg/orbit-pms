@@ -39,7 +39,7 @@ import {
 } from '@/lib/agent';
 import { collectEntities, type Inline, parseAnswer } from '@/lib/agent-answer';
 import { useRoomTypes } from '@/lib/api';
-import { formatCzk, formatParty, formatRange } from '@/lib/format';
+import { formatMoney, formatParty, formatRange } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 type ToolPart = Extract<UIMessage['parts'][number], { toolCallId: string }>;
@@ -391,7 +391,7 @@ function Amounts({ lines }: { lines: { label: string; amount: number }[] }) {
       {lines.map((l, i) => (
         <li key={i} className="flex items-baseline justify-between gap-4">
           <span className="min-w-0 text-muted-foreground">{l.label}</span>
-          <span className="shrink-0 font-mono tabular-nums">{formatCzk(l.amount)}</span>
+          <span className="shrink-0 font-mono tabular-nums">{formatMoney(l.amount)}</span>
         </li>
       ))}
     </ul>
@@ -412,7 +412,9 @@ function QuoteCard({ quote, roomId }: { quote: Quote; roomId: string | null }) {
             {formatParty(quote.adults, quote.childAges)}
           </span>
         </span>
-        <span className="shrink-0 font-mono text-base tabular-nums">{formatCzk(quote.total)}</span>
+        <span className="shrink-0 font-mono text-base tabular-nums">
+          {formatMoney(quote.total)}
+        </span>
       </div>
       <Amounts lines={quote.lines} />
     </Card>
@@ -441,9 +443,9 @@ function BillCard({ folio }: { folio: Folio }) {
           )}
         >
           {folio.balance > 0
-            ? `${formatCzk(folio.balance)} due`
+            ? `${formatMoney(folio.balance)} due`
             : folio.balance < 0
-              ? `${formatCzk(-folio.balance)} owed back`
+              ? `${formatMoney(-folio.balance)} owed back`
               : 'Paid in full'}
         </span>
       </div>

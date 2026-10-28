@@ -1,4 +1,5 @@
-import type { Booking, Room, RoomType } from '@orbit/shared';
+import type { Booking, HotelProfile, Room, RoomType } from '@orbit/shared';
+import { emptyHotelProfile } from './settings';
 
 export const double: RoomType = {
   id: 'rt_double',
@@ -47,3 +48,6 @@ export function booking(overrides: Partial<Booking> & Pick<Booking, 'roomId'>): 
     ...overrides,
   };
 }
+
+/** A hotel in Czechia, where the guest book records everyone in the room. */
+export const czechProfile: HotelProfile = { ...emptyHotelProfile, country: 'CZ', language: 'cs' };

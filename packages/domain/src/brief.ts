@@ -15,7 +15,7 @@ import type {
 import { blocksRoom } from './availability';
 import { addDays, nightsBetween } from './dates';
 import { arrivalsOn, departuresOn } from './day';
-import type { HotelPolicy } from './policy';
+import type { GuestBookRules } from './policy';
 import { buildGuestBook } from './registration';
 
 /** How far ahead the brief looks for empty nights between stays. */
@@ -41,7 +41,8 @@ export interface BriefInput {
   inquiries: Inquiry[];
   /** Guest-book entries of the stays `guestBookStays` returns. */
   stayGuests: StayGuest[];
-  policy: Pick<HotelPolicy, 'homeCountry' | 'idDocumentMinAge'>;
+  /** The guest-book rules of the hotel's country. */
+  rules: GuestBookRules;
 }
 
 /** Stays whose guest book the brief checks: arriving today or in house tonight. */
@@ -96,7 +97,7 @@ export function findGaps(input: Pick<BriefInput, 'date' | 'now' | 'rooms' | 'boo
  * decision, broken rooms, missing IDs, unanswered messages and short gaps worth discounting.
  */
 export function buildDailyBrief(input: BriefInput): DailyBrief {
-  const { date, now, rooms, guests, bookings, tasks, inquiries, stayGuests, policy } = input;
+  const { date, now, rooms, guests, bookings, tasks, inquiries, stayGuests, rules } = input;
   const guestName = (id: string) => guests.find((g) => g.id === id)?.name ?? 'Unknown guest';
   const roomById = new Map(rooms.map((r) => [r.id, r]));
   const roomName = (id: string) => roomById.get(id)?.name ?? id;
@@ -163,7 +164,7 @@ export function buildDailyBrief(input: BriefInput): DailyBrief {
     const guest = guests.find((g) => g.id === b.guestId);
     if (!guest) return [];
     const entries = stayGuests.filter((s) => s.bookingId === b.id);
-    const { missing } = buildGuestBook(b, guest, entries, null, date, policy);
+    const { missing } = buildGuestBook(b, guest, entries, null, date, rules);
     if (missing === 0) return [];
     return [
       {

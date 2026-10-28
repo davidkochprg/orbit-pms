@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   addDays,
   assertValidRange,
+  DEFAULT_HOTEL_TIMEZONE,
   eachNight,
+  getHotelTimeZone,
   hotelToday,
   nightsBetween,
   rangesOverlap,
+  setHotelTimeZone,
 } from './dates';
 import { DomainError } from './errors';
 
@@ -71,9 +74,20 @@ describe('rangesOverlap', () => {
 });
 
 describe('hotelToday', () => {
-  it('uses Prague time, not UTC', () => {
-    // 23:30 UTC on Jun 30 is already Jul 1 in Prague (UTC+2).
+  it("uses the hotel's time zone, not UTC", () => {
+    // 23:30 UTC on Jun 30 is already Jul 1 in Prague (UTC+2)…
+    expect(hotelToday(new Date('2026-06-30T23:30:00Z'), 'Europe/Prague')).toBe('2026-07-01');
+    expect(hotelToday(new Date('2026-06-30T21:30:00Z'), 'Europe/Prague')).toBe('2026-06-30');
+    // …and still Jun 30 on the US west coast (UTC−7), until 07:00 UTC.
+    expect(hotelToday(new Date('2026-07-01T06:30:00Z'), 'America/Los_Angeles')).toBe('2026-06-30');
+  });
+
+  it('defaults to the configured time zone and refuses unknown ones', () => {
+    expect(getHotelTimeZone()).toBe(DEFAULT_HOTEL_TIMEZONE);
+    setHotelTimeZone('Europe/Prague');
     expect(hotelToday(new Date('2026-06-30T23:30:00Z'))).toBe('2026-07-01');
-    expect(hotelToday(new Date('2026-06-30T21:30:00Z'))).toBe('2026-06-30');
+    setHotelTimeZone(DEFAULT_HOTEL_TIMEZONE);
+    expect(hotelToday(new Date('2026-06-30T23:30:00Z'))).toBe('2026-06-30');
+    expect(() => setHotelTimeZone('Mars/Olympus')).toThrow(/Unknown time zone/);
   });
 });

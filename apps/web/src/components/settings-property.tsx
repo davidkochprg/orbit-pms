@@ -1,15 +1,18 @@
-import type { HotelProfile } from '@orbit/shared';
+import { type HotelProfile, type Language, languages } from '@orbit/shared';
 import { FormField } from '@/components/form-field';
 import { Section } from '@/components/section';
 import { Input } from '@/components/ui/input';
+import { NativeSelect } from '@/components/ui/native-select';
 import { Textarea } from '@/components/ui/textarea';
+import { languageLabels } from '@/lib/format';
+import { countryOptions } from '@/lib/registration';
 
 interface Props {
   profile: HotelProfile;
   onChange: (profile: HotelProfile) => void;
 }
 
-/** Name, description, contact details and check-in/out times. */
+/** Name, description, country and language, contact details and check-in/out times. */
 export function PropertySettings({ profile, onChange }: Props) {
   const set = <K extends keyof HotelProfile>(key: K, value: HotelProfile[K]) =>
     onChange({ ...profile, [key]: value });
@@ -45,6 +48,45 @@ export function PropertySettings({ profile, onChange }: Props) {
               value={profile.description ?? ''}
               onChange={(e) => set('description', optional(e.target.value))}
             />
+          </FormField>
+        </div>
+      </Section>
+
+      <Section title="Country and language">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField
+            label="Country"
+            htmlFor="country"
+            hint="Sets the guest-book rules: in the US the guest who booked shows an ID; elsewhere everyone in the room is recorded."
+          >
+            <NativeSelect
+              id="country"
+              value={profile.country}
+              onChange={(e) => set('country', e.target.value)}
+            >
+              {countryOptions.map((c) => (
+                <option key={c.code} value={c.code}>
+                  {c.name}
+                </option>
+              ))}
+            </NativeSelect>
+          </FormField>
+          <FormField
+            label="Working language"
+            htmlFor="language"
+            hint="New staff and guests start with it."
+          >
+            <NativeSelect
+              id="language"
+              value={profile.language}
+              onChange={(e) => set('language', e.target.value as Language)}
+            >
+              {languages.map((l) => (
+                <option key={l} value={l}>
+                  {languageLabels[l]}
+                </option>
+              ))}
+            </NativeSelect>
           </FormField>
         </div>
       </Section>

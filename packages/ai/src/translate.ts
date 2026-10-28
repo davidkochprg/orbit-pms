@@ -9,7 +9,7 @@ import type { UsageStore } from './usage';
 export function translateSystemPrompt(to: Language): string {
   return `You translate messages between a small hotel and its guests into ${languageNames[to]}.
 - Keep the meaning, the tone and the line breaks.
-- Keep names, email addresses, dates, room numbers and every amount with its currency exactly as written: "12 500 CZK" stays "12 500 CZK".
+- Keep names, email addresses, dates, room numbers and every amount with its currency exactly as written: "$1,250" stays "$1,250" and "12 500 CZK" stays "12 500 CZK".
 - If the text is already in ${languageNames[to]}, return it unchanged.
 - Output only the translation, nothing before or after it.`;
 }

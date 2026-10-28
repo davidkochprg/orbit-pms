@@ -31,6 +31,8 @@ export const healthSchema = z.object({
     /** Whether ID documents can be scanned. */
     vision: z.boolean(),
   }),
+  /** The hotel's time zone (IANA), which decides what "today" is. */
+  hotel: z.object({ timezone: z.string() }),
 });
 export type Health = z.infer<typeof healthSchema>;
 

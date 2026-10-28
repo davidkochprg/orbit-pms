@@ -1,4 +1,4 @@
-import { addDays, pricingConfig } from '@orbit/domain';
+import { addDays } from '@orbit/domain';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from './client';
 import { createRepositories } from './repositories';
@@ -10,7 +10,7 @@ const DB_SETUP_TIMEOUT = 60_000;
 
 const handle = createDb('memory://');
 const repos = createRepositories(handle.db);
-const seed = buildSeed('2026-10-27', new Date('2026-10-27T08:00:00Z'), pricingConfig);
+const seed = buildSeed('2026-10-27', new Date('2026-10-27T08:00:00Z'), 'cz');
 
 beforeAll(async () => {
   await handle.migrate();

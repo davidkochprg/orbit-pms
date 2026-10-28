@@ -66,8 +66,11 @@ function groupNightsBySeason(range: DateRange, basePrice: number, config: Pricin
 }
 
 /**
- * Prices a stay for one room type. Every amount is whole CZK and the total is the sum of the lines,
- * so the breakdown can be shown verbatim.
+ * Prices a stay for one room type. Every amount is in whole units of the rates' currency and the
+ * total is the sum of the lines, so the breakdown can be shown verbatim. With `per_person` rates
+ * every guest pays the base price, children with their discount; with `per_room` rates the room
+ * does, whoever stays in it. Taxes are not part of a quote: they are included in the prices
+ * (`inclusive`) or added on the bill (`exclusive`).
  */
 export function quote(input: QuoteInput, config: PricingConfig): Quote {
   assertValidRange(input);
@@ -83,17 +86,26 @@ export function quote(input: QuoteInput, config: PricingConfig): Quote {
 
   const nights = eachNight(input).length;
   const guests = input.adults + input.childAges.length;
+  const perRoom = config.pricingBasis === 'per_room';
   const lines: QuoteLine[] = [];
 
   for (const group of groupNightsBySeason(input, input.roomType.basePrice, config)) {
     lines.push(
-      line(
-        'accommodation',
-        `Accommodation, ${plural(guests, 'guest')} × ${plural(group.nights, 'night')} (${group.label})`,
-        guests * group.nights,
-        group.rate,
-      ),
+      perRoom
+        ? line(
+            'accommodation',
+            `Room, ${plural(group.nights, 'night')} (${group.label})`,
+            group.nights,
+            group.rate,
+          )
+        : line(
+            'accommodation',
+            `Accommodation, ${plural(guests, 'guest')} × ${plural(group.nights, 'night')} (${group.label})`,
+            guests * group.nights,
+            group.rate,
+          ),
     );
+    if (perRoom) continue;
     for (const tier of config.childDiscounts) {
       const children = input.childAges.filter((age) => childTier(age, config) === tier).length;
       if (children === 0) continue;
@@ -167,6 +179,6 @@ export function quote(input: QuoteInput, config: PricingConfig): Quote {
     childAges: [...input.childAges],
     lines,
     total: lines.reduce((sum, l) => sum + l.amount, 0),
-    currency: 'CZK',
+    currency: config.currency,
   };
 }

@@ -13,7 +13,10 @@ import {
 import { apartment, booking, double, room } from './test-fixtures';
 import { createMemoryRepositories } from './testing';
 
-const pricing = { ...pricingConfig, cityTax: { perPersonPerNight: 50, minAge: 18 } };
+const pricing = {
+  ...pricingConfig,
+  cityTax: { label: 'City tax', perPersonPerNight: 50, minAge: 18 },
+};
 
 function priced(total: number, addons = 0): Quote {
   return {

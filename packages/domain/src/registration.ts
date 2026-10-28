@@ -13,7 +13,8 @@ import type {
 } from '@orbit/shared';
 import { hotelToday } from './dates';
 import { DomainError } from './errors';
-import type { HotelPolicy } from './policy';
+import { guestBookRulesFor, type GuestBookRules } from './policy';
+import { emptyHotelProfile } from './settings';
 import type { Repositories } from './repositories';
 
 const identityKeys = [
@@ -44,31 +45,44 @@ export function ageOn(dateOfBirth: IsoDate, day: IsoDate): number {
 }
 
 /**
- * Guest-book fields a person still needs: nationality and date of birth always, an ID document
- * from `idDocumentMinAge` (or when the age is unknown), and a home address for guests from abroad.
+ * Guest-book fields a person still needs under `rules`: where identity is recorded, nationality
+ * and date of birth, an ID document from `idDocumentMinAge` (or when the age is unknown) and a
+ * home address for guests from abroad; where only the main guest is recorded, their ID document.
  */
 export function missingFields(
   person: IdentityFields,
   today: IsoDate,
-  policy: Pick<HotelPolicy, 'homeCountry' | 'idDocumentMinAge'>,
+  rules: GuestBookRules,
+  primary: boolean,
 ): RegistrationField[] {
+  if (rules.scope === 'main_guest' && !primary) return [];
   const missing: RegistrationField[] = [];
-  if (!person.nationality) missing.push('nationality');
-  if (!person.dateOfBirth) missing.push('dateOfBirth');
+  if (rules.identity && !person.nationality) missing.push('nationality');
+  if (rules.identity && !person.dateOfBirth) missing.push('dateOfBirth');
   const needsDocument =
-    !person.dateOfBirth || ageOn(person.dateOfBirth, today) >= policy.idDocumentMinAge;
+    !person.dateOfBirth || ageOn(person.dateOfBirth, today) >= rules.idDocumentMinAge;
   if (needsDocument && !person.documentType) missing.push('documentType');
   if (needsDocument && !person.documentNumber) missing.push('documentNumber');
-  if (person.nationality && person.nationality !== policy.homeCountry && !person.address) {
+  if (
+    rules.foreignAddress &&
+    person.nationality &&
+    person.nationality !== rules.homeCountry &&
+    !person.address
+  ) {
     missing.push('address');
   }
   return missing;
 }
 
+/** The guest-book rules of the country in the hotel profile. */
+export async function currentGuestBookRules(repos: Repositories): Promise<GuestBookRules> {
+  return guestBookRulesFor(((await repos.settings.getProfile()) ?? emptyHotelProfile).country);
+}
+
 /**
  * Everyone in the room: the main guest (from their profile, entry or not) first, then companions.
- * People the party counts but nobody has added yet count as missing; people listed beyond the
- * party (it was made smaller after they were added) count as extra.
+ * Where everyone is recorded, people the party counts but nobody has added yet count as missing.
+ * People listed beyond the party (it was made smaller after they were added) count as extra.
  */
 export function buildGuestBook(
   booking: Booking,
@@ -76,7 +90,7 @@ export function buildGuestBook(
   stored: StayGuest[],
   previous: IdentityFields | null,
   today: IsoDate,
-  policy: Pick<HotelPolicy, 'homeCountry' | 'idDocumentMinAge'>,
+  rules: GuestBookRules,
 ): GuestBook {
   const primaryId = primaryStayGuestId(booking.id);
   const primary: StayGuest = stored.find((s) => s.id === primaryId) ?? {
@@ -95,7 +109,7 @@ export function buildGuestBook(
     ...s,
     ...(isPrimary && { name: guest.name, guestId: guest.id }),
     primary: isPrimary,
-    missing: missingFields(s, today, policy),
+    missing: missingFields(s, today, rules, isPrimary),
   });
   const guests = [view(primary, true), ...companions.map((c) => view(c, false))];
   const partySize = booking.adults + booking.childAges.length;
@@ -103,7 +117,7 @@ export function buildGuestBook(
   return {
     guests,
     partySize,
-    missing: incomplete + Math.max(0, partySize - guests.length),
+    missing: incomplete + (rules.scope === 'everyone' ? Math.max(0, partySize - guests.length) : 0),
     extra: Math.max(0, guests.length - partySize),
     previous,
   };
@@ -143,7 +157,6 @@ async function discardScan(r: Repositories, bookingId: string, scanId: string | 
 
 export interface RegistrationDeps {
   repos: Repositories;
-  policy: HotelPolicy;
   clock: () => Date;
   newId: (prefix: string) => string;
 }
@@ -153,7 +166,7 @@ export interface RegistrationDeps {
  * stay flagged on the booking until someone records them. The audit log notes which fields changed,
  * never their values.
  */
-export function createRegistrationService({ repos, policy, clock, newId }: RegistrationDeps) {
+export function createRegistrationService({ repos, clock, newId }: RegistrationDeps) {
   async function load(r: Repositories, bookingId: string) {
     const booking = await r.bookings.getBooking(bookingId);
     if (!booking) throw new DomainError('not_found', `Booking ${bookingId} not found`);
@@ -170,7 +183,7 @@ export function createRegistrationService({ repos, policy, clock, newId }: Regis
       await r.stayGuests.listByBooking(booking.id),
       earlier && identityOf(earlier),
       hotelToday(clock()),
-      policy,
+      await currentGuestBookRules(r),
     );
   }
 

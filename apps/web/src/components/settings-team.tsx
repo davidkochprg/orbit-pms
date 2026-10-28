@@ -23,7 +23,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { useAddStaff, useUpdateStaff } from '@/lib/api';
+import { useAddStaff, useHotelProfile, useUpdateStaff } from '@/lib/api';
 import { languageLabels } from '@/lib/format';
 import { staffRoleLabels } from '@/lib/session';
 import { cn } from '@/lib/utils';
@@ -138,11 +138,12 @@ function AddMember() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<StaffRole>('receptionist');
+  const hotelLanguage = useHotelProfile().data?.language ?? 'en';
 
   function submit(e: FormEvent) {
     e.preventDefault();
     add.mutate(
-      { name, email: email.trim() || null, role, language: 'cs' },
+      { name, email: email.trim() || null, role, language: hotelLanguage },
       {
         onSuccess: () => {
           setName('');

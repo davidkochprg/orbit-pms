@@ -15,7 +15,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useBookings, useGuest, useRooms } from '@/lib/api';
-import { formatCzk, formatParty, formatRange, languageLabels } from '@/lib/format';
+import { formatMoney, formatParty, formatRange, languageLabels } from '@/lib/format';
 
 export function GuestDetailPage() {
   const { id = '' } = useParams();
@@ -90,7 +90,7 @@ export function GuestDetailPage() {
                             Room {roomName(b.roomId)}, {formatParty(b.adults, b.childAges)}
                           </span>
                           <span className="hidden tabular-nums sm:inline">
-                            {b.priceSnapshot ? formatCzk(b.priceSnapshot.total) : '–'}
+                            {b.priceSnapshot ? formatMoney(b.priceSnapshot.total) : '–'}
                           </span>
                           <BookingStatusBadge status={b.status} />
                         </button>

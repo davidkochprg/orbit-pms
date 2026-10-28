@@ -1,36 +1,93 @@
-import type { BookingAction, BookingStatus, Language, PaymentMethod } from '@orbit/shared';
+import type {
+  BookingAction,
+  BookingStatus,
+  Currency,
+  Language,
+  PaymentMethod,
+} from '@orbit/shared';
 import { format, parseISO } from 'date-fns';
 
+/**
+ * How the hotel writes money, dates and times: its currency, US or European date style, and its
+ * time zone. Set once the rates, profile and health load (`RegionProvider`); US until then.
+ */
+export interface DisplayRegion {
+  currency: Currency;
+  /** "Wed, Oct 28" and "3:30 PM" in the US; "Wed 28 Oct" and "15:30" elsewhere. */
+  usDates: boolean;
+  timeZone: string;
+  /** Base prices per room (US) or per adult. */
+  perRoom: boolean;
+}
+
+let region: DisplayRegion = {
+  currency: 'USD',
+  usDates: true,
+  timeZone: 'America/Los_Angeles',
+  perRoom: true,
+};
+
+export function setDisplayRegion(next: DisplayRegion): void {
+  region = next;
+}
+
+export function displayRegion(): DisplayRegion {
+  return region;
+}
+
 export function formatDate(date: string): string {
-  return format(parseISO(date), 'EEE d MMM');
+  return format(parseISO(date), region.usDates ? 'EEE, MMM d' : 'EEE d MMM');
 }
 
-/** "14 Mar 1985", e.g. a date of birth, where the weekday is noise and the year matters. */
+/** "Mar 14, 1985", e.g. a date of birth, where the weekday is noise and the year matters. */
 export function formatFullDate(date: string): string {
-  return format(parseISO(date), 'd MMM yyyy');
+  return format(parseISO(date), region.usDates ? 'MMM d, yyyy' : 'd MMM yyyy');
 }
 
-/** "Wed" and "3 Oct" for a tape chart column header. */
+/** "Wed" and "Oct 3" for a tape chart column header. */
 export function formatDayHeader(date: string): { weekday: string; day: string } {
   const d = parseISO(date);
-  return { weekday: format(d, 'EEE'), day: format(d, 'd MMM') };
+  return { weekday: format(d, 'EEE'), day: format(d, region.usDates ? 'MMM d' : 'd MMM') };
 }
 
-/** "Tuesday, 27 October" for page titles. */
+/** "Tuesday, October 27" for page titles. */
 export function formatLongDate(date: string): string {
-  return format(parseISO(date), 'EEEE, d MMMM');
+  return format(parseISO(date), region.usDates ? 'EEEE, MMMM d' : 'EEEE, d MMMM');
 }
 
+/** A moment in the hotel's time zone, e.g. "Oct 28, 3:30 PM". */
 export function formatDateTime(iso: string): string {
-  return format(new Date(iso), 'd MMM, HH:mm');
+  return new Intl.DateTimeFormat(region.usDates ? 'en-US' : 'en-GB', {
+    timeZone: region.timeZone,
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: region.usDates,
+  }).format(new Date(iso));
+}
+
+/** "15:00" as the hotel writes a time of day: "3 PM" in the US. */
+export function formatTimeOfDay(time: string): string {
+  if (!region.usDates) return time;
+  const [hour = 0, minute = 0] = time.split(':').map(Number);
+  return `${hour % 12 || 12}${minute ? `:${String(minute).padStart(2, '0')}` : ''} ${hour < 12 ? 'AM' : 'PM'}`;
 }
 
 export function formatRange(checkIn: string, checkOut: string): string {
   return `${formatDate(checkIn)} – ${formatDate(checkOut)}`;
 }
 
-export function formatCzk(amount: number): string {
-  return `${new Intl.NumberFormat('en-US').format(amount)} CZK`;
+/** An amount in the hotel's currency: "$1,250", "-$150" or "12,500 CZK". */
+export function formatMoney(amount: number, currency: Currency = region.currency): string {
+  const digits = new Intl.NumberFormat('en-US').format(Math.abs(amount));
+  const sign = amount < 0 ? '-' : '';
+  return currency === 'USD' ? `${sign}$${digits}` : `${sign}${digits} ${currency}`;
+}
+
+/** The currency's symbol or code, e.g. for an input suffix: "$" or "CZK". */
+export function currencyMark(currency: Currency = region.currency): string {
+  return currency === 'USD' ? '$' : currency;
 }
 
 export function formatParty(adults: number, childAges: number[]): string {

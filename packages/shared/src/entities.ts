@@ -13,15 +13,15 @@ import {
   roomStatusSchema,
 } from './enums';
 import { inboxMessageSchema, inquiryExtractionSchema, inquirySuggestionSchema } from './inquiry';
-import { czkSchema, quoteAddonsSchema, quoteSchema } from './quote';
+import { moneySchema, quoteAddonsSchema, quoteSchema } from './quote';
 
 export const roomTypeSchema = z.object({
   id: z.string(),
   name: z.string(),
   maxAdults: z.number().int().positive(),
   maxChildren: z.number().int().nonnegative(),
-  /** Adult rate per person per night, whole CZK, before season multipliers. */
-  basePrice: czkSchema.positive(),
+  /** Per night before season multipliers: per adult, or per room (see `pricingBasis`). */
+  basePrice: moneySchema.positive(),
   description: z.string(),
 });
 export type RoomType = z.infer<typeof roomTypeSchema>;

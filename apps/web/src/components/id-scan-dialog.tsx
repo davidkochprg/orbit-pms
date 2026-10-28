@@ -18,6 +18,7 @@ import { Input } from '@/components/ui/input';
 import {
   useAddStayGuest,
   useHealth,
+  useHotelProfile,
   useIdScan,
   useStartIdScan,
   useUpdateStayGuest,
@@ -265,7 +266,8 @@ function ReviewForm({
   const [documentType, setDocumentType] = useState<DocumentType>(result.documentType ?? 'id_card');
   const [documentNumber, setDocumentNumber] = useState(result.documentNumber ?? '');
   const [address, setAddress] = useState(result.address ?? stayGuest?.address ?? '');
-  const abroad = needsAddress(nationality);
+  const country = useHotelProfile().data?.country ?? 'US';
+  const abroad = needsAddress(nationality, country);
   // A document under another name may be the wrong one; the main guest's name stays either way.
   const nameDiffers =
     stayGuest &&

@@ -62,7 +62,7 @@ describe('sceneMessages', () => {
         'RM 205 · DIRTY · GUEST DUE TODAY',
         'HOLD · GUEST HOLD · RM 409',
         '1 GUEST MESSAGE WAITING',
-        'RM 407 · 2 EMPTY NIGHTS · WED 28 OCT',
+        'RM 407 · 2 EMPTY NIGHTS · WED, OCT 28',
       ]),
     );
   });

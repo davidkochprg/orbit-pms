@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { paymentMethodSchema } from './billing';
 import { isoDateSchema } from './dates';
 import { bookingSourceSchema } from './enums';
-import { czkSchema } from './quote';
+import { moneySchema } from './quote';
 
 /** A reporting period of hotel nights, `[from, to)`, at most a year. */
 export const reportQuerySchema = z.object({
@@ -14,7 +14,7 @@ export type ReportQuery = z.infer<typeof reportQuerySchema>;
 /** Room nights and room revenue for one slice, e.g. a booking source or a room type. */
 const sliceSchema = z.object({
   roomNights: z.number().int().nonnegative(),
-  roomRevenue: czkSchema,
+  roomRevenue: moneySchema,
 });
 
 export const reportDaySchema = z.object({
@@ -22,7 +22,7 @@ export const reportDaySchema = z.object({
   roomsSold: z.number().int().nonnegative(),
   /** Fraction 0–1. */
   occupancy: z.number(),
-  roomRevenue: czkSchema,
+  roomRevenue: moneySchema,
 });
 export type ReportDay = z.infer<typeof reportDaySchema>;
 
@@ -42,17 +42,17 @@ export const reportSchema = z.object({
   /** Guest nights: every adult and child, every night. */
   guestNights: z.number().int().nonnegative(),
   /** Accommodation after child and long-stay discounts, without add-ons. */
-  roomRevenue: czkSchema,
+  roomRevenue: moneySchema,
   /** Wellness, extra beds and dogs from the booked price. */
-  addonRevenue: czkSchema,
+  addonRevenue: moneySchema,
   /** Extras posted to bills in the period. */
-  extrasRevenue: czkSchema,
+  extrasRevenue: moneySchema,
   /** Collected for the town, not revenue. */
-  cityTax: czkSchema,
+  cityTax: moneySchema,
   /** Average daily rate: room revenue per room night sold. */
-  adr: czkSchema,
+  adr: moneySchema,
   /** Revenue per available room night. */
-  revpar: czkSchema,
+  revpar: moneySchema,
   arrivals: z.number().int().nonnegative(),
   /** Average nights per stay arriving in the period; 0 without arrivals. */
   averageStay: z.number().nonnegative(),
@@ -68,7 +68,7 @@ export const reportSchema = z.object({
     }),
   ),
   /** Money received minus refunds, by method, on days in the period. */
-  payments: z.array(z.object({ method: paymentMethodSchema, amount: czkSchema })),
+  payments: z.array(z.object({ method: paymentMethodSchema, amount: moneySchema })),
   /** Guests who left in the period and still owe money. */
   unpaidDepartures: z.array(
     z.object({
@@ -76,7 +76,7 @@ export const reportSchema = z.object({
       guestName: z.string(),
       roomName: z.string(),
       checkOut: isoDateSchema,
-      balance: czkSchema,
+      balance: moneySchema,
     }),
   ),
   days: z.array(reportDaySchema),

@@ -52,8 +52,9 @@ pnpm eval           # AI extraction evals, prints pass rate
 - When you change extraction or tool behavior, run `pnpm eval` and note the pass rate in the commit body.
 
 ## Domain conventions
-- Stays are half-open date ranges `[checkIn, checkOut)`. Dates are stored as `YYYY-MM-DD`. Hotel timezone is `Europe/Prague`.
-- Money is integer whole CZK. No floats for prices.
+- Stays are half-open date ranges `[checkIn, checkOut)`. Dates are stored as `YYYY-MM-DD`. The hotel time zone is `HOTEL_TIMEZONE` (the demo lodge: `America/Los_Angeles`); use `hotelToday()`, never the browser's or UTC date.
+- Money is integer whole units of the hotel's currency (`PricingConfig.currency`: USD for the demo, CZK for the Czech preset). No floats for prices; format with `formatMoney`.
+- The region is configurable (ADR 0013): currency, per-room or per-person rates, taxes included or added, the country's guest-book rules. Don't hard-code a currency, tax name or country.
 - `quote()` returns a full line-item breakdown that the UI and agent display verbatim.
 - Pricing config values marked `TODO(David)` are placeholders. Don't replace them with guessed numbers.
 

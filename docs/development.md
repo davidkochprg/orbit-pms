@@ -20,19 +20,21 @@ To use the AI features, copy `.env.example` to `.env` at the repo root and fill 
 
 Read from `.env` at the repo root by the API and the db scripts, and validated with zod at startup (`apps/api/src/env.ts`). All of them are server-side; the web bundle gets none.
 
-| Variable                 | Default                  | Purpose                                   |
-| ------------------------ | ------------------------ | ----------------------------------------- |
-| `DATABASE_URL`           | `file:./.data/orbit`     | PGlite path, or a `postgres://` URL       |
-| `META_API_KEY`           | –                        | Meta Model API key                        |
-| `META_API_BASE_URL`      | `https://api.meta.ai/v1` | OpenAI-compatible base URL                |
-| `META_MODEL_AGENT`       | –                        | Model for the agent loop and tool calling |
-| `META_MODEL_VOICE`       | –                        | Transcription model for voice notes       |
-| `META_MODEL_VISION`      | –                        | Vision model for ID scans                 |
-| `META_MODEL_TRANSLATE`   | `META_MODEL_AGENT`       | Model for translating messages and drafts |
-| `AI_DAILY_TOKEN_BUDGET`  | `2000000`                | Global daily token budget                 |
-| `AI_RATE_LIMIT_PER_HOUR` | `20`                     | Agent calls per IP per hour               |
-| `AI_MONTHLY_BUDGET_USD`  | `100`                    | Monthly cap on real Meta spend            |
-| `PORT`                   | `3001`                   | API port                                  |
+| Variable                 | Default                  | Purpose                                                             |
+| ------------------------ | ------------------------ | ------------------------------------------------------------------- |
+| `DATABASE_URL`           | `file:./.data/orbit`     | PGlite path, or a `postgres://` URL                                 |
+| `META_API_KEY`           | –                        | Meta Model API key                                                  |
+| `META_API_BASE_URL`      | `https://api.meta.ai/v1` | OpenAI-compatible base URL                                          |
+| `META_MODEL_AGENT`       | –                        | Model for the agent loop and tool calling                           |
+| `META_MODEL_VOICE`       | –                        | Transcription model for voice notes                                 |
+| `META_MODEL_VISION`      | –                        | Vision model for ID scans                                           |
+| `META_MODEL_TRANSLATE`   | `META_MODEL_AGENT`       | Model for translating messages and drafts                           |
+| `HOTEL_TIMEZONE`         | `America/Los_Angeles`    | The hotel's IANA time zone; decides "today"                         |
+| `SEED_REGION`            | `us`                     | `pnpm db:seed` preset: `us` (demo lodge) or `cz` (Czech guesthouse) |
+| `AI_DAILY_TOKEN_BUDGET`  | `2000000`                | Global daily token budget                                           |
+| `AI_RATE_LIMIT_PER_HOUR` | `20`                     | Agent calls per IP per hour                                         |
+| `AI_MONTHLY_BUDGET_USD`  | `100`                    | Monthly cap on real Meta spend                                      |
+| `PORT`                   | `3001`                   | API port                                                            |
 
 The hourly and daily limits are kept in memory; the monthly budget is computed from the `ai_usage` table. See [ai.md](ai.md#rate-limits).
 
@@ -72,19 +74,19 @@ A PGlite directory can only be open in one process at a time; two processes writ
 
 ## Seeding
 
-`pnpm db:seed` replaces all data with a synthetic demo set built by `buildSeed(today, now, pricingConfig)`. Every date is relative to today in `Europe/Prague`, so the demo looks the same whenever it runs:
+`pnpm db:seed` replaces all data with a synthetic demo set built by `buildSeed(today, now, region)`. `SEED_REGION` picks the hotel ([ADR 0013](decisions/0013-configurable-region-us-demo.md)): `us` (default) is the fictional Orbit Demo Lodge in the Sierra Nevada, California, with an English-speaking team, per-room rates in dollars and occupancy and sales tax added on the bill; `cz` is the Czech guesthouse, in crowns per person with VAT included. For `cz` also set `HOTEL_TIMEZONE=Europe/Prague`. Every date is relative to today in the hotel's time zone, so the demo looks the same whenever it runs:
 
 - 50 rooms of six types: double, family, single, superior double and junior suite rooms on floors 1–4 (101–111, 201–211, 301–311, 401–411), and apartments A1–A6 on the ground floor.
 - 240 synthetic guests in Czech, German, Polish and English: a few hand-picked names plus first name and surname combinations. Emails use `example.com`. No guest has two stays at once.
 - About 440 bookings from three weeks ago to six weeks ahead, filling about half the hotel on a typical night, priced with `quote()`. There are always arrivals and departures today, at least one family arrival, and some open holds.
 - 14 open guest messages in mixed languages (from `packages/ai/src/evals/inquiries.ts`), unread. The seed makes sure each booking request has at least one free room.
 - Three conversations with history (`packages/db/src/seed/conversations.ts`): a Booking.com exchange about a late arrival, linked to its booking; an archived thank-you about a lost charger; and a welcome email the hotel wrote first.
-- Staff members read Czech, so drafts and guest messages translate into Czech; change it per person in Settings › Team.
+- The team reads English (Czech for `cz`), so drafts and guest messages translate into it; change it per person in Settings › Team. Guests stay multinational either way.
 - Bills: extras on past and current stays, deposits by bank transfer on some bookings, and settled bills for guests who left. Guests leaving today still owe something. Extra prices are placeholders.
 - Guest-book registrations for every stay that has started, with synthetic `DEMO-` document numbers and placeholder addresses. Today's arrivals are not registered yet; returning guests prefill from an earlier stay.
 - Housekeeping tasks: turnovers for today's departures, stayovers for in-house guests, one maintenance task.
-- The hotel profile of the fictional "Orbit Demo Penzion" (`packages/db/src/seed/hotel.ts`): policies, amenities and guest information, without prices. Seeding replaces any profile edited in Settings.
-- The rates from `packages/domain/src/pricing/config.ts` (placeholders). Seeding replaces any rates, room types and rooms edited in Settings.
+- The hotel profile of the fictional "Orbit Demo Lodge" or "Orbit Demo Penzion" (`packages/db/src/seed/hotel.ts`): policies, amenities and guest information, without prices. Seeding replaces any profile edited in Settings.
+- The rates from `packages/domain/src/pricing/config.ts`: `usDemoPricing` (illustrative) or the Czech placeholders. Seeding replaces any rates, room types and rooms edited in Settings.
 
 The generator is deterministic (fixed PRNG seed), and its invariants are tested in `packages/db/src/seed/build.test.ts`.
 

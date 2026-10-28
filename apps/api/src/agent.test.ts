@@ -1,4 +1,3 @@
-import { pricingConfig } from '@orbit/domain';
 import {
   applySeed,
   buildSeed,
@@ -20,7 +19,7 @@ const DB_SETUP_TIMEOUT = 60_000;
 const today = '2026-10-27';
 const now = new Date('2026-10-27T08:00:00Z');
 const handle = createDb('memory://');
-const seed = buildSeed(today, now, pricingConfig);
+const seed = buildSeed(today, now, 'cz');
 const repos = createRepositories(handle.db);
 const usageStore = createUsageStore(handle.db);
 

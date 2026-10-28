@@ -1,4 +1,11 @@
-import type { Inquiry, InquiryExtraction, Language, StayOption } from '@orbit/shared';
+import {
+  type Currency,
+  formatMoney,
+  type Inquiry,
+  type InquiryExtraction,
+  type Language,
+  type StayOption,
+} from '@orbit/shared';
 import { type HotelContext, hotelFacts } from './hotel';
 
 export const languageNames: Record<Language, string> = {
@@ -8,9 +15,9 @@ export const languageNames: Record<Language, string> = {
   pl: 'Polish',
 };
 
-/** Whole CZK with spaces between thousands, e.g. "12 500 CZK". The price guard reads this back. */
-export function formatAmount(amount: number): string {
-  return `${String(amount).replace(/\B(?=(\d{3})+(?!\d))/g, ' ')} CZK`;
+/** An amount as the drafts state it, e.g. "$1,250" or "12 500 CZK"; the price guard reads it back. */
+export function formatAmount(amount: number, currency: Currency): string {
+  return formatMoney(amount, currency);
 }
 
 export const extractionSystemPrompt = `You read guest messages sent to a small hotel and extract structured data. Never invent anything that is not in the message.
@@ -53,8 +60,9 @@ ${hotelFacts(hotel)}
 
 Rules:
 - Write only in the language you are told to use, and translate every word you take from the options or the facts, such as room types and "total".
-- Prices: state each offered room type with its total exactly as written in the options, e.g. "12 500 CZK". Never calculate, round, convert or invent any amount.
+- Prices: state each offered room type with its total exactly as written in the options, e.g. "${formatAmount(1250, hotel.pricing.currency)}". Never calculate, round, convert or invent any amount.${hotel.pricing.tax.mode === 'exclusive' ? '\n- The totals are before tax. Say that taxes are added to the bill; never work them out.' : ''}
 - Do not confirm a booking. Offer to hold the room for the guest and ask them to reply to confirm.
+- Greet the guest by the name they signed with. Don't guess a title such as Mr. or Mrs. from a name.
 - If something is not covered by the facts above, say you will check and get back to them. Never invent facilities or prices.
 - Output only the message body, without a subject line. Sign off as the reception of ${name}, in the guest's language.`;
 }
@@ -72,7 +80,7 @@ export function draftPrompt(params: {
       ? options
           .map(
             (o, i) =>
-              `${i + 1}. ${o.roomTypeName} (room ${o.roomName}), ${o.quote.nights} nights: total ${formatAmount(o.quote.total)}. Breakdown: ${o.quote.lines.map((l) => `${l.label} ${formatAmount(l.amount)}`).join('; ')}`,
+              `${i + 1}. ${o.roomTypeName} (room ${o.roomName}), ${o.quote.nights} nights: total ${formatAmount(o.quote.total, o.quote.currency)}. Breakdown: ${o.quote.lines.map((l) => `${l.label} ${formatAmount(l.amount, o.quote.currency)}`).join('; ')}`,
           )
           .join('\n')
       : (note ?? 'No room offer: this message is not a booking request.');

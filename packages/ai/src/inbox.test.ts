@@ -15,14 +15,20 @@ import type { UsageRecord } from './usage';
 
 const now = new Date('2026-05-10T08:00:00Z');
 const pricing: PricingConfig = {
+  currency: 'CZK',
+  pricingBasis: 'per_person',
   seasons: [],
   childDiscounts: [],
   longStay: [],
   wellness: { perPersonPerNight: 250, minAge: 0 },
   extraBed: { perNight: 0 },
   dog: { perNight: 0 },
-  cityTax: { perPersonPerNight: 0, minAge: 18 },
-  vat: { standard: 21, reduced: 12 },
+  cityTax: { label: 'City tax', perPersonPerNight: 0, minAge: 18 },
+  tax: {
+    mode: 'inclusive',
+    standard: { label: 'VAT', rate: 21 },
+    reduced: { label: 'VAT', rate: 12 },
+  },
 };
 const usageTokens = {
   inputTokens: { total: 800, noCache: 300, cacheRead: 500, cacheWrite: undefined },
@@ -102,7 +108,8 @@ function setup(replies: string[], { budgetLeft = true } = {}) {
     modelId: 'muse-spark-1.3',
     hotel,
     inbox,
-    hotelContext: () => Promise.resolve({ profile: emptyHotelProfile, policy: hotelPolicy }),
+    hotelContext: () =>
+      Promise.resolve({ profile: emptyHotelProfile, policy: hotelPolicy, pricing }),
     usage,
     canSpend,
     today: () => '2026-05-10',

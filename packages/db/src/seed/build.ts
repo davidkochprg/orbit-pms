@@ -23,11 +23,10 @@ import type {
   StaffMember,
 } from '@orbit/shared';
 import { buildBilling } from './billing';
-import { seedGuests, seedRooms, seedRoomTypes } from './catalog';
+import { seedGuests, seedRooms } from './catalog';
 import { buildConversations } from './conversations';
-import { seedHotelProfile } from './hotel';
+import { regionSeeds, type SeedRegion } from './regions';
 import { buildStayGuests } from './registrations';
-import { seedStaff } from './staff';
 import { createRandom } from './random';
 
 export interface SeedData {
@@ -102,7 +101,8 @@ function overlapsAny(draft: Draft, drafts: Draft[]): boolean {
  * past, present and future, and ten open inquiries that each have at least one free room.
  * Deterministic for a given `today`.
  */
-export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): SeedData {
+export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'): SeedData {
+  const { pricing, roomTypes: seedRoomTypes, hotelProfile, staff, extras } = regionSeeds[region];
   const random = createRandom(42);
   const roomTypes = new Map(seedRoomTypes.map((t) => [t.id, t]));
   const drafts: Draft[] = anchors(today);
@@ -181,7 +181,7 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
   }
 
   // Every inquiry must be bookable, so the hero flow works on any day. Free up a room if needed.
-  const kept = makeInquiriesBookable(bookings, inquiryFixtures, sorted, now);
+  const kept = makeInquiriesBookable(bookings, inquiryFixtures, sorted, seedRoomTypes, now);
 
   const inquiries: Inquiry[] = inquiryFixtures.map((f) => {
     const receivedAt = new Date(now.getTime() - f.receivedHoursAgo * 3600_000).toISOString();
@@ -250,12 +250,15 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
     rooms,
     guests: seedGuests,
     bookings: kept,
-    inquiries: [...inquiries, ...buildConversations(kept, seedGuests, today, now)],
+    inquiries: [
+      ...inquiries,
+      ...buildConversations(kept, seedGuests, staff, hotelProfile, today, now),
+    ],
     housekeepingTasks,
-    hotelProfile: seedHotelProfile,
+    hotelProfile,
     pricing,
-    staff: seedStaff,
-    ...buildBilling(kept, today, pricing),
+    staff,
+    ...buildBilling(kept, today, pricing, extras),
     stayGuests: buildStayGuests(kept, seedGuests, today),
   };
 }
@@ -276,6 +279,7 @@ function makeInquiriesBookable(
   bookings: Booking[],
   fixtures: ReturnType<typeof buildInquiryFixtures>,
   drafts: Draft[],
+  roomTypes: RoomType[],
   now: Date,
 ): Booking[] {
   const anchored = new Set(drafts.filter((d) => d.anchor).map((d) => `${d.roomId}:${d.checkIn}`));
@@ -291,7 +295,7 @@ function makeInquiriesBookable(
       childAges: f.expected.childAges,
       ...(f.expected.wishes.apartment ? { kind: 'apartment' as const } : {}),
     };
-    const ctx = { rooms: seedRooms, roomTypes: seedRoomTypes, bookings: result, now };
+    const ctx = { rooms: seedRooms, roomTypes, bookings: result, now };
     if (checkAvailability(query, ctx).length > 0) continue;
 
     const candidates = checkAvailability(query, { ...ctx, bookings: [] });

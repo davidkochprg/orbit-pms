@@ -2,11 +2,14 @@ import type {
   Booking,
   BookingPatch,
   Charge,
+  Currency,
   GuestPatch,
   PendingAction,
   PendingActionInput,
+  PricingConfig,
   StayGuestPatch,
 } from '@orbit/shared';
+import { formatMoney } from '@orbit/shared';
 import type { BillingService } from './billing';
 import { changedBookingFields } from './bookings';
 import { nightsBetween } from './dates';
@@ -36,7 +39,13 @@ function stay(b: Pick<Booking, 'checkIn' | 'checkOut'>): string {
   return `${b.checkIn} to ${b.checkOut} (${n} night${n === 1 ? '' : 's'})`;
 }
 
-const czk = (n: number | undefined) => (n === undefined ? '?' : `${n} CZK`);
+type Money = (n: number | undefined) => string;
+
+/** Formats amounts in the hotel's currency, "?" for one that isn't known. */
+const moneyIn =
+  (currency: Currency): Money =>
+  (n) =>
+    n === undefined ? '?' : formatMoney(n, currency);
 
 /** "party 2 adults → 1 adult, notes" for an edit summary. */
 function changes(before: Booking, after: Booking, patch: BookingPatch): string {
@@ -63,10 +72,17 @@ function changes(before: Booking, after: Booking, patch: BookingPatch): string {
     .join(', ');
 }
 
-/** "2 × Sauna at 150 CZK (300 CZK), standard VAT" for a bill extra. */
-function extra(c: Pick<Charge, 'quantity' | 'label' | 'unitPrice' | 'amount' | 'vatBracket'>) {
-  const vat = c.vatBracket === 'none' ? 'no VAT' : `${c.vatBracket} VAT`;
-  return `${c.quantity} × ${c.label} at ${czk(c.unitPrice)} (${czk(c.amount)}), ${vat}`;
+/** "2 × Sauna at 150 CZK (300 CZK), VAT 21%" for a bill extra. */
+function extra(
+  c: Pick<Charge, 'quantity' | 'label' | 'unitPrice' | 'amount' | 'vatBracket'>,
+  money: Money,
+  pricing: PricingConfig,
+) {
+  const tax =
+    c.vatBracket === 'none'
+      ? 'no tax'
+      : `${pricing.tax[c.vatBracket].label} ${pricing.tax[c.vatBracket].rate}%`;
+  return `${c.quantity} × ${c.label} at ${money(c.unitPrice)} (${money(c.amount)}), ${tax}`;
 }
 
 const documentNames = { id_card: 'ID card', passport: 'passport' } as const;
@@ -117,11 +133,13 @@ export function createPendingActionService({
   }
 
   async function describe(action: PendingActionInput): Promise<string> {
+    const pricing = await billing.pricing();
+    const money = moneyIn(pricing.currency);
     switch (action.kind) {
       case 'create_hold': {
         const { booking, room, newGuest } = await hotel.previewHold(action.input);
         const name = newGuest?.name ?? (await guestName(booking.guestId));
-        return `Hold room ${room.name} for ${name}, ${stay(booking)}, ${party(booking)}, total ${czk(booking.priceSnapshot?.total)}`;
+        return `Hold room ${room.name} for ${name}, ${stay(booking)}, ${party(booking)}, total ${money(booking.priceSnapshot?.total)}`;
       }
       case 'confirm_booking':
       case 'cancel_booking': {
@@ -148,9 +166,9 @@ export function createPendingActionService({
         const { balance } = await billing.getFolio(booking.id);
         const bill =
           balance > 0
-            ? `${czk(balance)} still due`
+            ? `${money(balance)} still due`
             : balance < 0
-              ? `${czk(-balance)} owed to the guest`
+              ? `${money(-balance)} owed to the guest`
               : 'bill paid in full';
         return `Check out ${await guestName(booking.guestId)} from room ${room.name}; ${bill}`;
       }
@@ -162,7 +180,7 @@ export function createPendingActionService({
       case 'change_dates': {
         const before = await hotel.getBookingDetail(action.input.bookingId);
         const { booking } = await hotel.previewDates(action.input.bookingId, action.input);
-        return `Change ${before.guest.name} in room ${before.room.name} to ${stay(booking)}, total ${czk(booking.priceSnapshot?.total)} (was ${czk(before.booking.priceSnapshot?.total)})`;
+        return `Change ${before.guest.name} in room ${before.room.name} to ${stay(booking)}, total ${money(booking.priceSnapshot?.total)} (was ${money(before.booking.priceSnapshot?.total)})`;
       }
       case 'update_booking': {
         const { bookingId, ...patch } = action.input;
@@ -170,13 +188,13 @@ export function createPendingActionService({
         const { booking, room } = await hotel.previewUpdate(bookingId, patch);
         const moved = room.id !== before.room.id ? `, move to room ${room.name}` : '';
         const details = changes(before.booking, booking, patch);
-        return `Update ${before.guest.name} in room ${before.room.name}${details ? `: ${details}` : ''}${moved}, total ${czk(booking.priceSnapshot?.total)} (was ${czk(before.booking.priceSnapshot?.total)})`;
+        return `Update ${before.guest.name} in room ${before.room.name}${details ? `: ${details}` : ''}${moved}, total ${money(booking.priceSnapshot?.total)} (was ${money(before.booking.priceSnapshot?.total)})`;
       }
       case 'add_charge': {
         const { bookingId, ...body } = action.input;
         const before = await hotel.getBookingDetail(bookingId);
         const { charge, balanceAfter } = await billing.previewCharge(bookingId, body);
-        return `Add ${charge.quantity} × ${charge.label} at ${czk(charge.unitPrice)} (${czk(charge.amount)}) to the bill of ${before.guest.name}, room ${before.room.name}; balance then ${czk(balanceAfter)}`;
+        return `Add ${charge.quantity} × ${charge.label} at ${money(charge.unitPrice)} (${money(charge.amount)}) to the bill of ${before.guest.name}, room ${before.room.name}; balance then ${money(balanceAfter)}`;
       }
       case 'record_payment': {
         const { bookingId, ...body } = action.input;
@@ -185,9 +203,9 @@ export function createPendingActionService({
         const method = payment.method.replace('_', ' ');
         const what =
           payment.kind === 'refund'
-            ? `Refund ${czk(payment.amount)} by ${method} to`
-            : `Record a ${method} payment of ${czk(payment.amount)} from`;
-        return `${what} ${before.guest.name}, room ${before.room.name}; balance then ${czk(balanceAfter)}`;
+            ? `Refund ${money(payment.amount)} by ${method} to`
+            : `Record a ${method} payment of ${money(payment.amount)} from`;
+        return `${what} ${before.guest.name}, room ${before.room.name}; balance then ${money(balanceAfter)}`;
       }
       case 'update_charge': {
         const { bookingId, chargeId, ...patch } = action.input;
@@ -197,13 +215,13 @@ export function createPendingActionService({
           chargeId,
           patch,
         );
-        return `Change ${charge.label} on the bill of ${before.guest.name}, room ${before.room.name}, to ${extra(updated)} (was ${extra(charge)}); balance then ${czk(balanceAfter)}`;
+        return `Change ${charge.label} on the bill of ${before.guest.name}, room ${before.room.name}, to ${extra(updated, money, pricing)} (was ${extra(charge, money, pricing)}); balance then ${money(balanceAfter)}`;
       }
       case 'remove_charge': {
         const { bookingId, chargeId } = action.input;
         const before = await hotel.getBookingDetail(bookingId);
         const { charge, balanceAfter } = await billing.previewChargeRemoval(bookingId, chargeId);
-        return `Remove ${extra(charge)} from the bill of ${before.guest.name}, room ${before.room.name}; balance then ${czk(balanceAfter)}`;
+        return `Remove ${extra(charge, money, pricing)} from the bill of ${before.guest.name}, room ${before.room.name}; balance then ${money(balanceAfter)}`;
       }
       case 'add_stay_guest': {
         const { bookingId, ...body } = action.input;

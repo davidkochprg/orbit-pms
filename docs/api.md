@@ -2,7 +2,7 @@
 
 `apps/api` is a Hono server. Routes are thin: they validate input with zod schemas from `packages/shared` and call repositories or domain functions. In development the web app reaches it through the Vite proxy, so the browser only ever talks to its own origin.
 
-All responses are JSON. Dates are `YYYY-MM-DD`, timestamps are ISO 8601 UTC, money is whole CZK.
+All responses are JSON. Dates are `YYYY-MM-DD`, timestamps are ISO 8601 UTC, money is whole units of the hotel's currency (`PricingConfig.currency`).
 
 ## Errors
 
@@ -24,14 +24,18 @@ All responses are JSON. Dates are `YYYY-MM-DD`, timestamps are ISO 8601 UTC, mon
 ### `GET /health`
 
 ```json
-{ "status": "ok", "ai": { "configured": false, "voice": false } }
+{
+  "status": "ok",
+  "ai": { "configured": false, "voice": false, "vision": false },
+  "hotel": { "timezone": "America/Los_Angeles" }
+}
 ```
 
-`ai.configured` is true when `META_API_KEY` and `META_MODEL_AGENT` are set; `ai.voice` when `META_MODEL_VOICE` is set too.
+`ai.configured` is true when `META_API_KEY` and `META_MODEL_AGENT` are set; `ai.voice` when `META_MODEL_VOICE` is set too, `ai.vision` when `META_MODEL_VISION` is. `hotel.timezone` is `HOTEL_TIMEZONE`, which decides what "today" is; the web app shows times in it.
 
 ### `GET /api/room-types`
 
-`RoomType[]`: `id`, `name`, `maxAdults`, `maxChildren`, `basePrice` (adult rate per person per night), `description`.
+`RoomType[]`: `id`, `name`, `maxAdults`, `maxChildren`, `basePrice` (per room or per adult per night, see `pricingBasis`), `description`.
 
 ### `GET /api/rooms`, `GET /api/rooms/:id`
 
@@ -114,15 +118,15 @@ An expired, unknown or saved scan is `404`. See [domain.md](domain.md#id-scans) 
 
 ### `GET /api/bookings/:id/folio`
 
-The booking's bill (`Folio`): `lines` (`{ kind: 'stay' | 'city_tax' | 'extra', label, quantity, unitPrice, amount, vatBracket, vatRate, chargeId }`), `payments`, `charged`, `paid`, `balance`, `vat` (one `{ bracket, rate, gross, net, vat }` per bracket with charges) and `currency`. See [domain.md](domain.md#billing).
+The booking's bill (`Folio`): `lines` (`{ kind: 'stay' | 'city_tax' | 'extra' | 'tax', label, quantity, unitPrice, amount, vatBracket, vatRate, chargeId }`), `payments`, `charged`, `paid`, `balance`, `vat` (one `{ bracket, label, rate, gross, net, vat }` per bracket with charges), `taxMode` and `currency`. See [domain.md](domain.md#billing).
 
 ### `POST /api/bookings/:id/charges`, `PATCH` and `DELETE /api/bookings/:id/charges/:chargeId`
 
-`POST` takes `{ label, quantity?, unitPrice, vatBracket? }` (whole CZK, non-zero; negative for a discount; `vatBracket` is `standard` (default), `reduced` or `none`) and returns `201` with the updated `Folio`. `PATCH` takes any of those fields (at least one) and returns the `Folio`. `DELETE` removes an extra and returns the `Folio`. Only on `confirmed` or `checked_in` bookings, otherwise `409 invalid_transition`.
+`POST` takes `{ label, quantity?, unitPrice, vatBracket? }` (whole units, non-zero; negative for a discount; `vatBracket` is `standard` (default), `reduced` or `none`) and returns `201` with the updated `Folio`. `PATCH` takes any of those fields (at least one) and returns the `Folio`. `DELETE` removes an extra and returns the `Folio`. Only on `confirmed` or `checked_in` bookings, otherwise `409 invalid_transition`.
 
 ### `POST /api/bookings/:id/payments`
 
-Takes `{ kind?: 'payment' | 'refund', method: 'cash' | 'card' | 'bank_transfer', amount, note? }` (amount positive whole CZK) and returns `201` with the updated `Folio`. A cancelled booking takes refunds only (`409`); a refund larger than what was paid is `400 invalid_input`.
+Takes `{ kind?: 'payment' | 'refund', method: 'cash' | 'card' | 'bank_transfer', amount, note? }` (amount positive, whole units) and returns `201` with the updated `Folio`. A cancelled booking takes refunds only (`409`); a refund larger than what was paid is `400 invalid_input`.
 
 ### `GET /api/guests`, `GET /api/guests/:id`
 
@@ -134,7 +138,7 @@ Takes `{ kind?: 'payment' | 'refund', method: 'cash' | 'card' | 'bank_transfer',
 
 ### `GET /api/day?date=`
 
-`DayOverview` for `date` (default: today in `Europe/Prague`): `arrivals`, `departures` and `inHouse`, each a list of `{ booking, guestName, roomName }`.
+`DayOverview` for `date` (default: today in the hotel's time zone): `arrivals`, `departures` and `inHouse`, each a list of `{ booking, guestName, roomName }`.
 
 ### `GET /api/brief?date=`
 
@@ -189,11 +193,11 @@ Requests are signed in with the `x-staff-id` header: the ID of an active staff m
 
 ### `GET /api/settings/profile`, `PUT /api/settings/profile`
 
-`HotelProfile`: `name`, `location`, `description`, `phone`, `email`, `website`, `checkInFrom` and `checkOutBy` (`HH:MM`), and `entries` (`{ id, category: 'policy' | 'amenity' | 'info', title, details }`, at most 100). `PUT` replaces the whole profile and returns it; empty strings become `null`. Check-out must be earlier than check-in (`400 invalid_input`). See [domain.md](domain.md#hotel-profile).
+`HotelProfile`: `name`, `location`, `description`, `phone`, `email`, `website`, `checkInFrom` and `checkOutBy` (`HH:MM`), `country` (ISO alpha-2; sets the guest-book rules), `language` (the working language new staff and guests start with), and `entries` (`{ id, category: 'policy' | 'amenity' | 'info', title, details }`, at most 100). `PUT` replaces the whole profile and returns it; empty strings become `null`. Check-out must be earlier than check-in (`400 invalid_input`). See [domain.md](domain.md#hotel-profile).
 
 ### `GET /api/settings/pricing`, `PUT /api/settings/pricing`
 
-`PricingConfig`: `seasons` (`{ name, from, to, multiplier }`, days as `MM-DD`), `childDiscounts` (`{ maxAge, discount }`, ascending age), `longStay` (`{ minNights, discount }`), `wellness` (`{ perPersonPerNight, minAge }`), `extraBed` (`{ perNight }`) and `dog` (`{ perNight }`) and `cityTax` (`{ perPersonPerNight, minAge }`). Discounts are fractions (0.5 = half); money is whole CZK. `PUT` replaces the rates and returns them; new quotes use them right away, existing bookings keep their price. An impossible day, a duplicate season or out-of-order child tiers are `400 invalid_input`. See [domain.md](domain.md#rates-and-rooms).
+`PricingConfig`: `currency` (`USD`, `EUR`, `CZK`), `pricingBasis` (`per_room`, `per_person`), `tax` (`{ mode: 'inclusive' | 'exclusive', standard: { label, rate }, reduced: { label, rate } }`, rates in percent with up to two decimals), `seasons` (`{ name, from, to, multiplier }`, days as `MM-DD`), `childDiscounts` (`{ maxAge, discount }`, ascending age), `longStay` (`{ minNights, discount }`), `wellness` (`{ perPersonPerNight, minAge }`), `extraBed` (`{ perNight }`) and `dog` (`{ perNight }`) and `cityTax` (`{ label, perPersonPerNight, minAge }`). Discounts are fractions (0.5 = half); money is whole units of `currency`. `PUT` replaces the rates and returns them; new quotes use them right away, existing bookings keep their price. An impossible day, a duplicate season or out-of-order child tiers are `400 invalid_input`. See [domain.md](domain.md#rates-and-rooms).
 
 ### `POST /api/room-types`, `PUT /api/room-types/:id`
 

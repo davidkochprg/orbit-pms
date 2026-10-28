@@ -1,7 +1,8 @@
 import type { Guest, Language, Room, RoomType } from '@orbit/shared';
 
 // TODO(David): replace placeholder base prices (adult rate per person per night, CZK).
-export const seedRoomTypes: RoomType[] = [
+/** The Czech guesthouse's room types; prices per person, placeholders like the rates. */
+export const czechRoomTypes: RoomType[] = [
   {
     id: 'rt_double',
     name: 'Double room',
@@ -51,6 +52,44 @@ export const seedRoomTypes: RoomType[] = [
     description: 'Two bedrooms, kitchenette, private entrance. Dogs welcome.',
   },
 ];
+
+/**
+ * The US demo lodge's room types: the same rooms and capacities, priced per room per night in
+ * dollars. Illustrative values for a fictional property.
+ */
+const usRoomTypeDetails: Record<string, Pick<RoomType, 'name' | 'basePrice' | 'description'>> = {
+  rt_double: {
+    name: 'Queen room',
+    basePrice: 159,
+    description: 'Queen bed or two twins, walk-in shower, forest view.',
+  },
+  rt_family: {
+    name: 'Family room',
+    basePrice: 219,
+    description: 'Queen bed plus bunk beds, bathtub, balcony.',
+  },
+  rt_single: { name: 'Cozy single', basePrice: 119, description: 'Twin bed, desk, shower.' },
+  rt_superior: {
+    name: 'King room',
+    basePrice: 189,
+    description: 'Larger room with a king bed, balcony and soaking tub.',
+  },
+  rt_suite: {
+    name: 'Junior suite',
+    basePrice: 249,
+    description: 'Loft suite with a sitting area and sofa bed, mountain view.',
+  },
+  rt_apartment: {
+    name: 'Cabin suite',
+    basePrice: 289,
+    description: 'Two bedrooms, kitchenette, private entrance. Dogs welcome.',
+  },
+};
+
+export const usRoomTypes: RoomType[] = czechRoomTypes.map((t) => ({
+  ...t,
+  ...usRoomTypeDetails[t.id],
+}));
 
 function room(name: string, roomTypeId: string, floor: number): Room {
   return {

@@ -33,6 +33,7 @@ import {
   useCreateBooking,
   useDayOverview,
   useGuests,
+  useHotelProfile,
   useRoomOptions,
   useUpdateBooking,
 } from '@/lib/api';
@@ -47,7 +48,7 @@ import {
   roomOptionsQuery,
   sourceLabels,
 } from '@/lib/booking-editor';
-import { formatCzk, formatRange, languageLabels } from '@/lib/format';
+import { formatMoney, formatRange, languageLabels } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 type EditorState =
@@ -92,6 +93,7 @@ export function BookingEditorProvider({ children }: { children: ReactNode }) {
 
 function NewBooking({ prefill, onDone }: { prefill: NewBookingPrefill; onDone: () => void }) {
   const day = useDayOverview();
+  const profile = useHotelProfile();
   if (!day.data) {
     return (
       <div className="p-6">
@@ -100,7 +102,12 @@ function NewBooking({ prefill, onDone }: { prefill: NewBookingPrefill; onDone: (
       </div>
     );
   }
-  return <NewBookingForm initial={newBookingForm(day.data.date, prefill)} onDone={onDone} />;
+  return (
+    <NewBookingForm
+      initial={newBookingForm(day.data.date, prefill, profile.data?.language)}
+      onDone={onDone}
+    />
+  );
 }
 
 function NewBookingForm({ initial, onDone }: { initial: BookingForm; onDone: () => void }) {
@@ -132,7 +139,7 @@ function NewBookingForm({ initial, onDone }: { initial: BookingForm; onDone: () 
           <PriceSummary
             text={
               chosen
-                ? `Room ${chosen.roomName}: ${formatCzk(chosen.quote.total)}`
+                ? `Room ${chosen.roomName}: ${formatMoney(chosen.quote.total)}`
                 : 'Choose a room to see the price'
             }
           />
@@ -210,14 +217,14 @@ function EditBookingForm({ detail, onDone }: { detail: BookingDetail; onDone: ()
             text={
               !changed
                 ? was !== undefined
-                  ? `Total ${formatCzk(was)}`
+                  ? `Total ${formatMoney(was)}`
                   : 'No changes yet'
                 : preview.isFetching
                   ? 'Checking the change…'
                   : now !== undefined && was !== undefined && now !== was
-                    ? `New total ${formatCzk(now)} (was ${formatCzk(was)})`
+                    ? `New total ${formatMoney(now)} (was ${formatMoney(was)})`
                     : now !== undefined
-                      ? `Total stays ${formatCzk(now)}`
+                      ? `Total stays ${formatMoney(now)}`
                       : ''
             }
           />
@@ -501,7 +508,7 @@ function RoomPicker({
                   {o.roomId === currentRoomId && ' · current room'}
                 </span>
                 <span className="shrink-0 font-medium tabular-nums">
-                  {formatCzk(o.quote.total)}
+                  {formatMoney(o.quote.total)}
                 </span>
               </button>
             );
@@ -530,6 +537,7 @@ function GuestFields({
   onChange: (guest: GuestChoice) => void;
 }) {
   const guests = useGuests();
+  const hotelLanguage = useHotelProfile().data?.language ?? 'en';
   const [query, setQuery] = useState('');
   const chosen =
     guest.mode === 'existing' ? guests.data?.find((g) => g.id === guest.guestId) : undefined;
@@ -553,7 +561,7 @@ function GuestFields({
           onChange(
             mode === 'existing'
               ? { mode, guestId: null }
-              : { mode, name: '', email: '', phone: '', language: 'cs' },
+              : { mode, name: '', email: '', phone: '', language: hotelLanguage },
           )
         }
         className="self-start"

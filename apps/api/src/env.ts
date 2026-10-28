@@ -13,6 +13,8 @@ export const envSchema = z.object({
   META_API_BASE_URL: z.url().default('https://api.meta.ai/v1'),
   META_MODEL_AGENT: optional,
   META_MODEL_TRANSLATE: optional,
+  /** The hotel's IANA time zone, which decides what "today" is. The demo lodge is on Pacific time. */
+  HOTEL_TIMEZONE: z.string().default('America/Los_Angeles'),
   META_MODEL_VOICE: optional,
   META_MODEL_VISION: optional,
   AI_DAILY_TOKEN_BUDGET: z.coerce.number().int().positive().default(2_000_000),

@@ -40,7 +40,7 @@ export function isSold(booking: Booking): boolean {
 }
 
 /**
- * Splits `total` over `nights` so the shares are whole CZK and add up exactly: night `i` gets
+ * Splits `total` over `nights` so the shares are whole units and add up exactly: night `i` gets
  * `floor((i + 1) * total / nights) - floor(i * total / nights)`.
  */
 export function nightlyShare(total: number, nights: number, index: number): number {

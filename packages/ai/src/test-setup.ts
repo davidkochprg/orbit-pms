@@ -1,5 +1,6 @@
 import {
   createHotelService,
+  emptyHotelProfile,
   createBillingService,
   createGuestService,
   createHousekeepingService,
@@ -40,6 +41,8 @@ const base: Omit<Booking, 'id' | 'roomId' | 'checkIn' | 'checkOut'> = {
 export function setup() {
   const repos = createMemoryRepositories(
     {
+      // A Czech hotel: the guest book records everyone in the room.
+      profile: { ...emptyHotelProfile, country: 'CZ', language: 'cs' },
       roomTypes: [double],
       rooms: [
         {
@@ -79,7 +82,7 @@ export function setup() {
     newId,
   });
   const billing = createBillingService({ repos, pricing: pricingConfig, clock, newId });
-  const registrations = createRegistrationService({ repos, policy: hotelPolicy, clock, newId });
+  const registrations = createRegistrationService({ repos, clock, newId });
   const guests = createGuestService({ repos, newId });
   const actions = createPendingActionService({
     repos,
@@ -100,6 +103,7 @@ export function setup() {
     housekeeping,
     registrations,
     listRooms: () => repos.rooms.listRooms(),
+    listRoomTypes: () => repos.rooms.listRoomTypes(),
   });
   return { repos, hotel, billing, actions, tools };
 }

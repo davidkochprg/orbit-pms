@@ -6,7 +6,7 @@ import { hotelPolicy } from './policy';
 import { pricingConfig } from './pricing';
 import { createRegistrationService } from './registration';
 import { createHotelService } from './service';
-import { booking, double, room } from './test-fixtures';
+import { booking, czechProfile, double, room } from './test-fixtures';
 import { createMemoryRepositories } from './testing';
 
 const now = new Date('2026-05-10T08:00:00Z');
@@ -14,6 +14,7 @@ const now = new Date('2026-05-10T08:00:00Z');
 function setup() {
   const repos = createMemoryRepositories(
     {
+      profile: czechProfile,
       roomTypes: [double],
       rooms: [room('rm_1', { name: '1' }), room('rm_2', { name: '2' })],
       guests: [
@@ -67,7 +68,6 @@ function setup() {
   const billing = createBillingService({ repos, pricing: pricingConfig, clock: () => now, newId });
   const registrations = createRegistrationService({
     repos,
-    policy: hotelPolicy,
     clock: () => now,
     newId,
   });
@@ -110,7 +110,7 @@ describe('pending actions', () => {
       input: { bookingId: 'bk_a', adults: 1, notes: 'Vegetarian breakfast' },
     });
     expect(proposed.summary).toMatch(
-      /^Update Tomáš Novák in room 1: party 2 adults → 1 adult, notes "Vegetarian breakfast", total 2000 CZK \(was \?\)$/,
+      /^Update Tomáš Novák in room 1: party 2 adults → 1 adult, notes "Vegetarian breakfast", total 2 000 CZK \(was \?\)$/,
     );
     expect(repos.state.bookings.find((b) => b.id === 'bk_a')?.adults).toBe(2);
     await actions.confirm(proposed.id);
@@ -169,7 +169,7 @@ describe('pending actions', () => {
       },
     });
     expect(proposed.summary).toMatch(
-      /^Hold room 2 for Jana Testová, 2026-05-11 to 2026-05-13 \(2 nights\), 2 adults, total \d+ CZK$/,
+      /^Hold room 2 for Jana Testová, 2026-05-11 to 2026-05-13 \(2 nights\), 2 adults, total [\d ]+ CZK$/,
     );
     expect(proposed.bookingId).toBeNull();
     const confirmed = await actions.confirm(proposed.id);
@@ -338,7 +338,7 @@ describe('pending actions', () => {
       input: { bookingId: 'bk_a', chargeId, quantity: 2 },
     });
     expect(update.summary).toBe(
-      'Change Sauna on the bill of Tomáš Novák, room 1, to 2 × Sauna at 150 CZK (300 CZK), standard VAT (was 1 × Sauna at 150 CZK (150 CZK), standard VAT); balance then 500 CZK',
+      'Change Sauna on the bill of Tomáš Novák, room 1, to 2 × Sauna at 150 CZK (300 CZK), VAT 21% (was 1 × Sauna at 150 CZK (150 CZK), VAT 21%); balance then 500 CZK',
     );
     expect(repos.state.charges[0]?.quantity).toBe(1);
     await actions.confirm(update.id);
@@ -356,7 +356,7 @@ describe('pending actions', () => {
       input: { bookingId: 'bk_a', chargeId },
     });
     expect(remove.summary).toBe(
-      'Remove 2 × Sauna at 150 CZK (300 CZK), standard VAT from the bill of Tomáš Novák, room 1; balance then 200 CZK',
+      'Remove 2 × Sauna at 150 CZK (300 CZK), VAT 21% from the bill of Tomáš Novák, room 1; balance then 200 CZK',
     );
     await actions.confirm(remove.id);
     expect(repos.state.charges).toEqual([]);

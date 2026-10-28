@@ -13,7 +13,10 @@ import { booking, double, room } from './test-fixtures';
 import { createMemoryRepositories } from './testing';
 
 const now = new Date('2026-05-11T08:00:00Z');
-const pricing = { ...pricingConfig, cityTax: { perPersonPerNight: 50, minAge: 18 } };
+const pricing = {
+  ...pricingConfig,
+  cityTax: { label: 'City tax', perPersonPerNight: 50, minAge: 18 },
+};
 
 const snapshot: Quote = {
   roomTypeId: double.id,
@@ -94,9 +97,12 @@ describe('cityTaxPayers and cityTaxLine', () => {
   });
 
   it('has no line when the rate is zero', () => {
-    expect(cityTaxLine(stay, { ...pricing, cityTax: { perPersonPerNight: 0, minAge: 18 } })).toBe(
-      null,
-    );
+    expect(
+      cityTaxLine(stay, {
+        ...pricing,
+        cityTax: { label: 'City tax', perPersonPerNight: 0, minAge: 18 },
+      }),
+    ).toBe(null);
   });
 });
 
@@ -134,9 +140,9 @@ describe('buildFolio', () => {
     ]);
     // 7500 at 12%: 7500 × 12 / 112 = 803.57 → 804. 300 at 21%: 52.07 → 52.
     expect(folio.vat).toEqual([
-      { bracket: 'standard', rate: 21, gross: 300, net: 248, vat: 52 },
-      { bracket: 'reduced', rate: 12, gross: 7500, net: 6696, vat: 804 },
-      { bracket: 'none', rate: 0, gross: 300, net: 300, vat: 0 },
+      { bracket: 'standard', label: 'VAT', rate: 21, gross: 300, net: 248, vat: 52 },
+      { bracket: 'reduced', label: 'VAT', rate: 12, gross: 7500, net: 6696, vat: 804 },
+      { bracket: 'none', label: null, rate: 0, gross: 300, net: 300, vat: 0 },
     ]);
   });
 
@@ -144,20 +150,52 @@ describe('buildFolio', () => {
     const discount = charge({ quantity: 1, unitPrice: -150, amount: -150 });
     const folio = buildFolio({ ...stay, priceSnapshot: null }, [discount], [], {
       ...pricing,
-      cityTax: { perPersonPerNight: 0, minAge: 18 },
+      cityTax: { label: 'City tax', perPersonPerNight: 0, minAge: 18 },
     });
     // -150 × 21 / 121 = -26.03 → -26.
     expect(folio.vat).toEqual([
-      { bracket: 'standard', rate: 21, gross: -150, net: -124, vat: -26 },
+      { bracket: 'standard', label: 'VAT', rate: 21, gross: -150, net: -124, vat: -26 },
     ]);
   });
 
   it('has no VAT when the hotel is not a VAT payer', () => {
     const folio = buildFolio(stay, [charge()], [], {
       ...pricing,
-      vat: { standard: 0, reduced: 0 },
+      tax: {
+        mode: 'inclusive',
+        standard: { label: 'VAT', rate: 0 },
+        reduced: { label: 'VAT', rate: 0 },
+      },
     });
     expect(folio.vat.every((v) => v.vat === 0 && v.net === v.gross)).toBe(true);
+  });
+
+  it('adds tax on top per bracket when prices are before tax, US style', () => {
+    const folio = buildFolio(
+      { ...stay, priceSnapshot: { ...snapshot, currency: 'USD' } },
+      [charge()],
+      [],
+      {
+        ...pricing,
+        currency: 'USD',
+        cityTax: { label: 'Tourism fee', perPersonPerNight: 0, minAge: 18 },
+        tax: {
+          mode: 'exclusive',
+          standard: { label: 'Sales tax', rate: 8.75 },
+          reduced: { label: 'Occupancy tax', rate: 12 },
+        },
+      },
+    );
+    // Lodging 7500 × 12% = 900; extras 300 × 8.75% = 26.25 → 26.
+    expect(folio.lines.filter((l) => l.kind === 'tax').map((l) => [l.label, l.amount])).toEqual([
+      ['Sales tax 8.75%', 26],
+      ['Occupancy tax 12%', 900],
+    ]);
+    expect(folio.vat).toEqual([
+      { bracket: 'standard', label: 'Sales tax', rate: 8.75, gross: 326, net: 300, vat: 26 },
+      { bracket: 'reduced', label: 'Occupancy tax', rate: 12, gross: 8400, net: 7500, vat: 900 },
+    ]);
+    expect(folio).toMatchObject({ charged: 8726, taxMode: 'exclusive', currency: 'USD' });
   });
 
   it('handles a booking without a recorded price', () => {
@@ -191,7 +229,7 @@ describe('assertCanPay', () => {
   it('refunds at most what was paid', () => {
     const refund = { kind: 'refund' as const, method: 'card' as const, amount: 2000, note: null };
     expect(() => assertCanPay(stay, folio, refund)).not.toThrow();
-    expect(() => assertCanPay(stay, folio, { ...refund, amount: 2001 })).toThrow(/2000 CZK/);
+    expect(() => assertCanPay(stay, folio, { ...refund, amount: 2001 })).toThrow(/2 000 CZK/);
   });
 });
 
@@ -347,11 +385,32 @@ describe('createBillingService', () => {
     expect(repos.state.audit).toEqual([]);
   });
 
+  it('counts the tax a new extra adds when tax goes on top', async () => {
+    const { repos, billing } = setup();
+    await repos.settings.savePricing({
+      ...pricing,
+      tax: {
+        mode: 'exclusive',
+        standard: { label: 'Sales tax', rate: 10 },
+        reduced: { label: 'Occupancy tax', rate: 12 },
+      },
+    });
+    const before = await billing.getFolio('bk_1');
+    const preview = await billing.previewCharge('bk_1', {
+      label: 'Wine',
+      quantity: 1,
+      unitPrice: 200,
+      vatBracket: 'standard',
+    });
+    // 200 plus 10% sales tax.
+    expect(preview.balanceAfter).toBe(before.balance + 220);
+  });
+
   it('uses the saved city tax rate', async () => {
     const { repos, billing } = setup();
     await repos.settings.savePricing({
       ...pricing,
-      cityTax: { perPersonPerNight: 30, minAge: 18 },
+      cityTax: { label: 'City tax', perPersonPerNight: 30, minAge: 18 },
     });
     const folio = await billing.getFolio('bk_1');
     expect(folio.lines.find((l) => l.kind === 'city_tax')?.amount).toBe(180);

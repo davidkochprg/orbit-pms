@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { formatMoney } from '@/lib/format';
 
 /** What proposal tools return (see docs/ai.md): the card fetches the pending action by ID. */
 const proposalSchema = z.object({
@@ -93,12 +94,12 @@ export function orbStateFor(toolName: string): AgentOrbState {
   return 'searching';
 }
 
-const czk = (n: number) => `${new Intl.NumberFormat('en-GB').format(n)} CZK`;
+const money = (n: number) => formatMoney(n);
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 type Obj = Record<string, unknown>;
 const isObj = (v: unknown): v is Obj => typeof v === 'object' && v !== null;
 
-/** A few words about what a finished tool step found or did, e.g. "8 guests" or "9,500 CZK due". */
+/** A few words about what a finished tool step found or did, e.g. "8 guests" or "$950 due". */
 export function toolResultSummary(toolName: string, output: unknown): string | null {
   if (asProposal(output)) return 'Waiting for your confirmation';
   const error = asToolError(output);
@@ -117,14 +118,14 @@ export function toolResultSummary(toolName: string, output: unknown): string | n
   if (!isObj(output)) return null;
   switch (toolName) {
     case 'quote':
-      return typeof output.total === 'number' ? czk(output.total) : null;
+      return typeof output.total === 'number' ? money(output.total) : null;
     case 'getBill': {
       const balance = output.balance;
       if (typeof balance !== 'number') return null;
       return balance > 0
-        ? `${czk(balance)} due`
+        ? `${money(balance)} due`
         : balance < 0
-          ? `${czk(-balance)} owed back`
+          ? `${money(-balance)} owed back`
           : 'Paid in full';
     }
     case 'getBooking': {
