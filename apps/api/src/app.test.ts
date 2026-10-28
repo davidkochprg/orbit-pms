@@ -18,7 +18,7 @@ import type {
   Guest,
   Health,
   Quote,
-  RegistrationView,
+  GuestBook,
   Room,
   RoomOption,
 } from '@orbit/shared';
@@ -69,7 +69,7 @@ describe('GET /health', () => {
   it('reports ok and whether AI is configured', async () => {
     expect(await get<Health>('/health')).toEqual({
       status: 200,
-      body: { status: 'ok', ai: { configured: false, voice: false } },
+      body: { status: 'ok', ai: { configured: false, voice: false, vision: false } },
     });
   });
 });
@@ -129,39 +129,62 @@ describe('GET /api/bookings/:id', () => {
   });
 });
 
+describe('guest book', () => {
+  const path = `/api/bookings/${arrival.id}/guests`;
+  const call2 = <T>(method: string, url: string, body?: unknown) => call<T>(method, url, body);
+
+  it("records the main guest's ID, adds and removes a companion, and tracks what is missing", async () => {
+    const empty = await get<GuestBook>(path);
+    expect(empty.body.guests).toHaveLength(1);
+    expect(empty.body.missing).toBe(arrival.adults + arrival.childAges.length);
+    const mainId = empty.body.guests[0]!.id;
+    const saved = await call2<GuestBook>('PATCH', `${path}/${mainId}`, {
+      nationality: 'cz',
+      dateOfBirth: '1980-02-03',
+      documentType: 'id_card',
+      documentNumber: 'DEMO-123',
+      address: '',
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.body.guests[0]).toMatchObject({ nationality: 'CZ', address: null, missing: [] });
+    if (arrival.adults + arrival.childAges.length > 1) {
+      const added = await post<GuestBook>(path, { name: 'Demo Companion' });
+      expect(added.status).toBe(201);
+      const companion = added.body.guests.at(-1)!;
+      expect(companion).toMatchObject({ name: 'Demo Companion', primary: false });
+      const removed = await call2<GuestBook>('DELETE', `${path}/${companion.id}`);
+      expect(removed.body.guests).toHaveLength(1);
+    }
+    const detail = await get<BookingDetail>(`/api/bookings/${arrival.id}`);
+    expect(detail.body.missingIds).toBe(arrival.adults + arrival.childAges.length - 1);
+  });
+
+  it('rejects a malformed nationality and a future birth date', async () => {
+    const mainId = (await get<GuestBook>(path)).body.guests[0]!.id;
+    expect((await call2('PATCH', `${path}/${mainId}`, { nationality: 'CZE' })).status).toBe(400);
+    const future = await call2<ApiError>('PATCH', `${path}/${mainId}`, {
+      dateOfBirth: '2030-01-01',
+    });
+    expect(future.status).toBe(400);
+  });
+
+  it('refuses to scan IDs without a vision model', async () => {
+    const res = await post<ApiError>(`/api/bookings/${arrival.id}/scans`, {});
+    expect(res.status).toBe(503);
+  });
+});
+
 describe('POST /api/bookings/:id/actions', () => {
-  it('checks a guest in once registered, and logs both as user actions', async () => {
-    const unregistered = await post<ApiError>(`/api/bookings/${arrival.id}/actions`, {
-      action: 'check_in',
-    });
-    expect(unregistered.status).toBe(409);
-    expect(unregistered.body.error.message).toMatch(/Register the guest/);
-    const view = await get<RegistrationView>(`/api/bookings/${arrival.id}/registration`);
-    expect(view.body.registration).toBeNull();
-    const registered = await app.request(`/api/bookings/${arrival.id}/registration`, {
-      method: 'PUT',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        nationality: 'cz',
-        dateOfBirth: '1980-02-03',
-        documentType: 'id_card',
-        documentNumber: 'DEMO-123',
-        address: '',
-      }),
-    });
-    expect(registered.status).toBe(200);
-    expect(await registered.json()).toMatchObject({ nationality: 'CZ', address: null });
+  it('checks a guest in with IDs still missing, and logs it as a user action', async () => {
     const res = await post<BookingDetail>(`/api/bookings/${arrival.id}/actions`, {
       action: 'check_in',
     });
     expect(res.status).toBe(200);
     expect(res.body.booking.status).toBe('checked_in');
     expect(res.body.allowedActions).toEqual(['check_out']);
+    expect(res.body.missingIds).toBe(arrival.adults + arrival.childAges.length);
     const log = await get<AuditLogEntry[]>(`/api/audit-log?subjectId=${arrival.id}`);
-    expect(log.body.map((e) => [e.actor, e.action])).toEqual([
-      ['user', 'booking.check_in'],
-      ['user', 'booking.register'],
-    ]);
+    expect(log.body.map((e) => [e.actor, e.action])).toEqual([['user', 'booking.check_in']]);
   });
 
   it('checks a guest out and marks the room dirty', async () => {

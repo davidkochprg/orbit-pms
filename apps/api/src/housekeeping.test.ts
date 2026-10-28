@@ -169,7 +169,7 @@ describe('housekeeping board', () => {
 describe('housekeeping notes', () => {
   it('reports voice support in the health check', async () => {
     const health = await call<Health>(appWith(), 'GET', '/health');
-    expect(health.body.ai).toEqual({ configured: true, voice: true });
+    expect(health.body.ai).toEqual({ configured: true, voice: true, vision: false });
     const noVoice = await call<Health>(appWith({ voice: false }), 'GET', '/health');
     expect(noVoice.body.ai.voice).toBe(false);
   });

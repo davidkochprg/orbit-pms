@@ -23,6 +23,8 @@ export const healthSchema = z.object({
     configured: z.boolean(),
     /** Whether voice notes can be transcribed. */
     voice: z.boolean(),
+    /** Whether ID documents can be scanned. */
+    vision: z.boolean(),
   }),
 });
 export type Health = z.infer<typeof healthSchema>;

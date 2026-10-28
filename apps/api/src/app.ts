@@ -1,6 +1,7 @@
-import { randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import {
   createHousekeepingNotePipeline,
+  createIdScanReader,
   createInboxPipeline,
   type HotelContext,
   type MetaProvider,
@@ -12,6 +13,7 @@ import {
   createGuestService,
   createHotelService,
   createHousekeepingService,
+  createIdScanService,
   createInboxService,
   createPendingActionService,
   createRatesService,
@@ -36,6 +38,7 @@ import { billingRoutes } from './routes/billing';
 import { bookingRoutes } from './routes/bookings';
 import { guestRoutes } from './routes/guests';
 import { housekeepingRoutes } from './routes/housekeeping';
+import { idScanRoutes } from './routes/id-scans';
 import { inboxRoutes } from './routes/inbox';
 import { overviewRoutes } from './routes/overview';
 import { pendingActionRoutes } from './routes/pending-actions';
@@ -57,6 +60,8 @@ export interface AppDeps {
 }
 
 const defaultNewId = (prefix: string) => `${prefix}_${randomUUID().slice(0, 8)}`;
+/** 144 random bits: the only key to a phone scan link. */
+const newScanToken = () => randomBytes(18).toString('base64url');
 
 export function createApp({
   repos,
@@ -77,7 +82,8 @@ export function createApp({
   });
   const billing = createBillingService({ repos, pricing: pricingConfig, clock, newId });
   const reports = createReportService({ repos, pricing: pricingConfig });
-  const registrations = createRegistrationService({ repos, clock });
+  const registrations = createRegistrationService({ repos, policy: hotelPolicy, clock, newId });
+  const scans = createIdScanService({ repos, policy: hotelPolicy, clock, newToken: newScanToken });
   const actions = createPendingActionService({ repos, hotel, billing, clock, newId });
   const settings = createSettingsService({ repos });
   const staff = createStaffService({ repos, newId });
@@ -119,7 +125,7 @@ export function createApp({
   app.get('/health', (c) =>
     c.json<Health>({
       status: 'ok',
-      ai: { configured: ai !== null, voice: ai?.transcription != null },
+      ai: { configured: ai !== null, voice: ai?.transcription != null, vision: ai?.vision != null },
     }),
   );
   app.route('/api', roomRoutes(repos));
@@ -127,6 +133,17 @@ export function createApp({
   app.route('/api', billingRoutes(billing));
   app.route('/api', reportRoutes(reports));
   app.route('/api', registrationRoutes(registrations));
+  app.route(
+    '/api',
+    idScanRoutes({
+      scans,
+      read:
+        ai?.vision && ai.visionModelId
+          ? createIdScanReader({ model: ai.vision, modelId: ai.visionModelId, usage })
+          : null,
+      gate,
+    }),
+  );
   app.route('/api', activityRoutes(createActivityService({ repos })));
   app.route('/api', guestRoutes(repos, createGuestService({ repos, newId })));
   app.route('/api', overviewRoutes(repos, hotel));

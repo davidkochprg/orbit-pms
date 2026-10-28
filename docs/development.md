@@ -87,3 +87,7 @@ The generator is deterministic (fixed PRNG seed), and its invariants are tested 
 ## Deploying
 
 _Not set up yet._
+
+## Scanning IDs with a phone
+
+The ID scan link opens on a phone, which can't reach `localhost`. Run the web app on the network (`pnpm --filter @orbit/web dev --host`), open Orbit on the computer by the network address Vite prints (e.g. `http://192.168.1.20:5173`), and scan the QR code with a phone on the same Wi-Fi. Without a phone, "Upload a photo instead" in the scan dialog sends a photo from the computer; the synthetic documents in `packages/ai/src/evals/id-documents/` work for trying it.

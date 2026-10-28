@@ -93,9 +93,24 @@ A body that fails validation returns 400 `invalid_json`; malformed JSON returns 
 
 `POST /api/bookings/:id/preview` takes the same body as `PATCH` and returns `{ booking, room }` as they would be after the edit, including the new price, without saving.
 
-### `GET /api/bookings/:id/registration`, `PUT /api/bookings/:id/registration`
+### `GET /api/bookings/:id/guests`, `POST`, `PATCH /api/bookings/:id/guests/:stayGuestId`, `DELETE`
 
-`GET` returns `{ registration, previous }`: the stay's guest-book entry (or `null`) and the guest's latest earlier one to prefill from. `PUT` takes `{ nationality, dateOfBirth, documentType: 'id_card' | 'passport', documentNumber, address? }` and returns the `Registration`; the nationality is upper-cased and an empty address becomes `null`. Check-in answers `409 invalid_transition` until the stay is registered. See [domain.md](domain.md#registration).
+The stay's guest book (`GuestBook`): `guests` (each a `StayGuest` with `primary` and `missing`, the guest-book fields it still needs), `partySize`, `missing` (people without a complete entry, counting ones not added yet) and `previous` (the main guest's details from an earlier stay, or `null`). Every call returns it.
+
+- `POST` adds a companion: `{ name, nationality?, dateOfBirth?, documentType?, documentNumber?, address?, scanId? }`, `201`. More people than the party is `409 over_capacity`.
+- `PATCH` changes any of `name`, `nationality`, `dateOfBirth`, `documentType`, `documentNumber`, `address`; `null` or blank clears a field, the nationality is upper-cased. Renaming the main guest is `400 invalid_input` (edit the profile). `scanId` marks values from an ID scan and deletes it.
+- `DELETE` removes a companion; the main guest can't be removed (`400`).
+
+A cancelled booking answers `409 invalid_transition`. Check-in doesn't wait for the guest book; `BookingDetail.missingIds` counts what is missing. See [domain.md](domain.md#guest-book).
+
+### ID scans
+
+- `POST /api/bookings/:id/scans` takes `{ stayGuestId: string | null }` (`null` to add a companion from the scan) and returns `201` with the `IdScan`; its `id` goes in the phone link `/scan/<id>`. `503 ai_not_configured` without a vision model.
+- `GET /api/bookings/:id/scans/:scanId` returns the `IdScan` for the desk to poll: `status` (`waiting`, `reading`, `done`, `failed`), `result` (`name`, the guest-book fields, `expiresOn`, `warnings`) and `error`.
+- `GET /api/scan/:scanId` is the phone's view, with no sign-in: `{ status, firstName, roomName, error, expiresAt }`, never the result.
+- `POST /api/scan/:scanId/photo` (phone) and `POST /api/bookings/:id/scans/:scanId/photo` (desk upload) take a multipart `photo` (JPEG, PNG or WebP, at most 8 MB; the web app sends a JPEG of at most 1600 px), read it with the vision model and return the phone's view. The photo is never stored. A failed model call returns `200` with `status: 'failed'` so the phone can retake. `400` for a file that is not an image, `413` too large, `429` over the demo limits, `409` while a photo is already being read.
+
+An expired, unknown or saved scan is `404`. See [domain.md](domain.md#id-scans) and [ai.md](ai.md#id-scans).
 
 ### `GET /api/bookings/:id/folio`
 
