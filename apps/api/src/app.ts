@@ -84,7 +84,17 @@ export function createApp({
   const reports = createReportService({ repos, pricing: pricingConfig });
   const registrations = createRegistrationService({ repos, policy: hotelPolicy, clock, newId });
   const scans = createIdScanService({ repos, policy: hotelPolicy, clock, newToken: newScanToken });
-  const actions = createPendingActionService({ repos, hotel, billing, clock, newId });
+  const guests = createGuestService({ repos, newId });
+  const housekeeping = createHousekeepingService({ repos, clock, newId });
+  const actions = createPendingActionService({
+    repos,
+    hotel,
+    billing,
+    registrations,
+    guests,
+    clock,
+    newId,
+  });
   const settings = createSettingsService({ repos });
   const staff = createStaffService({ repos, newId });
   const rates = createRatesService({ repos, defaults: pricingConfig, newId });
@@ -108,7 +118,6 @@ export function createApp({
       canSpend: withinBudget,
       today: () => hotelToday(clock()),
     });
-  const housekeeping = createHousekeepingService({ repos, clock, newId });
   const notes =
     ai &&
     createHousekeepingNotePipeline({
@@ -145,7 +154,7 @@ export function createApp({
     }),
   );
   app.route('/api', activityRoutes(createActivityService({ repos })));
-  app.route('/api', guestRoutes(repos, createGuestService({ repos, newId })));
+  app.route('/api', guestRoutes(repos, guests));
   app.route('/api', overviewRoutes(repos, hotel));
   app.route('/api', pendingActionRoutes(actions));
   app.route('/api', inboxRoutes({ inbox, hotel, pipeline, gate }));
@@ -159,6 +168,8 @@ export function createApp({
       billing,
       reports,
       actions,
+      housekeeping,
+      registrations,
       hotelContext,
       limiter,
       gate,

@@ -37,20 +37,20 @@ The hourly and daily limits are kept in memory; the monthly budget is computed f
 
 ## Scripts
 
-| Command            | What it does                                                   |
-| ------------------ | -------------------------------------------------------------- |
-| `pnpm dev`         | API (`tsx watch`) and web (Vite) in parallel                   |
-| `pnpm dev:lan`     | Same, with the web app open to the local network (phone scans) |
-| `pnpm build`       | Production build of the web app                                |
-| `pnpm typecheck`   | `tsc --noEmit` in every package                                |
-| `pnpm lint`        | ESLint (type-aware) and Prettier check                         |
-| `pnpm format`      | Prettier write                                                 |
-| `pnpm test`        | Vitest across all packages                                     |
-| `pnpm db:generate` | Drizzle migration from schema changes                          |
-| `pnpm db:migrate`  | Apply migrations                                               |
-| `pnpm db:seed`     | Replace all data with the demo seed                            |
-| `pnpm db:reset`    | Delete the local PGlite database, then migrate and seed        |
-| `pnpm eval`        | Extraction evals (only loads fixtures until the agent exists)  |
+| Command            | What it does                                                                      |
+| ------------------ | --------------------------------------------------------------------------------- |
+| `pnpm dev`         | API (`tsx watch`) and web (Vite) in parallel                                      |
+| `pnpm dev:lan`     | Same, with the web app open to the local network (phone scans)                    |
+| `pnpm build`       | Production build of the web app                                                   |
+| `pnpm typecheck`   | `tsc --noEmit` in every package                                                   |
+| `pnpm lint`        | ESLint (type-aware) and Prettier check                                            |
+| `pnpm format`      | Prettier write                                                                    |
+| `pnpm test`        | Vitest across all packages                                                        |
+| `pnpm db:generate` | Drizzle migration from schema changes                                             |
+| `pnpm db:migrate`  | Apply migrations                                                                  |
+| `pnpm db:seed`     | Replace all data with the demo seed                                               |
+| `pnpm db:reset`    | Delete the local PGlite database, then migrate and seed                           |
+| `pnpm eval`        | AI evals against the real model: inbox, housekeeping notes, ID scans, agent tools |
 
 Internal packages are consumed as TypeScript source (`workspace:*`, `exports` pointing at `src/index.ts`), so there is no per-package build step.
 

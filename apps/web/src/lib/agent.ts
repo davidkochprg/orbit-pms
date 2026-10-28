@@ -52,6 +52,17 @@ const toolLabels: Record<string, [running: string, done: string]> = {
   getBill: ['Opening the bill', 'Opened the bill'],
   addCharge: ['Preparing the charge', 'Prepared the charge'],
   recordPayment: ['Preparing the payment', 'Prepared the payment'],
+  updateCharge: ['Preparing the bill correction', 'Prepared the bill correction'],
+  removeCharge: ['Preparing to remove the extra', 'Prepared to remove the extra'],
+  getGuestBook: ['Opening the guest book', 'Opened the guest book'],
+  addToGuestBook: ['Preparing the guest-book entry', 'Prepared the guest-book entry'],
+  updateGuestBook: ['Preparing the guest-book update', 'Prepared the guest-book update'],
+  removeFromGuestBook: ['Preparing the guest-book removal', 'Prepared the guest-book removal'],
+  updateGuestProfile: ['Preparing the profile change', 'Prepared the profile change'],
+  getHousekeeping: ['Checking housekeeping', 'Checked housekeeping'],
+  setRoomStatus: ['Updating the room status', 'Updated the room status'],
+  createHousekeepingTask: ['Creating the task', 'Created the task'],
+  setTaskStatus: ['Updating the task', 'Updated the task'],
 };
 
 /** A plain-language line for a tool step, so staff see what the agent looked at. */
@@ -64,6 +75,7 @@ export function toolLabel(name: string, done: boolean): string {
 /** Starting points shown in the command bar before anything is typed. */
 export const suggestedQuestions = [
   'Who arrives today, and do any of them bring children?',
+  'Who still needs an ID in the guest book today?',
   'Which rooms are free this weekend for two adults?',
   'What does a week in the apartment cost for a family of four in August?',
 ];

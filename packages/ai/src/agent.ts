@@ -1,6 +1,6 @@
 import { isStepCount, type LanguageModel, type ModelMessage, streamText } from 'ai';
 import { fromSdkUsage, type TokenUsage } from './cost';
-import { reasoningEffort } from './reasoning';
+import { type ReasoningEffort, reasoningEffort } from './reasoning';
 import type { AgentTools } from './tools';
 
 export interface AgentRunOptions {
@@ -10,6 +10,8 @@ export interface AgentRunOptions {
   tools: AgentTools;
   /** Upper bound on model calls per user message (tool round-trips plus the final answer). */
   maxSteps?: number;
+  /** Defaults to the agent's configured effort; evals override it to compare levels. */
+  reasoning?: ReasoningEffort;
   abortSignal?: AbortSignal;
   /**
    * Called once per turn with the tokens used, also when the client disconnects midway. On abort
@@ -39,6 +41,7 @@ export function runAgent({
   messages,
   tools,
   maxSteps = 8,
+  reasoning = reasoningEffort.agent,
   abortSignal,
   onUsage,
 }: AgentRunOptions) {
@@ -47,7 +50,7 @@ export function runAgent({
     system,
     messages,
     tools,
-    reasoning: reasoningEffort.agent,
+    reasoning,
     stopWhen: isStepCount(maxSteps),
     ...(abortSignal && { abortSignal }),
     onFinish: async ({ totalUsage }) => {

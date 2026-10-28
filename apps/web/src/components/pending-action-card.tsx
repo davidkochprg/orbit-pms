@@ -1,4 +1,5 @@
 import { Check, CircleAlert, X } from 'lucide-react';
+import { Link } from 'react-router';
 import { Button } from '@/components/ui/button';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { usePendingAction, useResolvePendingAction } from '@/lib/api';
@@ -57,6 +58,11 @@ export function PendingActionCard({ id, summary }: { id: string; summary: string
             onClick={() => open(current.bookingId!)}
           >
             Open booking
+          </Button>
+        )}
+        {current?.kind === 'update_guest' && current.status === 'confirmed' && (
+          <Button size="sm" variant="ghost" className="ml-auto" asChild>
+            <Link to={`/guests/${encodeURIComponent(current.input.guestId)}`}>Open profile</Link>
           </Button>
         )}
       </div>

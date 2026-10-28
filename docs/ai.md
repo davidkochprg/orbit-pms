@@ -36,25 +36,33 @@ Staff talk to the agent in the ⌘K command bar. Each step the agent takes is li
 
 Defined in `packages/ai/src/tools.ts` with zod input schemas from `packages/shared`. Each is a thin wrapper over the domain service. Domain errors are returned to the model as `{ error: { code, message } }` so it can explain them and try something else.
 
-| Tool                              | Does                                                                                                                         | Side effect |
-| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `listRooms`                       | Rooms with IDs, kind, type, status                                                                                           | none        |
-| `searchBookings`                  | By guest name (accents ignored), room, dates, status                                                                         | none        |
-| `getBooking`                      | Booking detail with price breakdown                                                                                          | none        |
-| `checkAvailability`               | Free rooms that fit the party, cheapest first                                                                                | none        |
-| `quote`                           | Line-item price for a room or room type                                                                                      | none        |
-| `getArrivals`, `getDepartures`    | For a date, default today                                                                                                    | none        |
-| `getDailyBrief`                   | The day's brief (see [domain.md](domain.md#daily-brief))                                                                     | none        |
-| `createHold`                      | Hold for a new or existing guest                                                                                             | proposal    |
-| `confirmBooking`, `cancelBooking` | Status change                                                                                                                | proposal    |
-| `checkIn`, `checkOut`             | The check-in summary says how many guests still need an ID; the check-out summary says what is still due                     | proposal    |
-| `moveBooking`                     | Same dates, another room                                                                                                     | proposal    |
-| `changeDates`                     | New dates, same room, re-priced                                                                                              | proposal    |
-| `updateBooking`                   | Party, add-ons, source, notes, and room and dates, in one step; re-priced when the stay changes                              | proposal    |
-| `getReport`                       | Occupancy, ADR, RevPAR, revenue, sources, room types, payments and unpaid departures for a period (without the daily series) | none        |
-| `getBill`                         | A booking's bill: stay lines, city tax, extras, payments, balance                                                            | none        |
-| `addCharge`                       | Post an extra at the price and VAT bracket the staff member gives; the summary shows the balance after                       | proposal    |
-| `recordPayment`                   | Payment or refund by cash, card or bank transfer; the summary shows the balance after                                        | proposal    |
+| Tool                                                       | Does                                                                                                                                               | Side effect |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| `listRooms`                                                | Rooms with IDs, kind, type, status                                                                                                                 | none        |
+| `searchBookings`                                           | By guest name (accents ignored), room, dates, status                                                                                               | none        |
+| `getBooking`                                               | Booking detail with price breakdown                                                                                                                | none        |
+| `checkAvailability`                                        | Free rooms that fit the party, cheapest first                                                                                                      | none        |
+| `quote`                                                    | Line-item price for a room or room type                                                                                                            | none        |
+| `getArrivals`, `getDepartures`                             | For a date, default today                                                                                                                          | none        |
+| `getDailyBrief`                                            | The day's brief (see [domain.md](domain.md#daily-brief))                                                                                           | none        |
+| `createHold`                                               | Hold for a new or existing guest                                                                                                                   | proposal    |
+| `confirmBooking`, `cancelBooking`                          | Status change                                                                                                                                      | proposal    |
+| `checkIn`, `checkOut`                                      | The check-in summary says how many guests still need an ID; the check-out summary says what is still due                                           | proposal    |
+| `moveBooking`                                              | Same dates, another room                                                                                                                           | proposal    |
+| `changeDates`                                              | New dates, same room, re-priced                                                                                                                    | proposal    |
+| `updateBooking`                                            | Party, add-ons, source, notes, and room and dates, in one step; re-priced when the stay changes                                                    | proposal    |
+| `getReport`                                                | Occupancy, ADR, RevPAR, revenue, sources, room types, payments and unpaid departures for a period (without the daily series)                       | none        |
+| `getBill`                                                  | A booking's bill: stay lines, city tax, extras, payments, balance                                                                                  | none        |
+| `addCharge`                                                | Post an extra at the price and VAT bracket the staff member gives; the summary shows the balance after                                             | proposal    |
+| `recordPayment`                                            | Payment or refund by cash, card or bank transfer; the summary shows the balance after                                                              | proposal    |
+| `updateCharge`, `removeCharge`                             | Correct or remove an extra on a bill (chargeId from `getBill`); the summary shows the balance after                                                | proposal    |
+| `getGuestBook`                                             | Everyone in a booking's room and what each still needs. Document numbers and addresses are left out; the model only sees whether they are recorded | none        |
+| `addToGuestBook`, `updateGuestBook`, `removeFromGuestBook` | Add a companion, record or correct a person's ID details, take a companion off; the summary shows the values                                       | proposal    |
+| `updateGuestProfile`                                       | A guest's name, email, phone, language or notes                                                                                                    | proposal    |
+| `getHousekeeping`                                          | Today's housekeeping board: room status, occupancy, guest, urgency and open tasks                                                                  | none        |
+| `setRoomStatus`, `createHousekeepingTask`, `setTaskStatus` | Room status, a new maintenance or cleaning task, a task's progress                                                                                 | direct      |
+
+"Direct" tools change data straight away, logged in the audit log with actor `agent`: room status and housekeeping tasks are low-risk and reversible ([ADR 0006](decisions/0006-agent-autonomy-and-cost-budget.md)), the same rule as for voice notes. Everything else that changes data is a proposal.
 
 ## Approval pattern
 
@@ -119,6 +127,8 @@ Hotel facts come from the **hotel profile** staff edit in Settings ([domain.md](
 
 `packages/ai/src/evals/id-documents.ts` holds three synthetic specimen documents drawn for the eval, each marked SPECIMEN and photographed slightly askew (`id-documents/*.jpg`, rendered from the SVGs beside them): a Czech-style ID card, a German-style passport with a machine-readable zone, and a café receipt that must be refused as unreadable. `scoreIdReading` needs every expected field exact (names case-insensitively). The suite runs when `META_MODEL_VISION` is set.
 
+`packages/ai/src/evals/agent.ts` holds nine staff requests for the agent (one in Czech) against a four-room in-memory hotel dated relative to today: mark a room clean, log a repair, who still needs an ID, add a companion from spoken ID details, record the main guest's ID, remove and correct a bill extra, change a guest's email, and a guest-book question. Each runs the real agent with the real tools and is checked by its effect: the room status or task it created, or exactly one proposal of the right kind with the right arguments, or no change at all for a question (plus the tool it should read, and that the answer names the right guests with their diacritics and without booking IDs).
+
 `pnpm eval` runs all suites: the real extraction on each inbox message and scores it with `scoreExtraction`: exact match on kind, language, dates, adults, child ages (any order) and wishes; guest name and question wording are not scored. It prints PASS/FAIL per message, the pass rate, the cost, and output tokens and seconds per message. It needs `META_API_KEY` and `META_MODEL_AGENT`. `EVAL_REASONING=<level>` overrides the reasoning effort to compare levels.
 
 Latest results with `muse-spark-1.3` (2026-10-27):
@@ -157,7 +167,7 @@ What keeps cost down:
 - Only the last 20 chat messages are sent; at most 8 model calls per turn.
 - Background work (inbox extraction and drafts) runs once per message and is stored.
 
-Measured with `muse-spark-1.3` (2026-10-27): an agent turn costs about $0.019 (about 17,700 input tokens, a third of them cached, since each tool step resends the conversation and tool definitions); an inbox message about $0.004 (extraction $0.002 plus draft at `minimal` effort).
+Measured with `muse-spark-1.3` (2026-10-28, 31 tools): each agent step sends about 10,000 input tokens (system prompt and tool definitions, cached after the first call), so a question answered from one lookup costs about $0.005 and a change that needs lookups first about $0.02–0.03; the average turn stays near $0.019. An inbox message costs about $0.004 (extraction $0.002 plus draft at `minimal` effort).
 
 Estimate for a 30-room property per month, at 40 agent questions and 30 guest messages a day: agent ≈ $23, inbox ≈ $4, ID scans, voice notes and daily briefs ≈ $2. Total ≈ $30, well under the $100 cap.
 

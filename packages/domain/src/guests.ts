@@ -21,6 +21,20 @@ export interface GuestDeps {
 
 /** Guest records created and edited by staff. Every change is audited with the guest as subject. */
 export function createGuestService({ repos, newId }: GuestDeps) {
+  /** The profile `patch` would leave and the fields it changes; nothing is saved. */
+  async function planUpdate(r: Repositories, id: string, patch: GuestPatch) {
+    const guest = await r.guests.getGuest(id);
+    if (!guest) throw new DomainError('not_found', `Guest ${id} not found`);
+    const updated: Guest = { ...guest, ...patch };
+    const changed = (Object.keys(patch) as (keyof GuestPatch)[]).filter(
+      (key) => guest[key] !== updated[key],
+    );
+    if (changed.includes('email')) {
+      assertUniqueGuestEmail(await r.guests.listGuests(), updated.email, id);
+    }
+    return { guest, updated, changed };
+  }
+
   return {
     async create(input: NewGuestBody, actor: AuditActor): Promise<Guest> {
       return repos.transaction(async (tx) => {
@@ -37,18 +51,17 @@ export function createGuestService({ repos, newId }: GuestDeps) {
       });
     },
 
+    /** Checks an edit without saving it, e.g. for an agent proposal. */
+    async previewUpdate(id: string, patch: GuestPatch) {
+      const plan = await planUpdate(repos, id, patch);
+      if (plan.changed.length === 0) throw new DomainError('invalid_input', 'Nothing to change');
+      return plan;
+    },
+
     async update(id: string, patch: GuestPatch, actor: AuditActor): Promise<Guest> {
       return repos.transaction(async (tx) => {
-        const guest = await tx.guests.getGuest(id);
-        if (!guest) throw new DomainError('not_found', `Guest ${id} not found`);
-        const updated: Guest = { ...guest, ...patch };
-        const changed = (Object.keys(patch) as (keyof GuestPatch)[]).filter(
-          (key) => guest[key] !== updated[key],
-        );
+        const { guest, updated, changed } = await planUpdate(tx, id, patch);
         if (changed.length === 0) return guest;
-        if (changed.includes('email')) {
-          assertUniqueGuestEmail(await tx.guests.listGuests(), updated.email, id);
-        }
         await tx.guests.updateGuest(updated);
         await tx.audit.append({
           actor,

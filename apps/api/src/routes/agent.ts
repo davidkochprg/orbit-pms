@@ -12,7 +12,9 @@ import {
   HOTEL_TIMEZONE,
   hotelToday,
   type HotelService,
+  type HousekeepingService,
   type PendingActionService,
+  type RegistrationService,
   type ReportService,
   type Repositories,
 } from '@orbit/domain';
@@ -37,6 +39,8 @@ export interface AgentRouteDeps {
   billing: BillingService;
   reports: ReportService;
   actions: PendingActionService;
+  housekeeping: HousekeepingService;
+  registrations: RegistrationService;
   /** Read for every turn, so edits in Settings apply to the next message. */
   hotelContext: () => Promise<HotelContext>;
   limiter: AiLimiter;
@@ -56,6 +60,8 @@ export function agentRoutes({
   billing,
   reports,
   actions,
+  housekeeping,
+  registrations,
   hotelContext,
   limiter,
   clock,
@@ -67,6 +73,8 @@ export function agentRoutes({
     billing,
     reports,
     actions,
+    housekeeping,
+    registrations,
     listRooms: () => repos.rooms.listRooms(),
   });
 

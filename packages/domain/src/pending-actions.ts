@@ -1,8 +1,18 @@
-import type { Booking, BookingPatch, PendingAction, PendingActionInput } from '@orbit/shared';
+import type {
+  Booking,
+  BookingPatch,
+  Charge,
+  GuestPatch,
+  PendingAction,
+  PendingActionInput,
+  StayGuestPatch,
+} from '@orbit/shared';
 import type { BillingService } from './billing';
 import { changedBookingFields } from './bookings';
 import { nightsBetween } from './dates';
 import { DomainError } from './errors';
+import type { GuestService } from './guests';
+import type { RegistrationService } from './registration';
 import type { Repositories } from './repositories';
 import type { HotelService } from './service';
 
@@ -10,6 +20,8 @@ export interface PendingActionDeps {
   repos: Repositories;
   hotel: HotelService;
   billing: BillingService;
+  registrations: RegistrationService;
+  guests: GuestService;
   clock: () => Date;
   newId: (prefix: string) => string;
 }
@@ -51,6 +63,42 @@ function changes(before: Booking, after: Booking, patch: BookingPatch): string {
     .join(', ');
 }
 
+/** "2 × Sauna at 150 CZK (300 CZK), standard VAT" for a bill extra. */
+function extra(c: Pick<Charge, 'quantity' | 'label' | 'unitPrice' | 'amount' | 'vatBracket'>) {
+  const vat = c.vatBracket === 'none' ? 'no VAT' : `${c.vatBracket} VAT`;
+  return `${c.quantity} × ${c.label} at ${czk(c.unitPrice)} (${czk(c.amount)}), ${vat}`;
+}
+
+const documentNames = { id_card: 'ID card', passport: 'passport' } as const;
+
+/** "nationality DE, born 1990-05-01, passport no. X123" for a guest-book change. */
+function identityText(fields: Omit<StayGuestPatch, 'scanId'>): string {
+  const parts: string[] = [];
+  if (fields.name !== undefined) parts.push(`name "${fields.name}"`);
+  if (fields.nationality !== undefined)
+    parts.push(`nationality ${fields.nationality ?? 'cleared'}`);
+  if (fields.dateOfBirth !== undefined) parts.push(`born ${fields.dateOfBirth ?? 'cleared'}`);
+  if (fields.documentType !== undefined) {
+    parts.push(fields.documentType ? documentNames[fields.documentType] : 'document type cleared');
+  }
+  if (fields.documentNumber !== undefined) {
+    parts.push(`document no. ${fields.documentNumber ?? 'cleared'}`);
+  }
+  if (fields.address !== undefined) parts.push(`address "${fields.address ?? ''}"`);
+  return parts.join(', ');
+}
+
+/** "email anna@example.com, language de" for a guest profile edit. */
+function profileText(patch: GuestPatch): string {
+  return (Object.keys(patch) as (keyof GuestPatch)[])
+    .map((key) => {
+      const value = patch[key];
+      if (value === null || value === '') return `${key} cleared`;
+      return key === 'notes' || key === 'name' ? `${key} "${value}"` : `${key} ${value}`;
+    })
+    .join(', ');
+}
+
 /**
  * Agent mutations are proposed, not executed. `propose` validates the change against current
  * data and stores it; only `confirm` (a user click) runs it, using the stored arguments.
@@ -59,6 +107,8 @@ export function createPendingActionService({
   repos,
   hotel,
   billing,
+  registrations,
+  guests,
   clock,
   newId,
 }: PendingActionDeps) {
@@ -139,11 +189,52 @@ export function createPendingActionService({
             : `Record a ${method} payment of ${czk(payment.amount)} from`;
         return `${what} ${before.guest.name}, room ${before.room.name}; balance then ${czk(balanceAfter)}`;
       }
+      case 'update_charge': {
+        const { bookingId, chargeId, ...patch } = action.input;
+        const before = await hotel.getBookingDetail(bookingId);
+        const { charge, updated, balanceAfter } = await billing.previewChargeUpdate(
+          bookingId,
+          chargeId,
+          patch,
+        );
+        return `Change ${charge.label} on the bill of ${before.guest.name}, room ${before.room.name}, to ${extra(updated)} (was ${extra(charge)}); balance then ${czk(balanceAfter)}`;
+      }
+      case 'remove_charge': {
+        const { bookingId, chargeId } = action.input;
+        const before = await hotel.getBookingDetail(bookingId);
+        const { charge, balanceAfter } = await billing.previewChargeRemoval(bookingId, chargeId);
+        return `Remove ${extra(charge)} from the bill of ${before.guest.name}, room ${before.room.name}; balance then ${czk(balanceAfter)}`;
+      }
+      case 'add_stay_guest': {
+        const { bookingId, ...body } = action.input;
+        const before = await hotel.getBookingDetail(bookingId);
+        const { added } = await registrations.previewAdd(bookingId, body);
+        const { name: _, ...identity } = body;
+        const details = identityText(identity);
+        return `Add ${added.name} to the guest book of room ${before.room.name} (${before.guest.name}'s booking)${details ? `: ${details}` : ''}`;
+      }
+      case 'update_stay_guest': {
+        const { bookingId, stayGuestId, ...patch } = action.input;
+        const before = await hotel.getBookingDetail(bookingId);
+        const { current } = await registrations.previewUpdate(bookingId, stayGuestId, patch);
+        return `Record in the guest book of room ${before.room.name} for ${current.name}: ${identityText(patch) || 'no changes'}`;
+      }
+      case 'remove_stay_guest': {
+        const { bookingId, stayGuestId } = action.input;
+        const before = await hotel.getBookingDetail(bookingId);
+        const { removed } = await registrations.previewRemove(bookingId, stayGuestId);
+        return `Remove ${removed.name} from the guest book of room ${before.room.name} (${before.guest.name}'s booking)`;
+      }
+      case 'update_guest': {
+        const { guestId, ...patch } = action.input;
+        const { guest } = await guests.previewUpdate(guestId, patch);
+        return `Update the profile of ${guest.name}: ${profileText(patch)}`;
+      }
     }
   }
 
-  /** Runs the action and returns the ID of the booking it created or changed. */
-  async function execute(action: PendingActionInput): Promise<string> {
+  /** Runs the action and returns the ID of the booking it created or changed, if any. */
+  async function execute(action: PendingActionInput): Promise<string | null> {
     const id = (b: Booking) => b.id;
     switch (action.kind) {
       case 'create_hold':
@@ -171,6 +262,34 @@ export function createPendingActionService({
       case 'record_payment': {
         const { bookingId, ...body } = action.input;
         return (await billing.recordPayment(bookingId, body, 'agent')).bookingId;
+      }
+      case 'update_charge': {
+        const { bookingId, chargeId, ...patch } = action.input;
+        return (await billing.updateCharge(bookingId, chargeId, patch, 'agent')).bookingId;
+      }
+      case 'remove_charge': {
+        const { bookingId, chargeId } = action.input;
+        return (await billing.removeCharge(bookingId, chargeId, 'agent')).bookingId;
+      }
+      case 'add_stay_guest': {
+        const { bookingId, ...body } = action.input;
+        await registrations.addGuest(bookingId, body, 'agent');
+        return bookingId;
+      }
+      case 'update_stay_guest': {
+        const { bookingId, stayGuestId, ...patch } = action.input;
+        await registrations.updateGuest(bookingId, stayGuestId, patch, 'agent');
+        return bookingId;
+      }
+      case 'remove_stay_guest': {
+        const { bookingId, stayGuestId } = action.input;
+        await registrations.removeGuest(bookingId, stayGuestId, 'agent');
+        return bookingId;
+      }
+      case 'update_guest': {
+        const { guestId, ...patch } = action.input;
+        await guests.update(guestId, patch, 'agent');
+        return null;
       }
     }
   }

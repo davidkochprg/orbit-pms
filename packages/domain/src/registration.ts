@@ -174,36 +174,97 @@ export function createRegistrationService({ repos, policy, clock, newId }: Regis
     );
   }
 
+  /** The companion `body` would add, checked against the booking; nothing is saved. */
+  async function planAdd(r: Repositories, bookingId: string, body: NewStayGuestBody) {
+    const { booking, guest } = await load(r, bookingId);
+    assertCanEditGuests(booking);
+    const now = clock();
+    const { scanId, ...fields } = body;
+    assertValidIdentity(fields, hotelToday(now));
+    const before = await bookOf(r, booking, guest);
+    if (before.guests.length >= before.partySize) {
+      throw new DomainError(
+        'over_capacity',
+        `The booking is for ${before.partySize} ${before.partySize === 1 ? 'guest' : 'guests'}; change the party to add another`,
+      );
+    }
+    const added: StayGuest = {
+      ...emptyIdentity,
+      ...fields,
+      id: newId('sg'),
+      bookingId,
+      guestId: null,
+      registeredAt: hasIdentity(fields) ? now.toISOString() : null,
+      createdAt: now.toISOString(),
+    };
+    return { booking, guest, added, fields, scanId };
+  }
+
+  /** The entry `patch` would leave, checked against the booking; nothing is saved. */
+  async function planUpdate(
+    r: Repositories,
+    bookingId: string,
+    stayGuestId: string,
+    patch: StayGuestPatch,
+  ) {
+    const { booking, guest } = await load(r, bookingId);
+    assertCanEditGuests(booking);
+    const now = clock();
+    const { scanId, ...fields } = patch;
+    assertValidIdentity(fields, hotelToday(now));
+    const current = (await bookOf(r, booking, guest)).guests.find((g) => g.id === stayGuestId);
+    if (!current) {
+      throw new DomainError('not_found', `Guest ${stayGuestId} not found on this booking`);
+    }
+    if (current.primary && fields.name !== undefined && fields.name !== guest.name) {
+      throw new DomainError('invalid_input', "The main guest's name is changed on their profile");
+    }
+    const updated: StayGuest = {
+      ...identityOf(current),
+      id: current.id,
+      bookingId,
+      guestId: current.guestId,
+      name: current.name,
+      createdAt: current.createdAt,
+      ...fields,
+      registeredAt: hasIdentity(fields) ? now.toISOString() : current.registeredAt,
+    };
+    return { booking, guest, current, updated, fields, scanId };
+  }
+
+  /** The companion that would be taken off the booking; nothing is saved. */
+  async function planRemove(r: Repositories, bookingId: string, stayGuestId: string) {
+    const { booking, guest } = await load(r, bookingId);
+    assertCanEditGuests(booking);
+    if (stayGuestId === primaryStayGuestId(bookingId)) {
+      throw new DomainError('invalid_input', "The main guest can't be removed");
+    }
+    const removed = (await r.stayGuests.listByBooking(bookingId)).find((s) => s.id === stayGuestId);
+    if (!removed) {
+      throw new DomainError('not_found', `Guest ${stayGuestId} not found on this booking`);
+    }
+    return { booking, guest, removed };
+  }
+
   return {
     async getGuestBook(bookingId: string): Promise<GuestBook> {
       const { booking, guest } = await load(repos, bookingId);
       return bookOf(repos, booking, guest);
     },
 
+    /** Checks an addition without saving it, e.g. for an agent proposal. */
+    previewAdd: (bookingId: string, body: NewStayGuestBody) => planAdd(repos, bookingId, body),
+    /** Checks a change without saving it, e.g. for an agent proposal. */
+    previewUpdate: (bookingId: string, stayGuestId: string, patch: StayGuestPatch) =>
+      planUpdate(repos, bookingId, stayGuestId, patch),
+    /** Checks a removal without saving it, e.g. for an agent proposal. */
+    previewRemove: (bookingId: string, stayGuestId: string) =>
+      planRemove(repos, bookingId, stayGuestId),
+
     /** Adds a companion to the room, up to the party size, e.g. straight from an ID scan. */
     async addGuest(bookingId: string, body: NewStayGuestBody, actor: AuditActor) {
       return repos.transaction(async (tx) => {
-        const { booking, guest } = await load(tx, bookingId);
-        assertCanEditGuests(booking);
-        const now = clock();
-        const { scanId, ...fields } = body;
-        assertValidIdentity(fields, hotelToday(now));
-        const before = await bookOf(tx, booking, guest);
-        if (before.guests.length >= before.partySize) {
-          throw new DomainError(
-            'over_capacity',
-            `The booking is for ${before.partySize} ${before.partySize === 1 ? 'guest' : 'guests'}; change the party to add another`,
-          );
-        }
-        const added: StayGuest = {
-          ...emptyIdentity,
-          ...fields,
-          id: newId('sg'),
-          bookingId,
-          guestId: null,
-          registeredAt: hasIdentity(fields) ? now.toISOString() : null,
-          createdAt: now.toISOString(),
-        };
+        const { booking, guest, added, fields, scanId } = await planAdd(tx, bookingId, body);
         await tx.stayGuests.save(added);
         const scanned = await discardScan(tx, bookingId, scanId);
         await tx.audit.append({
@@ -231,31 +292,12 @@ export function createRegistrationService({ repos, policy, clock, newId }: Regis
       actor: AuditActor,
     ): Promise<GuestBook> {
       return repos.transaction(async (tx) => {
-        const { booking, guest } = await load(tx, bookingId);
-        assertCanEditGuests(booking);
-        const now = clock();
-        const { scanId, ...fields } = patch;
-        assertValidIdentity(fields, hotelToday(now));
-        const current = (await bookOf(tx, booking, guest)).guests.find((g) => g.id === stayGuestId);
-        if (!current) {
-          throw new DomainError('not_found', `Guest ${stayGuestId} not found on this booking`);
-        }
-        if (current.primary && fields.name !== undefined && fields.name !== guest.name) {
-          throw new DomainError(
-            'invalid_input',
-            "The main guest's name is changed on their profile",
-          );
-        }
-        const updated: StayGuest = {
-          ...identityOf(current),
-          id: current.id,
+        const { booking, guest, updated, fields, scanId } = await planUpdate(
+          tx,
           bookingId,
-          guestId: current.guestId,
-          name: current.name,
-          createdAt: current.createdAt,
-          ...fields,
-          registeredAt: hasIdentity(fields) ? now.toISOString() : current.registeredAt,
-        };
+          stayGuestId,
+          patch,
+        );
         await tx.stayGuests.save(updated);
         const scanned = await discardScan(tx, bookingId, scanId);
         await tx.audit.append({
@@ -275,15 +317,7 @@ export function createRegistrationService({ repos, policy, clock, newId }: Regis
     /** Takes a companion off the booking. The main guest stays. */
     async removeGuest(bookingId: string, stayGuestId: string, actor: AuditActor) {
       return repos.transaction(async (tx) => {
-        const { booking, guest } = await load(tx, bookingId);
-        assertCanEditGuests(booking);
-        if (stayGuestId === primaryStayGuestId(bookingId)) {
-          throw new DomainError('invalid_input', "The main guest can't be removed");
-        }
-        const stored = await tx.stayGuests.listByBooking(bookingId);
-        if (!stored.some((s) => s.id === stayGuestId)) {
-          throw new DomainError('not_found', `Guest ${stayGuestId} not found on this booking`);
-        }
+        const { booking, guest } = await planRemove(tx, bookingId, stayGuestId);
         await tx.stayGuests.delete(stayGuestId);
         await tx.audit.append({
           actor,

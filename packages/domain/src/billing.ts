@@ -238,6 +238,43 @@ export function createBillingService({ repos, pricing, clock, newId }: BillingDe
     return { booking, charge, balanceAfter: before.balance + charge.amount };
   }
 
+  async function planChargeUpdate(
+    r: Repositories,
+    bookingId: string,
+    chargeId: string,
+    patch: ChargePatch,
+  ) {
+    const { booking, charge } = await loadCharge(r, bookingId, chargeId);
+    assertCanCharge(booking);
+    const quantity = patch.quantity ?? charge.quantity;
+    const unitPrice = patch.unitPrice ?? charge.unitPrice;
+    const updated: Charge = {
+      ...charge,
+      label: patch.label ?? charge.label,
+      quantity,
+      unitPrice,
+      amount: quantity * unitPrice,
+      vatBracket: patch.vatBracket ?? charge.vatBracket,
+    };
+    if (JSON.stringify(updated) === JSON.stringify(charge)) {
+      throw new DomainError('invalid_input', 'Nothing to change');
+    }
+    const before = await folioOf(r, booking);
+    return {
+      booking,
+      charge,
+      updated,
+      balanceAfter: before.balance - charge.amount + updated.amount,
+    };
+  }
+
+  async function planChargeRemoval(r: Repositories, bookingId: string, chargeId: string) {
+    const { booking, charge } = await loadCharge(r, bookingId, chargeId);
+    assertCanCharge(booking);
+    const before = await folioOf(r, booking);
+    return { booking, charge, balanceAfter: before.balance - charge.amount };
+  }
+
   async function planPayment(r: Repositories, bookingId: string, body: NewPaymentBody) {
     const booking = await loadBooking(r, bookingId);
     const before = await folioOf(r, booking);
@@ -269,6 +306,10 @@ export function createBillingService({ repos, pricing, clock, newId }: BillingDe
       });
     },
 
+    /** Checks a correction against current data without saving it, e.g. for an agent proposal. */
+    previewChargeUpdate: (bookingId: string, chargeId: string, patch: ChargePatch) =>
+      planChargeUpdate(repos, bookingId, chargeId, patch),
+
     /** Corrects an extra in place: what it is, how many, the price or its VAT bracket. */
     async updateCharge(
       bookingId: string,
@@ -277,18 +318,7 @@ export function createBillingService({ repos, pricing, clock, newId }: BillingDe
       actor: AuditActor,
     ): Promise<Folio> {
       return repos.transaction(async (tx) => {
-        const { booking, charge } = await loadCharge(tx, bookingId, chargeId);
-        assertCanCharge(booking);
-        const quantity = patch.quantity ?? charge.quantity;
-        const unitPrice = patch.unitPrice ?? charge.unitPrice;
-        const updated: Charge = {
-          ...charge,
-          label: patch.label ?? charge.label,
-          quantity,
-          unitPrice,
-          amount: quantity * unitPrice,
-          vatBracket: patch.vatBracket ?? charge.vatBracket,
-        };
+        const { booking, updated } = await planChargeUpdate(tx, bookingId, chargeId, patch);
         await tx.billing.updateCharge(updated);
         await tx.audit.append({
           actor,
@@ -305,10 +335,13 @@ export function createBillingService({ repos, pricing, clock, newId }: BillingDe
       });
     },
 
+    /** Checks a removal against current data without saving it, e.g. for an agent proposal. */
+    previewChargeRemoval: (bookingId: string, chargeId: string) =>
+      planChargeRemoval(repos, bookingId, chargeId),
+
     async removeCharge(bookingId: string, chargeId: string, actor: AuditActor): Promise<Folio> {
       return repos.transaction(async (tx) => {
-        const { booking, charge } = await loadCharge(tx, bookingId, chargeId);
-        assertCanCharge(booking);
+        const { booking, charge } = await planChargeRemoval(tx, bookingId, chargeId);
         await tx.billing.deleteCharge(chargeId);
         await tx.audit.append({
           actor,

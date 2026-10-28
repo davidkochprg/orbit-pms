@@ -151,4 +151,98 @@ describe('agent tools', () => {
       expect.objectContaining({ date: '2026-05-10', arrivals: 1 }),
     );
   });
+
+  it('reads the guest book without document numbers or addresses', async () => {
+    const { tools, repos } = setup();
+    await repos.stayGuests.save({
+      id: 'sg_bk_1',
+      bookingId: 'bk_1',
+      guestId: 'gst_1',
+      name: 'Tomáš Novák',
+      nationality: 'CZ',
+      dateOfBirth: '1980-01-01',
+      documentType: 'id_card',
+      documentNumber: 'DEMO-SECRET-1',
+      address: 'Demo Street 1',
+      registeredAt: '2026-05-10T07:00:00.000Z',
+      createdAt: '2026-05-10T07:00:00.000Z',
+    });
+    const book = await tools.getGuestBook.execute({ bookingId: 'bk_1' }, callOptions);
+    expect(book).toMatchObject({
+      partySize: 2,
+      missing: 1,
+      guests: [
+        {
+          stayGuestId: 'sg_bk_1',
+          primary: true,
+          hasDocumentNumber: true,
+          hasAddress: true,
+          missing: [],
+        },
+      ],
+    });
+    expect(JSON.stringify(book)).not.toMatch(/DEMO-SECRET-1|Demo Street/);
+  });
+
+  it('proposes guest-book, bill and profile changes without making them', async () => {
+    const { tools, repos } = setup();
+    const results = [
+      await tools.updateGuestBook.execute(
+        { bookingId: 'bk_1', stayGuestId: 'sg_bk_1', nationality: 'CZ' },
+        callOptions,
+      ),
+      await tools.addToGuestBook.execute({ bookingId: 'bk_1', name: 'Demo Partner' }, callOptions),
+      await tools.updateGuestProfile.execute(
+        { guestId: 'gst_1', notes: 'Allergic to nuts' },
+        callOptions,
+      ),
+    ];
+    expect(results.map((r) => (r as { status: string }).status)).toEqual([
+      'awaiting_confirmation',
+      'awaiting_confirmation',
+      'awaiting_confirmation',
+    ]);
+    expect(repos.state.stayGuests).toEqual([]);
+    expect(repos.state.guests[0]?.notes).toBeNull();
+    expect(
+      await tools.removeCharge.execute({ bookingId: 'bk_1', chargeId: 'chg_nope' }, callOptions),
+    ).toMatchObject({ error: { code: 'not_found' } });
+  });
+
+  it('changes room status and tasks straight away, logged as the agent', async () => {
+    const { tools, repos } = setup();
+    expect(
+      await tools.setRoomStatus.execute({ roomId: 'rm_104', status: 'dirty' }, callOptions),
+    ).toEqual({ done: true, roomId: 'rm_104', roomName: '104', status: 'dirty' });
+    const created = await tools.createHousekeepingTask.execute(
+      { roomId: 'rm_201', type: 'maintenance', notes: 'Lamp broken' },
+      callOptions,
+    );
+    expect(created).toMatchObject({ done: true, task: { roomId: 'rm_201', status: 'open' } });
+    const taskId = repos.state.tasks[0]!.id;
+    await tools.setTaskStatus.execute({ taskId, status: 'done' }, callOptions);
+    expect(repos.state.tasks[0]?.status).toBe('done');
+    expect(repos.state.pendingActions).toEqual([]);
+    expect(repos.state.audit.map((e) => [e.actor, e.action])).toEqual([
+      ['agent', 'room.status'],
+      ['agent', 'task.create'],
+      ['agent', 'task.status'],
+    ]);
+    const board = (await tools.getHousekeeping.execute({}, callOptions)) as {
+      rooms: { roomId: string; status: string; guestName: string | null }[];
+    };
+    expect(board.rooms.find((r) => r.roomId === 'rm_104')).toMatchObject({
+      status: 'dirty',
+      guestName: 'Tomáš Novák',
+    });
+  });
+
+  it('refuses a housekeeping change that breaks a rule, as data', async () => {
+    const { tools, repos } = setup();
+    await tools.setRoomStatus.execute({ roomId: 'rm_201', status: 'out_of_order' }, callOptions);
+    expect(
+      await tools.setRoomStatus.execute({ roomId: 'rm_201', status: 'clean' }, callOptions),
+    ).toMatchObject({ error: { code: 'invalid_transition' } });
+    expect(repos.state.rooms.find((r) => r.id === 'rm_201')?.status).toBe('out_of_order');
+  });
 });

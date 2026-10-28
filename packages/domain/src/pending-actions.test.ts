@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { createBillingService } from './billing';
+import { createGuestService } from './guests';
 import { createPendingActionService } from './pending-actions';
 import { hotelPolicy } from './policy';
 import { pricingConfig } from './pricing';
+import { createRegistrationService } from './registration';
 import { createHotelService } from './service';
 import { booking, double, room } from './test-fixtures';
 import { createMemoryRepositories } from './testing';
@@ -63,10 +65,26 @@ function setup() {
     newId,
   });
   const billing = createBillingService({ repos, pricing: pricingConfig, clock: () => now, newId });
+  const registrations = createRegistrationService({
+    repos,
+    policy: hotelPolicy,
+    clock: () => now,
+    newId,
+  });
+  const guests = createGuestService({ repos, newId });
   return {
     repos,
     hotel,
-    actions: createPendingActionService({ repos, hotel, billing, clock: () => now, newId }),
+    billing,
+    actions: createPendingActionService({
+      repos,
+      hotel,
+      billing,
+      registrations,
+      guests,
+      clock: () => now,
+      newId,
+    }),
   };
 }
 
@@ -305,5 +323,125 @@ describe('pending actions', () => {
     expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
     expect(repos.state.charges).toHaveLength(1);
     expect((await actions.get(proposed.id)).status).toBe('confirmed');
+  });
+
+  it('proposes correcting and removing a bill extra, and runs them on confirm', async () => {
+    const { repos, billing, actions } = setup();
+    const folio = await billing.addCharge(
+      'bk_a',
+      { label: 'Sauna', quantity: 1, unitPrice: 150, vatBracket: 'standard' },
+      'user',
+    );
+    const chargeId = folio.lines.find((l) => l.kind === 'extra')!.chargeId!;
+    const update = await actions.propose({
+      kind: 'update_charge',
+      input: { bookingId: 'bk_a', chargeId, quantity: 2 },
+    });
+    expect(update.summary).toBe(
+      'Change Sauna on the bill of Tomáš Novák, room 1, to 2 × Sauna at 150 CZK (300 CZK), standard VAT (was 1 × Sauna at 150 CZK (150 CZK), standard VAT); balance then 500 CZK',
+    );
+    expect(repos.state.charges[0]?.quantity).toBe(1);
+    await actions.confirm(update.id);
+    expect(repos.state.charges[0]?.amount).toBe(300);
+
+    await expect(
+      actions.propose({
+        kind: 'update_charge',
+        input: { bookingId: 'bk_a', chargeId, quantity: 2 },
+      }),
+    ).rejects.toMatchObject({ code: 'invalid_input' });
+
+    const remove = await actions.propose({
+      kind: 'remove_charge',
+      input: { bookingId: 'bk_a', chargeId },
+    });
+    expect(remove.summary).toBe(
+      'Remove 2 × Sauna at 150 CZK (300 CZK), standard VAT from the bill of Tomáš Novák, room 1; balance then 200 CZK',
+    );
+    await actions.confirm(remove.id);
+    expect(repos.state.charges).toEqual([]);
+    expect(repos.state.audit.slice(-2).map((e) => [e.actor, e.action])).toEqual([
+      ['agent', 'folio.update_charge'],
+      ['agent', 'folio.remove_charge'],
+    ]);
+  });
+
+  it('proposes guest-book changes with the details, and runs them on confirm', async () => {
+    const { repos, actions } = setup();
+    const record = await actions.propose({
+      kind: 'update_stay_guest',
+      input: {
+        bookingId: 'bk_a',
+        stayGuestId: 'sg_bk_a',
+        nationality: 'CZ',
+        dateOfBirth: '1984-03-02',
+        documentType: 'id_card',
+        documentNumber: 'DEMO123',
+      },
+    });
+    expect(record.summary).toBe(
+      'Record in the guest book of room 1 for Tomáš Novák: nationality CZ, born 1984-03-02, ID card, document no. DEMO123',
+    );
+    expect(repos.state.stayGuests).toEqual([]);
+    await actions.confirm(record.id);
+    expect(repos.state.stayGuests[0]).toMatchObject({ id: 'sg_bk_a', documentNumber: 'DEMO123' });
+
+    const add = await actions.propose({
+      kind: 'add_stay_guest',
+      input: { bookingId: 'bk_a', name: 'Demo Partner', nationality: 'SK' },
+    });
+    expect(add.summary).toBe(
+      "Add Demo Partner to the guest book of room 1 (Tomáš Novák's booking): nationality SK",
+    );
+    await actions.confirm(add.id);
+    const partner = repos.state.stayGuests.find((g) => g.name === 'Demo Partner')!;
+
+    const remove = await actions.propose({
+      kind: 'remove_stay_guest',
+      input: { bookingId: 'bk_a', stayGuestId: partner.id },
+    });
+    expect(remove.summary).toBe(
+      "Remove Demo Partner from the guest book of room 1 (Tomáš Novák's booking)",
+    );
+    await actions.confirm(remove.id);
+    expect(repos.state.stayGuests.map((g) => g.id)).toEqual(['sg_bk_a']);
+    expect(repos.state.audit.map((e) => [e.actor, e.action])).toEqual([
+      ['agent', 'booking.update_guest'],
+      ['agent', 'booking.add_guest'],
+      ['agent', 'booking.remove_guest'],
+    ]);
+  });
+
+  it('refuses a guest-book entry that the booking has no room for', async () => {
+    const { actions } = setup();
+    await actions.confirm(
+      (
+        await actions.propose({
+          kind: 'add_stay_guest',
+          input: { bookingId: 'bk_a', name: 'Demo Partner' },
+        })
+      ).id,
+    );
+    await expect(
+      actions.propose({ kind: 'add_stay_guest', input: { bookingId: 'bk_a', name: 'One More' } }),
+    ).rejects.toMatchObject({ code: 'over_capacity' });
+  });
+
+  it('proposes a guest profile edit, which belongs to no booking', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'update_guest',
+      input: { guestId: 'gst_1', email: 'tomas@example.com', language: 'en' },
+    });
+    expect(proposed).toMatchObject({ bookingId: null });
+    expect(proposed.summary).toBe(
+      'Update the profile of Tomáš Novák: email tomas@example.com, language en',
+    );
+    const confirmed = await actions.confirm(proposed.id);
+    expect(confirmed).toMatchObject({ status: 'confirmed', bookingId: null });
+    expect(repos.state.guests[0]).toMatchObject({ email: 'tomas@example.com', language: 'en' });
+    await expect(
+      actions.propose({ kind: 'update_guest', input: { guestId: 'gst_1', language: 'en' } }),
+    ).rejects.toMatchObject({ code: 'invalid_input' });
   });
 });

@@ -1,12 +1,15 @@
 import { readFile } from 'node:fs/promises';
-import { hotelToday } from '@orbit/domain';
+import { emptyHotelProfile, HOTEL_TIMEZONE, hotelPolicy, hotelToday } from '@orbit/domain';
 import type { Inquiry } from '@orbit/shared';
-import { tokenCostMicroUsd, type TokenUsage } from '../cost';
+import { runAgent } from '../agent';
+import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from '../cost';
+import { buildSystemPrompt } from '../prompts/system';
 import { extractMessage } from '../inbox';
 import { createMetaProvider } from '../provider';
 import { reasoningEffort, type ReasoningEffort } from '../reasoning';
 import { readHousekeepingNote } from '../housekeeping';
 import { readIdDocument } from '../id-scan';
+import { agentFixtures, buildAgentEvalHotel } from './agent';
 import { evalRoomNames, housekeepingNoteFixtures } from './housekeeping-notes';
 import { idDocumentFixtures } from './id-documents';
 import { buildInquiryFixtures } from './inquiries';
@@ -181,4 +184,39 @@ const idsOk = vision
     )
   : (console.log('\nID scans skipped: set META_MODEL_VISION to run them.'), true);
 
-process.exit(inboxOk && notesOk && idsOk ? 0 : 1);
+const agentEffort = reasoning ?? reasoningEffort.agent;
+const agentOk = await suite(
+  'Agent tools',
+  agentEffort,
+  agentFixtures.map((f) => ({
+    id: f.id,
+    run: async () => {
+      const hotel = buildAgentEvalHotel(today);
+      const result = runAgent({
+        model: provider.agent,
+        system: buildSystemPrompt({
+          hotel: { profile: { ...emptyHotelProfile, name: 'Eval Lodge' }, policy: hotelPolicy },
+          today,
+          timezone: HOTEL_TIMEZONE,
+        }),
+        messages: [{ role: 'user', content: f.prompt }],
+        tools: hotel.tools,
+        ...(reasoning && { reasoning }),
+      });
+      await result.consumeStream();
+      const calls = (await result.steps).flatMap((s) =>
+        s.toolCalls.map((c) => ({ toolName: c.toolName, input: c.input })),
+      );
+      const answer = await result.text;
+      const problems = f.check({ hotel, calls, answer });
+      return {
+        passed: problems.length === 0,
+        label: problems.join('; '),
+        detail: `      prompt   ${f.prompt}\n      calls    ${calls.map((c) => `${c.toolName} ${JSON.stringify(c.input)}`).join(' | ')}\n      answer   ${answer.replace(/\n/g, ' ')}`,
+        tokens: fromSdkUsage(await result.totalUsage),
+      };
+    },
+  })),
+);
+
+process.exit(inboxOk && notesOk && idsOk && agentOk ? 0 : 1);

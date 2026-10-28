@@ -1,7 +1,10 @@
 import {
   createHotelService,
   createBillingService,
+  createGuestService,
+  createHousekeepingService,
   createPendingActionService,
+  createRegistrationService,
   createReportService,
   hotelPolicy,
   pricingConfig,
@@ -76,13 +79,26 @@ export function setup() {
     newId,
   });
   const billing = createBillingService({ repos, pricing: pricingConfig, clock, newId });
-  const actions = createPendingActionService({ repos, hotel, billing, clock, newId });
+  const registrations = createRegistrationService({ repos, policy: hotelPolicy, clock, newId });
+  const guests = createGuestService({ repos, newId });
+  const actions = createPendingActionService({
+    repos,
+    hotel,
+    billing,
+    registrations,
+    guests,
+    clock,
+    newId,
+  });
   const reports = createReportService({ repos, pricing: pricingConfig });
+  const housekeeping = createHousekeepingService({ repos, clock, newId });
   const tools = createAgentTools({
     hotel,
     billing,
     reports,
     actions,
+    housekeeping,
+    registrations,
     listRooms: () => repos.rooms.listRooms(),
   });
   return { repos, hotel, billing, actions, tools };
