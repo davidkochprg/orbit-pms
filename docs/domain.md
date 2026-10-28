@@ -93,17 +93,18 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 
 `buildDailyBrief` (`packages/domain/src/brief.ts`), via `getDailyBrief(date)` on the hotel service, sums up a day for the staff. It is computed from current data on every request; no model is involved.
 
-| Field                       | Meaning                                                                                                                                                                                     |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `occupancy`                 | Rooms taken tonight (`occupied`) out of rooms not out of order (`sellable`) and all rooms (`total`). A lapsed hold does not count.                                                          |
-| `guestsTonight`             | Adults and children in the rooms taken tonight.                                                                                                                                             |
-| `arrivals`, `departures`    | Counts, as in the day overview.                                                                                                                                                             |
-| `turnovers`                 | Rooms where one guest leaves and another arrives today, with the room status.                                                                                                               |
-| `roomsToPrepare`            | Rooms a guest arrives in today (not yet checked in) that are not `inspected`.                                                                                                               |
-| `holds`                     | Unconfirmed holds that lapsed, lapse within 24 hours, or arrive within 7 days, by check-in.                                                                                                 |
-| `outOfOrder`, `maintenance` | Out-of-order rooms and open maintenance tasks.                                                                                                                                              |
-| `unansweredMessages`        | Inbox messages that are `new` or `quoted`.                                                                                                                                                  |
-| `gaps`                      | Runs of 1–2 empty nights between two stays in the same room, starting within the next 14 days, worth a discount. A run already under way counts from today. Out-of-order rooms are skipped. |
+| Field                       | Meaning                                                                                                                                                                                       |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `occupancy`                 | Rooms taken tonight (`occupied`) out of rooms not out of order (`sellable`) and all rooms (`total`). A lapsed hold does not count.                                                            |
+| `guestsTonight`             | Adults and children in the rooms taken tonight.                                                                                                                                               |
+| `arrivals`, `departures`    | Counts, as in the day overview.                                                                                                                                                               |
+| `turnovers`                 | Rooms where one guest leaves and another arrives today, with the room status.                                                                                                                 |
+| `roomsToPrepare`            | Rooms a guest arrives in today (not yet checked in) that are not `inspected`.                                                                                                                 |
+| `holds`                     | Unconfirmed holds that lapsed, lapse within 24 hours, or arrive within 7 days, by check-in.                                                                                                   |
+| `outOfOrder`, `maintenance` | Out-of-order rooms and open maintenance tasks.                                                                                                                                                |
+| `missingIds`                | Stays arriving today (confirmed) or in house tonight whose guest book is incomplete, with the number of people missing (as `missingIds` on the booking) and whether they are still to arrive. |
+| `unansweredMessages`        | Inbox messages that are `new` or `quoted`.                                                                                                                                                    |
+| `gaps`                      | Runs of 1–2 empty nights between two stays in the same room, starting within the next 14 days, worth a discount. A run already under way counts from today. Out-of-order rooms are skipped.   |
 
 ## Hotel profile
 

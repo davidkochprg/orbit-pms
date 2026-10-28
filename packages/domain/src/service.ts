@@ -23,7 +23,7 @@ import type {
   StayOption,
 } from '@orbit/shared';
 import { checkAvailability } from './availability';
-import { briefBookingRange, buildDailyBrief } from './brief';
+import { briefBookingRange, buildDailyBrief, guestBookStays } from './brief';
 import {
   allowedActions,
   applyAction,
@@ -370,7 +370,22 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
       repos.housekeeping.listTasks({ status: ['open', 'in_progress'] }),
       repos.inquiries.listInquiries(),
     ]);
-    return buildDailyBrief({ date, now: clock(), rooms, guests, bookings, tasks, inquiries });
+    const stayGuests = (
+      await Promise.all(
+        guestBookStays(bookings, date).map((b) => repos.stayGuests.listByBooking(b.id)),
+      )
+    ).flat();
+    return buildDailyBrief({
+      date,
+      now: clock(),
+      rooms,
+      guests,
+      bookings,
+      tasks,
+      inquiries,
+      stayGuests,
+      policy,
+    });
   }
 
   async function searchBookings(search: BookingSearch): Promise<BookingSummary[]> {

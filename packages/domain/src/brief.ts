@@ -10,10 +10,13 @@ import type {
   Inquiry,
   IsoDate,
   Room,
+  StayGuest,
 } from '@orbit/shared';
 import { blocksRoom } from './availability';
 import { addDays, nightsBetween } from './dates';
 import { arrivalsOn, departuresOn } from './day';
+import type { HotelPolicy } from './policy';
+import { buildGuestBook } from './registration';
 
 /** How far ahead the brief looks for empty nights between stays. */
 export const BRIEF_GAP_HORIZON_DAYS = 14;
@@ -36,6 +39,18 @@ export interface BriefInput {
   /** Open and in-progress housekeeping tasks. */
   tasks: HousekeepingTask[];
   inquiries: Inquiry[];
+  /** Guest-book entries of the stays `guestBookStays` returns. */
+  stayGuests: StayGuest[];
+  policy: Pick<HotelPolicy, 'homeCountry' | 'idDocumentMinAge'>;
+}
+
+/** Stays whose guest book the brief checks: arriving today or in house tonight. */
+export function guestBookStays(bookings: Booking[], date: IsoDate): Booking[] {
+  return bookings.filter(
+    (b) =>
+      (b.status === 'confirmed' && b.checkIn === date) ||
+      (b.status === 'checked_in' && coversNight(b, date)),
+  );
 }
 
 /** The range of bookings `buildDailyBrief` needs for `date`. */
@@ -78,10 +93,10 @@ export function findGaps(input: Pick<BriefInput, 'date' | 'now' | 'rooms' | 'boo
 
 /**
  * The day's brief: occupancy, turnovers, rooms to get ready for arrivals, holds that need a
- * decision, broken rooms, unanswered messages and short gaps worth discounting.
+ * decision, broken rooms, missing IDs, unanswered messages and short gaps worth discounting.
  */
 export function buildDailyBrief(input: BriefInput): DailyBrief {
-  const { date, now, rooms, guests, bookings, tasks, inquiries } = input;
+  const { date, now, rooms, guests, bookings, tasks, inquiries, stayGuests, policy } = input;
   const guestName = (id: string) => guests.find((g) => g.id === id)?.name ?? 'Unknown guest';
   const roomById = new Map(rooms.map((r) => [r.id, r]));
   const roomName = (id: string) => roomById.get(id)?.name ?? id;
@@ -144,6 +159,21 @@ export function buildDailyBrief(input: BriefInput): DailyBrief {
       expired,
     }));
 
+  const missingIds = guestBookStays(bookings, date).flatMap((b) => {
+    const guest = guests.find((g) => g.id === b.guestId);
+    if (!guest) return [];
+    const entries = stayGuests.filter((s) => s.bookingId === b.id);
+    const { missing } = buildGuestBook(b, guest, entries, null, date, policy);
+    if (missing === 0) return [];
+    return [
+      {
+        summary: { booking: b, guestName: guest.name, roomName: roomName(b.roomId) },
+        missing,
+        arriving: b.status === 'confirmed',
+      },
+    ];
+  });
+
   return {
     date,
     occupancy: {
@@ -171,6 +201,7 @@ export function buildDailyBrief(input: BriefInput): DailyBrief {
         notes: t.notes,
       }))
       .sort(byRoomName),
+    missingIds: missingIds.sort((a, b) => byRoomName(a.summary, b.summary)),
     unansweredMessages: inquiries.filter((i) => i.status === 'new' || i.status === 'quoted').length,
     gaps: findGaps({ date, now, rooms, bookings }),
   };

@@ -3,7 +3,7 @@ import { formatDate, formatDateTime } from '@/lib/format';
 import { roomStatusLabels } from '@/lib/status';
 
 export type AttentionKind =
-  'prepare' | 'hold' | 'messages' | 'out_of_order' | 'maintenance' | 'gap';
+  'prepare' | 'ids' | 'hold' | 'messages' | 'out_of_order' | 'maintenance' | 'gap';
 
 /** One line in the brief's "needs attention" list, with where to go to deal with it. */
 export interface AttentionItem {
@@ -22,7 +22,7 @@ export function occupancyPercent({ occupied, sellable }: DailyBrief['occupancy']
   return sellable === 0 ? 0 : Math.round((occupied / sellable) * 100);
 }
 
-/** The brief's action items, most urgent first: rooms to get ready, decisions, repairs. */
+/** The brief's action items, most urgent first: rooms to get ready, IDs, decisions, repairs. */
 export function attentionItems(brief: DailyBrief): AttentionItem[] {
   const items: AttentionItem[] = [];
   for (const r of brief.roomsToPrepare) {
@@ -32,6 +32,15 @@ export function attentionItems(brief: DailyBrief): AttentionItem[] {
       title: `Room ${r.roomName} is ${roomStatusLabels[r.status].toLowerCase()}`,
       detail: `${r.guestName} arrives today`,
       target: { path: '/housekeeping' },
+    });
+  }
+  for (const { summary, missing, arriving } of brief.missingIds) {
+    items.push({
+      id: `ids:${summary.booking.id}`,
+      kind: 'ids',
+      title: `Room ${summary.roomName}: ${plural(missing, 'ID')} missing`,
+      detail: `${summary.guestName} ${arriving ? 'arrives today' : 'is in house'}`,
+      target: { bookingId: summary.booking.id },
     });
   }
   for (const { summary, expired } of brief.holds) {

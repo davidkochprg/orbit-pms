@@ -9,6 +9,7 @@ import {
   Inbox,
   type LucideIcon,
   OctagonAlert,
+  ScanLine,
   Wrench,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -25,6 +26,7 @@ const GAPS_SHOWN = 6;
 
 const kindIcons: Record<AttentionKind, { icon: LucideIcon; className: string }> = {
   prepare: { icon: BrushCleaning, className: 'text-warning' },
+  ids: { icon: ScanLine, className: 'text-warning' },
   hold: { icon: Clock, className: 'text-status-hold' },
   messages: { icon: Inbox, className: 'text-primary-text' },
   out_of_order: { icon: OctagonAlert, className: 'text-destructive' },

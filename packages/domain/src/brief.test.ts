@@ -1,6 +1,7 @@
-import type { Guest, HousekeepingTask, Inquiry, InquiryStatus } from '@orbit/shared';
+import type { Guest, HousekeepingTask, Inquiry, InquiryStatus, StayGuest } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { briefBookingRange, buildDailyBrief, findGaps } from './brief';
+import { hotelPolicy } from './policy';
 import { booking, room } from './test-fixtures';
 
 const date = '2026-05-10';
@@ -47,7 +48,31 @@ function maintenance(roomId: string, overrides: Partial<HousekeepingTask> = {}):
   };
 }
 
-const empty = { guests, bookings: [], tasks: [], inquiries: [] };
+const empty = {
+  guests,
+  bookings: [],
+  tasks: [],
+  inquiries: [],
+  stayGuests: [] as StayGuest[],
+  policy: hotelPolicy,
+};
+
+function entry(bookingId: string, overrides: Partial<StayGuest> = {}): StayGuest {
+  return {
+    id: `sg_${bookingId}`,
+    bookingId,
+    guestId: null,
+    name: 'Demo Person',
+    nationality: 'CZ',
+    dateOfBirth: '1980-01-01',
+    documentType: 'id_card',
+    documentNumber: 'DEMO-1',
+    address: null,
+    registeredAt: '2026-05-10T07:00:00.000Z',
+    createdAt: '2026-05-10T07:00:00.000Z',
+    ...overrides,
+  };
+}
 
 describe('briefBookingRange', () => {
   it('reaches back and ahead far enough to see gaps at both ends', () => {
@@ -300,6 +325,48 @@ describe('findGaps', () => {
     });
     expect(gaps).toEqual([
       { roomId: '101', roomName: '101', from: '2026-05-23', to: '2026-05-24', nights: 1 },
+    ]);
+  });
+
+  it('lists arrivals and in-house stays whose guest book is incomplete', () => {
+    const brief = buildDailyBrief({
+      ...empty,
+      date,
+      now,
+      rooms: [room('101'), room('102'), room('103'), room('104')],
+      bookings: [
+        // Arriving, one of two registered.
+        booking({ id: 'arr', roomId: '102', guestId: 'gst_a', checkIn: date, adults: 2 }),
+        // In house, nobody registered.
+        booking({
+          id: 'in',
+          roomId: '101',
+          guestId: 'gst_b',
+          checkIn: '2026-05-08',
+          checkOut: '2026-05-12',
+          adults: 1,
+          status: 'checked_in',
+        }),
+        // In house and complete.
+        booking({
+          id: 'done',
+          roomId: '103',
+          guestId: 'gst_c',
+          checkIn: '2026-05-09',
+          checkOut: '2026-05-11',
+          adults: 1,
+          status: 'checked_in',
+        }),
+        // A hold isn't a stay yet.
+        booking({ id: 'hold', roomId: '104', guestId: 'gst_c', checkIn: date, status: 'hold' }),
+      ],
+      stayGuests: [entry('arr'), entry('done')],
+    });
+    expect(
+      brief.missingIds.map((m) => [m.summary.roomName, m.summary.guestName, m.missing, m.arriving]),
+    ).toEqual([
+      ['101', 'Guest B', 1, false],
+      ['102', 'Guest A', 1, true],
     ]);
   });
 });

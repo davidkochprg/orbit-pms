@@ -43,6 +43,16 @@ export const briefGapSchema = z.object({
 });
 export type BriefGap = z.infer<typeof briefGapSchema>;
 
+/** A stay arriving today or in house with people still missing from the guest book. */
+export const briefMissingIdsSchema = z.object({
+  summary: bookingSummarySchema,
+  /** People without a complete guest-book entry, counting ones not added yet. */
+  missing: z.number().int().positive(),
+  /** Arrives today and isn't checked in yet; otherwise already in house. */
+  arriving: z.boolean(),
+});
+export type BriefMissingIds = z.infer<typeof briefMissingIdsSchema>;
+
 export const briefMaintenanceSchema = z.object({
   taskId: z.string(),
   roomId: z.string(),
@@ -69,6 +79,8 @@ export const dailyBriefSchema = z.object({
   holds: z.array(briefHoldSchema),
   outOfOrder: z.array(z.object({ roomId: z.string(), roomName: z.string() })),
   maintenance: z.array(briefMaintenanceSchema),
+  /** Arrivals and in-house stays whose guest book is incomplete, by room. */
+  missingIds: z.array(briefMissingIdsSchema),
   /** Inbox messages without a sent reply. */
   unansweredMessages: z.number().int().nonnegative(),
   gaps: z.array(briefGapSchema),

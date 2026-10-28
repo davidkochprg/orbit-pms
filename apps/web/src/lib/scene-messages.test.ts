@@ -37,6 +37,7 @@ const brief: DailyBrief = {
   maintenance: [
     { taskId: 'hk_1', roomId: 'rm_203', roomName: '203', notes: 'Bathroom tap is dripping.' },
   ],
+  missingIds: [],
   unansweredMessages: 1,
   gaps: [{ roomId: 'rm_407', roomName: '407', from: '2026-10-28', to: '2026-10-30', nights: 2 }],
 };
