@@ -142,6 +142,23 @@ describe('createIdScanService', () => {
     expect((await scans.complete('tok1', reading)).status).toBe('done');
   });
 
+  it('fails a read that was cut off, so the photo can be taken again', async () => {
+    const { scans, advance } = setup();
+    await scans.start('bk', null);
+    await scans.beginReading('tok1');
+    advance(1);
+    await expect(scans.beginReading('tok1')).rejects.toMatchObject({ code: 'conflict' });
+    expect((await scans.getForDesk('bk', 'tok1')).status).toBe('reading');
+    advance(1);
+    expect(await scans.getForDesk('bk', 'tok1')).toMatchObject({
+      status: 'failed',
+      error: 'Reading the photo took too long. Take it again.',
+    });
+    expect((await scans.getForPhone('tok1')).status).toBe('failed');
+    await scans.beginReading('tok1');
+    expect((await scans.complete('tok1', reading)).status).toBe('done');
+  });
+
   it('expires links and cleans up expired scans when the next one opens', async () => {
     const { repos, scans, advance } = setup();
     await scans.start('bk', null);

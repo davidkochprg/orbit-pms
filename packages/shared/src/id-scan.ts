@@ -56,6 +56,8 @@ export const idScanSchema = z.object({
   status: idScanStatusSchema,
   result: idScanResultSchema.nullable(),
   error: z.string().nullable(),
+  /** When the photo being read was received; null unless `status` is `reading`. */
+  readingSince: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),
   expiresAt: z.iso.datetime(),
 });

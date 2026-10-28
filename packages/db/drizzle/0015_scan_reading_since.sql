@@ -1,0 +1,1 @@
+ALTER TABLE "id_scans" ADD COLUMN "reading_since" timestamp with time zone;

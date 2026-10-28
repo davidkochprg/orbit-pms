@@ -106,7 +106,7 @@ A cancelled booking answers `409 invalid_transition`. Check-in doesn't wait for 
 ### ID scans
 
 - `POST /api/bookings/:id/scans` takes `{ stayGuestId: string | null }` (`null` to add a companion from the scan) and returns `201` with the `IdScan`; its `id` goes in the phone link `/scan/<id>`. `503 ai_not_configured` without a vision model.
-- `GET /api/bookings/:id/scans/:scanId` returns the `IdScan` for the desk to poll: `status` (`waiting`, `reading`, `done`, `failed`), `result` (`name`, the guest-book fields, `expiresOn`, `warnings`) and `error`.
+- `GET /api/bookings/:id/scans/:scanId` returns the `IdScan` for the desk to poll: `status` (`waiting`, `reading`, `done`, `failed`), `result` (`name`, the guest-book fields, `expiresOn`, `warnings`), `error` and `readingSince`. A read still running after 90 seconds comes back as `failed`, so the photo can be taken again.
 - `GET /api/scan/:scanId` is the phone's view, with no sign-in: `{ status, firstName, roomName, error, expiresAt }`, never the result.
 - `POST /api/scan/:scanId/photo` (phone) and `POST /api/bookings/:id/scans/:scanId/photo` (desk upload) take a multipart `photo` (JPEG, PNG or WebP, at most 8 MB; the web app sends a JPEG of at most 1600 px), read it with the vision model and return the phone's view. The photo is never stored. A failed model call returns `200` with `status: 'failed'` so the phone can retake. `400` for a file that is not an image, `413` too large, `429` over the demo limits, `409` while a photo is already being read.
 

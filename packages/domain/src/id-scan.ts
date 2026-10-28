@@ -15,6 +15,23 @@ import type { Repositories } from './repositories';
 const unreadable =
   "Couldn't read an ID in the photo. Take it again with the whole document in view and no glare.";
 
+/**
+ * How long a photo may be read before it counts as failed. A read takes a few seconds; one still
+ * going after this was cut off (e.g. the server stopped mid-request) and would otherwise block
+ * retakes until the link expired.
+ */
+export const ID_SCAN_READ_TIMEOUT_MS = 90_000;
+
+const tooSlow = 'Reading the photo took too long. Take it again.';
+
+/** A scan as it stands at `now`: a read that ran past the timeout has failed. */
+export function settleScan(scan: IdScan, now: Date): IdScan {
+  if (scan.status !== 'reading') return scan;
+  const since = scan.readingSince ? new Date(scan.readingSince).getTime() : 0;
+  if (now.getTime() - since <= ID_SCAN_READ_TIMEOUT_MS) return scan;
+  return { ...scan, status: 'failed', error: tooSlow, readingSince: null };
+}
+
 function isoDate(value: string | null): IsoDate | null {
   return value !== null && isoDateSchema.safeParse(value).success ? value : null;
 }
@@ -79,13 +96,14 @@ export interface IdScanDeps {
  * desk polls for the result to review. Nothing is saved to the guest book until staff save it.
  */
 export function createIdScanService({ repos, policy, clock, newToken }: IdScanDeps) {
-  /** A scan that is still open, or not_found. */
+  /** A scan that is still open, as it stands now, or not_found. */
   async function open(id: string): Promise<IdScan> {
     const scan = await repos.idScans.get(id);
-    if (!scan || scan.expiresAt <= clock().toISOString()) {
+    const now = clock();
+    if (!scan || scan.expiresAt <= now.toISOString()) {
       throw new DomainError('not_found', 'This scan link has expired. Open a new one at the desk.');
     }
-    return scan;
+    return settleScan(scan, now);
   }
 
   return {
@@ -108,6 +126,7 @@ export function createIdScanService({ repos, policy, clock, newToken }: IdScanDe
         status: 'waiting',
         result: null,
         error: null,
+        readingSince: null,
         createdAt: now.toISOString(),
         expiresAt: new Date(now.getTime() + policy.idScanMinutes * 60_000).toISOString(),
       };
@@ -143,13 +162,22 @@ export function createIdScanService({ repos, policy, clock, newToken }: IdScanDe
       };
     },
 
-    /** Marks a photo as being read. A retake is fine; two uploads at once are not. */
+    /**
+     * Marks a photo as being read. A retake is fine; two uploads at once are not, unless the
+     * earlier read was cut off.
+     */
     async beginReading(id: string): Promise<void> {
       const scan = await open(id);
       if (scan.status === 'reading') {
         throw new DomainError('conflict', 'A photo is already being read. Wait a moment.');
       }
-      await repos.idScans.save({ ...scan, status: 'reading', result: null, error: null });
+      await repos.idScans.save({
+        ...scan,
+        status: 'reading',
+        result: null,
+        error: null,
+        readingSince: clock().toISOString(),
+      });
     },
 
     async complete(id: string, reading: IdDocumentReading): Promise<IdScan> {
@@ -160,15 +188,22 @@ export function createIdScanService({ repos, policy, clock, newToken }: IdScanDe
             status: 'done',
             result: checkReading(reading, hotelToday(clock())),
             error: null,
+            readingSince: null,
           }
-        : { ...scan, status: 'failed', result: null, error: unreadable };
+        : { ...scan, status: 'failed', result: null, error: unreadable, readingSince: null };
       await repos.idScans.save(done);
       return done;
     },
 
     async fail(id: string, error: string): Promise<void> {
       const scan = await open(id);
-      await repos.idScans.save({ ...scan, status: 'failed', result: null, error });
+      await repos.idScans.save({
+        ...scan,
+        status: 'failed',
+        result: null,
+        error,
+        readingSince: null,
+      });
     },
   };
 }

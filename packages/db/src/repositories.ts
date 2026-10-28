@@ -472,8 +472,18 @@ function stayGuestRepository(db: Db): StayGuestRepository {
   };
 }
 
-function toIdScan({ createdAt, expiresAt, ...row }: typeof idScans.$inferSelect): IdScan {
-  return { ...row, createdAt: createdAt.toISOString(), expiresAt: expiresAt.toISOString() };
+function toIdScan({
+  readingSince,
+  createdAt,
+  expiresAt,
+  ...row
+}: typeof idScans.$inferSelect): IdScan {
+  return {
+    ...row,
+    readingSince: readingSince?.toISOString() ?? null,
+    createdAt: createdAt.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+  };
 }
 
 function idScanRepository(db: Db): IdScanRepository {
@@ -485,6 +495,7 @@ function idScanRepository(db: Db): IdScanRepository {
     async save(scan) {
       const row = {
         ...scan,
+        readingSince: scan.readingSince ? new Date(scan.readingSince) : null,
         createdAt: new Date(scan.createdAt),
         expiresAt: new Date(scan.expiresAt),
       };

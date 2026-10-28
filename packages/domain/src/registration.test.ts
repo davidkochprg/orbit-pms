@@ -164,6 +164,7 @@ describe('createRegistrationService', () => {
             status: 'done',
             result: null,
             error: null,
+            readingSince: null,
             createdAt: now.toISOString(),
             expiresAt: '2026-05-10T08:15:00.000Z',
           },

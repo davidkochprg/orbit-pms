@@ -280,6 +280,7 @@ export const idScans = pgTable(
     status: idScanStatus('status').notNull(),
     result: jsonb('result').$type<IdScanResult>(),
     error: text('error'),
+    readingSince: timestamp('reading_since', { withTimezone: true }),
     createdAt: createdAt(),
     expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
   },

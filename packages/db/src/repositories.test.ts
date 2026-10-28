@@ -388,9 +388,10 @@ describe('id scans (PGlite)', () => {
       id: 'tok_test',
       bookingId: seed.bookings[0]!.id,
       stayGuestId: null,
-      status: 'waiting' as const,
+      status: 'reading' as const,
       result: null,
       error: null,
+      readingSince: '2026-05-10T08:01:00.000Z',
       createdAt: '2026-05-10T08:00:00.000Z',
       expiresAt: '2026-05-10T08:15:00.000Z',
     };
