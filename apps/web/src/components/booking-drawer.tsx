@@ -509,7 +509,12 @@ function CheckOutDialog({
     >
       <DialogContent className="shadow-floating sm:max-w-sm" showCloseButton={paying}>
         {paying ? (
-          <PaymentForm bookingId={bookingId} balance={balance} onDone={onCheckOut} />
+          <PaymentForm
+            bookingId={bookingId}
+            balance={balance}
+            onDone={onCheckOut}
+            onCancel={() => setPaying(false)}
+          />
         ) : (
           <>
             <DialogHeader>

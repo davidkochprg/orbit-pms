@@ -75,6 +75,7 @@ function Flow({ detail, onDone }: { detail: BookingDetail; onDone: () => void })
             setPaying(false);
             setStep('Room');
           }}
+          onCancel={() => setPaying(false)}
         />
       </div>
     );

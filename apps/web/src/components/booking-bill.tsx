@@ -128,6 +128,7 @@ export function BookingBill({ booking }: { booking: Booking }) {
               bookingId={booking.id}
               balance={bill.balance}
               onDone={() => setPaying(false)}
+              onCancel={() => setPaying(false)}
             />
           )}
         </DialogContent>
@@ -489,15 +490,20 @@ function VatRecap({ folio }: { folio: Folio }) {
   );
 }
 
-/** Takes a payment, prefilled with what is due, or pays money back when the guest is owed. */
+/**
+ * Takes a payment, prefilled with what is due, or pays money back when the guest is owed.
+ * `onDone` runs once it is recorded, `onCancel` when staff back out without recording anything.
+ */
 export function PaymentForm({
   bookingId,
   balance,
   onDone,
+  onCancel,
 }: {
   bookingId: string;
   balance: number;
   onDone: () => void;
+  onCancel: () => void;
 }) {
   const record = useRecordPayment(bookingId);
   const [kind, setKind] = useState<PaymentKind>(balance < 0 ? 'refund' : 'payment');
@@ -560,7 +566,7 @@ export function PaymentForm({
       </FormField>
       {record.error && <ErrorNotice message={record.error.message} />}
       <DialogFooter>
-        <Button type="button" variant="ghost" onClick={onDone}>
+        <Button type="button" variant="ghost" onClick={onCancel}>
           Cancel
         </Button>
         <Button type="submit" disabled={!valid || record.isPending}>
