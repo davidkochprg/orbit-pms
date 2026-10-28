@@ -1,4 +1,4 @@
-import type { HousekeepingNoteReading, InquiryExtraction } from '@orbit/shared';
+import type { HousekeepingNoteReading, IdDocumentReading, InquiryExtraction } from '@orbit/shared';
 import type { HousekeepingNoteFixture } from './housekeeping-notes';
 
 export type ExtractionField = 'kind' | 'language' | 'dates' | 'adults' | 'childAges' | 'wishes';
@@ -70,4 +70,20 @@ export function scoreHousekeepingNote(
     problems.push(fixture.unclear ? 'unclear not reported' : 'unexpected unclear');
   }
   return { passed: problems.length === 0, problems };
+}
+
+/** Every expected field must match exactly; names compare case-insensitively. */
+export function scoreIdReading(
+  expected: Partial<IdDocumentReading>,
+  actual: IdDocumentReading,
+): { passed: boolean; failed: string[] } {
+  const failed = (Object.keys(expected) as (keyof IdDocumentReading)[]).filter((key) => {
+    const want = expected[key];
+    const got = actual[key];
+    if (key === 'fullName' && typeof want === 'string' && typeof got === 'string') {
+      return want.toLocaleLowerCase() !== got.trim().toLocaleLowerCase();
+    }
+    return want !== got;
+  });
+  return { passed: failed.length === 0, failed };
 }

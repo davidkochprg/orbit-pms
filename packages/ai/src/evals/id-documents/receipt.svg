@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="900" viewBox="0 0 800 900">
+  <rect width="800" height="900" fill="#7a6650"/>
+  <g transform="translate(400 450) rotate(-5) translate(-220 -380)">
+    <rect width="440" height="760" fill="#fbfbf7"/>
+    <g font-family="Courier New, monospace" font-size="24" fill="#333">
+      <text x="30" y="60" font-weight="bold">DEMO CAFÉ</text>
+      <text x="30" y="100">Sample Street 1</text>
+      <text x="30" y="180">2× Espresso      90</text>
+      <text x="30" y="220">1× Strudel       85</text>
+      <text x="30" y="260">1× Water         45</text>
+      <text x="30" y="320">TOTAL CZK       220</text>
+      <text x="30" y="400">Thank you!</text>
+    </g>
+  </g>
+</svg>

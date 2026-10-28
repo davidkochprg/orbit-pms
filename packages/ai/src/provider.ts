@@ -16,8 +16,9 @@ export interface MetaProvider {
   /** Text model for the agent loop and tool calling. */
   agent: LanguageModel;
   agentModelId: string;
-  /** Vision-capable chat model, if configured. */
+  /** Vision-capable chat model for ID scans, if configured. */
   vision: LanguageModel | null;
+  visionModelId: string | null;
   /** Speech-to-text settings, if a voice model is configured. */
   transcription: TranscriptionConfig | null;
 }
@@ -39,6 +40,7 @@ export function createMetaProvider(config: MetaModelConfig): MetaProvider {
     agent: meta.chatModel(config.models.agent),
     agentModelId: config.models.agent,
     vision: config.models.vision ? meta.chatModel(config.models.vision) : null,
+    visionModelId: config.models.vision ?? null,
     transcription: config.models.voice
       ? { apiKey: config.apiKey, baseURL: config.baseURL, model: config.models.voice }
       : null,

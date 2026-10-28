@@ -27,7 +27,7 @@ Read from `.env` at the repo root by the API and the db scripts, and validated w
 | `META_API_BASE_URL`      | `https://api.meta.ai/v1` | OpenAI-compatible base URL                |
 | `META_MODEL_AGENT`       | –                        | Model for the agent loop and tool calling |
 | `META_MODEL_VOICE`       | –                        | Transcription model for voice notes       |
-| `META_MODEL_VISION`      | –                        | Vision-capable model                      |
+| `META_MODEL_VISION`      | –                        | Vision model for ID scans                 |
 | `AI_DAILY_TOKEN_BUDGET`  | `2000000`                | Global daily token budget                 |
 | `AI_RATE_LIMIT_PER_HOUR` | `20`                     | Agent calls per IP per hour               |
 | `AI_MONTHLY_BUDGET_USD`  | `100`                    | Monthly cap on real Meta spend            |

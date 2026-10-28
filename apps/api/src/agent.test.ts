@@ -76,6 +76,7 @@ function appWith(
       agent: model,
       agentModelId: 'muse-spark-1.3',
       vision: null,
+      visionModelId: null,
       transcription: null,
     },
     limits,

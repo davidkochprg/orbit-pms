@@ -47,7 +47,7 @@ Defined in `packages/ai/src/tools.ts` with zod input schemas from `packages/shar
 | `getDailyBrief`                   | The day's brief (see [domain.md](domain.md#daily-brief))                                                                     | none        |
 | `createHold`                      | Hold for a new or existing guest                                                                                             | proposal    |
 | `confirmBooking`, `cancelBooking` | Status change                                                                                                                | proposal    |
-| `checkIn`, `checkOut`             | Check-in needs the stay's registration; the check-out summary says what is still due                                         | proposal    |
+| `checkIn`, `checkOut`             | The check-in summary says how many guests still need an ID; the check-out summary says what is still due                     | proposal    |
 | `moveBooking`                     | Same dates, another room                                                                                                     | proposal    |
 | `changeDates`                     | New dates, same room, re-priced                                                                                              | proposal    |
 | `updateBooking`                   | Party, add-ons, source, notes, and room and dates, in one step; re-priced when the stay changes                              | proposal    |
@@ -99,6 +99,12 @@ A housekeeper records a voice note ("room 104 done, the bedside lamp is broken")
 
 Usage is recorded under the `voice` feature: audio seconds for the transcription, tokens for the reading.
 
+## ID scans
+
+Staff scan a guest's ID card or passport with a phone at check-in, or later when it was missing ([domain.md](domain.md#id-scans)). The desk shows a QR code for a 15-minute link; the phone photographs the document and the browser re-encodes it as a JPEG of at most 1600 px. `readIdDocument` (`packages/ai/src/id-scan.ts`) sends it to `META_MODEL_VISION` as a file part in one structured-output call (`idDocumentReadingSchema`): whether an ID is readable, its type, the name as printed, nationality as ISO alpha-2, dates as `YYYY-MM-DD`, the document number and an address if printed. The prompt (`prompts/id-scan.ts`) says to copy, never guess, and to check dates against the machine-readable zone.
+
+The domain checks every value before staff see it and turns problems (an expired document, a different name than the booking's) into warnings. Staff review and correct the values on the desk and save them; the model never writes to the guest book. The photo exists only in memory for the one call. Usage is recorded under `id_scan`, at `minimal` reasoning effort.
+
 ## Prompts
 
 Hotel facts come from the **hotel profile** staff edit in Settings ([domain.md](domain.md#hotel-profile)), read for every agent turn and every draft, so a change applies to the next message. `hotelFacts` (`packages/ai/src/prompts/hotel.ts`) turns it into one block: name, location, description, contact, check-in and check-out times, then the policies, amenities and guest information, then the rules the domain enforces, written out from `hotelPolicy` (hold length, where dogs may stay) so the model never contradicts them.
@@ -111,7 +117,9 @@ Hotel facts come from the **hotel profile** staff edit in Settings ([domain.md](
 
 `packages/ai/src/evals/housekeeping-notes.ts` holds ten synthetic housekeeping notes in Czech, English, German and Polish, including spelled-out numbers, an unknown room and a note too vague to act on. They are scored by `scoreHousekeepingNote`: the same rooms, status per room, whether an issue was reported, and whether something was flagged as unclear.
 
-`pnpm eval` runs both suites: the real extraction on each inbox message and scores it with `scoreExtraction`: exact match on kind, language, dates, adults, child ages (any order) and wishes; guest name and question wording are not scored. It prints PASS/FAIL per message, the pass rate, the cost, and output tokens and seconds per message. It needs `META_API_KEY` and `META_MODEL_AGENT`. `EVAL_REASONING=<level>` overrides the reasoning effort to compare levels.
+`packages/ai/src/evals/id-documents.ts` holds three synthetic specimen documents drawn for the eval, each marked SPECIMEN and photographed slightly askew (`id-documents/*.jpg`, rendered from the SVGs beside them): a Czech-style ID card, a German-style passport with a machine-readable zone, and a café receipt that must be refused as unreadable. `scoreIdReading` needs every expected field exact (names case-insensitively). The suite runs when `META_MODEL_VISION` is set.
+
+`pnpm eval` runs all suites: the real extraction on each inbox message and scores it with `scoreExtraction`: exact match on kind, language, dates, adults, child ages (any order) and wishes; guest name and question wording are not scored. It prints PASS/FAIL per message, the pass rate, the cost, and output tokens and seconds per message. It needs `META_API_KEY` and `META_MODEL_AGENT`. `EVAL_REASONING=<level>` overrides the reasoning effort to compare levels.
 
 Latest results with `muse-spark-1.3` (2026-10-27):
 
@@ -121,6 +129,8 @@ Latest results with `muse-spark-1.3` (2026-10-27):
 | `low`              | 14/14 (100%) | $0.0036          | 564           | 2.3 s |
 | `minimal` (in use) | 14/14 (100%) | $0.0021–0.0025   | ~300          | 1.4 s |
 
+ID scans with `muse-spark-1.3` at `minimal` (2026-10-28): 3/3 (100%), about $0.0026 per scan, 1.7 s.
+
 ## Meta models
 
 The Meta Model API is OpenAI-compatible, so `packages/ai/src/provider.ts` wraps the AI SDK's `@ai-sdk/openai-compatible` provider pointed at `META_API_BASE_URL`. `apps/api` builds it from env vars and turns AI off when `META_API_KEY` or `META_MODEL_AGENT` is missing.
@@ -128,10 +138,10 @@ The Meta Model API is OpenAI-compatible, so `packages/ai/src/provider.ts` wraps 
 | Env var             | Model (from the Meta Model API docs) | Used for                                                                                           |
 | ------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------- |
 | `META_MODEL_AGENT`  | `muse-spark-1.3`                     | Agent loop and tool calling (Chat Completions)                                                     |
-| `META_MODEL_VISION` | `muse-spark-1.3` (accepts images)    | Not wired yet                                                                                      |
+| `META_MODEL_VISION` | `muse-spark-1.3` (accepts images)    | Reading ID documents for the guest book                                                            |
 | `META_MODEL_VOICE`  | `muse-voice-transcribe-1.0`          | Housekeeping voice notes, through Meta's own `/v1/asr/transcribe` endpoint (not OpenAI-compatible) |
 
-Muse Spark is a reasoning model: it always reasons before answering (`reasoning_effort: "none"` is rejected), and reasoning tokens are billed as output. `packages/ai/src/reasoning.ts` sets the effort per feature through the AI SDK's `reasoning` option: `minimal` for inbox extraction, drafts and housekeeping notes, `low` for the agent, which plans multi-step tool use. Each is the lowest level that keeps quality, measured with `pnpm eval` and live runs.
+Muse Spark is a reasoning model: it always reasons before answering (`reasoning_effort: "none"` is rejected), and reasoning tokens are billed as output. `packages/ai/src/reasoning.ts` sets the effort per feature through the AI SDK's `reasoning` option: `minimal` for inbox extraction, drafts, housekeeping notes and ID scans, `low` for the agent, which plans multi-step tool use. Each is the lowest level that keeps quality, measured with `pnpm eval` and live runs.
 
 Constraints from Meta's tool-calling docs that the agent respects: `tool_choice` only accepts `"auto"` (the SDK default), and tool arguments are not guaranteed to match the schema, so the SDK validates them with the zod schemas.
 

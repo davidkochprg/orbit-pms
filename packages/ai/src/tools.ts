@@ -164,7 +164,7 @@ export function createAgentTools({ hotel, billing, reports, actions, listRooms }
     }),
     checkIn: tool({
       description:
-        'Propose checking in a guest arriving today. The stay must be registered (nationality, date of birth, ID document); if not, tell the staff member to register the guest in the booking first. The user must confirm.',
+        'Propose checking in a guest arriving today. The summary says how many guests still need an ID in the guest book; if any, mention that staff can scan them from the booking, now or later. The user must confirm.',
       inputSchema: bookingIdSchema,
       execute: (input) => propose({ kind: 'check_in', input }),
     }),

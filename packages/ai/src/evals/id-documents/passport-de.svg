@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="760" viewBox="0 0 1100 760">
+  <rect width="1100" height="760" fill="#2f3a3f"/>
+  <g transform="translate(550 380) rotate(2) translate(-480 -320)">
+    <rect width="960" height="640" rx="14" fill="#f3efe4" stroke="#b9b09a" stroke-width="3"/>
+    <text x="40" y="60" font-family="Helvetica, Arial" font-size="26" font-weight="bold" fill="#5a2a2a">FEDERAL REPUBLIC OF GERMANY · PASSPORT</text>
+    <text x="520" y="330" font-family="Helvetica, Arial" font-size="72" font-weight="bold" fill="#d33" opacity="0.3" transform="rotate(-18 600 300)">SPECIMEN</text>
+    <rect x="40" y="100" width="230" height="300" fill="#ddd6c4"/>
+    <circle cx="155" cy="210" r="66" fill="#bdb39c"/>
+    <rect x="80" y="300" width="150" height="90" rx="40" fill="#bdb39c"/>
+    <g font-family="Helvetica, Arial" fill="#222">
+      <text x="310" y="110" font-size="17" fill="#665">Type / Code / Passport No.</text>
+      <text x="310" y="140" font-size="26">P   D   C01X00T47</text>
+      <text x="310" y="180" font-size="17" fill="#665">Surname</text>
+      <text x="310" y="210" font-size="30" font-weight="bold">MUSTERMANN</text>
+      <text x="310" y="248" font-size="17" fill="#665">Given names</text>
+      <text x="310" y="278" font-size="30" font-weight="bold">ERIKA</text>
+      <text x="310" y="316" font-size="17" fill="#665">Nationality</text>
+      <text x="310" y="344" font-size="26">DEUTSCH</text>
+      <text x="610" y="316" font-size="17" fill="#665">Date of birth</text>
+      <text x="610" y="344" font-size="26">12.08.1964</text>
+      <text x="310" y="384" font-size="17" fill="#665">Date of expiry</text>
+      <text x="310" y="412" font-size="26">31.10.2031</text>
+    </g>
+    <rect x="20" y="500" width="920" height="120" fill="#ebe5d4"/>
+    <g font-family="Courier New, monospace" font-size="34" fill="#111" letter-spacing="3">
+      <text x="34" y="548">P&lt;D&lt;&lt;MUSTERMANN&lt;&lt;ERIKA&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;&lt;</text>
+      <text x="34" y="598">C01X00T478D&lt;&lt;6408125F3110317&lt;&lt;&lt;&lt;&lt;&lt;&lt;4</text>
+    </g>
+  </g>
+</svg>

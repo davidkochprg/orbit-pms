@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import { hotelToday } from '@orbit/domain';
 import type { Inquiry } from '@orbit/shared';
 import { tokenCostMicroUsd, type TokenUsage } from '../cost';
@@ -5,13 +6,16 @@ import { extractMessage } from '../inbox';
 import { createMetaProvider } from '../provider';
 import { reasoningEffort, type ReasoningEffort } from '../reasoning';
 import { readHousekeepingNote } from '../housekeeping';
+import { readIdDocument } from '../id-scan';
 import { evalRoomNames, housekeepingNoteFixtures } from './housekeeping-notes';
+import { idDocumentFixtures } from './id-documents';
 import { buildInquiryFixtures } from './inquiries';
-import { scoreExtraction, scoreHousekeepingNote } from './score';
+import { scoreExtraction, scoreHousekeepingNote, scoreIdReading } from './score';
 
 const {
   META_API_KEY,
   META_MODEL_AGENT,
+  META_MODEL_VISION,
   META_API_BASE_URL = 'https://api.meta.ai/v1',
 } = process.env;
 if (!META_API_KEY || !META_MODEL_AGENT) {
@@ -24,7 +28,7 @@ if (!META_API_KEY || !META_MODEL_AGENT) {
 const provider = createMetaProvider({
   apiKey: META_API_KEY,
   baseURL: META_API_BASE_URL,
-  models: { agent: META_MODEL_AGENT },
+  models: { agent: META_MODEL_AGENT, ...(META_MODEL_VISION && { vision: META_MODEL_VISION }) },
 });
 // EVAL_REASONING overrides the configured effort, to compare levels before changing the default.
 const levels: ReasoningEffort[] = [
@@ -148,4 +152,33 @@ const notesOk = await suite(
   })),
 );
 
-process.exit(inboxOk && notesOk ? 0 : 1);
+const vision = provider.vision;
+const idEffort = reasoning ?? reasoningEffort.idScan;
+const idsOk = vision
+  ? await suite(
+      'ID scans',
+      idEffort,
+      idDocumentFixtures.map((f) => ({
+        id: f.id,
+        run: async () => {
+          const bytes = new Uint8Array(
+            await readFile(new URL(`./id-documents/${f.file}`, import.meta.url)),
+          );
+          const { reading, tokens } = await readIdDocument(
+            vision,
+            { bytes, mediaType: 'image/jpeg' },
+            idEffort,
+          );
+          const score = scoreIdReading(f.expected, reading);
+          return {
+            passed: score.passed,
+            label: score.failed.join(', '),
+            detail: `      expected ${JSON.stringify(f.expected)}\n      actual   ${JSON.stringify(reading)}`,
+            tokens,
+          };
+        },
+      })),
+    )
+  : (console.log('\nID scans skipped: set META_MODEL_VISION to run them.'), true);
+
+process.exit(inboxOk && notesOk && idsOk ? 0 : 1);

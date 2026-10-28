@@ -58,6 +58,7 @@ function appWith(model: MockLanguageModelV4 | null, monthlyBudgetUsd = 100) {
       agent: model,
       agentModelId: 'muse-spark-1.3',
       vision: null,
+      visionModelId: null,
       transcription: null,
     },
     usage: usageStore,

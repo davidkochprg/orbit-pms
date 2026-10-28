@@ -60,6 +60,7 @@ function appWith({ ai = true, voice = true } = {}) {
           agent: model,
           agentModelId: 'muse-spark-1.3',
           vision: null,
+          visionModelId: null,
           transcription: voice
             ? {
                 apiKey: 'k',

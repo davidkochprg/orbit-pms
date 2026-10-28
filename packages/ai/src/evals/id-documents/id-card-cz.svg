@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="660" viewBox="0 0 1000 660">
+  <rect width="1000" height="660" fill="#6b5a4a"/>
+  <g transform="translate(500 330) rotate(-3) translate(-430 -270)">
+    <rect width="860" height="540" rx="36" fill="#e8eef0" stroke="#9aa9b0" stroke-width="3"/>
+    <rect x="0" y="0" width="860" height="90" rx="36" fill="#3d6a8a"/>
+    <rect x="0" y="54" width="860" height="36" fill="#3d6a8a"/>
+    <text x="40" y="60" font-family="Helvetica, Arial" font-size="30" font-weight="bold" fill="#fff">CZECH REPUBLIC · IDENTITY CARD</text>
+    <text x="560" y="300" font-family="Helvetica, Arial" font-size="64" font-weight="bold" fill="#d33" opacity="0.35" transform="rotate(-20 600 300)">SPECIMEN</text>
+    <rect x="40" y="120" width="220" height="280" fill="#c8d2d6"/>
+    <circle cx="150" cy="220" r="62" fill="#9fb0b8"/>
+    <rect x="70" y="300" width="160" height="90" rx="40" fill="#9fb0b8"/>
+    <g font-family="Helvetica, Arial" fill="#222">
+      <text x="300" y="140" font-size="18" fill="#556">Surname</text>
+      <text x="300" y="172" font-size="32" font-weight="bold">UKÁZKOVÁ</text>
+      <text x="300" y="210" font-size="18" fill="#556">Given names</text>
+      <text x="300" y="242" font-size="32" font-weight="bold">JANA</text>
+      <text x="300" y="280" font-size="18" fill="#556">Date of birth</text>
+      <text x="300" y="310" font-size="28">12.04.1990</text>
+      <text x="560" y="280" font-size="18" fill="#556">Nationality</text>
+      <text x="560" y="310" font-size="28">CZE</text>
+      <text x="300" y="350" font-size="18" fill="#556">Date of expiry</text>
+      <text x="300" y="380" font-size="28">03.09.2032</text>
+      <text x="300" y="440" font-size="18" fill="#556">Document No.</text>
+      <text x="300" y="474" font-size="34" font-weight="bold" letter-spacing="2">219876543</text>
+    </g>
+  </g>
+</svg>

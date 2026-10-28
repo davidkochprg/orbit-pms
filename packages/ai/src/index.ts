@@ -1,6 +1,7 @@
 export * from './agent';
 export * from './cost';
 export * from './housekeeping';
+export * from './id-scan';
 export * from './inbox';
 export * from './price-guard';
 export * from './prompts/hotel';

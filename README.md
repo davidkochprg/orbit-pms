@@ -48,8 +48,9 @@ Every AI feature runs on the Meta Model API through the Vercel AI SDK. The model
 | Inbox extraction   | `muse-spark-1.3`                               | Structured output: kind, language, dates, party, child ages, wishes     | Picks rooms or prices                                                  |
 | Reply drafts       | `muse-spark-1.3`                               | Writes the reply in the guest's language around the exact quoted totals | Sends a reply itself; a draft with a wrong amount is redone or dropped |
 | Housekeeping notes | `muse-voice-transcribe-1.0` + `muse-spark-1.3` | Transcribes the recording, reads it into room/status/issue updates      | Changes bookings; unknown rooms and forbidden changes are skipped      |
+| ID scans           | `muse-spark-1.3` (vision)                      | Reads a phone photo of an ID card or passport into guest-book fields    | Saves them: staff review every value; the photo is never stored        |
 
-Muse Spark always reasons before answering, so the reasoning effort is set per feature to the lowest level that keeps quality, measured with the evals and live runs: `minimal` for extraction, drafts and notes, `low` for the agent, which plans multi-step tool use.
+Muse Spark always reasons before answering, so the reasoning effort is set per feature to the lowest level that keeps quality, measured with the evals and live runs: `minimal` for extraction, drafts, notes and ID scans, `low` for the agent, which plans multi-step tool use.
 
 **Guardrails**
 
