@@ -320,7 +320,6 @@ function StaySection({ detail, onEditStay }: { detail: BookingDetail; onEditStay
             value={booking.notes}
             multiline
             placeholder="Add a note"
-            disabled={!editable}
             onSave={(notes) => save({ notes: notes || null })}
           />
         </Property>
