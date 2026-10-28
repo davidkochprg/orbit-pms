@@ -115,7 +115,9 @@ export function BookingBill({ booking }: { booking: Booking }) {
 
       <Payments
         folio={bill}
-        canPay={booking.status !== 'cancelled'}
+        // A cancelled booking only pays back what was paid for it.
+        canPay={booking.status !== 'cancelled' || bill.paid > 0}
+        refundOnly={booking.status === 'cancelled'}
         onPay={() => setPaying(true)}
       />
 
@@ -127,6 +129,7 @@ export function BookingBill({ booking }: { booking: Booking }) {
             <PaymentForm
               bookingId={booking.id}
               balance={bill.balance}
+              refundOnly={booking.status === 'cancelled'}
               onDone={() => setPaying(false)}
               onCancel={() => setPaying(false)}
             />
@@ -419,14 +422,24 @@ function ExtraEditor({
   );
 }
 
-function Payments({ folio, canPay, onPay }: { folio: Folio; canPay: boolean; onPay: () => void }) {
+function Payments({
+  folio,
+  canPay,
+  refundOnly,
+  onPay,
+}: {
+  folio: Folio;
+  canPay: boolean;
+  refundOnly: boolean;
+  onPay: () => void;
+}) {
   return (
     <div className="flex flex-col gap-1.5">
       <div className="flex h-7 items-center justify-between">
         <h3 className="text-xs font-medium text-muted-foreground">Payments</h3>
         {canPay && (
           <Button variant={folio.balance > 0 ? 'outline' : 'ghost'} size="xs" onClick={onPay}>
-            <Plus /> {folio.balance < 0 ? 'Refund' : 'Take payment'}
+            <Plus /> {refundOnly || folio.balance < 0 ? 'Refund' : 'Take payment'}
           </Button>
         )}
       </div>
@@ -497,16 +510,19 @@ function VatRecap({ folio }: { folio: Folio }) {
 export function PaymentForm({
   bookingId,
   balance,
+  refundOnly = false,
   onDone,
   onCancel,
 }: {
   bookingId: string;
   balance: number;
+  /** Only money back, e.g. for a cancelled booking. */
+  refundOnly?: boolean;
   onDone: () => void;
   onCancel: () => void;
 }) {
   const record = useRecordPayment(bookingId);
-  const [kind, setKind] = useState<PaymentKind>(balance < 0 ? 'refund' : 'payment');
+  const [kind, setKind] = useState<PaymentKind>(refundOnly || balance < 0 ? 'refund' : 'payment');
   const [method, setMethod] = useState<PaymentMethod>('card');
   const [amount, setAmount] = useState(balance === 0 ? '' : String(Math.abs(balance)));
   const [note, setNote] = useState('');
@@ -533,15 +549,17 @@ export function PaymentForm({
               : 'The bill is paid in full.'}
         </DialogDescription>
       </DialogHeader>
-      <Segmented
-        label="Payment or refund"
-        value={kind}
-        options={[
-          { value: 'payment', label: 'Payment' },
-          { value: 'refund', label: 'Refund' },
-        ]}
-        onChange={setKind}
-      />
+      {!refundOnly && (
+        <Segmented
+          label="Payment or refund"
+          value={kind}
+          options={[
+            { value: 'payment', label: 'Payment' },
+            { value: 'refund', label: 'Refund' },
+          ]}
+          onChange={setKind}
+        />
+      )}
       <Segmented label="Method" value={method} options={methods} onChange={setMethod} />
       <FormField label="Amount, CZK" htmlFor="payment-amount">
         <Input
