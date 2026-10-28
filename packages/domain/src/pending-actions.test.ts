@@ -285,4 +285,25 @@ describe('pending actions', () => {
     });
     await expect(actions.confirm('nope')).rejects.toMatchObject({ code: 'not_found' });
   });
+
+  it('runs a change once when it is confirmed twice at the same time', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'add_charge',
+      input: {
+        bookingId: 'bk_a',
+        label: 'Sauna',
+        quantity: 1,
+        unitPrice: 150,
+        vatBracket: 'standard',
+      },
+    });
+    const results = await Promise.allSettled([
+      actions.confirm(proposed.id),
+      actions.confirm(proposed.id),
+    ]);
+    expect(results.map((r) => r.status).sort()).toEqual(['fulfilled', 'rejected']);
+    expect(repos.state.charges).toHaveLength(1);
+    expect((await actions.get(proposed.id)).status).toBe('confirmed');
+  });
 });

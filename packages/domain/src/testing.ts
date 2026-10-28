@@ -182,6 +182,12 @@ export function createMemoryRepositories(
         state.pendingActions = state.pendingActions.map((a) => (a.id === action.id ? action : a));
         return Promise.resolve();
       },
+      resolveIfPending: (action) => {
+        const stored = state.pendingActions.find((a) => a.id === action.id);
+        if (stored?.status !== 'pending') return Promise.resolve(false);
+        state.pendingActions = state.pendingActions.map((a) => (a.id === action.id ? action : a));
+        return Promise.resolve(true);
+      },
     },
     housekeeping: {
       listTasks: (filter = {}) =>

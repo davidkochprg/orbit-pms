@@ -259,6 +259,15 @@ function pendingActionRepository(db: Db): PendingActionRepository {
       const { id, ...row } = toPendingRow(action);
       await db.update(pendingActions).set(row).where(eq(pendingActions.id, id));
     },
+    async resolveIfPending(action) {
+      const { id, ...row } = toPendingRow(action);
+      const updated = await db
+        .update(pendingActions)
+        .set(row)
+        .where(and(eq(pendingActions.id, id), eq(pendingActions.status, 'pending')))
+        .returning({ id: pendingActions.id });
+      return updated.length > 0;
+    },
   };
 }
 

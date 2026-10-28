@@ -181,21 +181,21 @@ export function createPendingActionService({
     return action;
   }
 
-  async function resolve(
-    id: string,
-    decide: (a: PendingAction) => Promise<Partial<PendingAction>>,
-  ) {
+  function alreadyResolved(action: PendingAction) {
+    return new DomainError('invalid_transition', `This action was already ${action.status}`);
+  }
+
+  /**
+   * Marks a pending action resolved, atomically: of two clicks at once only one wins, so the
+   * change it describes can't run twice.
+   */
+  async function claim(id: string, status: 'confirmed' | 'rejected'): Promise<PendingAction> {
     const action = await load(id);
-    if (action.status !== 'pending') {
-      throw new DomainError('invalid_transition', `This action was already ${action.status}`);
-    }
-    const resolved = {
-      ...action,
-      ...(await decide(action)),
-      resolvedAt: clock().toISOString(),
-    } as PendingAction;
-    await repos.pendingActions.update(resolved);
-    return resolved;
+    if (action.status !== 'pending') throw alreadyResolved(action);
+    const claimed = { ...action, status, resolvedAt: clock().toISOString() } as PendingAction;
+    if (!(await repos.pendingActions.resolveIfPending(claimed)))
+      throw alreadyResolved(await load(id));
+    return claimed;
   }
 
   return {
@@ -218,17 +218,24 @@ export function createPendingActionService({
     },
 
     /** Runs the stored action. If it is no longer valid, the action is marked failed. */
-    confirm: (id: string) =>
-      resolve(id, async (action) => {
-        try {
-          return { status: 'confirmed', bookingId: await execute(action) };
-        } catch (err) {
-          if (!(err instanceof DomainError)) throw err;
-          return { status: 'failed', error: err.message };
+    async confirm(id: string): Promise<PendingAction> {
+      const claimed = await claim(id, 'confirmed');
+      let resolved: PendingAction;
+      try {
+        resolved = { ...claimed, bookingId: await execute(claimed) };
+      } catch (err) {
+        if (!(err instanceof DomainError)) {
+          // Not the change's fault: put it back so it can be confirmed again.
+          await repos.pendingActions.update({ ...claimed, status: 'pending', resolvedAt: null });
+          throw err;
         }
-      }),
+        resolved = { ...claimed, status: 'failed', error: err.message };
+      }
+      await repos.pendingActions.update(resolved);
+      return resolved;
+    },
 
-    reject: (id: string) => resolve(id, () => Promise.resolve({ status: 'rejected' })),
+    reject: (id: string) => claim(id, 'rejected'),
   };
 }
 

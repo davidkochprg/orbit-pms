@@ -88,6 +88,8 @@ export interface PendingActionRepository {
   create(action: PendingAction): Promise<void>;
   get(id: string): Promise<PendingAction | null>;
   update(action: PendingAction): Promise<void>;
+  /** Saves `action` only while the stored one is still pending; false if it was resolved first. */
+  resolveIfPending(action: PendingAction): Promise<boolean>;
 }
 
 export interface TaskFilter {

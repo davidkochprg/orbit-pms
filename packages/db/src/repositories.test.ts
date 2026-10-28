@@ -170,6 +170,16 @@ describe('creating records (PGlite)', () => {
     await repos.pendingActions.update(resolved);
     expect(await repos.pendingActions.get('act_1')).toEqual(resolved);
     expect(await repos.pendingActions.get('nope')).toBeNull();
+
+    // Only a pending action can be resolved this way, so a second click loses.
+    const pending = { ...action, id: 'act_2' };
+    await repos.pendingActions.create(pending);
+    const confirmed = { ...pending, status: 'confirmed' as const, resolvedAt: resolved.resolvedAt };
+    expect(await repos.pendingActions.resolveIfPending(confirmed)).toBe(true);
+    expect(await repos.pendingActions.resolveIfPending({ ...confirmed, status: 'rejected' })).toBe(
+      false,
+    );
+    expect(await repos.pendingActions.get('act_2')).toEqual(confirmed);
   });
 });
 
