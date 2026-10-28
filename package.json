@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "pnpm --parallel --filter @orbit/api --filter @orbit/web dev",
+    "dev:lan": "ORBIT_LAN=1 pnpm dev",
     "build": "pnpm -r --if-present build",
     "typecheck": "pnpm -r --if-present typecheck",
     "lint": "eslint . && prettier --check .",

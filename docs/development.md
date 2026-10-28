@@ -37,19 +37,20 @@ The hourly and daily limits are kept in memory; the monthly budget is computed f
 
 ## Scripts
 
-| Command            | What it does                                                  |
-| ------------------ | ------------------------------------------------------------- |
-| `pnpm dev`         | API (`tsx watch`) and web (Vite) in parallel                  |
-| `pnpm build`       | Production build of the web app                               |
-| `pnpm typecheck`   | `tsc --noEmit` in every package                               |
-| `pnpm lint`        | ESLint (type-aware) and Prettier check                        |
-| `pnpm format`      | Prettier write                                                |
-| `pnpm test`        | Vitest across all packages                                    |
-| `pnpm db:generate` | Drizzle migration from schema changes                         |
-| `pnpm db:migrate`  | Apply migrations                                              |
-| `pnpm db:seed`     | Replace all data with the demo seed                           |
-| `pnpm db:reset`    | Delete the local PGlite database, then migrate and seed       |
-| `pnpm eval`        | Extraction evals (only loads fixtures until the agent exists) |
+| Command            | What it does                                                   |
+| ------------------ | -------------------------------------------------------------- |
+| `pnpm dev`         | API (`tsx watch`) and web (Vite) in parallel                   |
+| `pnpm dev:lan`     | Same, with the web app open to the local network (phone scans) |
+| `pnpm build`       | Production build of the web app                                |
+| `pnpm typecheck`   | `tsc --noEmit` in every package                                |
+| `pnpm lint`        | ESLint (type-aware) and Prettier check                         |
+| `pnpm format`      | Prettier write                                                 |
+| `pnpm test`        | Vitest across all packages                                     |
+| `pnpm db:generate` | Drizzle migration from schema changes                          |
+| `pnpm db:migrate`  | Apply migrations                                               |
+| `pnpm db:seed`     | Replace all data with the demo seed                            |
+| `pnpm db:reset`    | Delete the local PGlite database, then migrate and seed        |
+| `pnpm eval`        | Extraction evals (only loads fixtures until the agent exists)  |
 
 Internal packages are consumed as TypeScript source (`workspace:*`, `exports` pointing at `src/index.ts`), so there is no per-package build step.
 
@@ -90,4 +91,4 @@ _Not set up yet._
 
 ## Scanning IDs with a phone
 
-The ID scan link opens on a phone, which can't reach `localhost`. Run the web app on the network (`pnpm --filter @orbit/web dev --host`), open Orbit on the computer by the network address Vite prints (e.g. `http://192.168.1.20:5173`), and scan the QR code with a phone on the same Wi-Fi. Without a phone, "Upload a photo instead" in the scan dialog sends a photo from the computer; the synthetic documents in `packages/ai/src/evals/id-documents/` work for trying it.
+The ID scan link opens on a phone, which can't reach `localhost`. Start Orbit with `pnpm dev:lan` instead of `pnpm dev`: it runs the API and the web app like `pnpm dev`, with the web app also listening on the local network. Open Orbit on the computer by the network address Vite prints (e.g. `http://192.168.1.20:5173`), and scan the QR code with a phone on the same Wi-Fi. Without a phone, "Upload a photo instead" in the scan dialog sends a photo from the computer; the synthetic documents in `packages/ai/src/evals/id-documents/` work for trying it.

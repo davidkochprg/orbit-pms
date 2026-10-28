@@ -196,8 +196,8 @@ function WaitForPhone({
       {local && (
         <p className="text-xs text-muted-foreground">
           This screen runs on localhost, which a phone can&apos;t open. Start Orbit with{' '}
-          <code className="font-mono">pnpm dev --host</code> and open it by the computer&apos;s
-          network address, or upload a photo here.
+          <code className="font-mono">pnpm dev:lan</code> and open it by the computer&apos;s network
+          address, or upload a photo here.
         </p>
       )}
       {status === 'failed' && error && <ErrorNotice message={error} />}
