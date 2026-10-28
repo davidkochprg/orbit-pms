@@ -124,12 +124,19 @@ function BookingMenuItems({
         </Item>
       ) : (
         steps.map((a) => {
-          // Check-in may need the registration and check-out may need a payment: both are asked
-          // for in the inspector, so these open it instead of running straight away.
-          const viaInspector = (a === 'check_in' && !d.registered) || a === 'check_out';
+          // Check-in walks through the guest book and the bill, and check-out may need a payment:
+          // both happen in the inspector, so these open it instead of running straight away.
+          const viaInspector = a === 'check_in' || a === 'check_out';
           if (viaInspector && inInspector) return null;
           return (
-            <Item key={a} onSelect={() => (viaInspector ? open(bookingId) : action.mutate(a))}>
+            <Item
+              key={a}
+              onSelect={() =>
+                viaInspector
+                  ? open(bookingId, a === 'check_in' ? 'check-in' : undefined)
+                  : action.mutate(a)
+              }
+            >
               <span className="size-4" aria-hidden />
               {actionLabels[a]}
               {viaInspector && '…'}

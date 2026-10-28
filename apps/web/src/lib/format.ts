@@ -5,6 +5,11 @@ export function formatDate(date: string): string {
   return format(parseISO(date), 'EEE d MMM');
 }
 
+/** "14 Mar 1985", e.g. a date of birth, where the weekday is noise and the year matters. */
+export function formatFullDate(date: string): string {
+  return format(parseISO(date), 'd MMM yyyy');
+}
+
 /** "Wed" and "3 Oct" for a tape chart column header. */
 export function formatDayHeader(date: string): { weekday: string; day: string } {
   const d = parseISO(date);

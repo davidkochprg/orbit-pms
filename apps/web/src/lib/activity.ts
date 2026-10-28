@@ -8,6 +8,9 @@ export const activityLabels: Record<string, string> = {
   'booking.confirm': 'Confirmed',
   'booking.register': 'Registered in the guest book',
   'booking.update_registration': 'Corrected the registration',
+  'booking.add_guest': 'Added a guest to the room',
+  'booking.update_guest': 'Updated the guest book',
+  'booking.remove_guest': 'Removed a guest from the room',
   'booking.check_in': 'Checked in',
   'booking.check_out': 'Checked out',
   'booking.cancel': 'Cancelled',
@@ -16,6 +19,7 @@ export const activityLabels: Record<string, string> = {
   'booking.reschedule': 'Rescheduled',
   'booking.update': 'Edited',
   'folio.charge': 'Added a charge',
+  'folio.update_charge': 'Edited a charge',
   'folio.remove_charge': 'Removed a charge',
   'folio.payment': 'Took a payment',
   'folio.refund': 'Refunded',
@@ -47,8 +51,19 @@ const totalPayload = z.object({
   total: z.object({ from: z.number().nullable(), to: z.number().nullable() }),
 });
 const changedPayload = z.object({ changed: z.array(z.string()) });
+const guestBookPayload = z.object({ fields: z.array(z.string()), scanned: z.boolean().optional() });
 
 const words = (s: string) => s.replaceAll('_', ' ');
+
+/** `['dateOfBirth', 'notes']` → "date of birth, notes". */
+const fieldWords = (fields: string[]) =>
+  fields
+    .map((f) =>
+      words(f)
+        .replace(/([a-z])([A-Z])/g, '$1 $2')
+        .toLowerCase(),
+    )
+    .join(', ');
 
 /** One short line from the entry's payload, or null when there is nothing worth showing. */
 export function activityDetail(action: string, payload: unknown): string | null {
@@ -56,9 +71,19 @@ export function activityDetail(action: string, payload: unknown): string | null 
     const p = paymentPayload.safeParse(payload);
     return p.success ? `${formatCzk(p.data.amount)} by ${words(p.data.method)}` : null;
   }
-  if (action === 'folio.charge' || action === 'folio.remove_charge') {
+  if (
+    action === 'folio.charge' ||
+    action === 'folio.remove_charge' ||
+    action === 'folio.update_charge'
+  ) {
     const p = amountPayload.safeParse(payload);
     return p.success ? `${p.data.label ?? 'Charge'}, ${formatCzk(p.data.amount)}` : null;
+  }
+  if (action === 'booking.add_guest' || action === 'booking.update_guest') {
+    const p = guestBookPayload.safeParse(payload);
+    if (!p.success) return null;
+    if (p.data.scanned) return 'From an ID scan';
+    return p.data.fields.length > 0 ? `Changed ${fieldWords(p.data.fields)}` : null;
   }
   if (action === 'room.status' || action === 'task.status') {
     const p = statusPayload.safeParse(payload);
@@ -71,13 +96,7 @@ export function activityDetail(action: string, payload: unknown): string | null 
   }
   const changed = changedPayload.safeParse(payload);
   if (changed.success && changed.data.changed.length > 0) {
-    return `Changed ${changed.data.changed
-      .map((f) =>
-        words(f)
-          .replace(/([a-z])([A-Z])/g, '$1 $2')
-          .toLowerCase(),
-      )
-      .join(', ')}`;
+    return `Changed ${fieldWords(changed.data.changed)}`;
   }
   return null;
 }

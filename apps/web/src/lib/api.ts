@@ -9,11 +9,13 @@ import {
   bookingSchema,
   type BookingAction,
   type BookingListQuery,
+  type ChargePatch,
   type CreateBookingInput,
   dailyBriefSchema,
   dayOverviewSchema,
   folioSchema,
   type GuestPatch,
+  guestBookSchema,
   guestSchema,
   housekeepingBoardSchema,
   housekeepingNoteResultSchema,
@@ -21,6 +23,8 @@ import {
   type HousekeepingTaskStatus,
   type NewTaskBody,
   healthSchema,
+  idScanPhoneViewSchema,
+  idScanSchema,
   hotelProfileSchema,
   type HotelProfile,
   inquiryListSchema,
@@ -28,6 +32,7 @@ import {
   type NewChargeBody,
   type NewGuestBody,
   type NewPaymentBody,
+  type NewStayGuestBody,
   type NewMessageBody,
   pendingActionSchema,
   type PricingConfig,
@@ -40,13 +45,11 @@ import {
   type RoomOptionsQuery,
   roomTypeSchema,
   type ReportQuery,
-  type RegistrationBody,
-  registrationSchema,
-  registrationViewSchema,
   reportSchema,
   type NewStaffBody,
   STAFF_HEADER,
   staffMemberSchema,
+  type StayGuestPatch,
   type UpdateStaffBody,
 } from '@orbit/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -218,24 +221,101 @@ export function useReport(query: ReportQuery | null) {
   });
 }
 
-export function useRegistration(bookingId: string, enabled = true) {
+const bookingPath = (bookingId: string) => `/api/bookings/${encodeURIComponent(bookingId)}`;
+
+/** Everyone in the booking's room, with what the guest book still needs. */
+export function useGuestBook(bookingId: string) {
   return useQuery({
-    queryKey: ['registration', bookingId],
-    queryFn: () =>
-      apiGet(`/api/bookings/${encodeURIComponent(bookingId)}/registration`, registrationViewSchema),
-    enabled,
+    queryKey: ['guest-book', bookingId],
+    queryFn: () => apiGet(`${bookingPath(bookingId)}/guests`, guestBookSchema),
   });
 }
 
-export function useSaveRegistration(bookingId: string) {
-  return useRefreshingMutation((body: RegistrationBody) =>
+export function useAddStayGuest(bookingId: string) {
+  return useRefreshingMutation((body: NewStayGuestBody) =>
+    apiPost(`${bookingPath(bookingId)}/guests`, body, guestBookSchema),
+  );
+}
+
+export function useUpdateStayGuest(bookingId: string) {
+  return useRefreshingMutation(({ id, patch }: { id: string; patch: StayGuestPatch }) =>
     apiPost(
-      `/api/bookings/${encodeURIComponent(bookingId)}/registration`,
-      body,
-      registrationSchema,
-      'PUT',
+      `${bookingPath(bookingId)}/guests/${encodeURIComponent(id)}`,
+      patch,
+      guestBookSchema,
+      'PATCH',
     ),
   );
+}
+
+export function useRemoveStayGuest(bookingId: string) {
+  return useRefreshingMutation((id: string) =>
+    request(`${bookingPath(bookingId)}/guests/${encodeURIComponent(id)}`, guestBookSchema, {
+      method: 'DELETE',
+    }),
+  );
+}
+
+/** Opens a phone scan for one person, or for a companion still to add (`null`). */
+export function useStartIdScan(bookingId: string) {
+  return useMutation({
+    mutationFn: (stayGuestId: string | null) =>
+      apiPost(`${bookingPath(bookingId)}/scans`, { stayGuestId }, idScanSchema),
+  });
+}
+
+/** The desk's view of a scan, polled until the photo has been read. */
+export function useIdScan(bookingId: string, scanId: string | null) {
+  return useQuery({
+    queryKey: ['id-scan', bookingId, scanId],
+    queryFn: () =>
+      apiGet(`${bookingPath(bookingId)}/scans/${encodeURIComponent(scanId ?? '')}`, idScanSchema),
+    enabled: scanId !== null,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'done' || query.state.error ? false : 1500,
+  });
+}
+
+/** Uploads a photo at the desk instead of from a phone. */
+export function useUploadIdPhoto(bookingId: string, scanId: string | null) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (photo: Blob) => {
+      const form = new FormData();
+      form.append('photo', photo, 'id.jpg');
+      return apiPostForm(
+        `${bookingPath(bookingId)}/scans/${encodeURIComponent(scanId ?? '')}/photo`,
+        form,
+        idScanPhoneViewSchema,
+      );
+    },
+    onSettled: () => queryClient.invalidateQueries({ queryKey: ['id-scan', bookingId, scanId] }),
+  });
+}
+
+/** The phone's view of a scan link. */
+export function usePhoneScan(scanId: string) {
+  return useQuery({
+    queryKey: ['phone-scan', scanId],
+    queryFn: () => apiGet(`/api/scan/${encodeURIComponent(scanId)}`, idScanPhoneViewSchema),
+    retry: false,
+  });
+}
+
+export function usePhoneUpload(scanId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (photo: Blob) => {
+      const form = new FormData();
+      form.append('photo', photo, 'id.jpg');
+      return apiPostForm(
+        `/api/scan/${encodeURIComponent(scanId)}/photo`,
+        form,
+        idScanPhoneViewSchema,
+      );
+    },
+    onSuccess: (view) => queryClient.setQueryData(['phone-scan', scanId], view),
+  });
 }
 
 export function useFolio(bookingId: string) {
@@ -248,6 +328,17 @@ export function useFolio(bookingId: string) {
 export function useAddCharge(bookingId: string) {
   return useRefreshingMutation((body: NewChargeBody) =>
     apiPost(`/api/bookings/${encodeURIComponent(bookingId)}/charges`, body, folioSchema),
+  );
+}
+
+export function useUpdateCharge(bookingId: string) {
+  return useRefreshingMutation(({ chargeId, patch }: { chargeId: string; patch: ChargePatch }) =>
+    apiPost(
+      `${bookingPath(bookingId)}/charges/${encodeURIComponent(chargeId)}`,
+      patch,
+      folioSchema,
+      'PATCH',
+    ),
   );
 }
 
@@ -385,7 +476,12 @@ export function useHousekeeping() {
 
 function useRefreshingMutation<T, R>(fn: (input: T) => Promise<R>) {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: fn, onSettled: () => queryClient.invalidateQueries() });
+  return useMutation({
+    mutationFn: fn,
+    // A scan is deleted once its details are saved, so refetching it would only 404.
+    onSettled: () =>
+      queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'id-scan' }),
+  });
 }
 
 export function useSetRoomStatus() {

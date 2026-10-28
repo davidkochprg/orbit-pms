@@ -321,6 +321,36 @@ export function RatesSettings({ pricing, onChange, readOnly }: Props) {
           </FormField>
         </div>
       </Section>
+
+      <Section title="VAT">
+        <Hint>
+          Prices include VAT. Accommodation, extra beds and food are billed at the reduced rate,
+          most other extras at the standard rate, and city tax without VAT. Set both to 0 if the
+          hotel is not a VAT payer.
+        </Hint>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label="Standard rate" htmlFor="vat-standard">
+            <NumberInput
+              id="vat-standard"
+              min={0}
+              max={50}
+              suffix="%"
+              value={pricing.vat.standard}
+              onValue={(v) => set('vat', { ...pricing.vat, standard: Math.round(v) })}
+            />
+          </FormField>
+          <FormField label="Reduced rate" htmlFor="vat-reduced">
+            <NumberInput
+              id="vat-reduced"
+              min={0}
+              max={50}
+              suffix="%"
+              value={pricing.vat.reduced}
+              onValue={(v) => set('vat', { ...pricing.vat, reduced: Math.round(v) })}
+            />
+          </FormField>
+        </div>
+      </Section>
     </div>
   );
 }

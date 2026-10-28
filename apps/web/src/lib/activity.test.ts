@@ -9,6 +9,19 @@ describe('activityLabel', () => {
 });
 
 describe('activityDetail', () => {
+  it('says which guest-book fields changed, or that a scan filled them, never the values', () => {
+    expect(
+      activityDetail('booking.update_guest', {
+        stayGuestId: 'sg_1',
+        fields: ['nationality', 'dateOfBirth'],
+      }),
+    ).toBe('Changed nationality, date of birth');
+    expect(
+      activityDetail('booking.add_guest', { stayGuestId: 'sg_2', fields: [], scanned: true }),
+    ).toBe('From an ID scan');
+    expect(activityDetail('booking.add_guest', { stayGuestId: 'sg_2', fields: [] })).toBe(null);
+  });
+
   it('summarises money, status and changed fields', () => {
     expect(activityDetail('folio.payment', { amount: 4500, method: 'bank_transfer' })).toBe(
       '4,500 CZK by bank transfer',

@@ -3,6 +3,7 @@ import {
   formatCzk,
   formatDate,
   formatDayHeader,
+  formatFullDate,
   formatLongDate,
   formatParty,
   formatRange,
@@ -13,6 +14,7 @@ import {
 describe('format', () => {
   it('formats dates without timezone shifts', () => {
     expect(formatDate('2026-10-27')).toBe('Tue 27 Oct');
+    expect(formatFullDate('1985-03-14')).toBe('14 Mar 1985');
     expect(formatRange('2026-12-31', '2027-01-02')).toBe('Thu 31 Dec – Sat 2 Jan');
   });
 

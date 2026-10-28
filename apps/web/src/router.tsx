@@ -8,6 +8,7 @@ import { ActivityPage } from '@/pages/activity';
 import { GuestsPage } from '@/pages/guests';
 import { InboxPage } from '@/pages/inbox';
 import { HousekeepingPage } from '@/pages/housekeeping';
+import { ScanPage } from '@/pages/scan';
 import { NotFoundPage } from '@/pages/sections';
 import { SettingsPage } from '@/pages/settings';
 import { TapeChartPage } from '@/pages/tape-chart';
@@ -15,6 +16,8 @@ import { WelcomePage } from '@/pages/welcome';
 
 export const router = createBrowserRouter([
   { path: 'welcome', element: <WelcomePage /> },
+  // Opened on a phone from the desk's QR code: no sign-in, no app chrome.
+  { path: 'scan/:id', element: <ScanPage /> },
   {
     element: <AppLayout />,
     errorElement: <AppError />,
