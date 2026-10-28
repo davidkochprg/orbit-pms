@@ -1,5 +1,5 @@
 import type { DocumentType, StayGuestPatch, StayGuestView } from '@orbit/shared';
-import { CircleCheck, CircleDashed, ScanLine, Trash2, UserPlus } from 'lucide-react';
+import { AlertTriangle, CircleCheck, CircleDashed, ScanLine, Trash2, UserPlus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Link } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
@@ -51,11 +51,20 @@ export function BookingGuests({
 
   if (book.isError) return <ErrorNotice message={book.error.message} />;
   if (!book.data) return <Skeleton className="h-48" />;
-  const { guests, partySize } = book.data;
+  const { guests, partySize, extra } = book.data;
   const open = Math.max(0, partySize - guests.length);
 
   return (
     <div className="flex flex-col gap-2">
+      {extra > 0 && (
+        <p className="flex items-start gap-2 rounded-stage bg-warning/10 px-3 py-2.5 text-sm">
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+          <span>
+            {guests.length} people are listed, but the booking is for {partySize}. Remove whoever
+            isn&apos;t staying, or change the party with Edit.
+          </span>
+        </p>
+      )}
       {guests.map((g, i) => (
         <StayGuestCard
           key={g.id}

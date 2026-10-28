@@ -95,7 +95,7 @@ A body that fails validation returns 400 `invalid_json`; malformed JSON returns 
 
 ### `GET /api/bookings/:id/guests`, `POST`, `PATCH /api/bookings/:id/guests/:stayGuestId`, `DELETE`
 
-The stay's guest book (`GuestBook`): `guests` (each a `StayGuest` with `primary` and `missing`, the guest-book fields it still needs), `partySize`, `missing` (people without a complete entry, counting ones not added yet) and `previous` (the main guest's details from an earlier stay, or `null`). Every call returns it.
+The stay's guest book (`GuestBook`): `guests` (each a `StayGuest` with `primary` and `missing`, the guest-book fields it still needs), `partySize`, `missing` (people without a complete entry, counting ones not added yet), `extra` (people listed beyond the party size) and `previous` (the main guest's details from an earlier stay, or `null`). Every call returns it.
 
 - `POST` adds a companion: `{ name, nationality?, dateOfBirth?, documentType?, documentNumber?, address?, scanId? }`, `201`. More people than the party is `409 over_capacity`.
 - `PATCH` changes any of `name`, `nationality`, `dateOfBirth`, `documentType`, `documentNumber`, `address`; `null` or blank clears a field, the nationality is upper-cased. Renaming the main guest is `400 invalid_input` (edit the profile). `scanId` marks values from an ID scan and deletes it.

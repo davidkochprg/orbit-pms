@@ -127,7 +127,7 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - document type and number, from `idDocumentMinAge` (15: Czech ID cards are compulsory from 15) or when the age is unknown;
 - a home address when the nationality is not the hotel's `homeCountry` (`CZ`).
 
-`buildGuestBook` returns everyone (main guest first, then companions in the order they were added), the party size (adults plus children) and `missing`: people with an incomplete entry plus people the party counts that nobody added yet. `BookingDetail.missingIds` is the same number.
+`buildGuestBook` returns everyone (main guest first, then companions in the order they were added), the party size (adults plus children) and `missing`: people with an incomplete entry plus people the party counts that nobody added yet. `BookingDetail.missingIds` is the same number. `extra` counts people listed beyond the party, which happens when the party is made smaller after companions were added; the inspector and the check-in flow warn about it.
 
 - `getGuestBook(bookingId)` also returns the main guest's details from their latest earlier stay, to prefill.
 - `addGuest(bookingId, body, actor)` adds a companion, up to the party size (`over_capacity`).

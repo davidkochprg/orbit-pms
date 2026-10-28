@@ -67,7 +67,8 @@ export function missingFields(
 
 /**
  * Everyone in the room: the main guest (from their profile, entry or not) first, then companions.
- * People the party counts but nobody has added yet count as missing.
+ * People the party counts but nobody has added yet count as missing; people listed beyond the
+ * party (it was made smaller after they were added) count as extra.
  */
 export function buildGuestBook(
   booking: Booking,
@@ -103,6 +104,7 @@ export function buildGuestBook(
     guests,
     partySize,
     missing: incomplete + Math.max(0, partySize - guests.length),
+    extra: Math.max(0, guests.length - partySize),
     previous,
   };
 }

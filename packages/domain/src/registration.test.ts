@@ -103,7 +103,7 @@ describe('buildGuestBook', () => {
         registeredAt: null,
       }),
     ]);
-    expect(book).toMatchObject({ partySize: 3, missing: 3 });
+    expect(book).toMatchObject({ partySize: 3, missing: 3, extra: 0 });
   });
 
   it("takes the main guest's name from the profile, and lists companions oldest first", () => {
@@ -136,6 +136,22 @@ describe('buildGuestBook', () => {
       ['sg_2', 'Demo Companion', false],
     ]);
     expect(book.missing).toBe(1);
+  });
+
+  it('counts people listed beyond a party that was made smaller', () => {
+    const book = buildGuestBook(
+      { ...stay, adults: 1, childAges: [] },
+      guest,
+      [
+        stayGuest({ id: 'sg_1', bookingId: 'bk', ...german }),
+        stayGuest({ id: 'sg_2', bookingId: 'bk', ...german }),
+      ],
+      null,
+      today,
+      hotelPolicy,
+    );
+    expect(book).toMatchObject({ partySize: 1, extra: 2 });
+    expect(book.guests).toHaveLength(3);
   });
 });
 

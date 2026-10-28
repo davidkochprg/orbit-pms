@@ -93,6 +93,8 @@ export const guestBookSchema = z.object({
   partySize: z.number().int().nonnegative(),
   /** People without a complete entry, counting ones not added yet. */
   missing: z.number().int().nonnegative(),
+  /** People listed beyond the party size, e.g. after the party was made smaller. */
+  extra: z.number().int().nonnegative(),
   /** The main guest's details from an earlier stay, to prefill from. */
   previous: identityFieldsSchema.nullable(),
 });

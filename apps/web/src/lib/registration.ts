@@ -51,8 +51,12 @@ export const documentTypeLabels: Record<DocumentType, string> = {
   passport: 'Passport',
 };
 
-/** "3 of 4 in the guest book" or "All 2 in the guest book". */
-export function guestBookProgress(book: Pick<GuestBook, 'partySize' | 'missing'>): string {
+/** "3 of 4 in the guest book", "All 2 in the guest book" or "3 listed for a party of 2". */
+export function guestBookProgress(
+  book: Pick<GuestBook, 'partySize' | 'missing' | 'extra'>,
+): string {
+  if (book.extra > 0)
+    return `${book.partySize + book.extra} listed for a party of ${book.partySize}`;
   const done = book.partySize - book.missing;
   return book.missing === 0
     ? `All ${book.partySize} in the guest book`

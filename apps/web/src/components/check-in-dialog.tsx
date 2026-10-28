@@ -159,17 +159,19 @@ function Flow({ detail, onDone }: { detail: BookingDetail; onDone: () => void })
             />
             {book.data && (
               <SummaryRow
-                ok={book.data.missing === 0}
+                ok={book.data.missing === 0 && book.data.extra === 0}
                 title={guestBookProgress(book.data)}
                 detail={
-                  book.data.missing === 0
-                    ? 'Everyone is registered.'
-                    : `${book.data.missing} still ${book.data.missing === 1 ? 'needs' : 'need'} an ID. Scan it later from the booking's Guests tab.`
+                  book.data.extra > 0
+                    ? 'More people are listed than the booking is for. Fix the party or the list.'
+                    : book.data.missing === 0
+                      ? 'Everyone is registered.'
+                      : `${book.data.missing} still ${book.data.missing === 1 ? 'needs' : 'need'} an ID. Scan it later from the booking's Guests tab.`
                 }
                 action={
-                  book.data.missing > 0 && (
+                  (book.data.missing > 0 || book.data.extra > 0) && (
                     <Button variant="ghost" size="xs" onClick={() => setStep('Guests & IDs')}>
-                      Scan now
+                      {book.data.extra > 0 ? 'Review' : 'Scan now'}
                     </Button>
                   )
                 }

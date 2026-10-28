@@ -52,7 +52,17 @@ describe('countryName', () => {
 
 describe('guestBookProgress', () => {
   it('counts the people with a complete entry', () => {
-    expect(guestBookProgress({ partySize: 4, missing: 1 })).toBe('3 of 4 in the guest book');
-    expect(guestBookProgress({ partySize: 2, missing: 0 })).toBe('All 2 in the guest book');
+    expect(guestBookProgress({ partySize: 4, missing: 1, extra: 0 })).toBe(
+      '3 of 4 in the guest book',
+    );
+    expect(guestBookProgress({ partySize: 2, missing: 0, extra: 0 })).toBe(
+      'All 2 in the guest book',
+    );
+  });
+
+  it('says when more people are listed than the party', () => {
+    expect(guestBookProgress({ partySize: 2, missing: 0, extra: 1 })).toBe(
+      '3 listed for a party of 2',
+    );
   });
 });
