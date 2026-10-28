@@ -18,6 +18,44 @@ import type {
 import { rangesOverlap } from './dates';
 import type { BillingFilter, Repositories } from './repositories';
 
+/**
+ * A conversation that started with one message from the guest, for tests. `body` is that
+ * message; anything else can be overridden.
+ */
+export function conversation(overrides: Partial<Inquiry> & { id: string; body?: string }): Inquiry {
+  const { body = 'Do you have a room?', ...rest } = overrides;
+  const receivedAt = rest.receivedAt ?? '2026-05-09T10:00:00.000Z';
+  return {
+    channel: 'email',
+    partner: null,
+    subject: null,
+    senderName: null,
+    senderAddress: null,
+    receivedAt,
+    lastMessageAt: receivedAt,
+    messages: [
+      {
+        id: `msg_${rest.id}`,
+        inquiryId: rest.id,
+        direction: 'in',
+        body,
+        sentAt: receivedAt,
+        author: null,
+        translation: null,
+      },
+    ],
+    unread: true,
+    archivedAt: null,
+    parsed: null,
+    suggestion: null,
+    status: 'new',
+    bookingId: null,
+    processedAt: null,
+    processingError: null,
+    ...rest,
+  };
+}
+
 export interface MemoryState {
   roomTypes: RoomType[];
   rooms: Room[];
@@ -162,7 +200,7 @@ export function createMemoryRepositories(
     inquiries: {
       listInquiries: () =>
         Promise.resolve(
-          [...state.inquiries].sort((a, b) => b.receivedAt.localeCompare(a.receivedAt)),
+          [...state.inquiries].sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt)),
         ),
       getInquiry: (id) => Promise.resolve(state.inquiries.find((i) => i.id === id) ?? null),
       createInquiry: (inquiry) => {
@@ -170,7 +208,24 @@ export function createMemoryRepositories(
         return Promise.resolve();
       },
       updateInquiry: (inquiry) => {
-        state.inquiries = state.inquiries.map((i) => (i.id === inquiry.id ? inquiry : i));
+        // Messages are stored by addMessage and updateMessage, as in the database.
+        state.inquiries = state.inquiries.map((i) =>
+          i.id === inquiry.id ? { ...inquiry, messages: i.messages } : i,
+        );
+        return Promise.resolve();
+      },
+      addMessage: (message) => {
+        state.inquiries = state.inquiries.map((i) =>
+          i.id === message.inquiryId ? { ...i, messages: [...i.messages, message] } : i,
+        );
+        return Promise.resolve();
+      },
+      updateMessage: (message) => {
+        state.inquiries = state.inquiries.map((i) =>
+          i.id === message.inquiryId
+            ? { ...i, messages: i.messages.map((m) => (m.id === message.id ? message : m)) }
+            : i,
+        );
         return Promise.resolve();
       },
     },

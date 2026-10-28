@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { emptyHotelProfile, HOTEL_TIMEZONE, hotelPolicy, hotelToday } from '@orbit/domain';
-import type { Inquiry } from '@orbit/shared';
+import { conversation } from '@orbit/domain/testing';
 import { runAgent } from '../agent';
 import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from '../cost';
 import { buildSystemPrompt } from '../prompts/system';
@@ -13,6 +13,8 @@ import { agentFixtures, buildAgentEvalHotel } from './agent';
 import { evalRoomNames, housekeepingNoteFixtures } from './housekeeping-notes';
 import { idDocumentFixtures } from './id-documents';
 import { buildInquiryFixtures } from './inquiries';
+import { translationFixtures } from './translations';
+import { createTranslator } from '../translate';
 import { scoreExtraction, scoreHousekeepingNote, scoreIdReading } from './score';
 
 const {
@@ -97,23 +99,16 @@ const inboxOk = await suite(
   buildInquiryFixtures(today).map((f) => ({
     id: f.id,
     run: async () => {
-      const inquiry: Inquiry = {
+      const inquiry = conversation({
         id: f.id,
-        rawText: f.rawText,
+        body: f.rawText,
         channel: f.channel,
         partner: f.partner,
         subject: f.subject,
         senderName: f.senderName,
         senderAddress: f.senderAddress,
         receivedAt: new Date().toISOString(),
-        parsed: null,
-        suggestion: null,
-        reply: null,
-        status: 'new',
-        bookingId: null,
-        processedAt: null,
-        processingError: null,
-      };
+      });
       const { analysis, tokens } = await extractMessage(
         provider.agent,
         inquiry,
@@ -219,4 +214,43 @@ const agentOk = await suite(
   })),
 );
 
-process.exit(inboxOk && notesOk && idsOk && agentOk ? 0 : 1);
+const translateEffort = reasoningEffort.translate;
+const translateOk = await suite(
+  'Translations',
+  translateEffort,
+  translationFixtures.map((f) => ({
+    id: f.id,
+    run: async () => {
+      const tokens: TokenUsage[] = [];
+      const translator = createTranslator({
+        model: provider.translate,
+        modelId: provider.translateModelId,
+        usage: {
+          record: (r) => {
+            tokens.push(r.tokens);
+            return Promise.resolve();
+          },
+          monthToDateMicroUsd: () => Promise.resolve(0),
+        },
+        canSpend: () => Promise.resolve(true),
+      });
+      const text = await translator.translate(f.text, f.to).catch((e: unknown) => String(e));
+      const problems = f.check(text);
+      return {
+        passed: problems.length === 0,
+        label: `${f.to}  ${problems.join('; ')}`,
+        detail: `      text     ${f.text.replace(/\n/g, ' ')}\n      actual   ${text.replace(/\n/g, ' ')}`,
+        tokens: tokens.reduce(
+          (a, t) => ({
+            input: a.input + t.input,
+            cachedInput: a.cachedInput + t.cachedInput,
+            output: a.output + t.output,
+          }),
+          { input: 0, cachedInput: 0, output: 0 },
+        ),
+      };
+    },
+  })),
+);
+
+process.exit(inboxOk && notesOk && idsOk && agentOk && translateOk ? 0 : 1);

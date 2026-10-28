@@ -9,6 +9,7 @@ import {
   inquiryChannels,
   inquiryStatuses,
   languages,
+  messageDirections,
   paymentKinds,
   paymentMethods,
   pendingActionStatuses,
@@ -22,6 +23,7 @@ import {
   type PendingActionInput,
   type PricingConfig,
   type Quote,
+  type Translation,
   type QuoteAddons,
   vatBrackets,
 } from '@orbit/shared';
@@ -48,6 +50,7 @@ export const bookingStatus = pgEnum('booking_status', bookingStatuses);
 export const bookingSource = pgEnum('booking_source', bookingSources);
 export const inquiryChannel = pgEnum('inquiry_channel', inquiryChannels);
 export const inquiryStatus = pgEnum('inquiry_status', inquiryStatuses);
+export const messageDirection = pgEnum('message_direction', messageDirections);
 export const housekeepingTaskType = pgEnum('housekeeping_task_type', housekeepingTaskTypes);
 export const housekeepingTaskStatus = pgEnum('housekeeping_task_status', housekeepingTaskStatuses);
 export const auditActor = pgEnum('audit_actor', auditActors);
@@ -124,23 +127,41 @@ export const bookings = pgTable(
   ],
 );
 
+/** A conversation with a guest; its messages are in `inbox_messages`. */
 export const inquiries = pgTable('inquiries', {
   id: text('id').primaryKey(),
-  rawText: text('raw_text').notNull(),
   channel: inquiryChannel('channel').notNull(),
   partner: text('partner'),
   subject: text('subject'),
   senderName: text('sender_name'),
   senderAddress: text('sender_address'),
   receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  lastMessageAt: timestamp('last_message_at', { withTimezone: true }).notNull(),
+  unread: boolean('unread').notNull().default(true),
+  archivedAt: timestamp('archived_at', { withTimezone: true }),
   parsed: jsonb('parsed').$type<InquiryExtraction>(),
   suggestion: jsonb('suggestion').$type<InquirySuggestion>(),
-  reply: text('reply'),
   status: inquiryStatus('status').notNull().default('new'),
   bookingId: text('booking_id').references(() => bookings.id),
   processedAt: timestamp('processed_at', { withTimezone: true }),
   processingError: text('processing_error'),
 });
+
+export const inboxMessages = pgTable(
+  'inbox_messages',
+  {
+    id: text('id').primaryKey(),
+    inquiryId: text('inquiry_id')
+      .notNull()
+      .references(() => inquiries.id, { onDelete: 'cascade' }),
+    direction: messageDirection('direction').notNull(),
+    body: text('body').notNull(),
+    sentAt: timestamp('sent_at', { withTimezone: true }).notNull(),
+    author: text('author'),
+    translation: jsonb('translation').$type<Translation>(),
+  },
+  (t) => [index('inbox_messages_inquiry_idx').on(t.inquiryId, t.sentAt)],
+);
 
 export const housekeepingTasks = pgTable('housekeeping_tasks', {
   id: text('id').primaryKey(),
@@ -187,6 +208,7 @@ export const staff = pgTable('staff', {
   name: text('name').notNull(),
   email: text('email').unique(),
   role: staffRole('role').notNull(),
+  language: language('language').notNull().default('cs'),
   active: boolean('active').notNull().default(true),
   createdAt: createdAt(),
 });

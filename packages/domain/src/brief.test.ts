@@ -2,6 +2,7 @@ import type { Guest, HousekeepingTask, Inquiry, InquiryStatus, StayGuest } from 
 import { describe, expect, it } from 'vitest';
 import { briefBookingRange, buildDailyBrief, findGaps } from './brief';
 import { hotelPolicy } from './policy';
+import { conversation } from './testing';
 import { booking, room } from './test-fixtures';
 
 const date = '2026-05-10';
@@ -17,23 +18,7 @@ const guests: Guest[] = ['a', 'b', 'c'].map((id) => ({
 }));
 
 function inquiry(id: string, status: InquiryStatus): Inquiry {
-  return {
-    id,
-    rawText: 'Do you have a room?',
-    channel: 'email',
-    partner: null,
-    subject: null,
-    senderName: null,
-    senderAddress: null,
-    receivedAt: '2026-05-09T10:00:00.000Z',
-    parsed: null,
-    suggestion: null,
-    reply: null,
-    status,
-    bookingId: null,
-    processedAt: null,
-    processingError: null,
-  };
+  return conversation({ id, status });
 }
 
 function maintenance(roomId: string, overrides: Partial<HousekeepingTask> = {}): HousekeepingTask {

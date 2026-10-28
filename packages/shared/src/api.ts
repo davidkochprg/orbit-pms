@@ -1,7 +1,12 @@
 import { z } from 'zod';
 import { isoDateSchema } from './dates';
 import { auditLogEntrySchema, inquirySchema } from './entities';
-import { bookingActionSchema, bookingStatusSchema, inquiryChannelSchema } from './enums';
+import {
+  bookingActionSchema,
+  bookingStatusSchema,
+  inquiryChannelSchema,
+  languageSchema,
+} from './enums';
 
 /** Query string for `GET /api/bookings`. `status` is comma-separated. */
 export const bookingListQuerySchema = z.object({
@@ -84,8 +89,9 @@ export const agentRequestSchema = z.object({
   messages: z.array(z.unknown()).min(1).max(100),
 });
 
+/** `POST /api/inbox`: a message from a guest that starts a conversation, e.g. pasted or an OTA's. */
 export const newMessageBodySchema = z.object({
-  rawText: z.string().trim().min(1).max(10_000),
+  body: z.string().trim().min(1).max(10_000),
   channel: inquiryChannelSchema.default('email'),
   partner: z.string().max(100).nullable().default(null),
   subject: z.string().max(300).nullable().default(null),
@@ -94,10 +100,40 @@ export const newMessageBodySchema = z.object({
 });
 export type NewMessageBody = z.infer<typeof newMessageBodySchema>;
 
-export const processMessageBodySchema = z.object({ force: z.boolean().default(false) });
+/** `POST /api/inbox/:id/process`: prepare a reply; `language` gets the draft side by side in it. */
+export const processMessageBodySchema = z.object({
+  force: z.boolean().default(false),
+  language: languageSchema.nullable().default(null),
+});
 
 export const inboxHoldBodySchema = z.object({ roomId: z.string().min(1) });
 
-export const markRepliedBodySchema = z.object({ reply: z.string().trim().min(1).max(20_000) });
+const messageText = z.string().trim().min(1).max(20_000);
+
+/** `POST /api/inbox/compose`: a new email to a guest. */
+export const composeBodySchema = z.object({
+  toName: z.string().trim().max(200).nullable().default(null),
+  toAddress: z.email().max(200),
+  subject: z.string().trim().min(1).max(300),
+  body: messageText,
+});
+export type ComposeBody = z.infer<typeof composeBodySchema>;
+
+/** `POST /api/inbox/:id/send` (the hotel's reply) and `/receive` (the guest writing again). */
+export const messageBodySchema = z.object({ body: messageText });
+
+export const unreadBodySchema = z.object({ unread: z.boolean() });
+export const archiveBodySchema = z.object({ archived: z.boolean() });
+
+/** `POST /api/inbox/translate`: any text into a staff member's or guest's language. */
+export const translateBodySchema = z.object({
+  text: z.string().trim().min(1).max(10_000),
+  to: languageSchema,
+});
+export const translateResultSchema = z.object({ text: z.string() });
+export type TranslateResult = z.infer<typeof translateResultSchema>;
+
+/** `POST /api/inbox/:id/messages/:messageId/translate`. */
+export const translateMessageBodySchema = z.object({ to: languageSchema });
 
 export const inquiryListSchema = z.array(inquirySchema);

@@ -425,7 +425,10 @@ describe('GET /api/brief', () => {
     expect(body.date).toBe(today);
     expect(body.arrivals).toBeGreaterThan(0);
     expect(body.occupancy.total).toBe(seed.rooms.length);
-    expect(body.unansweredMessages).toBe(seed.inquiries.length);
+    // The open requests; the seeded conversations with history are answered.
+    expect(body.unansweredMessages).toBe(
+      seed.inquiries.filter((i) => i.status === 'new' || i.status === 'quoted').length,
+    );
     expect(body.maintenance.map((t) => t.roomName)).toContain('203');
   });
 

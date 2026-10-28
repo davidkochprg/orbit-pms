@@ -12,7 +12,7 @@ import {
   roomKindSchema,
   roomStatusSchema,
 } from './enums';
-import { inquiryExtractionSchema, inquirySuggestionSchema } from './inquiry';
+import { inboxMessageSchema, inquiryExtractionSchema, inquirySuggestionSchema } from './inquiry';
 import { czkSchema, quoteAddonsSchema, quoteSchema } from './quote';
 
 export const roomTypeSchema = z.object({
@@ -63,20 +63,29 @@ export const bookingSchema = z.object({
 });
 export type Booking = z.infer<typeof bookingSchema>;
 
+/**
+ * A conversation with a guest, by email or through an OTA's messaging: its messages oldest
+ * first, what the agent prepared for it on request, and where it stands.
+ */
 export const inquirySchema = z.object({
   id: z.string(),
-  rawText: z.string(),
   channel: inquiryChannelSchema,
   /** OTA or partner the message came through, e.g. "Booking.com"; null for direct messages. */
   partner: z.string().nullable(),
   subject: z.string().nullable(),
+  /** The guest: who wrote, or who the hotel wrote to. */
   senderName: z.string().nullable(),
   senderAddress: z.string().nullable(),
+  /** When the conversation started. */
   receivedAt: z.iso.datetime(),
+  lastMessageAt: z.iso.datetime(),
+  messages: z.array(inboxMessageSchema),
+  /** Set when the guest wrote and nobody has opened it since. */
+  unread: z.boolean(),
+  /** Archived conversations leave the inbox; a new message from the guest brings them back. */
+  archivedAt: z.iso.datetime().nullable(),
   parsed: inquiryExtractionSchema.nullable(),
   suggestion: inquirySuggestionSchema.nullable(),
-  /** The reply as sent, once marked sent. */
-  reply: z.string().nullable(),
   status: inquiryStatusSchema,
   bookingId: z.string().nullable(),
   processedAt: z.iso.datetime().nullable(),

@@ -10,6 +10,7 @@ import {
   type BookingAction,
   type BookingListQuery,
   type ChargePatch,
+  type ComposeBody,
   type CreateBookingInput,
   dailyBriefSchema,
   dayOverviewSchema,
@@ -29,6 +30,8 @@ import {
   type HotelProfile,
   inquiryListSchema,
   inquirySchema,
+  type Inquiry,
+  type Language,
   type NewChargeBody,
   type NewGuestBody,
   type NewPaymentBody,
@@ -50,6 +53,7 @@ import {
   STAFF_HEADER,
   staffMemberSchema,
   type StayGuestPatch,
+  translateResultSchema,
   type UpdateStaffBody,
 } from '@orbit/shared';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -410,34 +414,100 @@ export function useInquiry(id: string | undefined) {
   });
 }
 
-function useInboxMutation<T>(fn: (input: T) => Promise<unknown>) {
+function useInboxMutation<T>(fn: (input: T) => Promise<Inquiry>) {
   const queryClient = useQueryClient();
-  return useMutation({ mutationFn: fn, onSuccess: () => queryClient.invalidateQueries() });
+  return useMutation({
+    mutationFn: fn,
+    onSuccess: (inquiry) => {
+      // Show the updated conversation at once, then refresh what depends on it.
+      queryClient.setQueryData(['inquiry', inquiry.id], inquiry);
+      void queryClient.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'id-scan' });
+    },
+  });
 }
 
+const inboxPath = (id: string) => `/api/inbox/${encodeURIComponent(id)}`;
+
+/** A guest's message that starts a conversation, e.g. pasted from an email or an OTA. */
 export function useCreateMessage() {
-  return useInboxMutation((body: Partial<NewMessageBody> & { rawText: string }) =>
+  return useInboxMutation((body: Partial<NewMessageBody> & { body: string }) =>
     apiPost('/api/inbox', body, inquirySchema),
   );
 }
 
-/** Lets the agent prepare the message. Already prepared messages come back without a model call. */
+/** A new email from the hotel to a guest. */
+export function useComposeMessage() {
+  return useInboxMutation((body: ComposeBody) =>
+    apiPost('/api/inbox/compose', body, inquirySchema),
+  );
+}
+
+/**
+ * Lets the agent prepare a reply, on request only. `language` is the staff member's, for the
+ * draft side by side. Already prepared conversations come back without a model call.
+ */
 export function useProcessInquiry(id: string) {
-  return useInboxMutation((force: boolean) =>
-    apiPost(`/api/inbox/${encodeURIComponent(id)}/process`, { force }, inquirySchema),
+  return useInboxMutation(({ force, language }: { force: boolean; language: Language | null }) =>
+    apiPost(`${inboxPath(id)}/process`, { force, language }, inquirySchema),
   );
 }
 
 export function useInboxHold(id: string) {
-  return useInboxMutation((roomId: string) =>
-    apiPost(`/api/inbox/${encodeURIComponent(id)}/hold`, { roomId }, bookingDetailSchema),
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (roomId: string) =>
+      apiPost(`${inboxPath(id)}/hold`, { roomId }, bookingDetailSchema),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+/** Sends the hotel's reply through the conversation's channel. */
+export function useSendReply(id: string) {
+  return useInboxMutation((body: string) =>
+    apiPost(`${inboxPath(id)}/send`, { body }, inquirySchema),
   );
 }
 
-export function useMarkReplied(id: string) {
-  return useInboxMutation((reply: string) =>
-    apiPost(`/api/inbox/${encodeURIComponent(id)}/replied`, { reply }, inquirySchema),
+/** Adds the guest's next message to the conversation, e.g. pasted from the mail client. */
+export function useReceiveMessage(id: string) {
+  return useInboxMutation((body: string) =>
+    apiPost(`${inboxPath(id)}/receive`, { body }, inquirySchema),
   );
+}
+
+export function useSetUnread(id: string) {
+  return useInboxMutation((unread: boolean) =>
+    apiPost(`${inboxPath(id)}/unread`, { unread }, inquirySchema),
+  );
+}
+
+export function useSetArchived(id: string) {
+  return useInboxMutation((archived: boolean) =>
+    apiPost(`${inboxPath(id)}/archive`, { archived }, inquirySchema),
+  );
+}
+
+/** Translates one message of the conversation, kept with it so asking again is free. */
+export function useTranslateMessage(id: string) {
+  return useInboxMutation(({ messageId, to }: { messageId: string; to: Language }) =>
+    apiPost(
+      `${inboxPath(id)}/messages/${encodeURIComponent(messageId)}/translate`,
+      { to },
+      inquirySchema,
+    ),
+  );
+}
+
+/** Translates text that isn't stored, e.g. a reply as staff edit it. */
+export function useTranslateText() {
+  return useMutation({
+    mutationFn: ({ text, to }: { text: string; to: Language }) =>
+      apiPost('/api/inbox/translate', { text, to }, translateResultSchema),
+  });
+}
+
+export function useDeclineInquiry(id: string) {
+  return useInboxMutation(() => apiPost(`${inboxPath(id)}/decline`, {}, inquirySchema));
 }
 
 /** Tape chart drag: new room and/or dates in one step. */
@@ -621,11 +691,5 @@ export function useCreateGuest() {
 export function useUpdateGuest() {
   return useRefreshingMutation(({ id, patch }: { id: string; patch: GuestPatch }) =>
     apiPost(`/api/guests/${encodeURIComponent(id)}`, patch, guestSchema, 'PATCH'),
-  );
-}
-
-export function useDeclineInquiry(id: string) {
-  return useRefreshingMutation(() =>
-    apiPost(`/api/inbox/${encodeURIComponent(id)}/decline`, {}, inquirySchema),
   );
 }

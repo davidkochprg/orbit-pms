@@ -4,6 +4,7 @@ export const aiFeatures = [
   'agent',
   'inbox_extract',
   'inbox_draft',
+  'translate',
   'id_scan',
   'voice',
   'brief',

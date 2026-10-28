@@ -9,6 +9,7 @@ import type {
   HousekeepingTask,
   HousekeepingTaskStatus,
   IdScan,
+  InboxMessage,
   Inquiry,
   IsoDate,
   PendingAction,
@@ -81,12 +82,18 @@ export interface AuditRepository {
   }): Promise<AuditLogEntry[]>;
 }
 
+/** Conversations with their messages. */
 export interface InquiryRepository {
-  /** Newest first. */
+  /** Latest message first. */
   listInquiries(): Promise<Inquiry[]>;
   getInquiry(id: string): Promise<Inquiry | null>;
+  /** Saves a new conversation with its messages. */
   createInquiry(inquiry: Inquiry): Promise<void>;
+  /** Saves the conversation's own fields; messages change through the methods below. */
   updateInquiry(inquiry: Inquiry): Promise<void>;
+  addMessage(message: InboxMessage): Promise<void>;
+  /** Replaces a stored message, e.g. to keep its translation. */
+  updateMessage(message: InboxMessage): Promise<void>;
 }
 
 export interface PendingActionRepository {

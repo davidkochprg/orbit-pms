@@ -7,6 +7,7 @@ export const seedStaff: StaffMember[] = [
     name: 'Martina Kovářová',
     email: 'martina@example.com',
     role: 'manager',
+    language: 'cs',
     active: true,
   },
   {
@@ -14,6 +15,7 @@ export const seedStaff: StaffMember[] = [
     name: 'Petr Svoboda',
     email: 'petr@example.com',
     role: 'receptionist',
+    language: 'cs',
     active: true,
   },
   {
@@ -21,6 +23,7 @@ export const seedStaff: StaffMember[] = [
     name: 'Lucie Benešová',
     email: 'lucie@example.com',
     role: 'receptionist',
+    language: 'cs',
     active: true,
   },
   {
@@ -28,6 +31,7 @@ export const seedStaff: StaffMember[] = [
     name: 'Eva Marková',
     email: 'eva@example.com',
     role: 'housekeeping',
+    language: 'cs',
     active: true,
   },
   {
@@ -35,6 +39,7 @@ export const seedStaff: StaffMember[] = [
     name: 'Tomáš Král',
     email: 'tomas@example.com',
     role: 'receptionist',
+    language: 'cs',
     active: false,
   },
 ];

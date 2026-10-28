@@ -1,7 +1,7 @@
 import type { Inquiry, InquiryExtraction, Language, StayOption } from '@orbit/shared';
 import { type HotelContext, hotelFacts } from './hotel';
 
-const languageNames: Record<Language, string> = {
+export const languageNames: Record<Language, string> = {
   cs: 'Czech',
   de: 'German',
   en: 'English',
@@ -23,16 +23,25 @@ export const extractionSystemPrompt = `You read guest messages sent to a small h
 - wishes: wellness (sauna, massage, spa), dog (any pet dog), apartment (apartment, holiday flat, "Ferienwohnung", "apartmán").
 - question: one English sentence summarising what they ask, or null if they only ask for a stay.`;
 
+/** The conversation oldest first, each message marked as the guest's or the hotel's. */
+export function transcript(inquiry: Inquiry): string {
+  return inquiry.messages
+    .map(
+      (m) =>
+        `${m.direction === 'in' ? 'Guest' : 'Hotel'} (${m.sentAt.slice(0, 10)}):\n"""\n${m.body}\n"""`,
+    )
+    .join('\n\n');
+}
+
 export function extractionPrompt(inquiry: Inquiry, today: string): string {
   return `Today is ${today}.
 Channel: ${inquiry.channel}${inquiry.partner ? ` via ${inquiry.partner}` : ''}
 From: ${inquiry.senderName ?? 'unknown'}
 Subject: ${inquiry.subject ?? '(none)'}
 
-Message:
-"""
-${inquiry.rawText}
-"""`;
+The conversation, oldest first. Extract what the guest wants as of their latest message.
+
+${transcript(inquiry)}`;
 }
 
 export function draftSystemPrompt(hotel: HotelContext): string {
@@ -73,8 +82,7 @@ ${analysis.question ? `They ask: ${analysis.question}\n` : ''}
 Options to offer:
 ${offer}
 ${feedback ? `\nYour previous draft was rejected: ${feedback} Use only the amounts listed above.\n` : ''}
-Their message:
-"""
-${inquiry.rawText}
-"""`;
+Reply to the guest's latest message. The conversation, oldest first:
+
+${transcript(inquiry)}`;
 }

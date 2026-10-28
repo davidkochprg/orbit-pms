@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { languageSchema } from './enums';
 
 /** Managers run Settings and the team; everyone else works the front desk or the rooms. */
 export const staffRoles = ['manager', 'receptionist', 'housekeeping'] as const;
@@ -10,6 +11,8 @@ export const staffMemberSchema = z.object({
   name: z.string(),
   email: z.string().nullable(),
   role: staffRoleSchema,
+  /** The language they read best; guest messages and drafts are translated into it. */
+  language: languageSchema,
   /** Inactive members keep their history but can no longer sign in. */
   active: z.boolean(),
 });
@@ -24,6 +27,7 @@ export const newStaffBodySchema = z.object({
   name: z.string().trim().min(1).max(100),
   email: staffEmailSchema.default(null),
   role: staffRoleSchema,
+  language: languageSchema.default('cs'),
 });
 export type NewStaffBody = z.infer<typeof newStaffBodySchema>;
 
@@ -32,6 +36,7 @@ export const updateStaffBodySchema = z
     name: z.string().trim().min(1).max(100),
     email: staffEmailSchema,
     role: staffRoleSchema,
+    language: languageSchema,
     active: z.boolean(),
   })
   .partial();

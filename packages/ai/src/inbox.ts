@@ -4,7 +4,9 @@ import {
   type InquiryExtraction,
   inquiryExtractionSchema,
   type IsoDate,
+  type Language,
   type StayOption,
+  type Translation,
 } from '@orbit/shared';
 import { generateText, type LanguageModel, Output } from 'ai';
 import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from './cost';
@@ -17,6 +19,7 @@ import {
   extractionPrompt,
   extractionSystemPrompt,
 } from './prompts/inbox';
+import type { Translator } from './translate';
 import type { AiFeature, UsageStore } from './usage';
 
 export interface InboxPipelineDeps {
@@ -30,6 +33,8 @@ export interface InboxPipelineDeps {
   /** False once the monthly AI budget is spent. */
   canSpend: () => Promise<boolean>;
   today: () => IsoDate;
+  /** Puts the draft into the staff member's language, to read side by side. */
+  translator: Translator;
 }
 
 export async function extractMessage(
@@ -68,12 +73,14 @@ export async function draftReply(
 }
 
 /**
- * Prepares a message for staff: extract the request (one model call), find rooms and prices in
- * the domain (no model), then draft a reply (one model call, plus one retry if the draft's
- * prices don't match the quotes). Results are stored, so each message is processed once.
+ * Prepares a conversation for staff when they ask for it: extract the request (one model call),
+ * find rooms and prices in the domain (no model), draft a reply (one model call, plus one retry
+ * if the draft's prices don't match the quotes), and translate the draft into the staff member's
+ * language when it differs from the guest's (one cheap call). Results are stored, so a
+ * conversation is prepared once until the guest writes again.
  */
 export function createInboxPipeline(deps: InboxPipelineDeps) {
-  const { model, modelId, hotel, inbox, hotelContext, usage, canSpend, today } = deps;
+  const { model, modelId, hotel, inbox, hotelContext, usage, canSpend, today, translator } = deps;
 
   async function record(feature: AiFeature, tokens: TokenUsage) {
     await usage.record({
@@ -124,8 +131,14 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
   }
 
   return {
-    /** Processes a message unless it already has a result. `force` re-runs it. */
-    async process(id: string, { force = false } = {}): Promise<Inquiry> {
+    /**
+     * Prepares a conversation unless it already has a result; `force` re-runs it. `language` is
+     * the staff member's, for the draft side by side.
+     */
+    async process(
+      id: string,
+      { force = false, language = null }: { force?: boolean; language?: Language | null } = {},
+    ): Promise<Inquiry> {
       const inquiry = await inbox.get(id);
       if (inquiry.processedAt && !inquiry.processingError && !force) return inquiry;
       if (!(await canSpend())) {
@@ -142,6 +155,14 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
           analysis.kind === 'other'
             ? { draft: null, note }
             : await draftWithGuard(inquiry, analysis, options, note);
+        let draftTranslation: Translation | null = null;
+        if (draft && language && language !== analysis.language) {
+          // The draft is the result; without its translation staff still have it to send.
+          draftTranslation = await translator
+            .translate(draft, language)
+            .then((text) => ({ language, text }))
+            .catch(() => null);
+        }
         return await inbox.saveProcessing(id, {
           ok: true,
           parsed: analysis,
@@ -150,6 +171,7 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
             note: finalNote,
             draft,
             draftLanguage: draft ? analysis.language : null,
+            draftTranslation,
           },
         });
       } catch (err) {

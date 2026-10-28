@@ -93,7 +93,7 @@ describe('inbox service', () => {
   async function processed(senderAddress: string | null = 'new.guest@example.com') {
     const ctx = setup();
     const msg = await ctx.inbox.create({
-      rawText: ' Hallo ',
+      body: ' Hallo ',
       channel: 'ota',
       partner: 'Booking.com',
       senderName: 'Familie Beispiel',
@@ -103,14 +103,23 @@ describe('inbox service', () => {
     const saved = await ctx.inbox.saveProcessing(msg.id, {
       ok: true,
       parsed: analysis,
-      suggestion: { options, note, draft: 'Guten Tag…', draftLanguage: 'de' },
+      suggestion: {
+        options,
+        note,
+        draft: 'Guten Tag…',
+        draftLanguage: 'de',
+        draftTranslation: { language: 'cs', text: 'Dobrý den…' },
+      },
     });
     return { ...ctx, msg, saved };
   }
 
   it('creates a message and marks it quoted once rooms are prepared', async () => {
     const { msg, saved } = await processed();
-    expect(msg).toMatchObject({ rawText: 'Hallo', status: 'new', partner: 'Booking.com' });
+    expect(msg).toMatchObject({ status: 'new', partner: 'Booking.com', unread: true });
+    expect(msg.messages).toEqual([
+      expect.objectContaining({ direction: 'in', body: 'Hallo', author: null }),
+    ]);
     expect(saved).toMatchObject({
       status: 'quoted',
       processedAt: now.toISOString(),
@@ -120,7 +129,7 @@ describe('inbox service', () => {
 
   it('records a processing error without losing the message', async () => {
     const { inbox } = setup();
-    const msg = await inbox.create({ rawText: 'x', channel: 'email' });
+    const msg = await inbox.create({ body: 'x', channel: 'email' });
     const saved = await inbox.saveProcessing(msg.id, { ok: false, error: 'AI budget reached' });
     expect(saved).toMatchObject({ status: 'new', processingError: 'AI budget reached' });
   });
@@ -156,24 +165,94 @@ describe('inbox service', () => {
       code: 'conflict',
     });
     const { inbox: other } = setup();
-    const question = await other.create({ rawText: 'Parking?', channel: 'email' });
+    const question = await other.create({ body: 'Parking?', channel: 'email' });
     await expect(other.createHold(question.id, 'rm_2', 'user')).rejects.toMatchObject({
       code: 'invalid_transition',
     });
   });
 
-  it('marks a reply as sent and audits it', async () => {
+  it('sends a reply, which uses up the draft but keeps the rooms on offer', async () => {
     const { repos, inbox, msg } = await processed();
-    const replied = await inbox.markReplied(msg.id, '  Guten Tag, gerne!  ', 'user');
-    expect(replied).toMatchObject({ status: 'replied', reply: 'Guten Tag, gerne!' });
+    const sent = await inbox.send(msg.id, '  Guten Tag, gerne!  ', 'Martina', 'user');
+    expect(sent).toMatchObject({ status: 'replied', unread: false });
+    expect(sent.messages.at(-1)).toMatchObject({
+      direction: 'out',
+      body: 'Guten Tag, gerne!',
+      author: 'Martina',
+    });
+    expect(sent.lastMessageAt).toBe(now.toISOString());
+    expect(sent.suggestion).toMatchObject({ draft: null, draftTranslation: null });
+    expect(sent.suggestion?.options.length).toBeGreaterThan(0);
+    expect(await inbox.get(msg.id)).toEqual(sent);
     expect(repos.state.audit.at(-1)).toMatchObject({
       action: 'inquiry.replied',
       subjectId: msg.id,
       actor: 'user',
     });
-    await expect(inbox.markReplied(msg.id, ' ', 'user')).rejects.toMatchObject({
+    await expect(inbox.send(msg.id, ' ', null, 'user')).rejects.toMatchObject({
       code: 'invalid_input',
     });
+  });
+
+  it('brings a conversation back when the guest writes again', async () => {
+    const { inbox, msg } = await processed();
+    await inbox.send(msg.id, 'Guten Tag', null, 'user');
+    await inbox.setArchived(msg.id, true);
+    const again = await inbox.receive(msg.id, 'Danke! Und ein Parkplatz?');
+    expect(again).toMatchObject({
+      status: 'new',
+      unread: true,
+      archivedAt: null,
+      suggestion: null,
+      processedAt: null,
+    });
+    expect(again.messages.map((m) => m.direction)).toEqual(['in', 'out', 'in']);
+    // The stay it asked for is still known, for holding a room.
+    expect(again.parsed).toEqual(analysis);
+  });
+
+  it('keeps a settled conversation settled when the guest writes again', async () => {
+    const { inbox, msg } = await processed();
+    await inbox.decline(msg.id, 'user');
+    expect((await inbox.receive(msg.id, 'Schade.')).status).toBe('declined');
+  });
+
+  it('composes a new email to a guest', async () => {
+    const { repos, inbox } = setup();
+    const sent = await inbox.compose(
+      { toName: 'Demo Guest', toAddress: 'demo@example.com', subject: 'Your stay', body: 'Hello' },
+      'Martina',
+      'user',
+    );
+    expect(sent).toMatchObject({
+      channel: 'email',
+      senderAddress: 'demo@example.com',
+      status: 'replied',
+      unread: false,
+    });
+    expect(sent.messages).toEqual([expect.objectContaining({ direction: 'out', body: 'Hello' })]);
+    expect(repos.state.audit.at(-1)).toMatchObject({ action: 'inquiry.compose' });
+  });
+
+  it('marks conversations read or unread and archives them', async () => {
+    const { inbox, msg } = await processed();
+    expect((await inbox.setUnread(msg.id, false)).unread).toBe(false);
+    expect((await inbox.setUnread(msg.id, true)).unread).toBe(true);
+    expect((await inbox.setArchived(msg.id, true)).archivedAt).toBe(now.toISOString());
+    expect((await inbox.setArchived(msg.id, false)).archivedAt).toBe(null);
+  });
+
+  it('keeps a translation with its message', async () => {
+    const { inbox, msg } = await processed();
+    const messageId = msg.messages[0]!.id;
+    await inbox.saveTranslation(msg.id, messageId, { language: 'cs', text: 'Dobrý den' });
+    expect((await inbox.get(msg.id)).messages[0]?.translation).toEqual({
+      language: 'cs',
+      text: 'Dobrý den',
+    });
+    await expect(
+      inbox.saveTranslation(msg.id, 'msg_nope', { language: 'cs', text: '' }),
+    ).rejects.toMatchObject({ code: 'not_found' });
   });
 
   it('declines a message unless it already led to a booking', async () => {

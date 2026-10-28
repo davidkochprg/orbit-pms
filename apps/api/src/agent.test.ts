@@ -75,6 +75,8 @@ function appWith(
     ai: model && {
       agent: model,
       agentModelId: 'muse-spark-1.3',
+      translate: model,
+      translateModelId: 'muse-spark-1.3',
       vision: null,
       visionModelId: null,
       transcription: null,

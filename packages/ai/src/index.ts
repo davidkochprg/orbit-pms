@@ -11,3 +11,4 @@ export * from './provider';
 export * from './tools';
 export * from './transcribe';
 export * from './usage';
+export * from './translate';

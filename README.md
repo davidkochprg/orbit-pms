@@ -18,11 +18,11 @@ Press <kbd>⌘K</kbd> and type what you need: "is a family room free from Friday
 
 ![The command bar: the agent checks availability, quotes a price and prepares a hold for confirmation](docs/images/agent.png)
 
-### An inbox that prepares the answer
+### An inbox that prepares the answer, in two languages
 
-Every guest message, whether an email, a web form, a phone note or a Booking.com message, is read when staff open it. Orbit pulls out the dates, party, children's ages and wishes, finds free rooms, prices them with the real pricing rules, and drafts a reply in the guest's language. A price guard checks every amount in the draft against the quote, so a wrong price never reaches a guest. One click puts a hold on the room.
+Email, web forms, phone notes and Booking.com messages land in one mail client: conversations with their history, folders, channel filters and search. Opening a message costs nothing. When staff click "Prepare a reply", Orbit reads the conversation, pulls out the dates, party, children's ages and wishes, finds free rooms, prices them with the real pricing rules, and drafts a reply in the guest's language, shown side by side with the receptionist's own language. Either side can be edited and translated into the other. A price guard checks every amount in the draft and its translation against the quote, so a wrong price never reaches a guest. One click puts a hold on the room.
 
-![A German family's apartment request with extracted details, a quoted option and a drafted reply in German](docs/images/inbox.png)
+![A German family's apartment request: the message translated into Czech, a priced apartment with a Hold button, and the German draft beside its Czech version](docs/images/inbox.png)
 
 ### Housekeeping by voice
 
@@ -42,13 +42,14 @@ All guests, bookings and messages in the demo and the screenshots are synthetic.
 
 Every AI feature runs on the Meta Model API through the Vercel AI SDK. The models do language, the domain does the facts:
 
-| Feature            | Model                                          | What the model does                                                     | What it never does                                                     |
-| ------------------ | ---------------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| ⌘K agent           | `muse-spark-1.3`                               | Plans multi-step tool use over 18 typed tools, writes the answer        | Computes a price or availability, or changes a booking without a click |
-| Inbox extraction   | `muse-spark-1.3`                               | Structured output: kind, language, dates, party, child ages, wishes     | Picks rooms or prices                                                  |
-| Reply drafts       | `muse-spark-1.3`                               | Writes the reply in the guest's language around the exact quoted totals | Sends a reply itself; a draft with a wrong amount is redone or dropped |
-| Housekeeping notes | `muse-voice-transcribe-1.0` + `muse-spark-1.3` | Transcribes the recording, reads it into room/status/issue updates      | Changes bookings; unknown rooms and forbidden changes are skipped      |
-| ID scans           | `muse-spark-1.3` (vision)                      | Reads a phone photo of an ID card or passport into guest-book fields    | Saves them: staff review every value; the photo is never stored        |
+| Feature            | Model                                          | What the model does                                                      | What it never does                                                           |
+| ------------------ | ---------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| ⌘K agent           | `muse-spark-1.3`                               | Plans multi-step tool use over 31 typed tools, writes the answer         | Computes a price or availability, or changes a booking without a click       |
+| Inbox extraction   | `muse-spark-1.3`                               | Structured output: kind, language, dates, party, child ages, wishes      | Picks rooms or prices                                                        |
+| Reply drafts       | `muse-spark-1.3`                               | Writes the reply in the guest's language around the exact quoted totals  | Runs before staff ask, or sends a reply; a wrong amount is redone or dropped |
+| Translation        | `muse-spark-1.3` (`META_MODEL_TRANSLATE`)      | Puts drafts and guest messages into the staff member's language and back | Changes an amount: such a translation is redone or refused                   |
+| Housekeeping notes | `muse-voice-transcribe-1.0` + `muse-spark-1.3` | Transcribes the recording, reads it into room/status/issue updates       | Changes bookings; unknown rooms and forbidden changes are skipped            |
+| ID scans           | `muse-spark-1.3` (vision)                      | Reads a phone photo of an ID card or passport into guest-book fields     | Saves them: staff review every value; the photo is never stored              |
 
 Muse Spark always reasons before answering, so the reasoning effort is set per feature to the lowest level that keeps quality, measured with the evals and live runs: `minimal` for extraction, drafts, notes and ID scans, `low` for the agent, which plans multi-step tool use.
 
@@ -71,8 +72,11 @@ More in [docs/ai.md](docs/ai.md).
 | ------------------ | ------------------------------------------------------------------------------------------------ | ------------ |
 | Inbox extraction   | 14 messages in Czech, German, English and Polish, including Booking.com questions about a stay   | 14/14 (100%) |
 | Housekeeping notes | 10 notes in four languages, including spelled-out room numbers, an unknown room and a vague note | 10/10 (100%) |
+| ID scans           | 3 synthetic specimen documents: a Czech-style ID card, a German-style passport and a receipt     | 3/3 (100%)   |
+| Agent tools        | 10 staff requests run through the real agent and tools, checked by their effect                  | 10/10 (100%) |
+| Translations       | 4 drafts and guest messages between Czech, German, English and Polish, amounts kept              | 4/4 (100%)   |
 
-Measured with `muse-spark-1.3` at `minimal` reasoning effort on 2026-10-27. An inbox message takes about 1.4 s to read.
+Measured with `muse-spark-1.3` on 2026-10-28, at `minimal` reasoning effort except the agent (`low`). An inbox message takes about 2 s to read; a translation costs about $0.002.
 
 ## Architecture
 

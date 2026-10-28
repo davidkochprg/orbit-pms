@@ -7,6 +7,8 @@ export interface MetaModelConfig {
   baseURL: string;
   models: {
     agent: string;
+    /** For translating messages and drafts; the agent model when unset. */
+    translate?: string;
     voice?: string;
     vision?: string;
   };
@@ -16,6 +18,9 @@ export interface MetaProvider {
   /** Text model for the agent loop and tool calling. */
   agent: LanguageModel;
   agentModelId: string;
+  /** Model for translations: a cheaper one if configured, otherwise the agent model. */
+  translate: LanguageModel;
+  translateModelId: string;
   /** Vision-capable chat model for ID scans, if configured. */
   vision: LanguageModel | null;
   visionModelId: string | null;
@@ -39,6 +44,8 @@ export function createMetaProvider(config: MetaModelConfig): MetaProvider {
   return {
     agent: meta.chatModel(config.models.agent),
     agentModelId: config.models.agent,
+    translate: meta.chatModel(config.models.translate ?? config.models.agent),
+    translateModelId: config.models.translate ?? config.models.agent,
     vision: config.models.vision ? meta.chatModel(config.models.vision) : null,
     visionModelId: config.models.vision ?? null,
     transcription: config.models.voice

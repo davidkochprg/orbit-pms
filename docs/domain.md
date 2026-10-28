@@ -10,7 +10,7 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 | Room             | name, room type, `kind` (`room` \| `apartment`), floor, `status` (`clean` \| `dirty` \| `inspected` \| `out_of_order`)                                                                                          |
 | Guest            | name, email, phone, `language` (`cs` \| `de` \| `en` \| `pl`), notes                                                                                                                                            |
 | Booking          | guest, room, `checkIn`, `checkOut`, adults, `childAges`, `status`, `holdExpiresAt`, `source`, `addons` (wellness, dogs, extra beds), `priceSnapshot` (a quote), notes                                           |
-| Inquiry          | raw text, channel, received at, parsed extraction, `status`, linked booking                                                                                                                                     |
+| Inquiry          | a conversation: channel, guest, messages (in or out), unread, archived, parsed extraction, `status`, linked booking                                                                                             |
 | HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes                                                                                                   |
 | HotelProfile     | name, location, description, contact, `checkInFrom`, `checkOutBy`, `entries` (`policy` \| `amenity` \| `info`, title, details)                                                                                  |
 | Charge           | booking, label, quantity, `unitPrice` (CZK, negative for a discount), amount, `vatBracket` (`standard` \| `reduced` \| `none`), `postedOn`                                                                      |
@@ -67,12 +67,16 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 
 ## Inbox
 
-`createInboxService` (`inbox-service.ts`) keeps guest messages from every channel in one stream.
+`createInboxService` (`inbox-service.ts`) keeps conversations with guests from every channel in one stream. Sending records a message; delivering it is a transport's job outside Orbit.
+
+- `create(message)`: a guest's first message starts an unread conversation. `compose(body, author, actor)`: the hotel writes first (`inquiry.compose`).
+- `receive(id, body)`: the guest writes again. The conversation is unread, leaves the archive, needs a reply (`new`) unless it is `converted` or `declined`, and its prepared reply is dropped; the parsed request stays for holding a room.
+- `send(id, body, author, actor)`: the hotel's reply, signed by the staff member; the conversation becomes `replied` unless settled, and the draft is used up (`inquiry.replied`).
+- `setUnread(id, unread)`, `setArchived(id, archived)`, `saveTranslation(id, messageId, translation)`.
 
 - `inboxOptions(analysis)`: for a complete booking request, up to three free rooms, one per room type, cheapest first, each with an exact quote. An apartment is required if the guest asks for one, or brings a dog (`hotelPolicy.dogsAllowedIn`, placeholder: apartments only). Wellness and a dog become quote add-ons.
 - `saveProcessing(id, result)`: stores the agent's extraction and suggestion; a `new` message with options becomes `quoted`.
 - `createHold(id, roomId, actor)`: a hold for the requested stay in the chosen room. Reuses a guest whose email matches the sender (case-insensitive), otherwise creates one. The hold and the message's `bookingId` are saved in one transaction.
-- `markReplied(id, reply, actor)`: stores the sent reply and marks the message `replied`.
 - `decline(id, actor)`: marks a message `declined`, unless it already led to a booking (`invalid_transition`).
 
 ## Guests

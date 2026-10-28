@@ -22,6 +22,7 @@ import {
   type Charge,
   hotelProfileSchema,
   type HousekeepingTask,
+  type InboxMessage,
   type Inquiry,
   type PendingAction,
   type Payment,
@@ -53,6 +54,7 @@ import {
   guests,
   hotelProfile,
   housekeepingTasks,
+  inboxMessages,
   inquiries,
   payments,
   pendingActions,
@@ -188,38 +190,76 @@ function auditRepository(db: Db): AuditRepository {
 
 type InquiryRow = typeof inquiries.$inferSelect;
 
-function toInquiry(row: InquiryRow): Inquiry {
+type MessageRow = typeof inboxMessages.$inferSelect;
+
+function toMessage({ sentAt, ...row }: MessageRow): InboxMessage {
+  return { ...row, sentAt: sentAt.toISOString() };
+}
+
+function toMessageRow(message: InboxMessage): MessageRow {
+  return { ...message, sentAt: new Date(message.sentAt) };
+}
+
+function toInquiry(row: InquiryRow, messages: InboxMessage[]): Inquiry {
   return {
     ...row,
     receivedAt: row.receivedAt.toISOString(),
+    lastMessageAt: row.lastMessageAt.toISOString(),
+    archivedAt: row.archivedAt?.toISOString() ?? null,
     processedAt: row.processedAt?.toISOString() ?? null,
+    messages,
   };
 }
 
-function toInquiryRow(inquiry: Inquiry): InquiryRow {
+function toInquiryRow({ messages: _, ...inquiry }: Inquiry): InquiryRow {
   return {
     ...inquiry,
     receivedAt: new Date(inquiry.receivedAt),
+    lastMessageAt: new Date(inquiry.lastMessageAt),
+    archivedAt: inquiry.archivedAt ? new Date(inquiry.archivedAt) : null,
     processedAt: inquiry.processedAt ? new Date(inquiry.processedAt) : null,
   };
 }
 
 function inquiryRepository(db: Db): InquiryRepository {
+  const messagesOf = async (inquiryId?: string) =>
+    (
+      await db
+        .select()
+        .from(inboxMessages)
+        .where(inquiryId ? eq(inboxMessages.inquiryId, inquiryId) : undefined)
+        .orderBy(asc(inboxMessages.sentAt), asc(inboxMessages.id))
+    ).map(toMessage);
+
   return {
     async listInquiries() {
-      const rows = await db.select().from(inquiries).orderBy(desc(inquiries.receivedAt));
-      return rows.map(toInquiry);
+      const rows = await db.select().from(inquiries).orderBy(desc(inquiries.lastMessageAt));
+      const byInquiry = new Map<string, InboxMessage[]>();
+      for (const m of await messagesOf()) {
+        byInquiry.set(m.inquiryId, [...(byInquiry.get(m.inquiryId) ?? []), m]);
+      }
+      return rows.map((row) => toInquiry(row, byInquiry.get(row.id) ?? []));
     },
     async getInquiry(id) {
       const [row] = await db.select().from(inquiries).where(eq(inquiries.id, id));
-      return row ? toInquiry(row) : null;
+      return row ? toInquiry(row, await messagesOf(id)) : null;
     },
     async createInquiry(inquiry) {
       await db.insert(inquiries).values(toInquiryRow(inquiry));
+      if (inquiry.messages.length > 0) {
+        await db.insert(inboxMessages).values(inquiry.messages.map(toMessageRow));
+      }
     },
     async updateInquiry(inquiry) {
       const { id, ...row } = toInquiryRow(inquiry);
       await db.update(inquiries).set(row).where(eq(inquiries.id, id));
+    },
+    async addMessage(message) {
+      await db.insert(inboxMessages).values(toMessageRow(message));
+    },
+    async updateMessage(message) {
+      const { id, ...row } = toMessageRow(message);
+      await db.update(inboxMessages).set(row).where(eq(inboxMessages.id, id));
     },
   };
 }
@@ -315,6 +355,7 @@ function staffRepository(db: Db): StaffRepository {
     name: staff.name,
     email: staff.email,
     role: staff.role,
+    language: staff.language,
     active: staff.active,
   };
   return {

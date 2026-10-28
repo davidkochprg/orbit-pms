@@ -9,6 +9,7 @@ export function createAi(env: Env): MetaProvider | null {
     baseURL: env.META_API_BASE_URL,
     models: {
       agent: env.META_MODEL_AGENT,
+      ...(env.META_MODEL_TRANSLATE ? { translate: env.META_MODEL_TRANSLATE } : {}),
       ...(env.META_MODEL_VOICE ? { voice: env.META_MODEL_VOICE } : {}),
       ...(env.META_MODEL_VISION ? { vision: env.META_MODEL_VISION } : {}),
     },

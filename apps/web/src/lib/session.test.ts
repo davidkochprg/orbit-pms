@@ -7,6 +7,7 @@ const member = (id: string, overrides: Partial<StaffMember> = {}): StaffMember =
   name: id,
   email: null,
   role: 'receptionist',
+  language: 'cs',
   active: true,
   ...overrides,
 });

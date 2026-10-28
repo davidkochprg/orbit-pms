@@ -1,11 +1,15 @@
 import type {
   AuditActor,
   Booking,
+  ComposeBody,
   CreateHoldInput,
+  InboxMessage,
   Inquiry,
   InquiryChannel,
   InquiryExtraction,
+  InquiryStatus,
   InquirySuggestion,
+  Translation,
 } from '@orbit/shared';
 import { DomainError } from './errors';
 import { addonsForWishes, bookingSourceFor, stayRequest } from './inbox';
@@ -21,7 +25,7 @@ export interface InboxDeps {
 }
 
 export interface NewMessage {
-  rawText: string;
+  body: string;
   channel: InquiryChannel;
   partner?: string | null;
   subject?: string | null;
@@ -33,32 +37,85 @@ export type ProcessingResult =
   | { ok: true; parsed: InquiryExtraction; suggestion: InquirySuggestion }
   | { ok: false; error: string };
 
-/** Guest messages from every channel in one stream, and what staff do with them. */
+/** Statuses a conversation keeps whatever is written: it led to a booking, or it was turned down. */
+const SETTLED: InquiryStatus[] = ['converted', 'declined'];
+
+/** The guest's messages, oldest first: what the agent reads to prepare a reply. */
+export function guestMessages(inquiry: Inquiry): InboxMessage[] {
+  return inquiry.messages.filter((m) => m.direction === 'in');
+}
+
+/**
+ * Guest conversations from every channel, by email or an OTA's messaging, and what staff do
+ * with them. Sending records the message; delivering it is a transport's job outside Orbit.
+ */
 export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
-  async function load(id: string): Promise<Inquiry> {
-    const inquiry = await repos.inquiries.getInquiry(id);
-    if (!inquiry) throw new DomainError('not_found', `Message ${id} not found`);
+  async function load(r: Repositories, id: string): Promise<Inquiry> {
+    const inquiry = await r.inquiries.getInquiry(id);
+    if (!inquiry) throw new DomainError('not_found', `Conversation ${id} not found`);
     return inquiry;
   }
 
-  return {
-    list: () => repos.inquiries.listInquiries(),
-    get: load,
+  function message(
+    inquiryId: string,
+    direction: InboxMessage['direction'],
+    body: string,
+    author: string | null,
+  ): InboxMessage {
+    const text = body.trim();
+    if (!text) throw new DomainError('invalid_input', 'The message is empty');
+    return {
+      id: newId('msg'),
+      inquiryId,
+      direction,
+      body: text,
+      sentAt: clock().toISOString(),
+      author,
+      translation: null,
+    };
+  }
 
-    async create(message: NewMessage): Promise<Inquiry> {
-      if (!message.rawText.trim()) throw new DomainError('invalid_input', 'The message is empty');
+  /** Adds a message to a conversation and saves the conversation as `next` says. */
+  async function append(
+    r: Repositories,
+    inquiry: Inquiry,
+    msg: InboxMessage,
+    next: Partial<Inquiry>,
+  ) {
+    await r.inquiries.addMessage(msg);
+    const updated: Inquiry = {
+      ...inquiry,
+      ...next,
+      messages: [...inquiry.messages, msg],
+      lastMessageAt: msg.sentAt,
+    };
+    await r.inquiries.updateInquiry(updated);
+    return updated;
+  }
+
+  return {
+    /** Newest conversation first. */
+    list: () => repos.inquiries.listInquiries(),
+    get: (id: string) => load(repos, id),
+
+    /** A guest's first message, e.g. pasted from an email or relayed by an OTA. */
+    async create(input: NewMessage): Promise<Inquiry> {
+      const id = newId('inq');
+      const first = message(id, 'in', input.body, null);
       const inquiry: Inquiry = {
-        id: newId('inq'),
-        rawText: message.rawText.trim(),
-        channel: message.channel,
-        partner: message.partner ?? null,
-        subject: message.subject ?? null,
-        senderName: message.senderName ?? null,
-        senderAddress: message.senderAddress ?? null,
-        receivedAt: clock().toISOString(),
+        id,
+        channel: input.channel,
+        partner: input.partner ?? null,
+        subject: input.subject ?? null,
+        senderName: input.senderName ?? null,
+        senderAddress: input.senderAddress ?? null,
+        receivedAt: first.sentAt,
+        lastMessageAt: first.sentAt,
+        messages: [first],
+        unread: true,
+        archivedAt: null,
         parsed: null,
         suggestion: null,
-        reply: null,
         status: 'new',
         bookingId: null,
         processedAt: null,
@@ -68,9 +125,119 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
       return inquiry;
     },
 
+    /**
+     * The guest wrote again. The conversation is unread and back in the inbox, needs a reply
+     * unless it is settled, and what the agent prepared no longer answers it.
+     */
+    async receive(id: string, body: string): Promise<Inquiry> {
+      return repos.transaction(async (tx) => {
+        const inquiry = await load(tx, id);
+        return append(tx, inquiry, message(id, 'in', body, null), {
+          unread: true,
+          archivedAt: null,
+          status: SETTLED.includes(inquiry.status) ? inquiry.status : 'new',
+          suggestion: null,
+          processedAt: null,
+          processingError: null,
+        });
+      });
+    },
+
+    /** A new email from the hotel to a guest, starting a conversation. */
+    async compose(input: ComposeBody, author: string | null, actor: AuditActor): Promise<Inquiry> {
+      return repos.transaction(async (tx) => {
+        const id = newId('inq');
+        const first = message(id, 'out', input.body, author);
+        const inquiry: Inquiry = {
+          id,
+          channel: 'email',
+          partner: null,
+          subject: input.subject,
+          senderName: input.toName,
+          senderAddress: input.toAddress,
+          receivedAt: first.sentAt,
+          lastMessageAt: first.sentAt,
+          messages: [first],
+          unread: false,
+          archivedAt: null,
+          parsed: null,
+          suggestion: null,
+          status: 'replied',
+          bookingId: null,
+          processedAt: null,
+          processingError: null,
+        };
+        await tx.inquiries.createInquiry(inquiry);
+        await tx.audit.append({
+          actor,
+          action: 'inquiry.compose',
+          subjectId: id,
+          payload: { messageId: first.id },
+        });
+        return inquiry;
+      });
+    },
+
+    /**
+     * Sends the hotel's reply through the conversation's channel. The prepared draft is used up;
+     * the room options stay for holding one later.
+     */
+    async send(id: string, body: string, author: string | null, actor: AuditActor) {
+      return repos.transaction(async (tx) => {
+        const inquiry = await load(tx, id);
+        const msg = message(id, 'out', body, author);
+        const updated = await append(tx, inquiry, msg, {
+          unread: false,
+          status: SETTLED.includes(inquiry.status) ? inquiry.status : 'replied',
+          suggestion: inquiry.suggestion && {
+            ...inquiry.suggestion,
+            draft: null,
+            draftLanguage: null,
+            draftTranslation: null,
+          },
+        });
+        await tx.audit.append({
+          actor,
+          action: 'inquiry.replied',
+          subjectId: id,
+          payload: { messageId: msg.id, bookingId: inquiry.bookingId },
+        });
+        return updated;
+      });
+    },
+
+    async setUnread(id: string, unread: boolean): Promise<Inquiry> {
+      const inquiry = await load(repos, id);
+      if (inquiry.unread === unread) return inquiry;
+      const updated = { ...inquiry, unread };
+      await repos.inquiries.updateInquiry(updated);
+      return updated;
+    },
+
+    async setArchived(id: string, archived: boolean): Promise<Inquiry> {
+      const inquiry = await load(repos, id);
+      if ((inquiry.archivedAt !== null) === archived) return inquiry;
+      const updated = { ...inquiry, archivedAt: archived ? clock().toISOString() : null };
+      await repos.inquiries.updateInquiry(updated);
+      return updated;
+    },
+
+    /** Keeps a message's translation, so reading it again costs nothing. */
+    async saveTranslation(id: string, messageId: string, translation: Translation) {
+      const inquiry = await load(repos, id);
+      const msg = inquiry.messages.find((m) => m.id === messageId);
+      if (!msg) throw new DomainError('not_found', `Message ${messageId} not found`);
+      const translated = { ...msg, translation };
+      await repos.inquiries.updateMessage(translated);
+      return {
+        ...inquiry,
+        messages: inquiry.messages.map((m) => (m.id === messageId ? translated : m)),
+      };
+    },
+
     /** Stores what the agent prepared. A message with offerable rooms becomes `quoted`. */
     async saveProcessing(id: string, result: ProcessingResult): Promise<Inquiry> {
-      const inquiry = await load(id);
+      const inquiry = await load(repos, id);
       const updated: Inquiry = result.ok
         ? {
             ...inquiry,
@@ -93,7 +260,7 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
      * same email address, otherwise creates one from the sender.
      */
     async createHold(id: string, roomId: string, actor: AuditActor): Promise<Booking> {
-      const inquiry = await load(id);
+      const inquiry = await load(repos, id);
       const analysis = inquiry.parsed;
       const stay = analysis && stayRequest(analysis);
       if (!analysis || !stay) {
@@ -131,8 +298,7 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
     /** Marks a message as not leading to a booking, e.g. spam or a request that can't be met. */
     async decline(id: string, actor: AuditActor): Promise<Inquiry> {
       return repos.transaction(async (tx) => {
-        const inquiry = await tx.inquiries.getInquiry(id);
-        if (!inquiry) throw new DomainError('not_found', `Message ${id} not found`);
+        const inquiry = await load(tx, id);
         if (inquiry.status === 'converted' || inquiry.bookingId) {
           throw new DomainError('invalid_transition', 'This message already led to a booking');
         }
@@ -143,24 +309,6 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
           action: 'inquiry.decline',
           subjectId: id,
           payload: { from: inquiry.status },
-        });
-        return updated;
-      });
-    },
-
-    /** Records the reply as sent (sending itself happens outside Orbit). */
-    async markReplied(id: string, reply: string, actor: AuditActor): Promise<Inquiry> {
-      if (!reply.trim()) throw new DomainError('invalid_input', 'The reply is empty');
-      return repos.transaction(async (tx) => {
-        const inquiry = await tx.inquiries.getInquiry(id);
-        if (!inquiry) throw new DomainError('not_found', `Message ${id} not found`);
-        const updated: Inquiry = { ...inquiry, reply: reply.trim(), status: 'replied' };
-        await tx.inquiries.updateInquiry(updated);
-        await tx.audit.append({
-          actor,
-          action: 'inquiry.replied',
-          subjectId: id,
-          payload: { bookingId: inquiry.bookingId },
         });
         return updated;
       });

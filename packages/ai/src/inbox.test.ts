@@ -10,6 +10,7 @@ import type { InquiryExtraction } from '@orbit/shared';
 import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
 import { createInboxPipeline } from './inbox';
+import { createTranslator } from './translate';
 import type { UsageRecord } from './usage';
 
 const now = new Date('2026-05-10T08:00:00Z');
@@ -88,27 +89,30 @@ function setup(replies: string[], { budgetLeft = true } = {}) {
     },
   });
   const records: UsageRecord[] = [];
+  const usage = {
+    record: (r: UsageRecord) => {
+      records.push(r);
+      return Promise.resolve();
+    },
+    monthToDateMicroUsd: () => Promise.resolve(0),
+  };
+  const canSpend = () => Promise.resolve(budgetLeft);
   const pipeline = createInboxPipeline({
     model,
     modelId: 'muse-spark-1.3',
     hotel,
     inbox,
     hotelContext: () => Promise.resolve({ profile: emptyHotelProfile, policy: hotelPolicy }),
-    usage: {
-      record: (r) => {
-        records.push(r);
-        return Promise.resolve();
-      },
-      monthToDateMicroUsd: () => Promise.resolve(0),
-    },
-    canSpend: () => Promise.resolve(budgetLeft),
+    usage,
+    canSpend,
     today: () => '2026-05-10',
+    translator: createTranslator({ model, modelId: 'muse-spark-1.3', usage, canSpend }),
   });
   return { repos, inbox, pipeline, calls, records };
 }
 
 const message = {
-  rawText: 'Dobrý den, máte pokoj pro 2 osoby 12.–14. 5.? I wellness. Jana',
+  body: 'Dobrý den, máte pokoj pro 2 osoby 12.–14. 5.? I wellness. Jana',
   channel: 'email' as const,
   senderName: 'Jana Testová',
 };
@@ -186,8 +190,7 @@ describe('inbox pipeline', () => {
     const reply = 'Dobrý den, psi jsou vítáni v apartmánech.';
     const { inbox, pipeline } = setup([JSON.stringify(question), reply]);
     const result = await pipeline.process(
-      (await inbox.create({ rawText: 'Můžeme vzít psa?', channel: 'ota', partner: 'Booking.com' }))
-        .id,
+      (await inbox.create({ body: 'Můžeme vzít psa?', channel: 'ota', partner: 'Booking.com' })).id,
     );
     expect(result.status).toBe('new');
     expect(result.suggestion).toEqual({
@@ -195,6 +198,7 @@ describe('inbox pipeline', () => {
       note: null,
       draft: reply,
       draftLanguage: 'cs',
+      draftTranslation: null,
     });
   });
 
@@ -214,5 +218,46 @@ describe('inbox pipeline', () => {
     expect(failed.parsed).toBeNull();
     await pipeline.process(msg.id);
     expect(calls.length).toBeGreaterThan(1);
+  });
+
+  it("puts the draft side by side in the staff member's language", async () => {
+    const draft = `Dobrý den, pokoj stojí ${TOTAL}.`;
+    const english = `Hello, the room costs ${TOTAL}.`;
+    const { inbox, pipeline, records } = setup([JSON.stringify(request), draft, english]);
+    const result = await pipeline.process((await inbox.create(message)).id, { language: 'en' });
+    expect(result.suggestion).toMatchObject({
+      draft,
+      draftLanguage: 'cs',
+      draftTranslation: { language: 'en', text: english },
+    });
+    expect(records.map((r) => r.feature)).toEqual(['inbox_extract', 'inbox_draft', 'translate']);
+  });
+
+  it('skips the translation when staff read the guest language, or when it changes an amount', async () => {
+    const draft = `Pokoj stojí ${TOTAL}.`;
+    const same = setup([JSON.stringify(request), draft]);
+    const czech = await same.pipeline.process((await same.inbox.create(message)).id, {
+      language: 'cs',
+    });
+    expect(czech.suggestion?.draftTranslation).toBeNull();
+    expect(same.calls).toHaveLength(2);
+
+    const wrong = setup([JSON.stringify(request), draft, 'The room costs 4 800 CZK.']);
+    const english = await wrong.pipeline.process((await wrong.inbox.create(message)).id, {
+      language: 'en',
+    });
+    expect(english.suggestion?.draft).toBe(draft);
+    expect(english.suggestion?.draftTranslation).toBeNull();
+  });
+
+  it('reads the whole conversation, answering the guest’s latest message', async () => {
+    const { inbox, pipeline, calls } = setup([JSON.stringify(request), `Cena ${TOTAL}.`]);
+    const msg = await inbox.create(message);
+    await inbox.send(msg.id, 'Dobrý den, na kdy přesně?', null, 'user');
+    await inbox.receive(msg.id, 'Od 12. do 14. května.');
+    await pipeline.process(msg.id);
+    expect(calls[0]).toContain('na kdy přesně');
+    expect(calls[1]).toContain('Od 12. do 14. května.');
+    expect(calls[1]).toContain("Reply to the guest's latest message");
   });
 });

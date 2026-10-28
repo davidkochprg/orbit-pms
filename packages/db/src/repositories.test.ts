@@ -191,6 +191,47 @@ describe('creating records (PGlite)', () => {
   });
 });
 
+describe('conversations (PGlite)', () => {
+  it('lists conversations by their latest message, each with its messages oldest first', async () => {
+    const all = await repos.inquiries.listInquiries();
+    expect(all).toHaveLength(seed.inquiries.length);
+    expect(all.map((i) => i.lastMessageAt)).toEqual(
+      all
+        .map((i) => i.lastMessageAt)
+        .sort()
+        .reverse(),
+    );
+    const ota = all.find((i) => i.id === 'inq_seed_ota')!;
+    expect(ota.messages.map((m) => m.direction)).toEqual(['in', 'out', 'in']);
+    expect(await repos.inquiries.getInquiry('inq_seed_ota')).toEqual(ota);
+  });
+
+  it('adds and updates messages without touching the conversation row', async () => {
+    const before = (await repos.inquiries.getInquiry('inq_01'))!;
+    const reply = {
+      id: 'msg_test',
+      inquiryId: 'inq_01',
+      direction: 'out' as const,
+      body: 'Dobrý den',
+      sentAt: '2026-10-27T09:00:00.000Z',
+      author: 'Martina',
+      translation: null,
+    };
+    await repos.inquiries.addMessage(reply);
+    await repos.inquiries.updateMessage({
+      ...reply,
+      translation: { language: 'en', text: 'Hello' },
+    });
+    await repos.inquiries.updateInquiry({ ...before, unread: false, lastMessageAt: reply.sentAt });
+    const after = (await repos.inquiries.getInquiry('inq_01'))!;
+    expect(after.unread).toBe(false);
+    expect(after.messages.at(-1)).toEqual({
+      ...reply,
+      translation: { language: 'en', text: 'Hello' },
+    });
+  });
+});
+
 describe('housekeeping tasks (PGlite)', () => {
   it('lists seeded tasks oldest first and filters by room and status', async () => {
     const all = await repos.housekeeping.listTasks();
@@ -442,13 +483,15 @@ describe('staff (PGlite)', () => {
       name: 'Test Porter',
       email: null,
       role: 'receptionist' as const,
+      language: 'cs' as const,
       active: true,
     };
     await repos.staff.create(member);
     expect(await repos.staff.get('stf_test')).toEqual(member);
-    await repos.staff.update({ ...member, role: 'housekeeping', active: false });
+    await repos.staff.update({ ...member, role: 'housekeeping', language: 'de', active: false });
     expect(await repos.staff.get('stf_test')).toMatchObject({
       role: 'housekeeping',
+      language: 'de',
       active: false,
     });
     expect(await repos.staff.get('nope')).toBeNull();

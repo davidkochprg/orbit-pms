@@ -12,6 +12,7 @@ export const envSchema = z.object({
   META_API_KEY: optional,
   META_API_BASE_URL: z.url().default('https://api.meta.ai/v1'),
   META_MODEL_AGENT: optional,
+  META_MODEL_TRANSLATE: optional,
   META_MODEL_VOICE: optional,
   META_MODEL_VISION: optional,
   AI_DAILY_TOKEN_BUDGET: z.coerce.number().int().positive().default(2_000_000),

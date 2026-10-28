@@ -28,6 +28,7 @@ Read from `.env` at the repo root by the API and the db scripts, and validated w
 | `META_MODEL_AGENT`       | –                        | Model for the agent loop and tool calling |
 | `META_MODEL_VOICE`       | –                        | Transcription model for voice notes       |
 | `META_MODEL_VISION`      | –                        | Vision model for ID scans                 |
+| `META_MODEL_TRANSLATE`   | `META_MODEL_AGENT`       | Model for translating messages and drafts |
 | `AI_DAILY_TOKEN_BUDGET`  | `2000000`                | Global daily token budget                 |
 | `AI_RATE_LIMIT_PER_HOUR` | `20`                     | Agent calls per IP per hour               |
 | `AI_MONTHLY_BUDGET_USD`  | `100`                    | Monthly cap on real Meta spend            |
@@ -76,7 +77,9 @@ A PGlite directory can only be open in one process at a time; two processes writ
 - 50 rooms of six types: double, family, single, superior double and junior suite rooms on floors 1–4 (101–111, 201–211, 301–311, 401–411), and apartments A1–A6 on the ground floor.
 - 240 synthetic guests in Czech, German, Polish and English: a few hand-picked names plus first name and surname combinations. Emails use `example.com`. No guest has two stays at once.
 - About 440 bookings from three weeks ago to six weeks ahead, filling about half the hotel on a typical night, priced with `quote()`. There are always arrivals and departures today, at least one family arrival, and some open holds.
-- 10 open inquiries in mixed languages (from `packages/ai/src/evals/inquiries.ts`). The seed makes sure each one has at least one free room.
+- 14 open guest messages in mixed languages (from `packages/ai/src/evals/inquiries.ts`), unread. The seed makes sure each booking request has at least one free room.
+- Three conversations with history (`packages/db/src/seed/conversations.ts`): a Booking.com exchange about a late arrival, linked to its booking; an archived thank-you about a lost charger; and a welcome email the hotel wrote first.
+- Staff members read Czech, so drafts and guest messages translate into Czech; change it per person in Settings › Team.
 - Bills: extras on past and current stays, deposits by bank transfer on some bookings, and settled bills for guests who left. Guests leaving today still owe something. Extra prices are placeholders.
 - Guest-book registrations for every stay that has started, with synthetic `DEMO-` document numbers and placeholder addresses. Today's arrivals are not registered yet; returning guests prefill from an earlier stay.
 - Housekeeping tasks: turnovers for today's departures, stayovers for in-house guests, one maintenance task.

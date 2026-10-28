@@ -26,16 +26,25 @@ const repos = createRepositories(handle.db);
 const usageStore = createUsageStore(handle.db);
 const fixture = buildInquiryFixtures(today).find((f) => f.id === 'inq_01')!;
 
-/** Replies with the fixture's expected extraction, then a draft quoting whatever total the prompt gave. */
+/**
+ * Answers like the real model would, by what is asked: the fixture's expected extraction, a draft
+ * quoting whatever total the prompt gave, or a translation that keeps the amounts.
+ */
 function scriptedModel() {
   let calls = 0;
   const model = new MockLanguageModelV4({
     doGenerate: (options) => {
       calls++;
       const prompt = JSON.stringify(options.prompt);
-      const text =
-        calls % 2 === 1
-          ? JSON.stringify(fixture.expected)
+      const user = options.prompt.findLast((m) => m.role === 'user');
+      const asked =
+        user?.role === 'user'
+          ? user.content.map((c) => (c.type === 'text' ? c.text : '')).join('')
+          : '';
+      const text = prompt.includes('extract structured data')
+        ? JSON.stringify(fixture.expected)
+        : prompt.includes('You translate')
+          ? `Translated: ${asked}`
           : `Dobrý den, nabízíme pokoj za ${/total (\d[\d ]* CZK)/.exec(prompt)?.[1] ?? '?'}.`;
       return Promise.resolve({
         content: [{ type: 'text', text }],
@@ -57,6 +66,8 @@ function appWith(model: MockLanguageModelV4 | null, monthlyBudgetUsd = 100) {
     ai: model && {
       agent: model,
       agentModelId: 'muse-spark-1.3',
+      translate: model,
+      translateModelId: 'muse-spark-1.3',
       vision: null,
       visionModelId: null,
       transcription: null,
@@ -72,10 +83,11 @@ async function call<T>(
   method: string,
   path: string,
   body?: unknown,
+  staffId?: string,
 ) {
   const res = await app.request(path, {
     method,
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', ...(staffId && { 'x-staff-id': staffId }) },
     ...(body !== undefined && { body: JSON.stringify(body) }),
   });
   return { status: res.status, body: (await res.json()) as T };
@@ -89,40 +101,55 @@ beforeEach(async () => {
 afterAll(() => handle.close());
 
 describe('unified inbox', () => {
-  it('lists direct and OTA messages, newest first', async () => {
+  it('lists direct and OTA conversations, latest message first, none prepared yet', async () => {
     const { body } = await call<Inquiry[]>(appWith(null), 'GET', '/api/inbox');
-    expect(body).toHaveLength(14);
-    expect(body[0]!.receivedAt >= body[1]!.receivedAt).toBe(true);
-    expect(body.filter((m) => m.partner === 'Booking.com')).toHaveLength(5);
-    expect(body.every((m) => m.status === 'new' && m.parsed === null)).toBe(true);
+    expect(body).toHaveLength(seed.inquiries.length);
+    expect(body.map((m) => m.lastMessageAt)).toEqual(
+      body
+        .map((m) => m.lastMessageAt)
+        .sort()
+        .reverse(),
+    );
+    expect(body.filter((m) => m.partner === 'Booking.com').length).toBeGreaterThanOrEqual(5);
+    expect(body.every((m) => m.parsed === null && m.messages.length > 0)).toBe(true);
   });
 
   it('accepts a pasted message', async () => {
     const res = await call<Inquiry>(appWith(null), 'POST', '/api/inbox', {
-      rawText: 'Hello, any room on Friday?',
+      body: 'Hello, any room on Friday?',
       channel: 'email',
     });
     expect(res.status).toBe(201);
     expect(res.body).toMatchObject({ status: 'new', channel: 'email', partner: null });
-    expect(
-      (await call<ApiError>(appWith(null), 'POST', '/api/inbox', { rawText: '  ' })).status,
-    ).toBe(400);
+    expect((await call<ApiError>(appWith(null), 'POST', '/api/inbox', { body: '  ' })).status).toBe(
+      400,
+    );
   });
 
-  it('runs the hero flow: process, hold from an option, mark the reply sent', async () => {
+  it('runs the hero flow: prepare on request, hold from an option, send the reply', async () => {
     const { model, calls } = scriptedModel();
     const app = appWith(model);
 
-    const processed = await call<Inquiry>(app, 'POST', '/api/inbox/inq_01/process', {});
+    // Opening a conversation costs nothing; only asking for a reply calls the model.
+    await call(app, 'GET', '/api/inbox/inq_01');
+    expect(calls()).toBe(0);
+
+    const processed = await call<Inquiry>(app, 'POST', '/api/inbox/inq_01/process', {
+      language: 'en',
+    });
     expect(processed.status).toBe(200);
     expect(processed.body.status).toBe('quoted');
     const option = processed.body.suggestion!.options[0]!;
     expect(processed.body.suggestion!.draft).toContain(formatAmount(option.quote.total));
-    expect(calls()).toBe(2);
+    expect(processed.body.suggestion!.draftTranslation).toEqual({
+      language: 'en',
+      text: `Translated: ${processed.body.suggestion!.draft}`,
+    });
+    expect(calls()).toBe(3);
 
-    // Opening it again is free.
+    // Asking again is free.
     await call(app, 'POST', '/api/inbox/inq_01/process', {});
-    expect(calls()).toBe(2);
+    expect(calls()).toBe(3);
 
     const hold = await call<BookingDetail>(app, 'POST', '/api/inbox/inq_01/hold', {
       roomId: option.roomId,
@@ -140,13 +167,89 @@ describe('unified inbox', () => {
       language: 'cs',
     });
 
-    const replied = await call<Inquiry>(app, 'POST', '/api/inbox/inq_01/replied', {
-      reply: processed.body.suggestion!.draft,
+    const sent = await call<Inquiry>(
+      app,
+      'POST',
+      '/api/inbox/inq_01/send',
+      { body: processed.body.suggestion!.draft },
+      'stf_martina',
+    );
+    expect(sent.body).toMatchObject({ status: 'replied', bookingId: hold.body.booking.id });
+    expect(sent.body.messages.at(-1)).toMatchObject({
+      direction: 'out',
+      author: 'Martina Kovářová',
+      body: processed.body.suggestion!.draft,
     });
-    expect(replied.body).toMatchObject({ status: 'replied', bookingId: hold.body.booking.id });
 
     const usage = await call<{ byFeature: { feature: string }[] }>(app, 'GET', '/api/ai-usage');
-    expect(usage.body.byFeature.map((f) => f.feature)).toEqual(['inbox_draft', 'inbox_extract']);
+    expect(usage.body.byFeature.map((f) => f.feature).sort()).toEqual([
+      'inbox_draft',
+      'inbox_extract',
+      'translate',
+    ]);
+  });
+
+  it('translates a guest message once per language', async () => {
+    const { model, calls } = scriptedModel();
+    const app = appWith(model);
+    const messageId = (await call<Inquiry>(app, 'GET', '/api/inbox/inq_02')).body.messages[0]!.id;
+    const path = `/api/inbox/inq_02/messages/${messageId}/translate`;
+    const first = await call<Inquiry>(app, 'POST', path, { to: 'en' });
+    expect(first.body.messages[0]!.translation?.language).toBe('en');
+    await call(app, 'POST', path, { to: 'en' });
+    expect(calls()).toBe(1);
+    expect(
+      (await call(app, 'POST', '/api/inbox/inq_02/messages/nope/translate', { to: 'en' })).status,
+    ).toBe(404);
+  });
+
+  it('translates any text, e.g. a reply staff wrote in their own language', async () => {
+    const { model } = scriptedModel();
+    const res = await call<{ text: string }>(appWith(model), 'POST', '/api/inbox/translate', {
+      text: 'Pokoj stojí 4 000 CZK.',
+      to: 'de',
+    });
+    expect(res.body.text).toBe('Translated: Pokoj stojí 4 000 CZK.');
+    expect(
+      (await call(appWith(null), 'POST', '/api/inbox/translate', { text: 'x', to: 'de' })).status,
+    ).toBe(503);
+  });
+
+  it('works as a mailbox without AI: compose, receive, read state and archive', async () => {
+    const app = appWith(null);
+    const composed = await call<Inquiry>(
+      app,
+      'POST',
+      '/api/inbox/compose',
+      { toName: 'Demo Guest', toAddress: 'demo@example.com', subject: 'Hello', body: 'Hi!' },
+      'stf_petr',
+    );
+    expect(composed.status).toBe(201);
+    expect(composed.body).toMatchObject({ status: 'replied', unread: false });
+    expect(composed.body.messages[0]).toMatchObject({ direction: 'out', author: 'Petr Svoboda' });
+
+    const answered = await call<Inquiry>(app, 'POST', `/api/inbox/${composed.body.id}/receive`, {
+      body: 'Thanks!',
+    });
+    expect(answered.body).toMatchObject({ status: 'new', unread: true });
+
+    const read = await call<Inquiry>(app, 'POST', `/api/inbox/${composed.body.id}/unread`, {
+      unread: false,
+    });
+    expect(read.body.unread).toBe(false);
+    const archived = await call<Inquiry>(app, 'POST', `/api/inbox/${composed.body.id}/archive`, {
+      archived: true,
+    });
+    expect(archived.body.archivedAt).toBe(now.toISOString());
+    expect(
+      (
+        await call(app, 'POST', '/api/inbox/compose', {
+          toAddress: 'not-an-email',
+          subject: 'x',
+          body: 'y',
+        })
+      ).status,
+    ).toBe(400);
   });
 
   it('works without AI, except processing', async () => {

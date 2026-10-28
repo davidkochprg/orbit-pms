@@ -24,6 +24,7 @@ import type {
 } from '@orbit/shared';
 import { buildBilling } from './billing';
 import { seedGuests, seedRooms, seedRoomTypes } from './catalog';
+import { buildConversations } from './conversations';
 import { seedHotelProfile } from './hotel';
 import { buildStayGuests } from './registrations';
 import { seedStaff } from './staff';
@@ -182,23 +183,38 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
   // Every inquiry must be bookable, so the hero flow works on any day. Free up a room if needed.
   const kept = makeInquiriesBookable(bookings, inquiryFixtures, sorted, now);
 
-  const inquiries: Inquiry[] = inquiryFixtures.map((f) => ({
-    id: f.id,
-    rawText: f.rawText,
-    channel: f.channel,
-    partner: f.partner,
-    subject: f.subject,
-    senderName: f.senderName,
-    senderAddress: f.senderAddress,
-    receivedAt: new Date(now.getTime() - f.receivedHoursAgo * 3600_000).toISOString(),
-    parsed: null,
-    suggestion: null,
-    reply: null,
-    status: 'new',
-    bookingId: null,
-    processedAt: null,
-    processingError: null,
-  }));
+  const inquiries: Inquiry[] = inquiryFixtures.map((f) => {
+    const receivedAt = new Date(now.getTime() - f.receivedHoursAgo * 3600_000).toISOString();
+    return {
+      id: f.id,
+      channel: f.channel,
+      partner: f.partner,
+      subject: f.subject,
+      senderName: f.senderName,
+      senderAddress: f.senderAddress,
+      receivedAt,
+      lastMessageAt: receivedAt,
+      messages: [
+        {
+          id: `msg_${f.id}`,
+          inquiryId: f.id,
+          direction: 'in',
+          body: f.rawText,
+          sentAt: receivedAt,
+          author: null,
+          translation: null,
+        },
+      ],
+      unread: true,
+      archivedAt: null,
+      parsed: null,
+      suggestion: null,
+      status: 'new',
+      bookingId: null,
+      processedAt: null,
+      processingError: null,
+    };
+  });
 
   const departingToday = new Set(
     kept.filter((b) => b.checkOut === today && b.status === 'checked_in').map((b) => b.roomId),
@@ -234,7 +250,7 @@ export function buildSeed(today: IsoDate, now: Date, pricing: PricingConfig): Se
     rooms,
     guests: seedGuests,
     bookings: kept,
-    inquiries,
+    inquiries: [...inquiries, ...buildConversations(kept, seedGuests, today, now)],
     housekeepingTasks,
     hotelProfile: seedHotelProfile,
     pricing,

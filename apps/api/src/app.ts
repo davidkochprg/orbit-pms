@@ -3,6 +3,7 @@ import {
   createHousekeepingNotePipeline,
   createIdScanReader,
   createInboxPipeline,
+  createTranslator,
   type HotelContext,
   type MetaProvider,
   type UsageStore,
@@ -106,8 +107,17 @@ export function createApp({
   const limiter = createAiLimiter(limits, clock);
   const monthlyBudgetMicroUsd = Math.round(monthlyBudgetUsd * 1_000_000);
   const { gate, withinBudget } = createAiGate({ limiter, usage, monthlyBudgetMicroUsd, clock });
+  const translator =
+    ai &&
+    createTranslator({
+      model: ai.translate,
+      modelId: ai.translateModelId,
+      usage,
+      canSpend: withinBudget,
+    });
   const pipeline =
     ai &&
+    translator &&
     createInboxPipeline({
       model: ai.agent,
       modelId: ai.agentModelId,
@@ -117,6 +127,7 @@ export function createApp({
       usage,
       canSpend: withinBudget,
       today: () => hotelToday(clock()),
+      translator,
     });
   const notes =
     ai &&
@@ -157,7 +168,17 @@ export function createApp({
   app.route('/api', guestRoutes(repos, guests));
   app.route('/api', overviewRoutes(repos, hotel));
   app.route('/api', pendingActionRoutes(actions));
-  app.route('/api', inboxRoutes({ inbox, hotel, pipeline, gate }));
+  app.route(
+    '/api',
+    inboxRoutes({
+      inbox,
+      hotel,
+      pipeline,
+      translator,
+      gate,
+      identify: (id) => staff.identify(id),
+    }),
+  );
   app.route('/api', housekeepingRoutes({ housekeeping, notes, gate }));
   app.route(
     '/api',

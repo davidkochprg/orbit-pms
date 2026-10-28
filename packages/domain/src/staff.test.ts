@@ -8,6 +8,7 @@ const manager: StaffMember = {
   name: 'Test Manager',
   email: 'manager@example.com',
   role: 'manager',
+  language: 'cs',
   active: true,
 };
 const desk: StaffMember = {
@@ -15,6 +16,7 @@ const desk: StaffMember = {
   name: 'Test Desk',
   email: 'desk@example.com',
   role: 'receptionist',
+  language: 'cs',
   active: true,
 };
 const former: StaffMember = {
@@ -75,7 +77,7 @@ describe('createStaffService', () => {
   it('adds a member and audits who did it', async () => {
     const { service, repos } = setup();
     const created = await service.create(
-      { name: 'New Housekeeper', email: null, role: 'housekeeping' },
+      { name: 'New Housekeeper', email: null, role: 'housekeeping', language: 'cs' },
       manager,
     );
     expect(created).toEqual({
@@ -83,6 +85,7 @@ describe('createStaffService', () => {
       name: 'New Housekeeper',
       email: null,
       role: 'housekeeping',
+      language: 'cs',
       active: true,
     });
     expect(repos.state.audit).toEqual([
@@ -97,7 +100,7 @@ describe('createStaffService', () => {
   it('refuses changes from anyone but a manager', async () => {
     const { service, repos } = setup();
     await expect(
-      service.create({ name: 'X', email: null, role: 'manager' }, desk),
+      service.create({ name: 'X', email: null, role: 'manager', language: 'cs' }, desk),
     ).rejects.toMatchObject({ code: 'forbidden' });
     await expect(service.update('stf_d', { role: 'manager' }, desk)).rejects.toMatchObject({
       code: 'forbidden',

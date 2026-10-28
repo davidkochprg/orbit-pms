@@ -55,6 +55,8 @@ const app = createApp({
   ai: {
     agent: vision,
     agentModelId: 'muse-spark-1.3',
+    translate: vision,
+    translateModelId: 'muse-spark-1.3',
     vision,
     visionModelId: 'muse-spark-1.3',
     transcription: null,

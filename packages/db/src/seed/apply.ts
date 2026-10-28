@@ -6,6 +6,7 @@ import {
   guests,
   hotelProfile,
   housekeepingTasks,
+  inboxMessages,
   inquiries,
   payments,
   pendingActions,
@@ -60,12 +61,21 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
       })),
     );
     await tx.insert(inquiries).values(
-      seed.inquiries.map((i) => ({
+      seed.inquiries.map(({ messages: _, ...i }) => ({
         ...i,
         receivedAt: new Date(i.receivedAt),
+        lastMessageAt: new Date(i.lastMessageAt),
+        archivedAt: i.archivedAt ? new Date(i.archivedAt) : null,
         processedAt: i.processedAt ? new Date(i.processedAt) : null,
       })),
     );
+    await tx
+      .insert(inboxMessages)
+      .values(
+        seed.inquiries.flatMap((i) =>
+          i.messages.map((m) => ({ ...m, sentAt: new Date(m.sentAt) })),
+        ),
+      );
     await tx
       .insert(housekeepingTasks)
       .values(seed.housekeepingTasks.map((t) => ({ ...t, createdAt: new Date(t.createdAt) })));

@@ -9,6 +9,7 @@ const manager: StaffMember = {
   name: 'Test Manager',
   email: null,
   role: 'manager',
+  language: 'cs',
   active: true,
 };
 

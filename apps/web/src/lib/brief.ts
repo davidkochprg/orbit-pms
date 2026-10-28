@@ -63,7 +63,7 @@ export function attentionItems(brief: DailyBrief): AttentionItem[] {
       id: 'messages',
       kind: 'messages',
       title: `${plural(brief.unansweredMessages, 'message')} waiting for a reply`,
-      detail: 'The agent prepares a reply when you open one',
+      detail: 'Orbit drafts a reply when you ask, in the guest’s language',
       target: { path: '/inbox' },
     });
   }

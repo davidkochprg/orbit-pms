@@ -1,4 +1,10 @@
-import { type StaffMember, type StaffRole, staffRoles } from '@orbit/shared';
+import {
+  type Language,
+  languages,
+  type StaffMember,
+  type StaffRole,
+  staffRoles,
+} from '@orbit/shared';
 import { MoreHorizontal, UserPlus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { ErrorNotice } from '@/components/error-notice';
@@ -18,6 +24,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { useAddStaff, useUpdateStaff } from '@/lib/api';
+import { languageLabels } from '@/lib/format';
 import { staffRoleLabels } from '@/lib/session';
 import { cn } from '@/lib/utils';
 
@@ -57,7 +64,7 @@ export function TeamSettings({ staff, currentId, readOnly }: Props) {
                   )}
                 </span>
                 <span className="truncate text-xs text-muted-foreground">
-                  {member.email ?? 'No email'}
+                  {member.email ?? 'No email'} · reads {languageLabels[member.language]}
                 </span>
               </span>
               <span className="shrink-0 rounded-full border border-ink/7 bg-ink/4 px-2 py-0.5 text-xs">
@@ -93,6 +100,22 @@ export function TeamSettings({ staff, currentId, readOnly }: Props) {
                       ))}
                     </DropdownMenuRadioGroup>
                     <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                      Language for translations
+                    </DropdownMenuLabel>
+                    <DropdownMenuRadioGroup
+                      value={member.language}
+                      onValueChange={(language) =>
+                        update.mutate({ id: member.id, language: language as Language })
+                      }
+                    >
+                      {languages.map((language) => (
+                        <DropdownMenuRadioItem key={language} value={language}>
+                          {languageLabels[language]}
+                        </DropdownMenuRadioItem>
+                      ))}
+                    </DropdownMenuRadioGroup>
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem
                       variant={member.active ? 'destructive' : 'default'}
                       onSelect={() => update.mutate({ id: member.id, active: !member.active })}
@@ -119,7 +142,7 @@ function AddMember() {
   function submit(e: FormEvent) {
     e.preventDefault();
     add.mutate(
-      { name, email: email.trim() || null, role },
+      { name, email: email.trim() || null, role, language: 'cs' },
       {
         onSuccess: () => {
           setName('');

@@ -45,6 +45,13 @@ export const stayOptionSchema = z.object({
 });
 export type StayOption = z.infer<typeof stayOptionSchema>;
 
+/** A text put into another language, e.g. a guest's message into the staff member's language. */
+export const translationSchema = z.object({
+  language: languageSchema,
+  text: z.string(),
+});
+export type Translation = z.infer<typeof translationSchema>;
+
 /** What the agent prepared for a message: offerable rooms and a reply draft. */
 export const inquirySuggestionSchema = z.object({
   options: z.array(stayOptionSchema),
@@ -52,5 +59,25 @@ export const inquirySuggestionSchema = z.object({
   note: z.string().nullable(),
   draft: z.string().nullable(),
   draftLanguage: languageSchema.nullable(),
+  /** The draft in the language of the staff member who asked for it, to read side by side. */
+  draftTranslation: translationSchema.nullable().default(null),
 });
+
+export const messageDirections = ['in', 'out'] as const;
+export const messageDirectionSchema = z.enum(messageDirections);
+export type MessageDirection = z.infer<typeof messageDirectionSchema>;
+
+/** One message in a conversation: from the guest (`in`) or sent by the hotel (`out`). */
+export const inboxMessageSchema = z.object({
+  id: z.string(),
+  inquiryId: z.string(),
+  direction: messageDirectionSchema,
+  body: z.string(),
+  sentAt: z.iso.datetime(),
+  /** The staff member who sent an outgoing message; null for the guest's own. */
+  author: z.string().nullable(),
+  /** The message in a staff member's language, once someone asked for it. */
+  translation: translationSchema.nullable(),
+});
+export type InboxMessage = z.infer<typeof inboxMessageSchema>;
 export type InquirySuggestion = z.infer<typeof inquirySuggestionSchema>;

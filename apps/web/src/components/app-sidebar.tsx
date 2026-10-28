@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/sidebar';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import { useHotelProfile, useInbox } from '@/lib/api';
+import { folderCounts } from '@/lib/inbox';
 import { type NavGroup, navItemFor, navItems } from '@/lib/nav';
 import { cn, labelCaps } from '@/lib/utils';
 
@@ -32,7 +33,7 @@ export function AppSidebar() {
   const { openPalette } = useCommandPalette();
   const inbox = useInbox();
   const hotel = useHotelProfile();
-  const unread = inbox.data?.filter((m) => m.status === 'new').length ?? 0;
+  const unread = inbox.data ? folderCounts(inbox.data).unread : 0;
 
   return (
     <Sidebar collapsible="icon" variant="inset">

@@ -76,7 +76,7 @@ The UI shows a confirm card. `POST /api/pending-actions/:id/confirm` runs the st
 
 ## Inbox pipeline
 
-Every guest message, direct or relayed by an OTA, is prepared in the background when staff open it (`packages/ai/src/inbox.ts`). It runs once per message and the result is stored, so reopening costs nothing.
+A conversation is prepared only when staff click "Prepare a reply" ([ADR 0012](decisions/0012-inbox-conversations-and-ai-on-request.md)); opening one never calls a model (`packages/ai/src/inbox.ts`). The model reads the whole conversation, oldest message first, and answers the guest's latest message. The result is stored until the guest writes again, so asking again costs nothing.
 
 ```mermaid
 flowchart LR
@@ -88,6 +88,7 @@ flowchart LR
   G -- wrong amount --> D2["redraft once with feedback"] --> G2{guard}
   G2 -- ok --> S
   G2 -- still wrong --> N["no draft, options only"]
+  S --> T["translate the draft into the staff member's language (1 cheap call, if it differs)"]
 ```
 
 1. **Extract**: `generateText` with `Output.object(inquiryExtractionSchema)` (Meta `response_format: json_schema`, `strictJsonSchema: false` because strict mode only adds a server check that may reject keywords zod emits). Classifies the message (`booking_request`, `question`, `other`), its language, stay, party and wishes.
@@ -95,7 +96,13 @@ flowchart LR
 3. **Draft**: the model writes a reply in the guest's language, given the exact totals as text (e.g. `12 500 CZK`).
 4. **Price guard** (`price-guard.ts`): every money amount in the draft must be one of the quoted totals, line amounts or unit prices, or an amount the hotel profile states, and every option's total must appear. Czech, German, Polish and English number formats are recognised. A failing draft is regenerated once; if it fails again, no draft is shown, so a wrong price never reaches a guest.
 
-The pipeline checks the monthly budget before calling the model and records `inbox_extract` and `inbox_draft` usage separately. Errors are stored on the message (`processingError`) and the next open retries.
+5. **Side by side** (`translate.ts`): when the staff member who asked reads another language than the guest writes, the draft is translated into theirs (`draftTranslation`). The UI shows both; staff edit either side and translate it into the other, and only the guest's side is sent.
+
+The pipeline checks the monthly budget before calling the model and records `inbox_extract`, `inbox_draft` and `translate` usage separately. Errors are stored on the conversation (`processingError`) and the next request retries.
+
+### Translation
+
+`createTranslator` (`packages/ai/src/translate.ts`) translates guest messages into the reader's language and reply texts both ways, only when staff ask. It runs on `META_MODEL_TRANSLATE` (the agent model when unset; Meta has no cheaper Standard-tier text model yet) at `minimal` reasoning. The prompt keeps names, dates, room numbers and every amount with its currency as written; `sameAmounts` checks that the translation states the same amounts as the source, and one that doesn't is redone once and otherwise refused (`translation_failed`). A guest message's translation is stored with the message. A translation costs about $0.002.
 
 ## Housekeeping notes
 
@@ -128,6 +135,8 @@ Hotel facts come from the **hotel profile** staff edit in Settings ([domain.md](
 `packages/ai/src/evals/id-documents.ts` holds three synthetic specimen documents drawn for the eval, each marked SPECIMEN and photographed slightly askew (`id-documents/*.jpg`, rendered from the SVGs beside them): a Czech-style ID card, a German-style passport with a machine-readable zone, and a café receipt that must be refused as unreadable. `scoreIdReading` needs every expected field exact (names case-insensitively). The suite runs when `META_MODEL_VISION` is set.
 
 `packages/ai/src/evals/agent.ts` holds nine staff requests for the agent (one in Czech) against a four-room in-memory hotel dated relative to today: mark a room clean, log a repair, who still needs an ID, add a companion from spoken ID details, record the main guest's ID, remove and correct a bill extra, change a guest's email, and a guest-book question. Each runs the real agent with the real tools and is checked by its effect: the room status or task it created, or exactly one proposal of the right kind with the right arguments, or no change at all for a question (plus the tool it should read, and that the answer names the right guests with their diacritics and without booking IDs).
+
+`packages/ai/src/evals/translations.ts` holds four texts to translate: a Czech reply draft with a price into German and English, and a German and a Polish guest message into Czech. Each must keep its amounts, names and numbers, read as the target language, and come without a preamble.
 
 `pnpm eval` runs all suites: the real extraction on each inbox message and scores it with `scoreExtraction`: exact match on kind, language, dates, adults, child ages (any order) and wishes; guest name and question wording are not scored. It prints PASS/FAIL per message, the pass rate, the cost, and output tokens and seconds per message. It needs `META_API_KEY` and `META_MODEL_AGENT`. `EVAL_REASONING=<level>` overrides the reasoning effort to compare levels.
 
