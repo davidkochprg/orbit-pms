@@ -1,9 +1,11 @@
 import type { Room, RoomKind, RoomType } from '@orbit/shared';
 import { Pencil, Plus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
+import { Link } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { FormField } from '@/components/form-field';
-import { Section } from '@/components/section';
+import { Panel } from '@/components/panel';
+import { StatusDot } from '@/components/status-dot';
 import { Segmented } from '@/components/segmented';
 import { Stepper } from '@/components/stepper';
 import { Button } from '@/components/ui/button';
@@ -19,8 +21,20 @@ import { Input } from '@/components/ui/input';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { useRooms, useRoomTypes, useSaveRoom, useSaveRoomType } from '@/lib/api';
+import {
+  useDayOverview,
+  useHousekeeping,
+  useReport,
+  useRooms,
+  useRoomTypes,
+  useSaveRoom,
+  useSaveRoomType,
+} from '@/lib/api';
 import { displayRegion, formatMoney } from '@/lib/format';
+import { occupancyLabels } from '@/lib/housekeeping';
+import { periodRange } from '@/lib/reports';
+import { roomStatusColor, roomStatusLabels } from '@/lib/status';
+import { cn } from '@/lib/utils';
 
 interface Props {
   readOnly: boolean;
@@ -48,91 +62,163 @@ function basisText(): string {
 export function RoomsEditor({ readOnly }: Props) {
   const roomTypes = useRoomTypes();
   const rooms = useRooms();
+  const today = useDayOverview().data?.date;
+  const report = useReport(today ? periodRange('last30', today) : null);
+  const board = useHousekeeping();
   const [editingType, setEditingType] = useState<Editing<RoomType>>(null);
   const [editingRoom, setEditingRoom] = useState<Editing<Room>>(null);
 
   if (roomTypes.isError || rooms.isError) {
     return <ErrorNotice message={(roomTypes.error ?? rooms.error)?.message ?? 'Failed to load'} />;
   }
-  if (!roomTypes.data || !rooms.data) return <Skeleton className="h-80" />;
+  if (!roomTypes.data || !rooms.data) return <Skeleton className="h-80 rounded-card" />;
   const types = roomTypes.data;
   const typeName = new Map(types.map((t) => [t.id, t.name]));
+  const performance = new Map(report.data?.byRoomType.map((r) => [r.roomTypeId, r]));
+  const tonight = new Map(board.data?.rooms.map((r) => [r.room.id, r.occupancy]));
+  const floors = [...new Set(rooms.data.map((r) => r.floor))].sort((a, b) => b - a);
 
   return (
-    <div className="flex flex-col gap-8">
-      <Section
+    <div className="flex flex-col gap-4">
+      <Panel
         title="Room types"
         count={types.length}
         actions={
           !readOnly && (
-            <Button variant="ghost" size="sm" onClick={() => setEditingType({ item: null })}>
+            <Button variant="ghost" size="xs" onClick={() => setEditingType({ item: null })}>
               <Plus /> Add
             </Button>
           )
         }
       >
-        <p className="-mt-1 max-w-prose text-sm text-muted-foreground">
-          The base price is the rate {basisText()} per night, before season surcharges. New quotes
-          use it as soon as you save.
-        </p>
-        <ul className="-mx-2 flex flex-col">
-          {types.map((t) => (
-            <li key={t.id} className="flex items-center gap-3 rounded-lg px-2 py-2">
-              <span className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate font-medium">{t.name}</span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {capacity(t)} · {rooms.data.filter((r) => r.roomTypeId === t.id).length} rooms
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-4 px-3 pt-2 pb-1 text-[0.6875rem] text-subtle-foreground sm:grid-cols-[minmax(0,1fr)_9rem_5rem_6rem_auto]">
+          <span>Type</span>
+          <span className="max-sm:hidden">Last 30 nights</span>
+          <span className="text-right max-sm:hidden">ADR</span>
+          <span className="text-right">Base, {basisText()}</span>
+          <span className="w-6" />
+        </div>
+        <ul className="flex flex-col">
+          {types.map((t) => {
+            const count = rooms.data.filter((r) => r.roomTypeId === t.id).length;
+            const perf = performance.get(t.id);
+            return (
+              <li
+                key={t.id}
+                className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-x-4 border-t border-ink/5 px-3 py-2.5 sm:grid-cols-[minmax(0,1fr)_9rem_5rem_6rem_auto]"
+              >
+                <span className="flex min-w-0 flex-col">
+                  <span className="truncate text-[0.8125rem] font-medium">{t.name}</span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {capacity(t)} · {count} room{count === 1 ? '' : 's'}
+                  </span>
                 </span>
-              </span>
-              <span className="shrink-0 text-sm tabular-nums">{formatMoney(t.basePrice)}</span>
-              {!readOnly && (
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  aria-label={`Edit ${t.name}`}
-                  onClick={() => setEditingType({ item: t })}
-                  className="text-muted-foreground"
-                >
-                  <Pencil />
-                </Button>
-              )}
-            </li>
-          ))}
+                <span className="flex items-center gap-2 max-sm:hidden">
+                  <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink/6">
+                    <span
+                      className="block h-full rounded-full bg-primary/70"
+                      style={{ width: `${Math.round((perf?.occupancy ?? 0) * 100)}%` }}
+                    />
+                  </span>
+                  <span className="w-9 text-right font-mono text-xs text-muted-foreground tabular-nums">
+                    {perf ? `${Math.round(perf.occupancy * 100)}%` : '–'}
+                  </span>
+                </span>
+                <span className="text-right font-mono text-xs text-muted-foreground tabular-nums max-sm:hidden">
+                  {perf && perf.roomNights > 0
+                    ? formatMoney(Math.round(perf.roomRevenue / perf.roomNights))
+                    : '–'}
+                </span>
+                <span className="text-right text-[0.8125rem] tabular-nums">
+                  {formatMoney(t.basePrice)}
+                </span>
+                {readOnly ? (
+                  <span className="w-6" />
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="icon-xs"
+                    aria-label={`Edit ${t.name}`}
+                    onClick={() => setEditingType({ item: t })}
+                    className="text-muted-foreground"
+                  >
+                    <Pencil />
+                  </Button>
+                )}
+              </li>
+            );
+          })}
         </ul>
-      </Section>
+        <p className="border-t border-ink/5 px-3 py-2 text-xs text-muted-foreground">
+          The base price is before season and per-night changes, which are on the{' '}
+          <Link to="/rates" className="underline underline-offset-2">
+            Rates
+          </Link>{' '}
+          page. New quotes use it as soon as you save.
+        </p>
+      </Panel>
 
-      <Section
+      <Panel
         title="Rooms"
         count={rooms.data.length}
         actions={
           !readOnly && (
-            <Button variant="ghost" size="sm" onClick={() => setEditingRoom({ item: null })}>
+            <Button variant="ghost" size="xs" onClick={() => setEditingRoom({ item: null })}>
               <Plus /> Add
             </Button>
           )
         }
       >
-        <p className="-mt-1 max-w-prose text-sm text-muted-foreground">
-          To take a room out of service, mark it out of order on the housekeeping board.
-        </p>
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {rooms.data.map((r) => (
-            <li key={r.id}>
-              <button
-                type="button"
-                disabled={readOnly}
-                onClick={() => setEditingRoom({ item: r })}
-                className="flex w-full flex-col items-start rounded-lg bg-surface-raised px-3 py-2 text-left shadow-raised outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
-              >
-                <span className="font-medium">{r.name}</span>
-                <span className="w-full truncate text-xs text-muted-foreground">
-                  {typeName.get(r.roomTypeId) ?? r.roomTypeId} · floor {r.floor}
-                </span>
-              </button>
-            </li>
+        <div className="flex flex-col">
+          {floors.map((floor) => (
+            <section
+              key={floor}
+              className="flex flex-col gap-2 border-b border-ink/5 px-2 py-2.5 last:border-b-0 sm:flex-row sm:items-start"
+            >
+              <h3 className="w-24 shrink-0 px-1 pt-2 text-xs text-muted-foreground">
+                {floor === 0 ? 'Ground floor' : `Floor ${floor}`}
+              </h3>
+              <ul className="grid flex-1 grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                {rooms.data
+                  .filter((r) => r.floor === floor)
+                  .map((r) => {
+                    const occupancy = tonight.get(r.id);
+                    return (
+                      <li key={r.id}>
+                        <button
+                          type="button"
+                          disabled={readOnly}
+                          onClick={() => setEditingRoom({ item: r })}
+                          title={`${roomStatusLabels[r.status]}${occupancy ? ` · ${occupancyLabels[occupancy]}` : ''}`}
+                          className="flex w-full flex-col items-start gap-0.5 rounded-[10px] bg-background px-2.5 py-2 text-left ring-1 ring-ink/6 outline-none ring-inset hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
+                        >
+                          <span className="flex w-full items-center gap-1.5">
+                            <span className="font-mono text-[0.8125rem] font-medium">{r.name}</span>
+                            <StatusDot className={cn('ml-auto', roomStatusColor[r.status])} />
+                          </span>
+                          <span className="w-full truncate text-[0.6875rem] text-muted-foreground">
+                            {typeName.get(r.roomTypeId) ?? r.roomTypeId}
+                          </span>
+                          <span className="text-[0.6875rem] text-subtle-foreground">
+                            {occupancy ? occupancyLabels[occupancy] : '\u00a0'}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+              </ul>
+            </section>
           ))}
-        </ul>
-      </Section>
+        </div>
+        <p className="border-t border-ink/5 px-3 py-2 text-xs text-muted-foreground">
+          The dot is the housekeeping status. To take a room out of service, mark it out of order on
+          the{' '}
+          <Link to="/housekeeping" className="underline underline-offset-2">
+            housekeeping board
+          </Link>
+          .
+        </p>
+      </Panel>
 
       <Dialog open={editingType !== null} onOpenChange={(open) => !open && setEditingType(null)}>
         <DialogContent className="shadow-floating sm:max-w-md">
