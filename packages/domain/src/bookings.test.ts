@@ -6,6 +6,7 @@ import {
   changedBookingFields,
   moveBooking,
   reschedule,
+  switchHold,
   updateBooking,
 } from './bookings';
 import { DomainError } from './errors';
@@ -381,5 +382,53 @@ describe('updateBooking', () => {
 
   it('refuses a patch that changes nothing', () => {
     expectCode(() => updateBooking(b, { adults: b.adults }, ctx), 'invalid_input');
+  });
+  describe('switchHold', () => {
+    const hold = booking({
+      id: 'h',
+      roomId: '1',
+      status: 'hold',
+      checkIn: '2026-05-10',
+      checkOut: '2026-05-12',
+      priceSnapshot: null,
+    });
+    const toApartment = {
+      room: room('a1', { kind: 'apartment', roomTypeId: apartment.id }),
+      roomType: apartment,
+      roomBookings: [],
+      now,
+      pricing,
+    };
+
+    it("moves a hold and quotes it in the new room's type", () => {
+      const switched = switchHold(hold, { roomId: 'a1' }, toApartment);
+      expect(switched).toMatchObject({ id: 'h', roomId: 'a1', status: 'hold' });
+      // A room change alone keeps the price on an edit; a switched hold is priced again.
+      expect(switched.priceSnapshot?.lines[0]?.unitPrice).toBe(apartment.basePrice);
+    });
+
+    it('switches only a hold, and only to another room', () => {
+      expectCode(
+        () => switchHold({ ...hold, status: 'confirmed' }, { roomId: 'a1' }, toApartment),
+        'invalid_transition',
+      );
+      expectCode(
+        () => switchHold(hold, { roomId: '1' }, { ...toApartment, room: room('1') }),
+        'conflict',
+      );
+    });
+
+    it('keeps the checks of an edit', () => {
+      const taken = booking({
+        id: 't',
+        roomId: 'a1',
+        checkIn: '2026-05-11',
+        checkOut: '2026-05-14',
+      });
+      expectCode(
+        () => switchHold(hold, { roomId: 'a1' }, { ...toApartment, roomBookings: [taken] }),
+        'conflict',
+      );
+    });
   });
 });

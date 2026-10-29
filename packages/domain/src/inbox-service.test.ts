@@ -149,7 +149,21 @@ describe('inbox service', () => {
       language: 'de',
     });
     expect((await inbox.get(msg.id)).bookingId).toBe(hold.id);
+  });
+
+  it('moves the hold when staff hold another room, quoted in that room', async () => {
+    const { hotel, inbox, msg } = await processed();
+    const first = await inbox.createHold(msg.id, 'rm_2', 'user');
+    const switched = await inbox.createHold(msg.id, 'rm_a1', 'user');
+    expect(switched).toMatchObject({ id: first.id, roomId: 'rm_a1', status: 'hold' });
+    expect(switched.priceSnapshot?.total).not.toBe(first.priceSnapshot?.total);
+    expect((await inbox.get(msg.id)).bookingId).toBe(first.id);
     await expect(inbox.createHold(msg.id, 'rm_a1', 'user')).rejects.toMatchObject({
+      code: 'conflict',
+    });
+    // Once confirmed, it is a booking, not a hold to move around.
+    await hotel.applyBookingAction(first.id, 'confirm', 'user');
+    await expect(inbox.createHold(msg.id, 'rm_2', 'user')).rejects.toMatchObject({
       code: 'conflict',
     });
   });

@@ -32,6 +32,7 @@ import {
   createHold,
   moveBooking,
   reschedule,
+  switchHold,
   updateBooking,
 } from './bookings';
 import { addDays, type DateRange, hotelToday } from './dates';
@@ -226,11 +227,12 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     };
   }
 
-  function planUpdate(id: string, patch: BookingPatch) {
+  /** An edit, or with `switchHold` a hold moved to another room and quoted there. */
+  function planUpdate(id: string, patch: BookingPatch, edit = updateBooking) {
     return async (tx: Repositories): Promise<Plan> => {
       const booking = await loadBooking(tx, id);
       const target = await loadRoom(tx, patch.roomId ?? booking.roomId);
-      const updated = updateBooking(booking, patch, {
+      const updated = edit(booking, patch, {
         ...target,
         roomBookings: await lockedRoomBookings(tx, target.room.id),
         now: clock(),
@@ -499,6 +501,8 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
       commit(planHold(input, input.status), actor),
     updateBooking: (id: string, patch: BookingPatch, actor: AuditActor) =>
       commit(planUpdate(id, patch), actor),
+    switchHold: (id: string, patch: BookingPatch, actor: AuditActor) =>
+      commit(planUpdate(id, patch, switchHold), actor),
     rescheduleBooking: (id: string, target: DateRange & { roomId: string }, actor: AuditActor) =>
       commit(planReschedule(id, target), actor),
     previewBookingAction: (id: string, action: BookingAction) => preview(planAction(id, action)),

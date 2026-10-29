@@ -329,18 +329,41 @@ export function updateBooking(booking: Booking, patch: BookingPatch, ctx: Update
   const reprice = changed.some((f) => f !== 'roomId' && f !== 'source' && f !== 'notes');
   return {
     ...updated,
-    priceSnapshot: reprice
-      ? quote(
-          {
-            roomType: ctx.roomType,
-            checkIn: updated.checkIn,
-            checkOut: updated.checkOut,
-            adults: updated.adults,
-            childAges: updated.childAges,
-            addons: updated.addons,
-          },
-          ctx.pricing,
-        )
-      : booking.priceSnapshot,
+    priceSnapshot: reprice ? quoteBooking(updated, ctx) : booking.priceSnapshot,
   };
+}
+
+/**
+ * Moves a hold to another room before the guest has agreed to a price, e.g. when staff hold a
+ * different room offered for an inbox request. The rules of an edit apply, but where an edit
+ * keeps the agreed price on a room change, a switched hold is always quoted in its new room's
+ * type. Only holds switch, and only to another room.
+ */
+export function switchHold(booking: Booking, patch: BookingPatch, ctx: UpdateContext): Booking {
+  if (booking.status !== 'hold') {
+    throw new DomainError(
+      'invalid_transition',
+      `Only a hold can switch rooms; this booking is ${booking.status.replace('_', ' ')}`,
+    );
+  }
+  if ((patch.roomId ?? booking.roomId) === booking.roomId) {
+    throw new DomainError('conflict', `Room ${ctx.room.name} is already held`);
+  }
+  const moved = updateBooking(booking, patch, ctx);
+  return { ...moved, priceSnapshot: quoteBooking(moved, ctx) };
+}
+
+/** The stay's price in the context's room type. */
+function quoteBooking(booking: Booking, ctx: UpdateContext) {
+  return quote(
+    {
+      roomType: ctx.roomType,
+      checkIn: booking.checkIn,
+      checkOut: booking.checkOut,
+      adults: booking.adults,
+      childAges: booking.childAges,
+      addons: booking.addons,
+    },
+    ctx.pricing,
+  );
 }

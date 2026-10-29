@@ -257,7 +257,8 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
 
     /**
      * Turns a processed booking request into a hold in the chosen room. Reuses a guest with the
-     * same email address, otherwise creates one from the sender.
+     * same email address, otherwise creates one from the sender. If the message already has a
+     * hold, it moves to the chosen room and is quoted there (`switchHold`).
      */
     async createHold(id: string, roomId: string, actor: AuditActor): Promise<Booking> {
       const inquiry = await load(repos, id);
@@ -266,10 +267,19 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
       if (!analysis || !stay) {
         throw new DomainError('invalid_transition', 'This message has no complete stay request');
       }
+      // Holding another offered room moves the message's hold there, while it is still a hold.
       if (inquiry.bookingId) {
-        throw new DomainError(
-          'conflict',
-          `A hold already exists for this message (${inquiry.bookingId})`,
+        const held = await repos.bookings.getBooking(inquiry.bookingId);
+        if (held?.status !== 'hold') {
+          throw new DomainError(
+            'conflict',
+            `This message already led to a booking (${inquiry.bookingId})`,
+          );
+        }
+        return hotel.switchHold(
+          held.id,
+          { roomId, ...stay, addons: addonsForWishes(analysis.wishes) },
+          actor,
         );
       }
       const email = inquiry.senderAddress && normalizeText(inquiry.senderAddress);
