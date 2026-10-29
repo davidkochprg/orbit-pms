@@ -192,6 +192,29 @@ describe('unified inbox', () => {
     ]);
   });
 
+  it('reads the request first, then drafts about the room staff hold', async () => {
+    const { model, calls } = scriptedModel();
+    const app = appWith(model);
+
+    const read = await call<Inquiry>(app, 'POST', '/api/inbox/inq_01/read', {});
+    expect(read.status).toBe(200);
+    expect(read.body.suggestion).toMatchObject({ draft: null });
+    expect(read.body.suggestion!.options.length).toBeGreaterThan(0);
+    expect(calls()).toBe(1);
+    // Reading again is free.
+    await call(app, 'POST', '/api/inbox/inq_01/read', {});
+    expect(calls()).toBe(1);
+
+    const option = read.body.suggestion!.options[0]!;
+    await call(app, 'POST', '/api/inbox/inq_01/hold', { roomId: option.roomId });
+    const drafted = await call<Inquiry>(app, 'POST', '/api/inbox/inq_01/draft', { language: 'cs' });
+    expect(drafted.body.suggestion!.draft).toContain(
+      formatAmount(option.quote.total, option.quote.currency),
+    );
+    // One call for the draft; the guest writes Czech, so there is nothing to translate.
+    expect(calls()).toBe(2);
+  });
+
   it('translates a guest message once per language', async () => {
     const { model, calls } = scriptedModel();
     const app = appWith(model);

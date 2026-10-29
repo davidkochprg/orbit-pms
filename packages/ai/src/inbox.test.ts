@@ -166,6 +166,63 @@ describe('inbox pipeline', () => {
     expect(calls[3]).toMatch(/held for them until \w+day/);
   });
 
+  it('reads the request and finds rooms without writing anything', async () => {
+    const { inbox, pipeline, records } = setup([JSON.stringify(request)]);
+    const msg = await inbox.create(message);
+    const result = await pipeline.read(msg.id);
+
+    expect(result.parsed).toEqual(request);
+    expect(result.suggestion?.options.map((o) => o.roomName)).toEqual(['101']);
+    expect(result.suggestion?.draft).toBeNull();
+    expect(records.map((r) => r.feature)).toEqual(['inbox_extract']);
+    // Reading again costs nothing.
+    await pipeline.read(msg.id);
+    expect(records).toHaveLength(1);
+  });
+
+  it('drafts after a hold from the stored reading, without reading the request again', async () => {
+    const offer = `Pokoj 101 stojí ${TOTAL}.`;
+    const heldDraft = `Pokoj 101 vám držíme, cena ${TOTAL}.`;
+    const { inbox, pipeline, records, calls } = setup([JSON.stringify(request), offer, heldDraft]);
+    const msg = await inbox.create(message);
+    await pipeline.read(msg.id);
+    expect((await pipeline.draft(msg.id)).suggestion?.draft).toBe(offer);
+    await inbox.createHold(msg.id, 'rm_1', 'user');
+    const result = await pipeline.draft(msg.id);
+
+    expect(result.suggestion?.draft).toBe(heldDraft);
+    expect(result.suggestion?.options.map((o) => o.roomName)).toEqual(['101']);
+    expect(records.map((r) => r.feature)).toEqual(['inbox_extract', 'inbox_draft', 'inbox_draft']);
+    expect(calls[2]).toContain('Already on hold for the guest');
+  });
+
+  it('reads the request again once the guest has written again', async () => {
+    const changed = { ...request, checkIn: '2026-05-13', checkOut: '2026-05-15' };
+    const { inbox, pipeline, records } = setup([
+      JSON.stringify(request),
+      JSON.stringify(changed),
+      `Cena ${TOTAL}.`,
+    ]);
+    const msg = await inbox.create(message);
+    await pipeline.read(msg.id);
+    await inbox.receive(msg.id, 'Můžeme raději 13.–15. 5.?');
+    const result = await pipeline.draft(msg.id);
+    expect(result.parsed?.checkIn).toBe('2026-05-13');
+    expect(records.map((r) => r.feature)).toEqual([
+      'inbox_extract',
+      'inbox_extract',
+      'inbox_draft',
+    ]);
+  });
+
+  it('reads the request first when asked for a draft of a conversation nobody read', async () => {
+    const { inbox, pipeline, records } = setup([JSON.stringify(request), `Cena ${TOTAL}.`]);
+    const msg = await inbox.create(message);
+    const result = await pipeline.draft(msg.id);
+    expect(result.suggestion?.draft).toBe(`Cena ${TOTAL}.`);
+    expect(records.map((r) => r.feature)).toEqual(['inbox_extract', 'inbox_draft']);
+  });
+
   it('retries once when the draft states a wrong price', async () => {
     const good = `Pokoj stojí ${TOTAL}.`;
     const { inbox, pipeline, records, calls } = setup([

@@ -87,12 +87,24 @@ export async function draftReply(
 }
 
 /**
- * Prepares a conversation for staff when they ask for it: extract the request (one model call),
- * find rooms and prices in the domain (no model), draft a reply (one model call, plus one retry
- * if the draft's prices don't match the quotes), and translate the draft into the staff member's
- * language when it differs from the guest's (one cheap call). Results are stored, so a
- * conversation is prepared once until the guest writes again.
+ * Prepares a conversation for staff when they ask for it, in two steps. `read` extracts the
+ * request (one model call) and finds rooms and prices in the domain (no model), so staff can
+ * choose before anything is written. `draft` writes the reply from that reading and whatever room
+ * staff hold (one model call, plus one retry if the draft's prices don't match the quotes), and
+ * translates it into the staff member's language when it differs from the guest's (one cheap
+ * call). `process` runs both. Results are stored, so a conversation is read once until the guest
+ * writes again.
  */
+/**
+ * Whether the conversation's reading answers its latest message: a guest writing again clears
+ * `processedAt`, and the old reading no longer counts.
+ */
+export function hasReading(
+  inquiry: Inquiry,
+): inquiry is Inquiry & { parsed: InquiryExtraction; processedAt: string } {
+  return inquiry.parsed !== null && inquiry.processedAt !== null && !inquiry.processingError;
+}
+
 export function createInboxPipeline(deps: InboxPipelineDeps) {
   const { model, modelId, hotel, inbox, hotelContext, usage, canSpend, today, translator } = deps;
   const draftModel = deps.draftModel ?? model;
@@ -123,6 +135,19 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
       },
       until: booking.holdExpiresAt,
     };
+  }
+
+  /**
+   * The rooms for a reading, as of now: a room staff already hold is no longer free, so it is
+   * added back and leads the options.
+   */
+  async function roomsFor(inquiry: Inquiry, analysis: InquiryExtraction) {
+    const { options: free, note } = await hotel.inboxOptions(analysis);
+    const held = await heldRoom(inquiry);
+    const options = held
+      ? [held.option, ...free.filter((o) => o.roomId !== held.option.roomId)]
+      : free;
+    return { options, note, held };
   }
 
   async function draftWithGuard(
@@ -170,10 +195,84 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
     };
   }
 
+  const failed = (id: string, err: unknown) =>
+    inbox.saveProcessing(id, {
+      ok: false,
+      error: err instanceof Error ? err.message : 'Processing failed',
+    });
+  const budgetSpent = (id: string) =>
+    inbox.saveProcessing(id, { ok: false, error: 'The AI budget for this month is used up.' });
+
+  /** Extracts the request and finds its rooms; a draft from an earlier reading is dropped. */
+  async function read(id: string, { force = false }: { force?: boolean } = {}): Promise<Inquiry> {
+    const inquiry = await inbox.get(id);
+    if (hasReading(inquiry) && !force) return inquiry;
+    if (!(await canSpend())) return budgetSpent(id);
+    try {
+      const { analysis, tokens } = await extractMessage(model, inquiry, today());
+      await record('inbox_extract', tokens);
+      const { options, note } = await roomsFor(inquiry, analysis);
+      return await inbox.saveProcessing(id, {
+        ok: true,
+        parsed: analysis,
+        suggestion: { options, note, draft: null, draftLanguage: null, draftTranslation: null },
+      });
+    } catch (err) {
+      return failed(id, err);
+    }
+  }
+
+  /**
+   * Writes the reply from the stored reading and the room staff hold now, reading the request
+   * first if nobody has. Rooms are looked up again, so the draft offers what is free now.
+   */
+  async function draft(
+    id: string,
+    { language = null }: { language?: Language | null } = {},
+  ): Promise<Inquiry> {
+    let inquiry = await inbox.get(id);
+    if (!hasReading(inquiry)) {
+      inquiry = await read(id, { force: true });
+      if (!hasReading(inquiry)) return inquiry;
+    }
+    const analysis = inquiry.parsed;
+    if (!(await canSpend())) return budgetSpent(id);
+    try {
+      const { options, note, held } = await roomsFor(inquiry, analysis);
+      const { draft: text, note: finalNote } =
+        analysis.kind === 'other'
+          ? { draft: null, note }
+          : await draftWithGuard(inquiry, analysis, held ? [held.option] : options, note, held);
+      let draftTranslation: Translation | null = null;
+      if (text && language && language !== analysis.language) {
+        // The draft is the result; without its translation staff still have it to send.
+        draftTranslation = await translator
+          .translate(text, language)
+          .then((t) => ({ language, text: t }))
+          .catch(() => null);
+      }
+      return await inbox.saveProcessing(id, {
+        ok: true,
+        parsed: analysis,
+        suggestion: {
+          options,
+          note: finalNote,
+          draft: text,
+          draftLanguage: text ? analysis.language : null,
+          draftTranslation,
+        },
+      });
+    } catch (err) {
+      return failed(id, err);
+    }
+  }
+
   return {
+    read,
+    draft,
     /**
-     * Prepares a conversation unless it already has a result; `force` re-runs it. `language` is
-     * the staff member's, for the draft side by side.
+     * Reads and drafts a conversation unless it already has a result; `force` re-runs both.
+     * `language` is the staff member's, for the draft side by side.
      */
     async process(
       id: string,
@@ -181,51 +280,9 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
     ): Promise<Inquiry> {
       const inquiry = await inbox.get(id);
       if (inquiry.processedAt && !inquiry.processingError && !force) return inquiry;
-      if (!(await canSpend())) {
-        return inbox.saveProcessing(id, {
-          ok: false,
-          error: 'The AI budget for this month is used up.',
-        });
-      }
-      try {
-        const { analysis, tokens } = await extractMessage(model, inquiry, today());
-        await record('inbox_extract', tokens);
-        const { options: free, note } = await hotel.inboxOptions(analysis);
-        // A room staff already hold is no longer free; it leads the options, and the draft
-        // tells the guest it is held for them instead of offering every room again.
-        const held = await heldRoom(inquiry);
-        const options = held
-          ? [held.option, ...free.filter((o) => o.roomId !== held.option.roomId)]
-          : free;
-        const { draft, note: finalNote } =
-          analysis.kind === 'other'
-            ? { draft: null, note }
-            : await draftWithGuard(inquiry, analysis, held ? [held.option] : options, note, held);
-        let draftTranslation: Translation | null = null;
-        if (draft && language && language !== analysis.language) {
-          // The draft is the result; without its translation staff still have it to send.
-          draftTranslation = await translator
-            .translate(draft, language)
-            .then((text) => ({ language, text }))
-            .catch(() => null);
-        }
-        return await inbox.saveProcessing(id, {
-          ok: true,
-          parsed: analysis,
-          suggestion: {
-            options,
-            note: finalNote,
-            draft,
-            draftLanguage: draft ? analysis.language : null,
-            draftTranslation,
-          },
-        });
-      } catch (err) {
-        return inbox.saveProcessing(id, {
-          ok: false,
-          error: err instanceof Error ? err.message : 'Processing failed',
-        });
-      }
+      const reading = await read(id, { force: true });
+      if (!hasReading(reading)) return reading;
+      return draft(id, { language });
     },
   };
 }

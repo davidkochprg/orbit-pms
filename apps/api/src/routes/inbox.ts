@@ -1,4 +1,4 @@
-import { type InboxPipeline, TranslationError, type Translator } from '@orbit/ai';
+import { hasReading, type InboxPipeline, TranslationError, type Translator } from '@orbit/ai';
 import type { HotelService, InboxService } from '@orbit/domain';
 import {
   archiveBodySchema,
@@ -37,7 +37,7 @@ const notConfigured = errorBody(
 
 /**
  * The inbox: conversations with guests by email and through OTAs, and what staff do with them.
- * Nothing calls the model until staff ask for a prepared reply or a translation.
+ * Nothing calls the model until staff ask for the request to be read, a reply or a translation.
  */
 export function inboxRoutes({
   inbox,
@@ -99,6 +99,26 @@ export function inboxRoutes({
       const limit = await blocked(c);
       if (limit) return c.json(errorBody('demo_limit', limit), 429);
       return c.json(await pipeline.process(id, { force, language }));
+    })
+    .post('/inbox/:id/read', validate('json', processMessageBodySchema), async (c) => {
+      if (!pipeline) return c.json(notConfigured, 503);
+      const id = c.req.param('id');
+      const current = await inbox.get(id);
+      // A conversation already read is served from storage and costs nothing.
+      if (hasReading(current) && !c.req.valid('json').force) {
+        return c.json(current);
+      }
+      const limit = await blocked(c);
+      if (limit) return c.json(errorBody('demo_limit', limit), 429);
+      return c.json(await pipeline.read(id, { force: true }));
+    })
+    .post('/inbox/:id/draft', validate('json', processMessageBodySchema), async (c) => {
+      if (!pipeline) return c.json(notConfigured, 503);
+      const limit = await blocked(c);
+      if (limit) return c.json(errorBody('demo_limit', limit), 429);
+      return c.json(
+        await pipeline.draft(c.req.param('id'), { language: c.req.valid('json').language }),
+      );
     })
     .post(
       '/inbox/:id/messages/:messageId/translate',
