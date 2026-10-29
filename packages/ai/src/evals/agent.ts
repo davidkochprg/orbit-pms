@@ -212,6 +212,20 @@ function bareIds(answer: string): string[] {
   return bare ? [`answer shows bare IDs ${bare.join(', ')}`] : [];
 }
 
+/** The app shows a chip's name, so writing it next to the token says it twice. */
+function nameBesideChip(answer: string, id: string, name: string): string[] {
+  const token = `[[${id}]]`;
+  return answer.includes(`${token} ${name}`) || answer.includes(`${name} ${token}`)
+    ? [`answer writes ${name} next to their chip`]
+    : [];
+}
+
+/** Dates in the answer's own words should read like "Sun, Nov 1", not like data. */
+function isoDates(answer: string): string[] {
+  const found = answer.match(/\b20\d\d-\d\d-\d\d\b/g);
+  return found ? [`answer writes dates as ${found.join(', ')}`] : [];
+}
+
 /** Problems unless the answer names each thing, by any of its names (a guest or their room). */
 function mentions(answer: string, ...things: string[][]): string[] {
   return things
@@ -251,6 +265,7 @@ export const agentFixtures: AgentFixture[] = [
       // In the US only the guest who booked shows an ID, and Anna's is recorded.
       ...(/Anna|\[\[bk_anna\]\]/.test(answer) ? ['answer lists Anna, whose ID is recorded'] : []),
       ...bareIds(answer),
+      ...nameBesideChip(answer, 'bk_jan', 'Jan Dvořák'),
       ...(/Dvorak/.test(answer) ? ['answer drops the diacritics in Dvořák'] : []),
     ],
   },
@@ -316,6 +331,7 @@ export const agentFixtures: AgentFixture[] = [
         ? []
         : ['answer has no list item leading with [[bk_jan]]']),
       ...bareIds(answer),
+      ...nameBesideChip(answer, 'bk_jan', 'Jan Dvořák'),
     ],
   },
   {
@@ -339,6 +355,7 @@ export const agentFixtures: AgentFixture[] = [
         // 104 and 201 are taken tomorrow night.
         ...(/\[\[rm_(?:104|201)\]\]/.test(answer) ? ['answer offers a taken room'] : []),
         ...bareIds(answer),
+        ...isoDates(answer),
       ];
     },
   },
