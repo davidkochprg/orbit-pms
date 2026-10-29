@@ -80,14 +80,17 @@ const outputOf = (p: ToolPart) => (p.state === 'output-available' ? p.output : u
  * The conversation: each question as a heading, then what the agent did (one line, opening into
  * the steps) and its answer, where the bookings, rooms and guests it names are chips and rows
  * that open them. Free rooms, quotes and bills it fetched show as cards; changes it proposed as
- * confirm cards.
+ * confirm cards. Each question and its answer is a turn (`data-turn`, the question's ID), and the
+ * last turn is at least `lastTurnMinHeight` tall, so its question can be scrolled to the top.
  */
 export function AgentThread({
   messages,
   status,
+  lastTurnMinHeight = 0,
 }: {
   messages: UIMessage[];
   status: 'submitted' | 'streaming' | 'ready' | 'error';
+  lastTurnMinHeight?: number;
 }) {
   const entities = useMemo(
     () =>
@@ -98,31 +101,59 @@ export function AgentThread({
   );
   const last = messages.at(-1);
   const waiting = status === 'submitted' && last?.role === 'user';
+  const turns = useMemo(() => toTurns(messages), [messages]);
 
   return (
     <AgentEntitiesContext value={entities}>
       <div className="flex flex-col gap-6">
-        {messages.map((m) =>
-          m.role === 'user' ? (
-            <p key={m.id} className="text-base font-medium tracking-tight">
-              {m.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')}
-            </p>
-          ) : (
-            <AssistantMessage
-              key={m.id}
-              message={m}
-              working={m === last && (status === 'streaming' || status === 'submitted')}
-            />
-          ),
-        )}
-        {waiting && (
-          <div className="-mt-3">
-            <WorkingLine state="working" label="Thinking" note={null} steps={0} />
-          </div>
-        )}
+        {turns.map((turn, i) => {
+          const isLast = i === turns.length - 1;
+          return (
+            <section
+              key={turn.question?.id ?? `turn-${i}`}
+              data-turn={turn.question?.id}
+              className="flex flex-col gap-6"
+              style={isLast && lastTurnMinHeight ? { minHeight: lastTurnMinHeight } : undefined}
+            >
+              {turn.question && (
+                <p className="text-base font-medium tracking-tight">
+                  {turn.question.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')}
+                </p>
+              )}
+              {turn.answers.map((m) => (
+                <AssistantMessage
+                  key={m.id}
+                  message={m}
+                  working={m === last && (status === 'streaming' || status === 'submitted')}
+                />
+              ))}
+              {isLast && waiting && (
+                <div className="-mt-3">
+                  <WorkingLine state="working" label="Thinking" note={null} steps={0} />
+                </div>
+              )}
+            </section>
+          );
+        })}
       </div>
     </AgentEntitiesContext>
   );
+}
+
+interface Turn {
+  question: UIMessage | null;
+  answers: UIMessage[];
+}
+
+/** Each question with the answers that follow it. */
+function toTurns(messages: UIMessage[]): Turn[] {
+  const turns: Turn[] = [];
+  for (const m of messages) {
+    if (m.role === 'user') turns.push({ question: m, answers: [] });
+    else if (turns.length === 0) turns.push({ question: null, answers: [m] });
+    else turns.at(-1)!.answers.push(m);
+  }
+  return turns;
 }
 
 function AssistantMessage({ message, working }: { message: UIMessage; working: boolean }) {

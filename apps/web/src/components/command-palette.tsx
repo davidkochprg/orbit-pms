@@ -21,6 +21,7 @@ import {
   type ReactNode,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -96,7 +97,11 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
         <DialogContent
           showCloseButton={false}
           // A transparent shell: the panel is inside the beam, so its glow isn't clipped.
-          className="top-[12vh] block translate-y-0 gap-0 rounded-card border-0 bg-transparent p-0 shadow-none ring-0 sm:max-w-[640px]"
+          className={cn(
+            'top-[12vh] block translate-y-0 gap-0 rounded-card border-0 bg-transparent p-0 shadow-none ring-0 transition-[max-width] duration-200 ease-snap',
+            // The conversation gets more room: cards with four figures need it.
+            mode === 'agent' ? 'sm:max-w-[760px]' : 'sm:max-w-[640px]',
+          )}
           onEscapeKeyDown={(e) => {
             // Like Raycast: Escape steps back from the agent to search before it closes.
             if (mode === 'agent') {
@@ -328,6 +333,9 @@ function SearchView({
   );
 }
 
+/** Breathing room above a question scrolled to the top of the thread. */
+const TURN_GAP = 16;
+
 function AgentView({
   chat,
   text,
@@ -347,47 +355,62 @@ function AgentView({
   const aiOn = health.data?.ai.configured ?? false;
   const busy = chat.status === 'submitted' || chat.status === 'streaming';
   const scroller = useRef<HTMLDivElement>(null);
+  const [viewHeight, setViewHeight] = useState(0);
+  const lastQuestion = chat.messages.findLast((m) => m.role === 'user')?.id;
 
-  // Follow the answer as it streams in.
   useEffect(() => {
     const el = scroller.current;
-    if (el) el.scrollTop = el.scrollHeight;
-  }, [chat.messages]);
+    if (!el) return;
+    const observer = new ResizeObserver(() => setViewHeight(el.clientHeight));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // A new question goes to the top and its answer fills in below it, read from the start; the
+  // last turn is tall enough for that. Reopening the bar shows the latest question the same way.
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    const turn = lastQuestion && el?.querySelector<HTMLElement>(`[data-turn="${lastQuestion}"]`);
+    if (el && turn) el.scrollTop = turn.offsetTop - TURN_GAP;
+  }, [lastQuestion]);
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
       e.preventDefault();
       onAsk(text);
     }
-    if (e.key === 'Backspace' && text === '') onBack();
+    if (e.key === 'Backspace' && text === '' && chat.messages.length === 0) onBack();
   }
 
   return (
-    <div className="flex min-h-0 flex-col">
-      <InputRow
-        icon={
+    <div className="flex h-[min(46rem,76vh)] min-h-0 flex-col">
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3 text-sm text-muted-foreground">
+        <button
+          type="button"
+          aria-label="Back to search"
+          onClick={onBack}
+          className="rounded-md p-1 hover:bg-accent hover:text-foreground"
+        >
+          <ArrowLeft className="size-4" />
+        </button>
+        <span className="flex items-center gap-1.5 font-medium text-foreground">
+          <Sparkles className="size-3.5 text-primary-text" /> Orbit
+        </span>
+        {chat.messages.length > 0 && !busy && (
           <button
             type="button"
-            aria-label="Back to search"
-            onClick={onBack}
-            className="-m-1 rounded-md p-1 hover:bg-accent hover:text-foreground"
+            onClick={onNew}
+            className="ml-auto rounded px-1.5 py-0.5 text-xs hover:bg-accent hover:text-foreground"
           >
-            <ArrowLeft className="size-[18px]" />
+            New conversation
           </button>
-        }
-      >
-        <input
-          autoFocus
-          value={text}
-          onChange={(e) => onTextChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          disabled={!aiOn}
-          placeholder={chat.messages.length > 0 ? 'Ask a follow-up…' : 'Ask Orbit…'}
-          className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-subtle-foreground"
-        />
-      </InputRow>
+        )}
+      </div>
 
-      <div ref={scroller} className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      <div
+        ref={scroller}
+        className="scrollbar-thin relative min-h-0 flex-1 overflow-y-auto px-5 py-4"
+      >
         {!aiOn && (
           <p className="text-muted-foreground">
             The agent is not configured on this server. Set the Meta API variables to use it.
@@ -399,12 +422,28 @@ function AgentView({
             for your confirmation.
           </p>
         )}
-        <AgentThread messages={chat.messages} status={chat.status} />
+        <AgentThread
+          messages={chat.messages}
+          status={chat.status}
+          lastTurnMinHeight={Math.max(0, viewHeight - TURN_GAP * 2)}
+        />
         {chat.error && <ErrorNotice message={agentErrorMessage(chat.error)} className="mt-3" />}
       </div>
 
+      <InputRow icon={<Sparkles className="size-[18px] text-primary-text" />} placement="bottom">
+        <input
+          autoFocus
+          value={text}
+          onChange={(e) => onTextChange(e.target.value)}
+          onKeyDown={onKeyDown}
+          disabled={!aiOn}
+          placeholder={chat.messages.length > 0 ? 'Ask a follow-up…' : 'Ask Orbit…'}
+          className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-subtle-foreground"
+        />
+      </InputRow>
+
       <Footer>
-        {busy ? (
+        {busy && (
           <button
             type="button"
             onClick={() => void chat.stop()}
@@ -412,12 +451,6 @@ function AgentView({
           >
             Stop
           </button>
-        ) : (
-          chat.messages.length > 0 && (
-            <button type="button" onClick={onNew} className="rounded px-1 hover:text-foreground">
-              New conversation
-            </button>
-          )
         )}
         <span className="flex items-center gap-1.5">
           <Kbd>
@@ -433,9 +466,23 @@ function AgentView({
   );
 }
 
-function InputRow({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+function InputRow({
+  icon,
+  children,
+  placement = 'top',
+}: {
+  icon: ReactNode;
+  children: ReactNode;
+  /** Search types at the top; the agent's input sits under the conversation. */
+  placement?: 'top' | 'bottom';
+}) {
   return (
-    <div className="flex h-14 shrink-0 items-center gap-3 border-b px-5 text-muted-foreground [&_input]:text-foreground">
+    <div
+      className={cn(
+        'flex h-14 shrink-0 items-center gap-3 px-5 text-muted-foreground [&_input]:text-foreground',
+        placement === 'top' ? 'border-b' : 'border-t',
+      )}
+    >
       {icon}
       {children}
     </div>
