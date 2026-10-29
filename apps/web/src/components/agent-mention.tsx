@@ -137,7 +137,7 @@ export function Mention({ id }: { id: string }) {
  * A list item that leads with a booking: the guest, room, dates and status from hotel data, and
  * what the agent said about it underneath. Click opens the booking; right-click has its actions.
  */
-export function BookingRow({ id, children }: { id: string; children: ReactNode }) {
+export function BookingRow({ id, children }: { id: string; children?: ReactNode }) {
   const b = useBooking(id);
   const openBooking = useOpenBooking();
   return (

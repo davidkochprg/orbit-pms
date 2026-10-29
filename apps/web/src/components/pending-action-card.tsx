@@ -1,8 +1,18 @@
-import { Check, CircleAlert, X } from 'lucide-react';
+import type { PendingAction, PendingActionDetails, PendingValue } from '@orbit/shared';
+import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { ArrowRight, Check, CircleAlert, X } from 'lucide-react';
 import { Link } from 'react-router';
+import { BookingRow } from '@/components/agent-mention';
 import { Button } from '@/components/ui/button';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
-import { usePendingAction, useResolvePendingAction } from '@/lib/api';
+import { useCommandPalette } from '@/hooks/use-command-palette';
+import {
+  useConfirmPendingActions,
+  usePendingAction,
+  usePendingActions,
+  useResolvePendingAction,
+} from '@/lib/api';
+import { formatMoney, formatRange } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 const outcome = {
@@ -11,17 +21,59 @@ const outcome = {
   failed: { icon: CircleAlert, text: 'Could not be applied', className: 'text-destructive' },
 } as const;
 
-/** Confirm card for a change the agent proposed. Nothing happens until the user confirms. */
+const titles: Record<PendingAction['kind'], string> = {
+  create_hold: 'New hold',
+  confirm_booking: 'Confirm the booking',
+  cancel_booking: 'Cancel the booking',
+  check_in: 'Check in',
+  check_out: 'Check out',
+  move_booking: 'Move to another room',
+  change_dates: 'Change the dates',
+  update_booking: 'Edit the booking',
+  add_charge: 'Add to the bill',
+  record_payment: 'Record a payment',
+  update_charge: 'Correct the bill',
+  remove_charge: 'Remove from the bill',
+  add_stay_guest: 'Add to the guest book',
+  update_stay_guest: 'Update the guest book',
+  remove_stay_guest: 'Remove from the guest book',
+  update_guest: 'Edit the guest profile',
+};
+
+/**
+ * Confirm card for a change the agent proposed: the booking it concerns, what changes from what
+ * to what, and the money it moves, as the domain worked them out. Nothing happens until the user
+ * confirms.
+ */
 export function PendingActionCard({ id, summary }: { id: string; summary: string }) {
   const action = usePendingAction(id);
   const resolve = useResolvePendingAction(id);
   const { open } = useBookingDrawer();
+  const { closePalette } = useCommandPalette();
   const current = resolve.data ?? action.data;
   const result = current && current.status !== 'pending' ? outcome[current.status] : null;
+  const details = current?.details ?? null;
+  // A new hold has no booking yet; once confirmed, `bookingId` is the one it created.
+  const bookingId =
+    current && (current.kind !== 'create_hold' || current.status === 'confirmed')
+      ? current.bookingId
+      : null;
 
   return (
-    <div className="relative flex flex-col gap-2.5 rounded-control fill-panel p-3.5 shadow-[0_1px_2px_var(--shadow-soft),0_10px_30px_-18px_var(--shadow-deep)] stroke-lit">
-      <p className="text-sm">{current?.summary ?? summary}</p>
+    <div className="relative flex flex-col gap-3 rounded-control fill-panel p-3.5 shadow-[0_1px_2px_var(--shadow-soft),0_10px_30px_-18px_var(--shadow-deep)] stroke-lit">
+      {details && current ? (
+        <>
+          <p className="text-xs font-medium text-muted-foreground">{titles[current.kind]}</p>
+          {bookingId && (
+            <div className="-mx-1.5 -my-1">
+              <BookingRow id={bookingId} />
+            </div>
+          )}
+          <Details details={details} />
+        </>
+      ) : (
+        <p className="text-sm">{current?.summary ?? summary}</p>
+      )}
       <div className="flex flex-wrap items-center gap-1.5">
         {current?.status === 'pending' && (
           <>
@@ -55,18 +107,113 @@ export function PendingActionCard({ id, summary }: { id: string; summary: string
             size="sm"
             variant="ghost"
             className="ml-auto"
-            onClick={() => open(current.bookingId!)}
+            onClick={() => {
+              closePalette();
+              open(current.bookingId!);
+            }}
           >
             Open booking
           </Button>
         )}
         {current?.kind === 'update_guest' && current.status === 'confirmed' && (
           <Button size="sm" variant="ghost" className="ml-auto" asChild>
-            <Link to={`/guests/${encodeURIComponent(current.input.guestId)}`}>Open profile</Link>
+            <Link
+              to={`/guests/${encodeURIComponent(current.input.guestId)}`}
+              onClick={closePalette}
+            >
+              Open profile
+            </Link>
           </Button>
         )}
       </div>
       {resolve.isError && <p className="text-xs text-destructive">{resolve.error.message}</p>}
+    </div>
+  );
+}
+
+function Value({ value, className }: { value: PendingValue; className?: string }) {
+  if ('text' in value) return <span className={className}>{value.text}</span>;
+  const nights = differenceInCalendarDays(parseISO(value.checkOut), parseISO(value.checkIn));
+  return (
+    <span className={cn('tabular-nums', className)}>
+      {formatRange(value.checkIn, value.checkOut)} · {nights} night{nights === 1 ? '' : 's'}
+    </span>
+  );
+}
+
+/** What changes, one row each: the old value struck through, then the new one. */
+function Details({ details }: { details: PendingActionDetails }) {
+  const { changes, amount, note } = details;
+  return (
+    <div className="flex flex-col gap-2 text-sm">
+      {changes.length > 0 && (
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
+          {changes.map((c, i) => (
+            <div key={i} className="contents">
+              <dt className="text-muted-foreground">{c.label}</dt>
+              <dd className="flex min-w-0 flex-wrap items-center gap-x-1.5">
+                {c.before && (
+                  <>
+                    <Value
+                      value={c.before}
+                      className="text-muted-foreground line-through decoration-ink/30"
+                    />
+                    {c.after && <ArrowRight className="size-3 shrink-0 text-muted-foreground" />}
+                  </>
+                )}
+                {c.after ? (
+                  <Value value={c.after} className="font-medium" />
+                ) : (
+                  <span className="text-muted-foreground">removed</span>
+                )}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {amount && (
+        <div className="flex items-baseline justify-between gap-3 border-t border-border pt-2">
+          <span className="text-muted-foreground">{amount.label}</span>
+          <span className="flex items-baseline gap-1.5 font-mono tabular-nums">
+            {amount.before !== null && amount.before !== amount.after && (
+              <>
+                <span className="text-xs text-muted-foreground line-through decoration-ink/30">
+                  {formatMoney(amount.before)}
+                </span>
+                <ArrowRight className="size-3 self-center text-muted-foreground" />
+              </>
+            )}
+            <span className="text-base">{formatMoney(amount.after)}</span>
+          </span>
+        </div>
+      )}
+      {note && (
+        <p className="flex items-start gap-1.5 text-xs text-warning">
+          <CircleAlert className="mt-px size-3.5 shrink-0" />
+          {note}
+        </p>
+      )}
+    </div>
+  );
+}
+
+/** "Confirm all 3" for an answer that proposed several changes; shown while any still wait. */
+export function ConfirmAllButton({ ids }: { ids: string[] }) {
+  const actions = usePendingActions(ids);
+  const confirm = useConfirmPendingActions();
+  const pending = ids.filter((_, i) => actions[i]?.data?.status === 'pending');
+  if (pending.length < 2) return null;
+  return (
+    <div className="flex items-center gap-2">
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={confirm.isPending}
+        onClick={() => confirm.mutate(pending)}
+      >
+        Confirm all {pending.length}
+      </Button>
+      {confirm.isError && <span className="text-xs text-destructive">{confirm.error.message}</span>}
     </div>
   );
 }

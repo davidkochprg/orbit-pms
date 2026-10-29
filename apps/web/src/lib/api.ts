@@ -57,7 +57,7 @@ import {
   translateResultSchema,
   type UpdateStaffBody,
 } from '@orbit/shared';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
 import { storedStaffId } from '@/lib/session';
 
@@ -398,26 +398,52 @@ export function usePendingAction(id: string) {
   });
 }
 
+/** Confirms or rejects a proposed change. A failed confirm comes back as the action, "failed". */
+async function resolvePendingAction(id: string, decision: 'confirm' | 'reject') {
+  const res = await fetch(`/api/pending-actions/${encodeURIComponent(id)}/${decision}`, {
+    method: 'POST',
+    headers: { accept: 'application/json' },
+  });
+  // A failed confirm comes back as 409 with the action (status "failed") as the body.
+  const body: unknown = await res.json().catch(() => null);
+  const action = pendingActionSchema.safeParse(body);
+  if (action.success) return action.data;
+  const error = apiErrorSchema.safeParse(body);
+  throw new ApiRequestError(
+    res.status,
+    error.success ? error.data.error.code : 'http_error',
+    error.success ? error.data.error.message : `Request failed with ${res.status}`,
+  );
+}
+
 export function useResolvePendingAction(id: string) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (decision: 'confirm' | 'reject') => {
-      const res = await fetch(`/api/pending-actions/${encodeURIComponent(id)}/${decision}`, {
-        method: 'POST',
-        headers: { accept: 'application/json' },
-      });
-      // A failed confirm comes back as 409 with the action (status "failed") as the body.
-      const body: unknown = await res.json().catch(() => null);
-      const action = pendingActionSchema.safeParse(body);
-      if (action.success) return action.data;
-      const error = apiErrorSchema.safeParse(body);
-      throw new ApiRequestError(
-        res.status,
-        error.success ? error.data.error.code : 'http_error',
-        error.success ? error.data.error.message : `Request failed with ${res.status}`,
-      );
-    },
+    mutationFn: (decision: 'confirm' | 'reject') => resolvePendingAction(id, decision),
     onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
+/** Confirms several proposed changes one after another, in the order the agent proposed them. */
+export function useConfirmPendingActions() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: string[]) => {
+      const results = [];
+      for (const id of ids) results.push(await resolvePendingAction(id, 'confirm'));
+      return results;
+    },
+    onSettled: () => queryClient.invalidateQueries(),
+  });
+}
+
+/** Several proposed changes, sharing the cache with `usePendingAction`. */
+export function usePendingActions(ids: string[]) {
+  return useQueries({
+    queries: ids.map((id) => ({
+      queryKey: ['pending-action', id],
+      queryFn: () => apiGet(`/api/pending-actions/${encodeURIComponent(id)}`, pendingActionSchema),
+    })),
   });
 }
 

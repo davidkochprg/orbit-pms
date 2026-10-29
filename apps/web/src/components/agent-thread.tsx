@@ -24,7 +24,7 @@ import { type ReactNode, useMemo, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
 import { BookingRow, Mention } from '@/components/agent-mention';
 import { ResultCards } from '@/components/agent-result-cards';
-import { PendingActionCard } from '@/components/pending-action-card';
+import { ConfirmAllButton, PendingActionCard } from '@/components/pending-action-card';
 import { AgentEntitiesContext } from '@/hooks/use-agent-entities';
 import {
   asProposal,
@@ -170,6 +170,7 @@ function AssistantMessage({ message, working }: { message: UIMessage; working: b
       {proposals.map((p) => (
         <PendingActionCard key={p.pendingActionId} id={p.pendingActionId} summary={p.summary} />
       ))}
+      {proposals.length > 1 && <ConfirmAllButton ids={proposals.map((p) => p.pendingActionId)} />}
     </div>
   );
 }
