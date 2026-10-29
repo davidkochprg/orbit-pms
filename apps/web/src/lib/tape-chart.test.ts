@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addDaysIso,
+  barGeometry,
   buildWindow,
   dayWidthFor,
   isIsoDate,
@@ -33,10 +34,10 @@ describe('tape-chart window', () => {
 });
 
 describe('placeBooking', () => {
-  it('places a stay fully inside the window', () => {
+  it('runs a stay from midday of arrival to midday of departure', () => {
     expect(placeBooking({ checkIn: '2026-10-29', checkOut: '2026-11-01' }, start)).toEqual({
-      startIndex: 2,
-      span: 3,
+      start: 2.5,
+      end: 5.5,
       continuesBefore: false,
       continuesAfter: false,
     });
@@ -44,31 +45,58 @@ describe('placeBooking', () => {
 
   it('clips stays that start before or end after the window', () => {
     expect(placeBooking({ checkIn: '2026-10-20', checkOut: '2026-10-29' }, start)).toEqual({
-      startIndex: 0,
-      span: 2,
+      start: 0,
+      end: 2.5,
       continuesBefore: true,
       continuesAfter: false,
     });
     expect(placeBooking({ checkIn: '2026-11-08', checkOut: '2026-11-20' }, start)).toEqual({
-      startIndex: 12,
-      span: 2,
+      start: 12.5,
+      end: 14,
       continuesBefore: false,
       continuesAfter: true,
     });
   });
 
-  it('treats stays as half-open: same-day turnover does not spill over', () => {
-    // Leaves on the first window day: no visible night.
-    expect(placeBooking({ checkIn: '2026-10-25', checkOut: '2026-10-27' }, start)).toBeNull();
-    // Arrives the day after the last visible night (window ends 2026-11-10 exclusive).
-    expect(placeBooking({ checkIn: '2026-11-10', checkOut: '2026-11-12' }, start)).toBeNull();
-    // One-night stay on the last visible day.
-    expect(placeBooking({ checkIn: '2026-11-09', checkOut: '2026-11-10' }, start)).toEqual({
-      startIndex: 13,
-      span: 1,
-      continuesBefore: false,
+  it('shares the turnover day: one stay ends where the next begins', () => {
+    const leaving = placeBooking({ checkIn: '2026-10-28', checkOut: '2026-10-30' }, start);
+    const arriving = placeBooking({ checkIn: '2026-10-30', checkOut: '2026-11-02' }, start);
+    expect(leaving?.end).toBe(3.5);
+    expect(arriving?.start).toBe(3.5);
+  });
+
+  it("shows the morning of a stay leaving on the window's first day", () => {
+    expect(placeBooking({ checkIn: '2026-10-25', checkOut: '2026-10-27' }, start)).toEqual({
+      start: 0,
+      end: 0.5,
+      continuesBefore: true,
       continuesAfter: false,
     });
+    // Left the day before the window: nothing to show.
+    expect(placeBooking({ checkIn: '2026-10-24', checkOut: '2026-10-26' }, start)).toBeNull();
+  });
+
+  it("shows the afternoon of a stay arriving on the window's last day", () => {
+    // The window is 2026-10-27 to 2026-11-09; this arrives on its last day.
+    expect(placeBooking({ checkIn: '2026-11-09', checkOut: '2026-11-10' }, start)).toEqual({
+      start: 13.5,
+      end: 14,
+      continuesBefore: false,
+      continuesAfter: true,
+    });
+    expect(placeBooking({ checkIn: '2026-11-10', checkOut: '2026-11-12' }, start)).toBeNull();
+  });
+});
+
+describe('barGeometry', () => {
+  it('insets both ends from the midday lines', () => {
+    const place = placeBooking({ checkIn: '2026-10-29', checkOut: '2026-11-01' }, start)!;
+    expect(barGeometry(place, 80)).toEqual({ left: 202, width: 236 });
+  });
+
+  it('runs flush to the window edge where a stay is clipped', () => {
+    const place = placeBooking({ checkIn: '2026-10-20', checkOut: '2026-10-29' }, start)!;
+    expect(barGeometry(place, 80)).toEqual({ left: 0, width: 198 });
   });
 });
 

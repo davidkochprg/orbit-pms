@@ -55,6 +55,7 @@ import { formatDate, formatDayHeader, formatRange, statusLabels } from '@/lib/fo
 import { bookingStatusColor, groupRoomsByType, type RoomGroup } from '@/lib/status';
 import {
   addDaysIso,
+  barGeometry,
   buildWindow,
   dayWidthFor,
   isIsoDate,
@@ -82,6 +83,8 @@ const movable: BookingStatus[] = ['hold', 'confirmed', 'checked_in'];
 
 /** Bars narrower than this show only the name. */
 const ICONS_MIN_WIDTH = 150;
+/** Narrower than this, a bar is a stub (a departure's morning) and shows only its stripe. */
+const LABEL_MIN_WIDTH = 48;
 
 export function TapeChartPage() {
   // Today comes from the API, so it is the hotel's date in its time zone, not the browser's.
@@ -119,7 +122,8 @@ function TapeChart({ today }: { today: string }) {
   const rooms = useRooms();
   const roomTypes = useRoomTypes();
   const guests = useGuests();
-  const bookings = useBookings({ from: start, to: end });
+  // From the day before, so a stay leaving on the first day still shows its morning.
+  const bookings = useBookings({ from: addDaysIso(start, -1), to: end });
   const reschedule = useRescheduleBooking();
   const changeDates = useChangeBookingDates();
   const { open } = useBookingDrawer();
@@ -271,7 +275,7 @@ function TapeChart({ today }: { today: string }) {
       <footer className="flex h-10 shrink-0 items-center gap-4 border-t bg-surface-sunken px-4 text-xs text-muted-foreground">
         <span className="hidden truncate md:inline">
           Click an empty night to book it. Drag a booking to move it, or its right edge to change
-          the departure. Right-click for more.
+          the departure. Stays run from midday to midday, so turnovers share a day.
         </span>
         <Legend />
       </footer>
@@ -532,9 +536,12 @@ function BookingBar({
   if (!place || booking.status === 'cancelled') return null;
 
   const label = `${name}, ${formatRange(booking.checkIn, booking.checkOut)}, ${statusLabels[booking.status]}`;
-  const left = place.startIndex * dayWidth + 2;
+  const geometry = barGeometry(place, dayWidth);
+  const left = geometry.left;
   // While resizing, the bar follows the pointer horizontally, never narrower than one night.
-  const width = Math.max(place.span * dayWidth - 4 + (resizeTransform?.x ?? 0), dayWidth - 4);
+  const width = resizeTransform
+    ? Math.max(geometry.width + resizeTransform.x, dayWidth - 4)
+    : geometry.width;
   const dragging = moving || resizing;
   const icons = width >= ICONS_MIN_WIDTH ? bookingIcons(booking) : [];
 
@@ -575,10 +582,10 @@ function BookingBar({
               bookingStatusColor[booking.status],
             )}
           />
-          {place.continuesBefore && (
+          {width >= LABEL_MIN_WIDTH && place.continuesBefore && (
             <ChevronLeft className="-ml-1 size-3.5 shrink-0 text-muted-foreground" />
           )}
-          <span className="truncate">{name}</span>
+          {width >= LABEL_MIN_WIDTH && <span className="truncate">{name}</span>}
           {icons.length > 0 && (
             <span className="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
               {icons.map(({ icon: Icon, label: iconLabel }) => (

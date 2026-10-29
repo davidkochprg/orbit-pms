@@ -35,35 +35,44 @@ export function isWeekend(date: IsoDate): boolean {
 }
 
 export interface BarPlacement {
-  /** First visible night, as a column offset from the window start. */
-  startIndex: number;
-  /** Visible nights. */
-  span: number;
+  /** Left edge in days from the window start: the middle of the arrival day, or 0 when clipped. */
+  start: number;
+  /** Right edge in days: the middle of the departure day, or the window's end when clipped. */
+  end: number;
   continuesBefore: boolean;
   continuesAfter: boolean;
 }
 
 /**
- * Places a stay on the window. Stays are half-open `[checkIn, checkOut)`, so a booking
- * leaving on the window's first day (or arriving on its last night + 1) is not visible.
- * Returns `null` when no night of the stay falls in the window.
+ * Places a stay on the window, from midday of the arrival day to midday of the departure day,
+ * the way guests use a room: in the afternoon, out by the morning. A departure and an arrival
+ * on the same day share that day's cell, each taking half of it. A stay leaving on the window's
+ * first day still shows its morning there. Returns `null` when no part of it falls in the window.
  */
 export function placeBooking(
   booking: Pick<Booking, 'checkIn' | 'checkOut'>,
   windowStart: IsoDate,
   windowDays = TAPE_DAYS,
 ): BarPlacement | null {
-  const startOffset = differenceInCalendarDays(parseISO(booking.checkIn), parseISO(windowStart));
-  const endOffset = differenceInCalendarDays(parseISO(booking.checkOut), parseISO(windowStart));
-  const startIndex = Math.max(0, startOffset);
-  const endIndex = Math.min(windowDays, endOffset);
-  if (endIndex <= startIndex) return null;
-  return {
-    startIndex,
-    span: endIndex - startIndex,
-    continuesBefore: startOffset < 0,
-    continuesAfter: endOffset > windowDays,
-  };
+  const arrives = differenceInCalendarDays(parseISO(booking.checkIn), parseISO(windowStart)) + 0.5;
+  const leaves = differenceInCalendarDays(parseISO(booking.checkOut), parseISO(windowStart)) + 0.5;
+  const start = Math.max(0, arrives);
+  const end = Math.min(windowDays, leaves);
+  if (end <= start) return null;
+  return { start, end, continuesBefore: arrives < 0, continuesAfter: leaves > windowDays };
+}
+
+/** Space between a bar and the midday line, so a turnover's two bars don't touch. */
+export const TAPE_BAR_INSET = 2;
+
+/** A placed bar in px: inset from the midday lines, flush with the window edge where clipped. */
+export function barGeometry(
+  place: BarPlacement,
+  dayWidth: number,
+): { left: number; width: number } {
+  const left = place.start * dayWidth + (place.continuesBefore ? 0 : TAPE_BAR_INSET);
+  const right = place.end * dayWidth - (place.continuesAfter ? 0 : TAPE_BAR_INSET);
+  return { left, width: right - left };
 }
 
 /** Whole nights a horizontal drag covers, snapped to the nearest day column. */

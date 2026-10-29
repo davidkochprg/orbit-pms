@@ -40,7 +40,7 @@ The booking panel keeps the guest book per person. "Scan ID" shows a QR code: a 
 
 ### A tape chart that follows the day
 
-The Mews-style tape chart groups rooms by type. Drag a booking to another room or other dates, or drag its right edge to change the departure; every drag goes through the same rules as the agent.
+The Mews-style tape chart groups rooms by type. Stays run from midday of the arrival day to midday of the departure day, so on a turnover the leaving and the arriving guest share that day's cell. Drag a booking to another room or other dates, or drag its right edge to change the departure; every drag goes through the same rules as the agent.
 
 ![The tape chart: two weeks of bookings by room, with occupancy per night, holds dashed and checked-in stays in green](docs/images/tape-chart.png)
 
