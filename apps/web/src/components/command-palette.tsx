@@ -2,7 +2,7 @@ import { useChat } from '@ai-sdk/react';
 import type { AgentContext } from '@orbit/shared';
 import { DefaultChatTransport } from 'ai';
 import { BorderBeam } from 'border-beam';
-import { Command as CommandPrimitive, defaultFilter } from 'cmdk';
+import { Command as CommandPrimitive } from 'cmdk';
 import {
   ArrowLeft,
   CalendarPlus,
@@ -47,6 +47,7 @@ import {
 import { useDarkMode } from '@/hooks/use-dark-mode';
 import { agentErrorMessage, proposalIds, suggestedQuestions, toolResults } from '@/lib/agent';
 import { contextFromLocation } from '@/lib/agent-context';
+import { paletteMatch } from '@/lib/palette-match';
 import { followUps } from '@/lib/agent-follow-ups';
 import {
   useDayOverview,
@@ -251,7 +252,7 @@ function SearchView({
       loop
       // The "Ask Orbit" row always matches and stays on top, so Enter asks by default.
       filter={(value, search, keywords) =>
-        value === ASK ? 1 : defaultFilter(value, search, keywords)
+        value === ASK ? 1 : paletteMatch(value, search, keywords)
       }
       className="flex min-h-0 flex-col"
     >
