@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateSchema } from './dates';
 import { roomKindSchema } from './enums';
 import { currencySchema, moneySchema } from './quote';
 
@@ -39,6 +40,15 @@ export const longStayTierSchema = z.object({
   discount: fractionSchema,
 });
 export type LongStayTier = z.infer<typeof longStayTierSchema>;
+
+/** A change to one night's rates, on top of its season, for every room type. */
+export const rateAdjustmentSchema = z.object({
+  /** The night, `YYYY-MM-DD`. */
+  date: isoDateSchema,
+  /** Percent added to the night's rate, e.g. 15 or -10. Never 0: no adjustment is no entry. */
+  percent: z.number().int().min(-50).max(100),
+});
+export type RateAdjustment = z.infer<typeof rateAdjustmentSchema>;
 
 /**
  * Whether prices include tax (European VAT) or tax is added on top of them (US sales and
@@ -131,6 +141,8 @@ export const pricingConfigSchema = z.preprocess(
       .default({ label: 'City tax', perPersonPerNight: 0, minAge: 18 }),
     /** Tax brackets; rates saved before it existed read as Czech VAT included in prices. */
     tax: taxConfigSchema.default(czechVat),
+    /** Per-night changes, one per date, from the Rates page; rates saved before read as none. */
+    adjustments: z.array(rateAdjustmentSchema).max(500).default([]),
   }),
 );
 export type PricingConfig = z.infer<typeof pricingConfigSchema>;

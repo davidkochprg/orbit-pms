@@ -29,6 +29,7 @@ export const pricingConfig: PricingConfig = {
     standard: { label: 'VAT', rate: 21 },
     reduced: { label: 'VAT', rate: 12 },
   },
+  adjustments: [],
 };
 
 /**
@@ -51,4 +52,5 @@ export const usDemoPricing: PricingConfig = {
     standard: { label: 'Sales tax', rate: 8.75 },
     reduced: { label: 'Occupancy tax', rate: 12 },
   },
+  adjustments: [],
 };

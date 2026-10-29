@@ -12,6 +12,7 @@ export const reasoningEffort = {
   draft: 'minimal',
   housekeeping: 'minimal',
   stayNotes: 'minimal',
+  revenueBrief: 'minimal',
   idScan: 'minimal',
   translate: 'minimal',
   agent: 'low',

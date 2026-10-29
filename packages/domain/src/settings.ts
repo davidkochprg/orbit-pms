@@ -16,6 +16,7 @@ export const emptyHotelProfile: HotelProfile = {
   entries: [],
   country: 'US',
   language: 'en',
+  coordinates: null,
 };
 
 /**

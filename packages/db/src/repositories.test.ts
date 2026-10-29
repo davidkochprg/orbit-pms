@@ -539,3 +539,23 @@ describe('stay readings (PGlite)', () => {
     expect(await repos.stayReadings.list([])).toEqual([]);
   });
 });
+
+describe('local events (PGlite)', () => {
+  it('lists seeded events by first night, and creates and deletes one', async () => {
+    const listed = await repos.events.list();
+    expect(listed).toEqual(
+      [...seed.events].sort((a, b) => a.firstNight.localeCompare(b.firstNight)),
+    );
+    const event = {
+      id: 'evt_test',
+      name: 'Demo fair',
+      firstNight: '2000-01-01',
+      lastNight: '2000-01-02',
+      impact: 'low' as const,
+    };
+    await repos.events.create(event);
+    expect((await repos.events.list())[0]).toEqual(event);
+    await repos.events.delete('evt_test');
+    expect(await repos.events.list()).toEqual(listed);
+  });
+});

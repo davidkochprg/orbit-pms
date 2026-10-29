@@ -29,6 +29,8 @@ import {
   newTaskBodySchema,
   type PendingAction,
   type PendingActionInput,
+  type RevenueOutlook,
+  adjustRatesBodySchema,
   quoteInputSchema,
   roomOptionSchema,
   roomOptionsQuerySchema,
@@ -38,6 +40,7 @@ import {
   stayGuestPatchSchema,
 } from '@orbit/shared';
 import { type JSONValue, tool } from 'ai';
+import { compactOutlook } from './outlook';
 import { z } from 'zod';
 
 export interface ToolDeps {
@@ -53,6 +56,8 @@ export interface ToolDeps {
   >;
   /** Room type names, so "a King room" can be matched to its rooms. */
   listRoomTypes: () => Promise<{ id: string; name: string }[]>;
+  /** The next nights with suggested rates, with the forecast when there is one. */
+  rateOutlook: (days: number) => Promise<RevenueOutlook>;
 }
 
 export interface ToolError {
@@ -198,6 +203,7 @@ export const proposalToolNames = [
   'updateGuestBook',
   'removeFromGuestBook',
   'updateGuestProfile',
+  'adjustRates',
 ] as const;
 
 /** Tools that change data straight away: housekeeping is low-risk and reversible (ADR 0006). */
@@ -221,6 +227,7 @@ export function createAgentTools({
   registrations,
   listRooms,
   listRoomTypes,
+  rateOutlook,
 }: ToolDeps) {
   const propose = (input: PendingActionInput) =>
     safely(async () => toProposal(await actions.propose(input)));
@@ -339,6 +346,20 @@ export function createAgentTools({
           currency: (await billing.pricing()).currency,
         })),
       toModelOutput: reportForModel,
+    }),
+    getRateOutlook: tool({
+      description:
+        "The next nights with occupancy on the books, how full that weekday usually ends up, the current rate change and the suggested one (percent on top of the season, for every room type) with its reasons: demand, local events and the weather forecast. Also expected no-shows per night and the arrivals of the next week most likely not to come, with why. Suggestions come from the hotel's rules; never work out a rate yourself. Repeat percentages verbatim.",
+      inputSchema: z.object({
+        days: z.number().int().min(7).max(90).default(30).describe('Nights from tonight.'),
+      }),
+      execute: ({ days }) => safely(async () => compactOutlook(await rateOutlook(days))),
+    }),
+    adjustRates: tool({
+      description:
+        "Propose changing nights' rates by a percent on top of their season, for every room type, e.g. +15 or -10; 0 goes back to the season rate. Use the suggested percents from getRateOutlook unless the user names one. Tonight or later only. The user must confirm.",
+      inputSchema: adjustRatesBodySchema,
+      execute: (input) => propose({ kind: 'adjust_rates', input }),
     }),
     getBill: tool({
       description:

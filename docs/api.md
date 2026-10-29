@@ -209,11 +209,27 @@ Requests are signed in with the `x-staff-id` header: the ID of an active staff m
 
 ### `GET /api/settings/profile`, `PUT /api/settings/profile`
 
-`HotelProfile`: `name`, `location`, `description`, `phone`, `email`, `website`, `checkInFrom` and `checkOutBy` (`HH:MM`), `country` (ISO alpha-2; sets the guest-book rules), `language` (the working language new staff and guests start with), and `entries` (`{ id, category: 'policy' | 'amenity' | 'info', title, details }`, at most 100). `PUT` replaces the whole profile and returns it; empty strings become `null`. Check-out must be earlier than check-in (`400 invalid_input`). See [domain.md](domain.md#hotel-profile).
+`HotelProfile`: `name`, `location`, `description`, `phone`, `email`, `website`, `checkInFrom` and `checkOutBy` (`HH:MM`), `country` (ISO alpha-2; sets the guest-book rules), `language` (the working language new staff and guests start with), `coordinates` (`{ latitude, longitude }` or null; where the weather forecast is for), and `entries` (`{ id, category: 'policy' | 'amenity' | 'info', title, details }`, at most 100). `PUT` replaces the whole profile and returns it; empty strings become `null`. Check-out must be earlier than check-in (`400 invalid_input`). See [domain.md](domain.md#hotel-profile).
 
 ### `GET /api/settings/pricing`, `PUT /api/settings/pricing`
 
-`PricingConfig`: `currency` (`USD`, `EUR`, `CZK`), `pricingBasis` (`per_room`, `per_person`), `tax` (`{ mode: 'inclusive' | 'exclusive', standard: { label, rate }, reduced: { label, rate } }`, rates in percent with up to two decimals), `seasons` (`{ name, from, to, multiplier }`, days as `MM-DD`), `childDiscounts` (`{ maxAge, discount }`, ascending age), `longStay` (`{ minNights, discount }`), `wellness` (`{ perPersonPerNight, minAge }`), `extraBed` (`{ perNight }`) and `dog` (`{ perNight }`) and `cityTax` (`{ label, perPersonPerNight, minAge }`). Discounts are fractions (0.5 = half); money is whole units of `currency`. `PUT` replaces the rates and returns them; new quotes use them right away, existing bookings keep their price. An impossible day, a duplicate season or out-of-order child tiers are `400 invalid_input`. See [domain.md](domain.md#rates-and-rooms).
+`PricingConfig`: `currency` (`USD`, `EUR`, `CZK`), `pricingBasis` (`per_room`, `per_person`), `tax` (`{ mode: 'inclusive' | 'exclusive', standard: { label, rate }, reduced: { label, rate } }`, rates in percent with up to two decimals), `seasons` (`{ name, from, to, multiplier }`, days as `MM-DD`), `childDiscounts` (`{ maxAge, discount }`, ascending age), `longStay` (`{ minNights, discount }`), `wellness` (`{ perPersonPerNight, minAge }`), `extraBed` (`{ perNight }`) and `dog` (`{ perNight }`), `cityTax` (`{ label, perPersonPerNight, minAge }`) and `adjustments` (`{ date, percent }`, one per night). Discounts are fractions (0.5 = half); money is whole units of `currency`. `PUT` replaces the rates and returns them; new quotes use them right away, existing bookings keep their price. An impossible day, a duplicate season or out-of-order child tiers are `400 invalid_input`. See [domain.md](domain.md#rates-and-rooms).
+
+### `POST /api/rates/adjust`
+
+Body `{ nights: [{ date, percent }] }` (1 to 120 nights, −50 to +100; 0 goes back to the season rate). Returns the `PricingConfig`. A night given twice is `400 invalid_input`. See [domain.md](domain.md#rate-outlook).
+
+### `GET /api/revenue/outlook?days=`
+
+`RevenueOutlook` for `days` nights from today (7 to 90, default 60): `today`, `nights` (`{ date, roomsSold, roomsTotal, typicalOccupancy, currentPercent, suggestedPercent, factors: [{ kind: 'demand' | 'event' | 'weather', label, percent }], events, weather, expectedNoShows }`), `events` in the period, `arrivalRisks` (`{ bookingId, guestName, roomName, checkIn, source, chance, reasons }`) and `weatherAvailable`. The forecast comes from Open-Meteo for the profile's `coordinates`, cached for three hours; without coordinates, or when it fails within 4 s, the nights have no weather. Reads need no header.
+
+### `POST /api/revenue/brief`
+
+Body `{ days? }`. `{ text }`: a few sentences from Muse Spark on the outlook. 503 `ai_not_configured`, 429 `demo_limit`, 502 `brief_failed` when the text twice stated a percent the outlook doesn't have.
+
+### `GET /api/events`, `POST /api/events`, `DELETE /api/events/:id`
+
+`LocalEvent[]` by first night. `POST` body `{ name, firstNight, lastNight, impact }` returns `201` with the event; a last night before the first is `400`. `DELETE` returns `204`, `404` for an unknown event.
 
 ### `POST /api/room-types`, `PUT /api/room-types/:id`
 

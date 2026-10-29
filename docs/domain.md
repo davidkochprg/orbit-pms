@@ -196,7 +196,17 @@ An unknown, expired or already saved scan is `not_found`.
 - `updatePricing(config, by)` replaces the rates. Season days must be real `MM-DD` days (29 February counts) and season names unique, child tiers must go up in age, and there is one long-stay tier per length (`invalid_input`). Audited as `settings.pricing` with the changed fields; a save that changes nothing writes nothing.
 - `createRoomType` / `updateRoomType` set the name, capacity, base price and description (`room_type.create`, `room_type.update`; a price change logs the old and new base price).
 - `createRoom` / `updateRoom` set the name, room type, kind and floor. Room names are unique, ignoring case (`conflict`), and the room type must exist (`not_found`). New rooms start `clean`; an edit keeps the housekeeping status (`room.create`, `room.update`).
+- The rates include `adjustments`: per-night changes `{ date, percent }` on top of the season, for every room type (−50 to +100, one per night). `adjustRates(nights, actor, by)` sets each night to its percent, 0 removing it; a manager does it from the Rates page, the agent through a proposal (`adjust_rates`). Audited as `rates.adjust` with each night's old and new percent; nights that would not change are skipped. Rates saved before it existed read as none.
 - The hotel service reads the saved rates inside each operation's transaction. Existing bookings keep their `priceSnapshot`; only new quotes and re-pricing (date or party changes) use new rates.
+
+## Rate outlook
+
+`buildOutlook` (`revenue.ts`) and `createRevenueService` (`revenue-service.ts`) describe the next nights (60 on the Rates page) for rate decisions. Weather is loaded outside the domain and passed in.
+
+- **Per night**: rooms sold (bookings not cancelled whose stay covers it) of rooms that can be sold (all but out of order), how full that weekday usually ends up (`typicalOccupancy`, the average over the eight weeks before today), the night's current adjustment, the local events on it, the forecast, and expected no-shows (the sum of the arrivals' no-show chances).
+- **Suggested rate**: the factors that apply add up, rounded to 5 and kept within −20 and +30 (`rateRules`, illustrative values for the demo, not tuned on a real hotel). Demand: almost full (90% or more) +20, otherwise 15 points busier than the usual weekday +10, or, within a week, 20 points quieter −10. Events: the biggest of the night, small +5, medium +10, big +15. Weather: 5 cm of fresh snow or more +5, a storm or 20 mm of rain or more −5. With no factor the night keeps its current adjustment, so a manager's own change is never suggested away.
+- **No-show chance** of a confirmed arrival (`noShowChance`): 3%, +7% booked through an OTA, +5% with no deposit, +10% when the guest cancelled a stay before, −2% when they have stayed before, at least 1%. Only how the stay was booked and the guest's own history count, never who the guest is or where they come from. The outlook lists this week's arrivals at 10% or more, riskiest first.
+- **Local events** (`LocalEvent`: `name`, `firstNight`, `lastNight`, `impact` `low` | `medium` | `high`) are added and removed by a manager (`event.create`, `event.delete`). The demo seeds four mock events, dated from today; the seed nearly fills the big one's weekend.
 
 ## Staff
 
@@ -221,7 +231,7 @@ An unknown, expired or already saved scan is `not_found`.
 
 `quote(input, pricing)` returns a line-item breakdown whose amounts sum to `total`. The rates are edited on the Rates page ([Rates and rooms](#rates-and-rooms)); the defaults in `packages/domain/src/pricing/config.ts` and the seeded base prices **are placeholders until replaced with real prices.**
 
-1. **Accommodation**: `basePrice × season multiplier`, rounded to whole units, per guest per night (`per_person`) or per room per night (`per_room`). One line per season the stay touches. Taxes are not part of a quote: they are included in the prices or added on the bill.
+1. **Accommodation**: `basePrice × season multiplier × (1 + the night's adjustment)`, rounded to whole units, per guest per night (`per_person`) or per room per night (`per_room`). One line per season and adjustment the stay touches, e.g. "Room, 2 nights (standard, +15%)". Taxes are not part of a quote: they are included in the prices or added on the bill.
 2. **Seasons** are `MM-DD` ranges, inclusive of both nights, and may wrap the new year (`12-20` → `03-15`). The first matching season wins; other nights use multiplier 1.
 3. **Child discounts** (per-person rates only): each child gets the first tier with `age ≤ maxAge`; the discount is a fraction of that night's adult rate (1 = free). Older children pay the adult rate.
 4. **Long stay**: the tier with the highest `minNights` the stay reaches takes a fraction off accommodation, after child discounts. Add-ons are not discounted.

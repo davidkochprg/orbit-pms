@@ -2,6 +2,7 @@ import type { PricingConfig, RoomBody, StaffMember } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { pricingConfig } from './pricing';
 import {
+  applyAdjustments,
   assertUniqueRoomName,
   assertValidPricing,
   changedPricingFields,
@@ -86,12 +87,48 @@ describe('assertValidPricing', () => {
     expect(() => assertValidPricing({ ...pricingConfig, childDiscounts: same })).toThrow();
   });
 
+  it('allows one adjustment per night', () => {
+    const night = { date: '2026-05-10', percent: 10 };
+    expect(() =>
+      assertValidPricing({ ...pricingConfig, adjustments: [night, { ...night, percent: 5 }] }),
+    ).toThrow('Two rate changes');
+  });
+
   it('allows one long-stay discount per length', () => {
     const longStay = [
       { minNights: 7, discount: 0.1 },
       { minNights: 7, discount: 0.2 },
     ];
     expect(() => assertValidPricing({ ...pricingConfig, longStay })).toThrow(/7 nights/);
+  });
+});
+
+describe('applyAdjustments', () => {
+  const current = [
+    { date: '2026-05-10', percent: 10 },
+    { date: '2026-05-12', percent: -5 },
+  ];
+
+  it('sets, replaces and removes nights, sorted by date', () => {
+    expect(
+      applyAdjustments(current, [
+        { date: '2026-05-11', percent: 15 },
+        { date: '2026-05-12', percent: 0 },
+        { date: '2026-05-10', percent: 20 },
+      ]),
+    ).toEqual([
+      { date: '2026-05-10', percent: 20 },
+      { date: '2026-05-11', percent: 15 },
+    ]);
+  });
+
+  it('refuses a night given twice', () => {
+    expect(() =>
+      applyAdjustments(current, [
+        { date: '2026-05-11', percent: 15 },
+        { date: '2026-05-11', percent: 5 },
+      ]),
+    ).toThrow('set twice');
   });
 });
 
@@ -140,6 +177,32 @@ describe('createRatesService', () => {
     await service.updatePricing(pricingConfig, manager);
     expect(repos.state.audit).toEqual([]);
     expect(repos.state.pricing).toBeNull();
+  });
+
+  it('adjusts nights and audits each change, by a manager or the agent', async () => {
+    const { repos, service } = setup();
+    const saved = await service.adjustRates(
+      [
+        { date: '2026-05-10', percent: 15 },
+        { date: '2026-05-11', percent: 0 },
+      ],
+      'user',
+      manager,
+    );
+    expect(saved.adjustments).toEqual([{ date: '2026-05-10', percent: 15 }]);
+    expect(repos.state.audit.map((a) => [a.actor, a.action, a.payload])).toEqual([
+      ['user', 'rates.adjust', { by: 'stf_m', nights: [{ date: '2026-05-10', from: 0, to: 15 }] }],
+    ]);
+
+    await service.adjustRates([{ date: '2026-05-10', percent: 15 }], 'agent');
+    expect(repos.state.audit).toHaveLength(1);
+    await service.adjustRates([{ date: '2026-05-10', percent: 0 }], 'agent');
+    expect((await service.getPricing()).adjustments).toEqual([]);
+    expect(repos.state.audit.at(-1)).toMatchObject({ actor: 'agent', action: 'rates.adjust' });
+
+    await expect(
+      service.adjustRates([{ date: '2026-05-10', percent: 5 }], 'user', receptionist),
+    ).rejects.toThrow('Only a manager');
   });
 
   it('lets only an active manager change rates, room types and rooms', async () => {

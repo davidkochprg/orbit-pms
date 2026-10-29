@@ -22,6 +22,7 @@ import {
 } from '@orbit/domain';
 import {
   type AgentContext,
+  type RevenueOutlook,
   type AgentMessageMetadata,
   agentMessageMetadataSchema,
   agentRequestSchema,
@@ -48,6 +49,8 @@ export interface AgentRouteDeps {
   actions: PendingActionService;
   housekeeping: HousekeepingService;
   registrations: RegistrationService;
+  /** The next nights with suggested rates and the forecast. */
+  rateOutlook: (days: number) => Promise<RevenueOutlook>;
   /** Read for every turn, so edits in Settings apply to the next message. */
   hotelContext: () => Promise<HotelContext>;
   limiter: AiLimiter;
@@ -69,6 +72,7 @@ export function agentRoutes({
   actions,
   housekeeping,
   registrations,
+  rateOutlook,
   hotelContext,
   limiter,
   clock,
@@ -84,6 +88,7 @@ export function agentRoutes({
     registrations,
     listRooms: () => repos.rooms.listRooms(),
     listRoomTypes: () => repos.rooms.listRoomTypes(),
+    rateOutlook,
   });
 
   /** What the staff member was looking at, from the hotel's own data; null if it is gone. */

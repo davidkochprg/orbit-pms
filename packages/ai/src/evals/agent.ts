@@ -5,6 +5,8 @@ import {
   createHotelService,
   createHousekeepingService,
   createPendingActionService,
+  createRatesService,
+  createRevenueService,
   createRegistrationService,
   createReportService,
   hotelPolicy,
@@ -149,6 +151,7 @@ export function buildAgentEvalHotel(today: IsoDate) {
   const registrations = createRegistrationService({ repos, clock, newId });
   const actions = createPendingActionService({
     repos,
+    rates: createRatesService({ repos, defaults: usDemoPricing, newId }),
     hotel,
     billing,
     registrations,
@@ -165,6 +168,8 @@ export function buildAgentEvalHotel(today: IsoDate) {
     registrations,
     listRooms: () => repos.rooms.listRooms(),
     listRoomTypes: () => repos.rooms.listRoomTypes(),
+    rateOutlook: (days) =>
+      createRevenueService({ repos, defaults: usDemoPricing, clock, newId }).outlook(days, null),
   });
   return { repos, tools };
 }
@@ -320,6 +325,17 @@ export const agentFixtures: AgentFixture[] = [
     prompt: "Anna Example's new email address is anna.example@example.com.",
     check: ({ hotel }) =>
       proposed(hotel, 'update_guest', { guestId: 'gst_anna', email: 'anna.example@example.com' }),
+  },
+  {
+    id: 'raise-rate',
+    prompt: "Raise tomorrow night's rate by 15%.",
+    check: ({ hotel }) => {
+      // Jan Dvořák arrives today, so his check-in is the eval's today.
+      const today = hotel.repos.state.bookings.find((b) => b.id === 'bk_jan')!.checkIn;
+      return proposed(hotel, 'adjust_rates', {
+        nights: [{ date: addDays(today, 1), percent: 15 }],
+      });
+    },
   },
   {
     id: 'arrivals-list',

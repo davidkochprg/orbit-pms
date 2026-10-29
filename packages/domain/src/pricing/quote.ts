@@ -49,14 +49,26 @@ interface SeasonGroup {
   nights: number;
 }
 
+/** The night's adjustment in percent, 0 when it has none. */
+export function adjustmentFor(night: IsoDate, config: PricingConfig): number {
+  return config.adjustments.find((a) => a.date === night)?.percent ?? 0;
+}
+
+function signedPercent(n: number): string {
+  return `${n > 0 ? '+' : ''}${n}%`;
+}
+
+/** Nights grouped by season and the night's adjustment, each group with its nightly rate. */
 function groupNightsBySeason(range: DateRange, basePrice: number, config: PricingConfig) {
   const groups = new Map<string, SeasonGroup>();
   for (const night of eachNight(range)) {
     const season = seasonFor(night, config);
-    const key = season?.name ?? STANDARD;
+    const name = season?.name ?? STANDARD;
+    const adjustment = adjustmentFor(night, config);
+    const key = `${name}|${adjustment}`;
     const group = groups.get(key) ?? {
-      label: key.replaceAll('_', ' '),
-      rate: Math.round(basePrice * (season?.multiplier ?? 1)),
+      label: name.replaceAll('_', ' ') + (adjustment ? `, ${signedPercent(adjustment)}` : ''),
+      rate: Math.round(basePrice * (season?.multiplier ?? 1) * (1 + adjustment / 100)),
       nights: 0,
     };
     group.nights += 1;

@@ -7,6 +7,7 @@ import type {
   HousekeepingTask,
   IdScan,
   Inquiry,
+  LocalEvent,
   PendingAction,
   Payment,
   PricingConfig,
@@ -74,6 +75,7 @@ export interface MemoryState {
   stayGuests: StayGuest[];
   idScans: IdScan[];
   stayReadings: SavedStayReading[];
+  events: LocalEvent[];
 }
 
 function inBilling<T extends { bookingId: string }>(
@@ -113,6 +115,7 @@ export function createMemoryRepositories(
     stayGuests: [],
     idScans: [],
     stayReadings: [],
+    events: [],
     ...clone(initial),
   };
 
@@ -369,6 +372,18 @@ export function createMemoryRepositories(
           ...state.stayReadings.filter((r) => r.bookingId !== reading.bookingId),
           reading,
         ];
+        return Promise.resolve();
+      },
+    },
+    events: {
+      list: () =>
+        Promise.resolve([...state.events].sort((a, b) => a.firstNight.localeCompare(b.firstNight))),
+      create: (event) => {
+        state.events.push(event);
+        return Promise.resolve();
+      },
+      delete: (id) => {
+        state.events = state.events.filter((e) => e.id !== id);
         return Promise.resolve();
       },
     },

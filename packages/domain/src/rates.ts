@@ -1,5 +1,7 @@
 import type {
+  AuditActor,
   PricingConfig,
+  RateAdjustment,
   Room,
   RoomBody,
   RoomType,
@@ -47,6 +49,16 @@ export function assertValidPricing(pricing: PricingConfig): void {
       );
     }
   });
+  const nights = new Set<string>();
+  for (const adjustment of pricing.adjustments) {
+    if (nights.has(adjustment.date)) {
+      throw new DomainError(
+        'invalid_input',
+        `Two rate changes for the night of ${adjustment.date}`,
+      );
+    }
+    nights.add(adjustment.date);
+  }
   const lengths = new Set<number>();
   for (const tier of pricing.longStay) {
     if (lengths.has(tier.minNights)) {
@@ -64,6 +76,38 @@ export function changedPricingFields(before: PricingConfig, after: PricingConfig
   return (Object.keys(after) as (keyof PricingConfig)[]).filter(
     (key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]),
   );
+}
+
+/**
+ * The adjustments after setting each of `nights` to its percent, sorted by date; 0 removes the
+ * night's adjustment. Throws for a night given twice.
+ */
+export function applyAdjustments(
+  current: RateAdjustment[],
+  nights: RateAdjustment[],
+): RateAdjustment[] {
+  const byDate = new Map(current.map((a) => [a.date, a.percent]));
+  const seen = new Set<string>();
+  for (const { date, percent } of nights) {
+    if (seen.has(date)) throw new DomainError('invalid_input', `The night of ${date} is set twice`);
+    seen.add(date);
+    if (percent === 0) byDate.delete(date);
+    else byDate.set(date, percent);
+  }
+  return [...byDate]
+    .map(([date, percent]) => ({ date, percent }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/** Each night whose percent would change, with what it was. */
+export function adjustmentChanges(current: RateAdjustment[], nights: RateAdjustment[]) {
+  return nights
+    .map(({ date, percent }) => ({
+      date,
+      from: current.find((a) => a.date === date)?.percent ?? 0,
+      to: percent,
+    }))
+    .filter((c) => c.from !== c.to);
 }
 
 /** The saved rates, or `defaults` until a manager has saved some. */
@@ -117,6 +161,34 @@ export function createRatesService({ repos, defaults, newId }: RatesDeps) {
           action: 'settings.pricing',
           subjectId: null,
           payload: { by: by.id, changed },
+        });
+        return pricing;
+      });
+    },
+
+    /**
+     * Sets nights' rates to a percent on top of their season, for every room type; 0 removes the
+     * change. A manager does it on the Rates page; the agent's proposal runs once someone confirms
+     * it. Nights that would not change are skipped, and nothing changing writes no audit entry.
+     */
+    async adjustRates(
+      nights: RateAdjustment[],
+      actor: AuditActor,
+      by: StaffMember | null = null,
+    ): Promise<PricingConfig> {
+      if (actor === 'user') assertManager(by);
+      return repos.transaction(async (tx) => {
+        const before = await currentPricing(tx, defaults);
+        const changes = adjustmentChanges(before.adjustments, nights);
+        const adjustments = applyAdjustments(before.adjustments, nights);
+        if (changes.length === 0) return before;
+        const pricing = { ...before, adjustments };
+        await tx.settings.savePricing(pricing);
+        await tx.audit.append({
+          actor,
+          action: 'rates.adjust',
+          subjectId: null,
+          payload: { ...(by && { by: by.id }), nights: changes },
         });
         return pricing;
       });

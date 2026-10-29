@@ -141,6 +141,13 @@
       "when": 1793313719842,
       "tag": "0019_stay_readings",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793317024303,
+      "tag": "0020_local_events",
+      "breakpoints": true
     }
   ]
 }

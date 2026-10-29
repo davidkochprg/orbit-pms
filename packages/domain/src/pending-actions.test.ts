@@ -4,6 +4,7 @@ import { createGuestService } from './guests';
 import { createPendingActionService } from './pending-actions';
 import { hotelPolicy } from './policy';
 import { pricingConfig } from './pricing';
+import { createRatesService } from './rates';
 import { createRegistrationService } from './registration';
 import { createHotelService } from './service';
 import { booking, czechProfile, double, room } from './test-fixtures';
@@ -78,6 +79,7 @@ function setup() {
     billing,
     actions: createPendingActionService({
       repos,
+      rates: createRatesService({ repos, defaults: pricingConfig, newId }),
       hotel,
       billing,
       registrations,
@@ -133,6 +135,42 @@ describe('pending actions', () => {
       notes: 'Vegetarian breakfast',
     });
     expect(repos.state.audit[0]).toMatchObject({ actor: 'agent', action: 'booking.update' });
+  });
+
+  it('proposes rate changes per night and applies them on confirm, as the agent', async () => {
+    const { repos, actions } = setup();
+    const action = await actions.propose({
+      kind: 'adjust_rates',
+      input: {
+        nights: [
+          { date: '2026-05-15', percent: 15 },
+          { date: '2026-05-16', percent: 0 },
+        ],
+      },
+    });
+    // Saturday the 16th has no change to remove, so only Friday is in it.
+    expect(action.summary).toBe('Change the rates of 1 night: Fri 2026-05-15 +15%');
+    expect(action.details?.changes).toEqual([
+      { label: 'Fri 2026-05-15', before: { text: 'Season rate' }, after: { text: '+15%' } },
+    ]);
+    expect(repos.state.pricing).toBeNull();
+    const done = await actions.confirm(action.id);
+    expect(done).toMatchObject({ status: 'confirmed', bookingId: null });
+    expect(repos.state.pricing?.adjustments).toEqual([{ date: '2026-05-15', percent: 15 }]);
+    expect(repos.state.audit.at(-1)).toMatchObject({ actor: 'agent', action: 'rates.adjust' });
+
+    await expect(
+      actions.propose({
+        kind: 'adjust_rates',
+        input: { nights: [{ date: '2026-05-15', percent: 15 }] },
+      }),
+    ).rejects.toThrow('already have these rates');
+    await expect(
+      actions.propose({
+        kind: 'adjust_rates',
+        input: { nights: [{ date: '2026-05-09', percent: 10 }] },
+      }),
+    ).rejects.toThrow('tonight or later');
   });
 
   it('refuses to propose an invalid change', async () => {

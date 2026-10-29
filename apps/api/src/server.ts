@@ -3,6 +3,7 @@ import { setHotelTimeZone } from '@orbit/domain';
 import { createAi } from './ai';
 import { createApp } from './app';
 import { parseEnv } from './env';
+import { createOpenMeteo } from './weather';
 
 /** The API wired to its database and Meta models from the environment, for every way it runs. */
 export function createServer(source: Record<string, string | undefined>) {
@@ -20,6 +21,7 @@ export function createServer(source: Record<string, string | undefined>) {
     usage: createUsageStore(db.db),
     monthlyBudgetUsd: env.AI_MONTHLY_BUDGET_USD,
     accessCode: env.DEMO_ACCESS_CODE,
+    weather: createOpenMeteo(),
     log: true,
   });
   return { env, db, ai, app };

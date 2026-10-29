@@ -5,6 +5,8 @@ import {
   createGuestService,
   createHousekeepingService,
   createPendingActionService,
+  createRatesService,
+  createRevenueService,
   createRegistrationService,
   createReportService,
   hotelPolicy,
@@ -86,6 +88,7 @@ export function setup() {
   const guests = createGuestService({ repos, newId });
   const actions = createPendingActionService({
     repos,
+    rates: createRatesService({ repos, defaults: pricingConfig, newId }),
     hotel,
     billing,
     registrations,
@@ -104,6 +107,8 @@ export function setup() {
     registrations,
     listRooms: () => repos.rooms.listRooms(),
     listRoomTypes: () => repos.rooms.listRoomTypes(),
+    rateOutlook: (days) =>
+      createRevenueService({ repos, defaults: pricingConfig, clock, newId }).outlook(days, null),
   });
   return { repos, hotel, billing, actions, tools };
 }

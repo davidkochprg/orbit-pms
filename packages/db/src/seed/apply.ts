@@ -17,6 +17,7 @@ import {
   staff,
   stayGuests,
   stayReadings,
+  localEvents,
 } from '../schema';
 import type { SeedData } from './build';
 
@@ -26,6 +27,7 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
     await tx.delete(pendingActions);
     await tx.delete(idScans);
     await tx.delete(stayReadings);
+    await tx.delete(localEvents);
     await tx.delete(stayGuests);
     await tx.delete(charges);
     await tx.delete(payments);
@@ -89,5 +91,6 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
     await tx.insert(hotelProfile).values({ id: 'hotel', profile: seed.hotelProfile });
     await tx.insert(pricing).values({ id: 'hotel', config: seed.pricing });
     await tx.insert(staff).values(seed.staff);
+    if (seed.events.length > 0) await tx.insert(localEvents).values(seed.events);
   });
 }

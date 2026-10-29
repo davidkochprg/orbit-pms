@@ -30,6 +30,7 @@ const pricing: PricingConfig = {
     standard: { label: 'VAT', rate: 21 },
     reduced: { label: 'VAT', rate: 12 },
   },
+  adjustments: [],
 };
 
 function expectCode(fn: () => unknown, code: DomainError['code']) {

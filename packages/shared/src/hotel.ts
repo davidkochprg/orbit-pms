@@ -59,5 +59,10 @@ export const hotelProfileSchema = z.object({
     .default('CZ'),
   /** The language the hotel works in: new staff and guests without one start with it. */
   language: languageSchema.default('cs'),
+  /** Where the weather forecast is for; null for no forecast. */
+  coordinates: z
+    .object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) })
+    .nullable()
+    .default(null),
 });
 export type HotelProfile = z.infer<typeof hotelProfileSchema>;

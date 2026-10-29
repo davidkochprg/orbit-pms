@@ -16,5 +16,6 @@ export * from './quote';
 export * from './rates';
 export * from './registration';
 export * from './reports';
+export * from './revenue';
 export * from './staff';
 export * from './views';

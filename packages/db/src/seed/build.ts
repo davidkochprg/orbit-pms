@@ -17,6 +17,7 @@ import type {
   HousekeepingTask,
   Inquiry,
   IsoDate,
+  LocalEvent,
   Payment,
   QuoteAddons,
   StayGuest,
@@ -28,6 +29,7 @@ import { buildActivity } from './activity';
 import { buildBilling } from './billing';
 import { seedGuests, seedRooms } from './catalog';
 import { buildConversations } from './conversations';
+import { buildEvents } from './events';
 import { regionSeeds, type SeedRegion } from './regions';
 import { buildStayGuests } from './registrations';
 import { createRandom } from './random';
@@ -48,7 +50,12 @@ export interface SeedData {
   stayGuests: StayGuest[];
   /** The recent activity feed. */
   auditLog: AuditLogEntry[];
+  /** Mock local events behind suggested rates. */
+  events: LocalEvent[];
 }
+
+/** Share of rooms the seed books for the biggest event, leaving a few free for inbox requests. */
+const EVENT_FILL = 0.98;
 
 interface Draft {
   roomId: string;
@@ -64,7 +71,7 @@ interface Draft {
 
 // Two months back, so a report and the period before it both have stays to compare.
 const WINDOW_START = -63;
-const WINDOW_END = 45;
+const WINDOW_END = 75;
 const sources: BookingSource[] = ['email', 'email', 'phone', 'web', 'web', 'ota', 'walk_in'];
 
 /** Stays that start or end today, so the dashboard and tape chart are never empty. */
@@ -146,6 +153,29 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
       };
       if (!overlapsAny(draft, drafts)) drafts.push(draft);
       cursor = addDays(draft.checkOut, random.chance(0.2) ? 0 : random.int(1, 9));
+    }
+  }
+
+  // The big event weekend fills up, as it would: book free rooms night by night until each night
+  // is nearly full, keeping a guest on for the next night where the room is free then too.
+  const events = buildEvents(today, region);
+  const big = events.find((e) => e.impact === 'high');
+  if (big) {
+    const target = Math.round(seedRooms.length * EVENT_FILL);
+    const holds = (roomId: string, night: IsoDate) =>
+      drafts.some((d) => d.roomId === roomId && d.checkIn <= night && night < d.checkOut);
+    const sold = (night: IsoDate) => seedRooms.filter((r) => holds(r.id, night)).length;
+    for (let night = big.firstNight; night <= big.lastNight; night = addDays(night, 1)) {
+      for (const room of seedRooms) {
+        if (sold(night) >= target) break;
+        if (holds(room.id, night)) continue;
+        let checkOut = addDays(night, 1);
+        while (checkOut <= big.lastNight && !holds(room.id, checkOut) && sold(checkOut) < target) {
+          checkOut = addDays(checkOut, 1);
+        }
+        // Anchored, so no random cancellation or freed room undoes the sell-out.
+        drafts.push({ roomId: room.id, checkIn: night, checkOut, anchor: true });
+      }
     }
   }
 
@@ -299,6 +329,7 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
     ...billing,
     stayGuests: buildStayGuests(linked, guests, today),
     auditLog: buildActivity(linked, rooms, billing.payments, housekeepingTasks, today, now),
+    events,
   };
 }
 

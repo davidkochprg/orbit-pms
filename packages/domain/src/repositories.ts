@@ -12,6 +12,7 @@ import type {
   InboxMessage,
   Inquiry,
   IsoDate,
+  LocalEvent,
   PendingAction,
   Payment,
   PricingConfig,
@@ -175,6 +176,14 @@ export interface IdScanRepository {
   deleteExpired(now: string): Promise<void>;
 }
 
+/** Events in the area that move demand, for suggested rates. */
+export interface LocalEventRepository {
+  /** By first night. */
+  list(): Promise<LocalEvent[]>;
+  create(event: LocalEvent): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+
 /** What the model read from stays' notes for housekeeping, one per booking. */
 export interface StayReadingRepository {
   list(bookingIds: string[]): Promise<SavedStayReading[]>;
@@ -196,6 +205,7 @@ export interface Repositories {
   stayGuests: StayGuestRepository;
   idScans: IdScanRepository;
   stayReadings: StayReadingRepository;
+  events: LocalEventRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

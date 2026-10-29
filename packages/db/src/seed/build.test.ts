@@ -154,7 +154,7 @@ describe('buildSeed', () => {
 
   it('has a few hundred bookings in the past, present and future', () => {
     expect(seed.bookings.length).toBeGreaterThanOrEqual(300);
-    expect(seed.bookings.length).toBeLessThanOrEqual(900);
+    expect(seed.bookings.length).toBeLessThanOrEqual(1100);
     expect(seed.bookings.some((b) => b.status === 'checked_out')).toBe(true);
     expect(seed.bookings.some((b) => b.status === 'checked_in')).toBe(true);
     expect(seed.bookings.some((b) => b.status === 'hold')).toBe(true);
@@ -241,7 +241,8 @@ describe('buildSeed', () => {
 
   it('is deterministic and shifts with today', () => {
     const later = buildSeed('2027-01-10', new Date('2027-01-10T08:00:00Z'), 'cz');
-    expect(later.bookings.length).toBe(seed.bookings.length);
+    // The event weekend falls on a Friday, so how many rooms it fills depends on the weekday.
+    expect(Math.abs(later.bookings.length - seed.bookings.length)).toBeLessThanOrEqual(15);
     expect(buildSeed(today, now, 'cz')).toEqual(seed);
   });
 });
@@ -288,5 +289,24 @@ describe('buildSeed for the US demo lodge', () => {
     const authors = us.inquiries.flatMap((i) => i.messages.map((m) => m.author)).filter(Boolean);
     expect(authors.every((a) => us.staff.some((s) => s.name === a))).toBe(true);
     expect(JSON.stringify(us.hotelProfile)).not.toMatch(/CZK|Prague|Czech/);
+  });
+});
+
+describe('buildSeed events', () => {
+  it('dates mock events ahead of today and nearly fills the big weekend', () => {
+    expect(seed.events.map((e) => e.impact)).toEqual(['high', 'medium', 'low', 'medium']);
+    expect(seed.events.every((e) => e.firstNight > today && e.lastNight >= e.firstNight)).toBe(
+      true,
+    );
+    const big = seed.events[0]!;
+    const sold = new Set(
+      seed.bookings
+        .filter(
+          (b) =>
+            b.status !== 'cancelled' && b.checkIn <= big.firstNight && big.firstNight < b.checkOut,
+        )
+        .map((b) => b.roomId),
+    );
+    expect(sold.size / seed.rooms.length).toBeGreaterThanOrEqual(0.9);
   });
 });

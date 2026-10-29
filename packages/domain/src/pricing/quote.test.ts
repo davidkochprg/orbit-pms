@@ -29,6 +29,7 @@ const config: PricingConfig = {
     standard: { label: 'VAT', rate: 21 },
     reduced: { label: 'VAT', rate: 12 },
   },
+  adjustments: [],
 };
 
 const base = {
@@ -54,6 +55,31 @@ describe('quote', () => {
     ]);
     expect(q.total).toBe(4000);
     expect(q.currency).toBe('CZK');
+  });
+
+  it("applies a night's adjustment on top of its season, in its own line", () => {
+    const adjusted = { ...config, adjustments: [{ date: '2026-05-11', percent: 15 }] };
+    expect(quote(base, adjusted).lines).toEqual([
+      {
+        kind: 'accommodation',
+        label: 'Accommodation, 2 guests × 1 night (standard)',
+        quantity: 2,
+        unitPrice: 1000,
+        amount: 2000,
+      },
+      {
+        kind: 'accommodation',
+        label: 'Accommodation, 2 guests × 1 night (standard, +15%)',
+        quantity: 2,
+        unitPrice: 1150,
+        amount: 2300,
+      },
+    ]);
+    const lower = { ...config, adjustments: [{ date: '2026-05-10', percent: -10 }] };
+    expect(quote(base, lower).lines[0]).toMatchObject({
+      label: 'Accommodation, 2 guests × 1 night (standard, -10%)',
+      unitPrice: 900,
+    });
   });
 
   it('splits nights across a season boundary', () => {

@@ -12,6 +12,7 @@ import type {
   IdScanRepository,
   StayGuestRepository,
   StayReadingRepository,
+  LocalEventRepository,
   Repositories,
   RoomRepository,
   SettingsRepository,
@@ -63,6 +64,7 @@ import {
   idScans,
   stayGuests,
   stayReadings,
+  localEvents,
   rooms,
   roomTypes,
   staff,
@@ -574,6 +576,24 @@ function stayReadingRepository(db: Db): StayReadingRepository {
   };
 }
 
+function localEventRepository(db: Db): LocalEventRepository {
+  return {
+    async list() {
+      const rows = await db
+        .select()
+        .from(localEvents)
+        .orderBy(asc(localEvents.firstNight), asc(localEvents.id));
+      return rows.map(({ createdAt: _, ...event }) => event);
+    },
+    async create(event) {
+      await db.insert(localEvents).values(event);
+    },
+    async delete(id) {
+      await db.delete(localEvents).where(eq(localEvents.id, id));
+    },
+  };
+}
+
 export function createRepositories(db: Db): Repositories {
   return {
     rooms: roomRepository(db),
@@ -589,6 +609,7 @@ export function createRepositories(db: Db): Repositories {
     stayGuests: stayGuestRepository(db),
     idScans: idScanRepository(db),
     stayReadings: stayReadingRepository(db),
+    events: localEventRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

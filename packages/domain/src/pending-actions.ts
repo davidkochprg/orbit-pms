@@ -17,9 +17,10 @@ import type {
 import { formatMoney } from '@orbit/shared';
 import type { BillingService } from './billing';
 import { changedBookingFields } from './bookings';
-import { nightsBetween } from './dates';
+import { hotelToday, nightsBetween } from './dates';
 import { DomainError } from './errors';
 import type { GuestService } from './guests';
+import { adjustmentChanges, applyAdjustments, type RatesService } from './rates';
 import type { RegistrationService } from './registration';
 import type { Repositories } from './repositories';
 import type { HotelService } from './service';
@@ -30,6 +31,7 @@ export interface PendingActionDeps {
   billing: BillingService;
   registrations: RegistrationService;
   guests: GuestService;
+  rates: Pick<RatesService, 'getPricing' | 'adjustRates'>;
   clock: () => Date;
   newId: (prefix: string) => string;
 }
@@ -151,6 +153,18 @@ function details(
   return { changes, amount, note };
 }
 
+/** "+15%", "-10%", or "Season rate" for none. */
+function ratePercent(percent: number): string {
+  return percent === 0 ? 'Season rate' : `${percent > 0 ? '+' : ''}${percent}%`;
+}
+
+const shortWeekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** "Fri 2026-11-06" */
+function nightLabel(date: string): string {
+  return `${shortWeekdays[new Date(`${date}T12:00:00Z`).getUTCDay()]} ${date}`;
+}
+
 const bookingStatusLabels: Record<BookingStatus, string> = {
   hold: 'Hold',
   confirmed: 'Confirmed',
@@ -241,6 +255,7 @@ export function createPendingActionService({
   billing,
   registrations,
   guests,
+  rates,
   clock,
   newId,
 }: PendingActionDeps) {
@@ -462,6 +477,30 @@ export function createPendingActionService({
           details: details([removed('Guest book', text(person.name))]),
         };
       }
+      case 'adjust_rates': {
+        const { adjustments } = await rates.getPricing();
+        const { nights } = action.input;
+        if (nights.some((n) => n.date < hotelToday(clock()))) {
+          throw new DomainError('invalid_input', 'Rates can only change for tonight or later');
+        }
+        applyAdjustments(adjustments, nights);
+        const list = adjustmentChanges(adjustments, nights);
+        if (list.length === 0) {
+          throw new DomainError('invalid_input', 'Those nights already have these rates');
+        }
+        return {
+          summary: `Change the rates of ${list.length} night${list.length === 1 ? '' : 's'}: ${list
+            .map((c) => `${nightLabel(c.date)} ${ratePercent(c.to)}`)
+            .join(', ')}`,
+          details: details(
+            list.map((c) =>
+              changed(nightLabel(c.date), text(ratePercent(c.from)), text(ratePercent(c.to))),
+            ),
+            null,
+            'For every room type, on top of the season. Existing bookings keep their price.',
+          ),
+        };
+      }
       case 'update_guest': {
         const { guestId, ...patch } = action.input;
         const { guest } = await guests.previewUpdate(guestId, patch);
@@ -541,6 +580,9 @@ export function createPendingActionService({
         await guests.update(guestId, patch, 'agent');
         return null;
       }
+      case 'adjust_rates':
+        await rates.adjustRates(action.input.nights, 'agent');
+        return null;
     }
   }
 

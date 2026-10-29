@@ -7,6 +7,7 @@ import type { HotelProfile } from '@orbit/shared';
 export const czechHotelProfile: HotelProfile = {
   country: 'CZ',
   language: 'cs',
+  coordinates: { latitude: 50.82, longitude: 15.25 },
   name: 'Orbit Demo Penzion',
   location: 'Jizera Mountains, Czech Republic',
   description:
@@ -132,6 +133,7 @@ export const czechHotelProfile: HotelProfile = {
 export const usHotelProfile: HotelProfile = {
   country: 'US',
   language: 'en',
+  coordinates: { latitude: 37.65, longitude: -118.97 },
   name: 'Orbit Demo Lodge',
   location: 'Sierra Nevada, California',
   description:

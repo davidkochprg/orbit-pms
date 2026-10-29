@@ -15,6 +15,7 @@ const profile: HotelProfile = {
   checkOutBy: '11:00',
   country: 'CZ',
   language: 'cs',
+  coordinates: null,
   entries: [
     { id: 'quiet', category: 'policy', title: 'Quiet hours', details: 'From 22:00.' },
     { id: 'sauna', category: 'amenity', title: 'Sauna', details: 'Open 16:00 to 21:00.' },

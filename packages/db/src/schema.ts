@@ -20,6 +20,7 @@ import {
   type IdScanResult,
   type InquiryExtraction,
   type InquirySuggestion,
+  type EventImpact,
   type PendingActionDetails,
   type PendingActionInput,
   type PricingConfig,
@@ -325,6 +326,16 @@ export const stayReadings = pgTable('stay_readings', {
   /** The text that was read; a different text means it needs reading again. */
   source: text('source').notNull(),
   readAt: timestamp('read_at', { withTimezone: true }).notNull(),
+});
+
+/** Events in the area that move demand, behind suggested rates. */
+export const localEvents = pgTable('local_events', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  firstNight: date('first_night', { mode: 'string' }).notNull(),
+  lastNight: date('last_night', { mode: 'string' }).notNull(),
+  impact: text('impact').$type<EventImpact>().notNull(),
+  createdAt: createdAt(),
 });
 
 /** Rates from Settings: seasons, discounts and add-on prices. One row, `id = 'hotel'`. */
