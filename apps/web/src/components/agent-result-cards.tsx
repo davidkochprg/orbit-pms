@@ -22,6 +22,7 @@ import { useState } from 'react';
 import { type BookingListKind, BookingListCard } from '@/components/agent-booking-list-card';
 import { BriefCard } from '@/components/agent-brief-card';
 import { AgentCard, AgentCardHeader, Amounts } from '@/components/agent-card';
+import { GuestBookCard } from '@/components/agent-guest-book-card';
 import { ReportCard } from '@/components/agent-report-card';
 import {
   type HousekeepingChangeResult,
@@ -32,6 +33,7 @@ import { Button } from '@/components/ui/button';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
+import { asToolError } from '@/lib/agent';
 import { useRoomTypes } from '@/lib/api';
 import { formatMoney, formatParty, formatRange } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -47,7 +49,8 @@ export interface ToolResult {
 /**
  * Cards straight from the tools, so the amounts are exactly what the domain worked out: reports,
  * the day's brief, the bookings a list tool returned, one card per availability check and per quote
- * asked for, the latest bill of each booking, and the housekeeping changes the agent made.
+ * asked for, the latest bill of each booking, the housekeeping changes the agent made, and the
+ * guest books it opened.
  */
 const bookingLists: Record<string, BookingListKind> = {
   getArrivals: 'arrivals',
@@ -55,7 +58,10 @@ const bookingLists: Record<string, BookingListKind> = {
   searchBookings: 'search',
 };
 
-/** `listBookings` is false when the answer already lists the bookings as rows itself. */
+/**
+ * `listBookings` is false when the answer already lists the bookings as rows itself, or proposed
+ * changes to them.
+ */
 export function ResultCards({
   results,
   listBookings,
@@ -66,11 +72,16 @@ export function ResultCards({
   const lists: { key: string; kind: BookingListKind; rows: AgentBookingRow[] }[] = [];
   const briefs = new Map<string, DailyBrief>();
   const reports: Report[] = [];
+  const guestBooks = new Set<string>();
   const searches: { key: string; options: RoomOption[]; addons: QuoteAddons }[] = [];
   const quotes: { key: string; quote: Quote; roomId: string | null }[] = [];
   const bills = new Map<string, Folio>();
   const housekeeping: HousekeepingChangeResult[] = [];
   for (const { id, name, input, output } of results) {
+    if (name === 'getGuestBook' && output && !asToolError(output)) {
+      const bookingId = (input as { bookingId?: unknown } | undefined)?.bookingId;
+      if (typeof bookingId === 'string') guestBooks.add(bookingId);
+    }
     if (name === 'getReport') {
       const parsed = reportSchema.safeParse(output);
       if (parsed.success) reports.push(parsed.data);
@@ -121,17 +132,17 @@ export function ResultCards({
       if (parsed.success) bills.set(parsed.data.bookingId, parsed.data);
     }
   }
-  if (
-    reports.length === 0 &&
-    briefs.size === 0 &&
-    lists.length === 0 &&
-    searches.length === 0 &&
-    quotes.length === 0 &&
-    bills.size === 0 &&
-    housekeeping.length === 0
-  ) {
-    return null;
-  }
+  const others =
+    guestBooks.size +
+    reports.length +
+    briefs.size +
+    searches.length +
+    quotes.length +
+    bills.size +
+    housekeeping.length;
+  // A search the agent ran to find the booking another card is about was only a step.
+  const shownLists = others > 0 ? lists.filter((l) => l.kind !== 'search') : lists;
+  if (others === 0 && shownLists.length === 0) return null;
   return (
     <div className="flex flex-col gap-2">
       {reportPairs(reports).map(({ report, previous }) => (
@@ -140,7 +151,7 @@ export function ResultCards({
       {[...briefs.values()].map((brief) => (
         <BriefCard key={brief.date} brief={brief} />
       ))}
-      {lists.map((l) => (
+      {shownLists.map((l) => (
         <BookingListCard key={l.key} kind={l.kind} rows={l.rows} />
       ))}
       {searches.map((s) => (
@@ -153,6 +164,9 @@ export function ResultCards({
         <BillCard key={folio.bookingId} folio={folio} />
       ))}
       {housekeeping.length > 0 && <HousekeepingCard changes={housekeeping} />}
+      {[...guestBooks].map((bookingId) => (
+        <GuestBookCard key={bookingId} bookingId={bookingId} />
+      ))}
     </div>
   );
 }

@@ -162,7 +162,10 @@ function AssistantMessage({ message, working }: { message: UIMessage; working: b
       {!live && tools.length > 0 && <StepSummary tools={tools} narration={narration} />}
       {blocks.length > 0 && <Answer blocks={blocks} />}
       <ResultCards
-        listBookings={!blocks.some((b) => b.type === 'list' && b.items.some((i) => i.lead))}
+        listBookings={
+          proposals.length === 0 &&
+          !blocks.some((b) => b.type === 'list' && b.items.some((i) => i.lead))
+        }
         results={tools.flatMap((p) =>
           p.state === 'output-available'
             ? [{ id: p.toolCallId, name: getToolName(p), input: p.input, output: p.output }]
