@@ -3,6 +3,8 @@ import {
   agentRoomStatusResultSchema,
   agentTaskCreatedResultSchema,
   agentTaskStatusResultSchema,
+  dailyBriefSchema,
+  type DailyBrief,
   folioSchema,
   quoteAddonsSchema,
   quoteSchema,
@@ -16,6 +18,7 @@ import {
 import { Calculator, CalendarSearch, ChevronRight, Receipt } from 'lucide-react';
 import { useState } from 'react';
 import { type BookingListKind, BookingListCard } from '@/components/agent-booking-list-card';
+import { BriefCard } from '@/components/agent-brief-card';
 import { AgentCard, AgentCardHeader, Amounts } from '@/components/agent-card';
 import {
   type HousekeepingChangeResult,
@@ -40,8 +43,8 @@ export interface ToolResult {
 
 /**
  * Cards straight from the tools, so the amounts are exactly what the domain worked out: the
- * bookings a list tool returned, one card per availability check and per quote asked for, the
- * latest bill of each booking, and the housekeeping changes the agent made.
+ * day's brief, the bookings a list tool returned, one card per availability check and per quote
+ * asked for, the latest bill of each booking, and the housekeeping changes the agent made.
  */
 const bookingLists: Record<string, BookingListKind> = {
   getArrivals: 'arrivals',
@@ -58,11 +61,16 @@ export function ResultCards({
   listBookings: boolean;
 }) {
   const lists: { key: string; kind: BookingListKind; rows: AgentBookingRow[] }[] = [];
+  const briefs = new Map<string, DailyBrief>();
   const searches: { key: string; options: RoomOption[]; addons: QuoteAddons }[] = [];
   const quotes: { key: string; quote: Quote; roomId: string | null }[] = [];
   const bills = new Map<string, Folio>();
   const housekeeping: HousekeepingChangeResult[] = [];
   for (const { id, name, input, output } of results) {
+    if (name === 'getDailyBrief') {
+      const parsed = dailyBriefSchema.safeParse(output);
+      if (parsed.success) briefs.set(parsed.data.date, parsed.data);
+    }
     const listKind = bookingLists[name];
     if (listKind && listBookings) {
       const parsed = agentBookingRowSchema.array().safeParse(output);
@@ -106,6 +114,7 @@ export function ResultCards({
     }
   }
   if (
+    briefs.size === 0 &&
     lists.length === 0 &&
     searches.length === 0 &&
     quotes.length === 0 &&
@@ -116,6 +125,9 @@ export function ResultCards({
   }
   return (
     <div className="flex flex-col gap-2">
+      {[...briefs.values()].map((brief) => (
+        <BriefCard key={brief.date} brief={brief} />
+      ))}
       {lists.map((l) => (
         <BookingListCard key={l.key} kind={l.kind} rows={l.rows} />
       ))}
