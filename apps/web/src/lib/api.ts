@@ -1,4 +1,5 @@
 import {
+  accessStatusSchema,
   activityItemSchema,
   type AuditActor,
   apiErrorSchema,
@@ -127,6 +128,24 @@ function toSearch(params: Record<string, string | string[] | undefined>): string
   }
   const s = search.toString();
   return s ? `?${s}` : '';
+}
+
+/** Whether this deployment asks for a demo access code, and whether this browser entered it. */
+export function useAccess() {
+  return useQuery({
+    queryKey: ['access'],
+    queryFn: () => apiGet('/api/access', accessStatusSchema),
+    staleTime: Infinity,
+    retry: 2,
+  });
+}
+
+export function useEnterAccessCode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (code: string) => apiPost('/api/access', { code }, accessStatusSchema),
+    onSuccess: (status) => queryClient.setQueryData(['access'], status),
+  });
 }
 
 export function useHealth() {

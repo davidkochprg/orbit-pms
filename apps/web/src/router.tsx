@@ -1,4 +1,5 @@
 import { createBrowserRouter } from 'react-router';
+import { AccessGate } from '@/components/access-gate';
 import { AppLayout } from '@/components/app-layout';
 import { AppError, PageError } from '@/components/route-error';
 import { DashboardPage } from '@/pages/dashboard';
@@ -15,28 +16,33 @@ import { TapeChartPage } from '@/pages/tape-chart';
 import { WelcomePage } from '@/pages/welcome';
 
 export const router = createBrowserRouter([
-  { path: 'welcome', element: <WelcomePage /> },
-  // Opened on a phone from the desk's QR code: no sign-in, no app chrome.
+  // Opened on a phone from the desk's QR code: no sign-in, no access code, no app chrome.
   { path: 'scan/:id', element: <ScanPage /> },
   {
-    element: <AppLayout />,
-    errorElement: <AppError />,
+    element: <AccessGate />,
     children: [
+      { path: 'welcome', element: <WelcomePage /> },
       {
-        // Catches page crashes inside the workspace; navigating away clears it.
-        errorElement: <PageError />,
+        element: <AppLayout />,
+        errorElement: <AppError />,
         children: [
-          { index: true, element: <DashboardPage /> },
-          { path: 'tape-chart', element: <TapeChartPage /> },
-          { path: 'inbox', element: <InboxPage /> },
-          { path: 'inbox/:id', element: <InboxPage /> },
-          { path: 'housekeeping', element: <HousekeepingPage /> },
-          { path: 'guests', element: <GuestsPage /> },
-          { path: 'guests/:id', element: <GuestDetailPage /> },
-          { path: 'reports', element: <ReportsPage /> },
-          { path: 'activity', element: <ActivityPage /> },
-          { path: 'settings/:section?', element: <SettingsPage /> },
-          { path: '*', element: <NotFoundPage /> },
+          {
+            // Catches page crashes inside the workspace; navigating away clears it.
+            errorElement: <PageError />,
+            children: [
+              { index: true, element: <DashboardPage /> },
+              { path: 'tape-chart', element: <TapeChartPage /> },
+              { path: 'inbox', element: <InboxPage /> },
+              { path: 'inbox/:id', element: <InboxPage /> },
+              { path: 'housekeeping', element: <HousekeepingPage /> },
+              { path: 'guests', element: <GuestsPage /> },
+              { path: 'guests/:id', element: <GuestDetailPage /> },
+              { path: 'reports', element: <ReportsPage /> },
+              { path: 'activity', element: <ActivityPage /> },
+              { path: 'settings/:section?', element: <SettingsPage /> },
+              { path: '*', element: <NotFoundPage /> },
+            ],
+          },
         ],
       },
     ],
