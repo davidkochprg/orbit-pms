@@ -238,7 +238,7 @@ function TapeChart({ today }: { today: string }) {
               aria-label="Jump to date"
               value={start}
               onChange={(e) => isIsoDate(e.target.value) && goTo(e.target.value)}
-              className="relative h-8 rounded-control fill-action px-3 text-[0.8125rem] text-muted-foreground tabular-nums shadow-action stroke-lit outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="relative hidden h-8 rounded-control fill-action px-3 text-[0.8125rem] text-muted-foreground tabular-nums shadow-action stroke-lit outline-none focus-visible:ring-2 focus-visible:ring-ring sm:block"
             />
             <div className="relative flex items-center rounded-control fill-action shadow-action stroke-lit">
               <Button
