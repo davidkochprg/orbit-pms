@@ -7,6 +7,23 @@ import type {
 } from '@orbit/shared';
 import { roomStatusLabels } from './status';
 
+/**
+ * The step a room usually takes next, as a one-tap button on its card: cleaned, then inspected; a
+ * repaired room goes back to dirty for cleaning. Null when there is no usual next step.
+ */
+export function nextRoomStep(status: RoomStatus): { status: RoomStatus; label: string } | null {
+  switch (status) {
+    case 'dirty':
+      return { status: 'clean', label: 'Mark clean' };
+    case 'clean':
+      return { status: 'inspected', label: 'Mark inspected' };
+    case 'out_of_order':
+      return { status: 'dirty', label: 'Back in service' };
+    case 'inspected':
+      return null;
+  }
+}
+
 /** Board columns, in the order rooms move through them. */
 export const boardColumns: RoomStatus[] = ['dirty', 'clean', 'inspected', 'out_of_order'];
 

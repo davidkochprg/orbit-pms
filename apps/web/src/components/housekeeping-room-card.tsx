@@ -1,4 +1,10 @@
-import type { HousekeepingRoom, HousekeepingTask, RoomOccupancy } from '@orbit/shared';
+import {
+  type HousekeepingRoom,
+  type HousekeepingTask,
+  type RoomOccupancy,
+  type RoomStatus,
+  roomStatuses,
+} from '@orbit/shared';
 import {
   ArrowLeftRight,
   BedDouble,
@@ -6,11 +12,23 @@ import {
   LogIn,
   LogOut,
   type LucideIcon,
+  MoreHorizontal,
+  Plus,
   Sparkles,
   Wrench,
 } from 'lucide-react';
-import type { ComponentProps } from 'react';
-import { occupancyLabels, taskLabel } from '@/lib/housekeeping';
+import type { ComponentProps, PointerEvent } from 'react';
+import { StatusDot } from '@/components/status-dot';
+import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { nextRoomStep, occupancyLabels, taskLabel } from '@/lib/housekeeping';
+import { roomStatusColor, roomStatusLabels } from '@/lib/status';
 import { cn } from '@/lib/utils';
 
 const occupancyIcons: Record<RoomOccupancy, LucideIcon | null> = {
@@ -24,14 +42,25 @@ const occupancyIcons: Record<RoomOccupancy, LucideIcon | null> = {
 interface RoomCardProps extends ComponentProps<'div'> {
   item: HousekeepingRoom;
   onCompleteTask: (task: HousekeepingTask) => void;
+  /** Sets the room's status, from its button or menu; without it the card has no actions. */
+  onSetStatus?: (status: RoomStatus) => void;
+  onAddTask?: () => void;
   busy?: boolean;
   dragging?: boolean;
 }
 
-/** A room on the housekeeping board: today's situation and what still needs doing. */
+// A tap on a button inside the card must not start dragging the card.
+const noDrag = { onPointerDown: (e: PointerEvent) => e.stopPropagation() };
+
+/**
+ * A room on the housekeeping board: today's situation, what still needs doing, and a button for
+ * its usual next step (e.g. "Mark clean") with the other statuses in its menu.
+ */
 export function HousekeepingRoomCard({
   item,
   onCompleteTask,
+  onSetStatus,
+  onAddTask,
   busy,
   dragging,
   className,
@@ -39,6 +68,7 @@ export function HousekeepingRoomCard({
 }: RoomCardProps) {
   const { room, roomTypeName, occupancy, guestName, urgent, openTasks } = item;
   const Icon = occupancyIcons[occupancy];
+  const next = nextRoomStep(room.status);
   return (
     <div
       {...props}
@@ -50,9 +80,64 @@ export function HousekeepingRoomCard({
         className,
       )}
     >
-      <div className="flex items-baseline gap-2">
+      <div className="flex items-center gap-2">
         <span className="font-mono text-[0.9375rem] font-medium">{room.name}</span>
-        <span className="truncate text-xs text-muted-foreground">{roomTypeName}</span>
+        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+          {roomTypeName}
+        </span>
+        {onSetStatus && (
+          <span className="-my-1 -mr-1 flex shrink-0 items-center gap-0.5">
+            {next && (
+              <Button
+                variant="outline"
+                size="xs"
+                disabled={busy}
+                {...noDrag}
+                onClick={() => onSetStatus(next.status)}
+              >
+                <StatusDot className={roomStatusColor[next.status]} />
+                {next.label}
+              </Button>
+            )}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`More for room ${room.name}`}
+                  disabled={busy}
+                  {...noDrag}
+                >
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                {roomStatuses
+                  // A repaired room is cleaned before it can be clean or inspected again.
+                  .filter(
+                    (s) =>
+                      s !== room.status &&
+                      s !== next?.status &&
+                      !(room.status === 'out_of_order' && (s === 'clean' || s === 'inspected')),
+                  )
+                  .map((s) => (
+                    <DropdownMenuItem key={s} onSelect={() => onSetStatus(s)}>
+                      <StatusDot className={roomStatusColor[s]} />
+                      Mark {roomStatusLabels[s].toLowerCase()}
+                    </DropdownMenuItem>
+                  ))}
+                {onAddTask && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onSelect={onAddTask}>
+                      <Plus /> Add task…
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </span>
+        )}
       </div>
 
       {(occupancy !== 'vacant' || urgent) && (

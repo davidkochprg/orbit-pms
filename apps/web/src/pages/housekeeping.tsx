@@ -208,6 +208,8 @@ function Column({
               item={item}
               busy={busyRoomId === item.room.id}
               onCompleteTask={onCompleteTask}
+              onSetStatus={(s) => onSetStatus(item.room.id, s)}
+              onAddTask={() => onAddTask(item.room.id)}
             />
           </RoomContextMenu>
         ))}
@@ -220,12 +222,16 @@ function DraggableCard({
   item,
   busy,
   onCompleteTask,
+  onSetStatus,
+  onAddTask,
   ref,
   ...rest
 }: Omit<ComponentProps<'div'>, 'ref'> & {
   item: HousekeepingRoom;
   busy: boolean;
   onCompleteTask: (task: HousekeepingTask) => void;
+  onSetStatus: (status: RoomStatus) => void;
+  onAddTask: () => void;
   /** From a wrapping trigger, e.g. the room's context menu. */
   ref?: Ref<HTMLDivElement>;
 }) {
@@ -247,6 +253,8 @@ function DraggableCard({
       busy={busy}
       dragging={isDragging}
       onCompleteTask={onCompleteTask}
+      onSetStatus={onSetStatus}
+      onAddTask={onAddTask}
       className="cursor-grab touch-manipulation active:cursor-grabbing"
       style={
         transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)` } : undefined
