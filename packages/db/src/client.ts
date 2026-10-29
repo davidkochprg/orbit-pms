@@ -29,7 +29,8 @@ export const DEFAULT_LOCAL_DATABASE_URL = 'file:./.data/orbit';
  */
 export function createDb(url: string = DEFAULT_LOCAL_DATABASE_URL): DbHandle {
   if (/^postgres(ql)?:\/\//.test(url)) {
-    const client = postgres(url, { max: 5, onnotice: () => {} });
+    // Neon's pooled endpoint is PgBouncer in transaction mode: skip named prepared statements.
+    const client = postgres(url, { max: 5, prepare: false, onnotice: () => {} });
     const db = drizzlePostgres(client, { schema });
     return {
       db,

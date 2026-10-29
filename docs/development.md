@@ -92,7 +92,33 @@ The generator is deterministic (fixed PRNG seed), and its invariants are tested 
 
 ## Deploying
 
-_Not set up yet._
+Orbit runs on Vercel with a Neon Postgres database ([ADR 0014](decisions/0014-vercel-build-output-and-demo-access-code.md)). `pnpm build:vercel` builds the web app, bundles the API into one Node.js function with esbuild, and writes both to `.vercel/output` (the [Build Output API](https://vercel.com/docs/build-output-api)), which Vercel deploys as is. `vercel.json` points the project at that command.
+
+| Path                | Served by                                                             |
+| ------------------- | --------------------------------------------------------------------- |
+| `/api/*`, `/health` | The API function (Node.js 24, streaming on, 120 s limit)              |
+| `/assets/*`         | The CDN, cached for a year (file names carry a content hash)          |
+| Anything else       | `index.html`, revalidated on every visit; React Router takes it there |
+
+There is no server rendering and no ISR, so nothing is ever written to Vercel's cache: the app is static files plus one function. API answers are `Cache-Control: private, no-store`, and every page sends `X-Robots-Tag: noindex`.
+
+Environment variables in the Vercel project:
+
+- `DATABASE_URL`: Neon's **pooled** connection string (host with `-pooler`). The function connects without prepared statements, which PgBouncer's transaction mode needs.
+- `DEMO_ACCESS_CODE`: the code visitors must enter. Unset it to open the demo.
+- `META_API_KEY`, `META_API_BASE_URL`, `META_MODEL_*`, `AI_*` and `HOTEL_TIMEZONE` as in `.env.example`.
+- `ENABLE_EXPERIMENTAL_COREPACK=1`, so the build uses the pnpm version from `packageManager`.
+
+Migrations and the seed don't run on deploy. Run them from a laptop against Neon's direct (unpooled) connection string:
+
+```sh
+DATABASE_URL='postgres://…' pnpm db:migrate
+DATABASE_URL='postgres://…' pnpm db:seed
+```
+
+Seed dates are relative to the day the seed runs, so re-seed shortly before a demo.
+
+To try the function without deploying, run `pnpm build:vercel`, then serve `.vercel/output/functions/api.func/index.mjs` (its default export is a Node.js request listener) with `DATABASE_URL` set to a Postgres server.
 
 ## Scanning IDs with a phone
 
