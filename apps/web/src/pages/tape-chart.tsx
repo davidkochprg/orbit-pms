@@ -1,13 +1,14 @@
 import {
   DndContext,
   type DragEndEvent,
+  type DragMoveEvent,
   PointerSensor,
   useDraggable,
   useDroppable,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import type { Booking, BookingStatus, Room } from '@orbit/shared';
+import type { Booking, BookingStatus, IsoDate, Room } from '@orbit/shared';
 import {
   Baby,
   Bath,
@@ -86,6 +87,27 @@ const ICONS_MIN_WIDTH = 150;
 /** Narrower than this, a bar is a stub (a departure's morning) and shows only its stripe. */
 const LABEL_MIN_WIDTH = 48;
 
+/** Where a bar being dragged would land, or where a dropped one landed while it saves. */
+interface DragTarget {
+  id: string;
+  mode: 'move' | 'resize';
+  roomId: string;
+  checkIn: IsoDate;
+  checkOut: IsoDate;
+}
+
+function sameTarget(a: DragTarget | null, b: DragTarget | null): boolean {
+  return (
+    a === b ||
+    (a !== null &&
+      b !== null &&
+      a.id === b.id &&
+      a.roomId === b.roomId &&
+      a.checkIn === b.checkIn &&
+      a.checkOut === b.checkOut)
+  );
+}
+
 export function TapeChartPage() {
   // Today comes from the API, so it is the hotel's date in its time zone, not the browser's.
   const day = useDayOverview();
@@ -131,6 +153,9 @@ function TapeChart({ today }: { today: string }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
   // A drag ends with a click on the bar; this keeps that click from opening the inspector.
   const dragged = useRef(false);
+  const [preview, setPreview] = useState<DragTarget | null>(null);
+  // A dropped bar stays where it landed until the change is saved, and goes back if it fails.
+  const [landed, setLanded] = useState<DragTarget | null>(null);
 
   const goTo = (date: string) =>
     setParams((p) => {
@@ -139,7 +164,13 @@ function TapeChart({ today }: { today: string }) {
     });
 
   const guestName = (id: string) => guests.data?.find((g) => g.id === id)?.name ?? 'Unknown guest';
-  const visible = (bookings.data ?? []).filter((b) => b.status !== 'cancelled');
+  const visible = (bookings.data ?? [])
+    .filter((b) => b.status !== 'cancelled')
+    .map((b) =>
+      b.id === landed?.id
+        ? { ...b, roomId: landed.roomId, checkIn: landed.checkIn, checkOut: landed.checkOut }
+        : b,
+    );
   const byRoom = new Map<string, Booking[]>();
   for (const booking of visible) {
     const list = byRoom.get(booking.roomId) ?? [];
@@ -149,20 +180,42 @@ function TapeChart({ today }: { today: string }) {
   const occupied = (d: string) => visible.filter((b) => b.checkIn <= d && d < b.checkOut).length;
   const groups = rooms.data && roomTypes.data ? groupRoomsByType(rooms.data, roomTypes.data) : null;
 
-  function onDragEnd({ active, delta, over }: DragEndEvent) {
-    setTimeout(() => (dragged.current = false), 0);
+  function dragTarget({ active, delta, over }: DragMoveEvent): DragTarget | null {
     const [mode, id] = String(active.id).split(':');
     const booking = visible.find((b) => b.id === id);
-    if (!booking) return;
-    reschedule.reset();
-    changeDates.reset();
+    if (!booking) return null;
     if (mode === 'move') {
       const target = moveTarget(booking, delta.x, dayWidth, over ? String(over.id) : null);
-      if (target) reschedule.mutate({ id: booking.id, ...target });
-    } else {
-      const checkOut = resizeTarget(booking, delta.x, dayWidth);
-      if (checkOut) changeDates.mutate({ id: booking.id, checkIn: booking.checkIn, checkOut });
+      return target && { id: booking.id, mode, ...target };
     }
+    const checkOut = resizeTarget(booking, delta.x, dayWidth);
+    if (!checkOut) return null;
+    return {
+      id: booking.id,
+      mode: 'resize',
+      roomId: booking.roomId,
+      checkIn: booking.checkIn,
+      checkOut,
+    };
+  }
+
+  function onDragMove(event: DragMoveEvent) {
+    const next = dragTarget(event);
+    setPreview((current) => (sameTarget(current, next) ? current : next));
+  }
+
+  function onDragEnd(event: DragEndEvent) {
+    setTimeout(() => (dragged.current = false), 0);
+    setPreview(null);
+    const target = dragTarget(event);
+    if (!target) return;
+    reschedule.reset();
+    changeDates.reset();
+    setLanded(target);
+    const { id, roomId, checkIn, checkOut } = target;
+    const settle = { onSettled: () => setLanded(null) };
+    if (target.mode === 'move') reschedule.mutate({ id, roomId, checkIn, checkOut }, settle);
+    else changeDates.mutate({ id, checkIn, checkOut }, settle);
   }
 
   const error = reschedule.error ?? changeDates.error;
@@ -185,7 +238,7 @@ function TapeChart({ today }: { today: string }) {
               aria-label="Jump to date"
               value={start}
               onChange={(e) => isIsoDate(e.target.value) && goTo(e.target.value)}
-              className="relative h-8 rounded-control fill-action px-3 font-mono text-xs text-muted-foreground shadow-action stroke-lit outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="relative h-8 rounded-control fill-action px-3 text-[0.8125rem] text-muted-foreground tabular-nums shadow-action stroke-lit outline-none focus-visible:ring-2 focus-visible:ring-ring"
             />
             <div className="relative flex items-center rounded-control fill-action shadow-action stroke-lit">
               <Button
@@ -241,10 +294,18 @@ function TapeChart({ today }: { today: string }) {
           <DndContext
             sensors={sensors}
             onDragStart={() => (dragged.current = true)}
+            onDragMove={onDragMove}
             onDragEnd={onDragEnd}
-            onDragCancel={() => (dragged.current = false)}
+            onDragCancel={() => {
+              dragged.current = false;
+              setPreview(null);
+            }}
           >
-            <div style={{ width: TAPE_ROOM_COLUMN + TAPE_DAYS * dayWidth }}>
+            {/* Clipped, so a bar dragged past the edge doesn't widen the scroll area. */}
+            <div
+              className="overflow-x-clip"
+              style={{ width: TAPE_ROOM_COLUMN + TAPE_DAYS * dayWidth }}
+            >
               <DayHeader
                 days={days}
                 today={today}
@@ -261,6 +322,8 @@ function TapeChart({ today }: { today: string }) {
                   start={start}
                   dayWidth={dayWidth}
                   byRoom={byRoom}
+                  preview={preview}
+                  saving={landed?.id ?? null}
                   guestName={guestName}
                   onOpen={(id) => !dragged.current && open(id)}
                   onNew={(roomId, checkIn) => openNew({ roomId, checkIn })}
@@ -349,6 +412,10 @@ interface RowProps {
   today: string;
   start: string;
   dayWidth: number;
+  /** The bar being dragged and where it would land. */
+  preview: DragTarget | null;
+  /** The booking whose drop is being saved. */
+  saving: string | null;
   guestName: (id: string) => string;
   onOpen: (id: string) => void;
   /** Starts a new booking in a room from a night. */
@@ -412,12 +479,14 @@ function RoomLane({
   today,
   start,
   dayWidth,
+  preview,
+  saving,
   guestName,
   onOpen,
   onNew,
   disabled,
 }: RowProps & { room: Room; bookings: Booking[] }) {
-  const { setNodeRef, isOver } = useDroppable({ id: room.id });
+  const { setNodeRef } = useDroppable({ id: room.id });
   // The night under the pointer when the context menu opened.
   const [menuDay, setMenuDay] = useState<string | null>(null);
   const bookable = (day: string) => day >= today && room.status !== 'out_of_order';
@@ -456,13 +525,21 @@ function RoomLane({
           {room.status === 'out_of_order' && (
             <div className="bg-hatch pointer-events-none absolute inset-0" title="Out of order" />
           )}
-          {isOver && <div className="pointer-events-none absolute inset-0 bg-primary-soft" />}
+          {preview?.mode === 'move' && preview.roomId === room.id && (
+            <LandingGhost target={preview} start={start} dayWidth={dayWidth} />
+          )}
           {bookings.map((booking) => (
             <BookingBar
               key={booking.id}
               booking={booking}
               start={start}
               dayWidth={dayWidth}
+              resizeTo={
+                preview?.mode === 'resize' && preview.id === booking.id
+                  ? preview.checkOut
+                  : undefined
+              }
+              saving={saving === booking.id}
               name={guestName(booking.guestId)}
               onOpen={onOpen}
               disabled={disabled}
@@ -502,10 +579,40 @@ function bookingIcons(booking: Booking): { icon: LucideIcon; label: string }[] {
   return icons;
 }
 
+/** Where a bar being moved will land: a dashed outline with the new dates. */
+function LandingGhost({
+  target,
+  start,
+  dayWidth,
+}: {
+  target: DragTarget;
+  start: string;
+  dayWidth: number;
+}) {
+  const place = placeBooking(target, start);
+  if (!place) return null;
+  const { left, width } = barGeometry(place, dayWidth);
+  return (
+    <div
+      aria-hidden
+      className={cn(
+        'pointer-events-none absolute top-[6px] bottom-[6px] flex items-center overflow-hidden rounded-lg border border-dashed border-primary/60 bg-primary-soft px-2.5 text-xs whitespace-nowrap text-primary-text',
+        place.continuesBefore && 'rounded-l-none',
+        place.continuesAfter && 'rounded-r-none',
+      )}
+      style={{ left, width }}
+    >
+      <span className="truncate">{formatRange(target.checkIn, target.checkOut)}</span>
+    </div>
+  );
+}
+
 function BookingBar({
   booking,
   start,
   dayWidth,
+  resizeTo,
+  saving,
   name,
   onOpen,
   disabled,
@@ -513,6 +620,9 @@ function BookingBar({
   booking: Booking;
   start: string;
   dayWidth: number;
+  /** The departure the right edge is being dragged to, snapped to whole days. */
+  resizeTo: IsoDate | undefined;
+  saving: boolean;
   name: string;
   onOpen: (id: string) => void;
   disabled: boolean;
@@ -529,19 +639,14 @@ function BookingBar({
     setNodeRef: resizeRef,
     listeners: resizeListeners,
     attributes: resizeAttributes,
-    transform: resizeTransform,
     isDragging: resizing,
   } = useDraggable({ id: `resize:${booking.id}`, disabled: !canDrag });
-  const place = placeBooking(booking, start);
+  // While resizing, the right edge jumps to the departure under the pointer, a day at a time.
+  const place = placeBooking({ ...booking, checkOut: resizeTo ?? booking.checkOut }, start);
   if (!place || booking.status === 'cancelled') return null;
 
   const label = `${name}, ${formatRange(booking.checkIn, booking.checkOut)}, ${statusLabels[booking.status]}`;
-  const geometry = barGeometry(place, dayWidth);
-  const left = geometry.left;
-  // While resizing, the bar follows the pointer horizontally, never narrower than one night.
-  const width = resizeTransform
-    ? Math.max(geometry.width + resizeTransform.x, dayWidth - 4)
-    : geometry.width;
+  const { left, width } = barGeometry(place, dayWidth);
   const dragging = moving || resizing;
   const icons = width >= ICONS_MIN_WIDTH ? bookingIcons(booking) : [];
 
@@ -566,6 +671,7 @@ function BookingBar({
             place.continuesAfter && 'rounded-r-none',
             canDrag && 'cursor-grab active:cursor-grabbing',
             dragging && 'z-30 shadow-floating',
+            saving && 'opacity-70',
           )}
           style={{
             left,
@@ -586,12 +692,18 @@ function BookingBar({
             <ChevronLeft className="-ml-1 size-3.5 shrink-0 text-muted-foreground" />
           )}
           {width >= LABEL_MIN_WIDTH && <span className="truncate">{name}</span>}
-          {icons.length > 0 && (
-            <span className="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
-              {icons.map(({ icon: Icon, label: iconLabel }) => (
-                <Icon key={iconLabel} aria-label={iconLabel} className="size-3.5" />
-              ))}
+          {resizeTo ? (
+            <span className="ml-auto shrink-0 pl-1 text-xs text-primary-text">
+              to {formatDate(resizeTo)}
             </span>
+          ) : (
+            icons.length > 0 && (
+              <span className="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
+                {icons.map(({ icon: Icon, label: iconLabel }) => (
+                  <Icon key={iconLabel} aria-label={iconLabel} className="size-3.5" />
+                ))}
+              </span>
+            )
           )}
         </button>
       </BookingContextMenu>
