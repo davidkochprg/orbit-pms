@@ -46,6 +46,7 @@ describe('sameSettings', () => {
   const profile: HotelProfile = {
     country: 'US',
     language: 'en',
+    coordinates: null,
     name: 'A',
     location: 'B',
     description: null,

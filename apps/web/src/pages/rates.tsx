@@ -1,26 +1,67 @@
 import type { PricingConfig } from '@orbit/shared';
 import { useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { PageBody, PageHeader } from '@/components/page-header';
+import { RateOutlook } from '@/components/rate-outlook';
 import { RatesEditor } from '@/components/rates-editor';
 import { ReadOnlyNotice, SaveBar } from '@/components/save-bar';
+import { Segmented } from '@/components/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/hooks/use-session';
 import { usePricing, useSavePricing } from '@/lib/api';
 import { sameSettings } from '@/lib/settings';
 
-/** Everything `quote()` reads: currency and taxes, seasons, discounts and add-on prices. */
+type RatesView = 'outlook' | 'rules';
+
+const views: { value: RatesView; label: string }[] = [
+  { value: 'outlook', label: 'Outlook' },
+  { value: 'rules', label: 'Rules' },
+];
+
+/**
+ * Rates: the outlook of the coming nights with suggested changes, and the rules every quote is
+ * computed from (currency and taxes, seasons, discounts and add-on prices).
+ */
 export function RatesPage() {
+  const [params, setParams] = useSearchParams();
+  const view: RatesView = params.get('view') === 'rules' ? 'rules' : 'outlook';
+  const { canManage } = useSession();
+
+  return (
+    <>
+      <PageHeader
+        title="Rates"
+        actions={
+          <Segmented
+            label="View"
+            size="sm"
+            value={view}
+            options={views}
+            onChange={(v) => setParams(v === 'rules' ? { view: v } : {}, { replace: true })}
+          />
+        }
+      />
+      {view === 'outlook' ? (
+        <PageBody>
+          <RateOutlook canManage={canManage} />
+        </PageBody>
+      ) : (
+        <RateRules canManage={canManage} />
+      )}
+    </>
+  );
+}
+
+function RateRules({ canManage }: { canManage: boolean }) {
   const pricing = usePricing();
   const save = useSavePricing();
-  const { canManage } = useSession();
   const [draft, setDraft] = useState<PricingConfig | null>(null);
   const current = draft ?? pricing.data;
   const dirty = draft !== null && pricing.data !== undefined && !sameSettings(draft, pricing.data);
 
   return (
     <>
-      <PageHeader title="Rates" />
       <PageBody>
         <div className="flex max-w-3xl flex-col gap-6">
           <ReadOnlyNotice what="the rates" />

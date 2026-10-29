@@ -41,6 +41,11 @@ import {
   pendingActionSchema,
   type PricingConfig,
   pricingConfigSchema,
+  type AdjustRatesBody,
+  type LocalEventBody,
+  localEventSchema,
+  revenueBriefSchema,
+  revenueOutlookSchema,
   type RoomBody,
   type RoomTypeBody,
   roomSchema,
@@ -113,6 +118,10 @@ export function apiPost<S extends z.ZodType>(
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify(body),
   });
+}
+
+export function apiDelete(path: string) {
+  return request(path, z.null(), { method: 'DELETE' });
 }
 
 /** Multipart upload, e.g. a recording. The browser sets the content type with its boundary. */
@@ -687,6 +696,38 @@ export function useSavePricing() {
   return useRefreshingMutation((pricing: PricingConfig) =>
     apiPost('/api/settings/pricing', pricing, pricingConfigSchema, 'PUT'),
   );
+}
+
+/** The next nights with occupancy, suggested rates, events, the forecast and arrival risks. */
+export function useRevenueOutlook(days = 60) {
+  return useQuery({
+    queryKey: ['revenue-outlook', days],
+    queryFn: () => apiGet(`/api/revenue/outlook?days=${days}`, revenueOutlookSchema),
+  });
+}
+
+/** Sets nights' rates to a percent on top of their season; 0 goes back to the season rate. */
+export function useAdjustRates() {
+  return useRefreshingMutation((body: AdjustRatesBody) =>
+    apiPost('/api/rates/adjust', body, pricingConfigSchema),
+  );
+}
+
+export function useCreateEvent() {
+  return useRefreshingMutation((body: LocalEventBody) =>
+    apiPost('/api/events', body, localEventSchema),
+  );
+}
+
+export function useDeleteEvent() {
+  return useRefreshingMutation((id: string) => apiDelete(`/api/events/${encodeURIComponent(id)}`));
+}
+
+/** A few sentences from Muse Spark on the outlook. */
+export function useRevenueBrief() {
+  return useMutation({
+    mutationFn: (days: number) => apiPost('/api/revenue/brief', { days }, revenueBriefSchema),
+  });
 }
 
 /** Adds a room type, or replaces one when `id` is given. */

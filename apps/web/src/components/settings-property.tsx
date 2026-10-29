@@ -17,6 +17,13 @@ export function PropertySettings({ profile, onChange }: Props) {
   const set = <K extends keyof HotelProfile>(key: K, value: HotelProfile[K]) =>
     onChange({ ...profile, [key]: value });
   const optional = (value: string) => (value.trim() === '' ? null : value);
+  /** Clearing either field turns the forecast off. */
+  const setCoordinate = (key: 'latitude' | 'longitude', raw: string) => {
+    if (raw.trim() === '') return set('coordinates', null);
+    const value = Number(raw);
+    if (!Number.isFinite(value)) return;
+    set('coordinates', { ...(profile.coordinates ?? { latitude: 0, longitude: 0 }), [key]: value });
+  };
 
   return (
     <div className="flex flex-col gap-8">
@@ -47,6 +54,36 @@ export function PropertySettings({ profile, onChange }: Props) {
               rows={3}
               value={profile.description ?? ''}
               onChange={(e) => set('description', optional(e.target.value))}
+            />
+          </FormField>
+        </div>
+      </Section>
+
+      <Section title="Weather">
+        <p className="text-xs text-muted-foreground">
+          Where the forecast behind suggested rates is for. Leave empty for no forecast.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label="Latitude" htmlFor="latitude" hint="e.g. 37.65">
+            <Input
+              id="latitude"
+              type="number"
+              step="0.01"
+              min={-90}
+              max={90}
+              value={profile.coordinates?.latitude ?? ''}
+              onChange={(e) => setCoordinate('latitude', e.target.value)}
+            />
+          </FormField>
+          <FormField label="Longitude" htmlFor="longitude" hint="e.g. -118.97">
+            <Input
+              id="longitude"
+              type="number"
+              step="0.01"
+              min={-180}
+              max={180}
+              value={profile.coordinates?.longitude ?? ''}
+              onChange={(e) => setCoordinate('longitude', e.target.value)}
             />
           </FormField>
         </div>
