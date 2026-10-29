@@ -223,7 +223,7 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
   return (
     <header className="flex flex-col gap-3">
       <div className="flex items-start gap-2">
-        <Button variant="ghost" size="icon-sm" asChild className="md:hidden">
+        <Button variant="ghost" size="icon-sm" asChild className="lg:hidden">
           <Link to="/inbox" aria-label="Back to the list">
             <ArrowLeft />
           </Link>

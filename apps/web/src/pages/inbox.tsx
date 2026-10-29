@@ -58,8 +58,14 @@ export function InboxPage() {
         meta={counts.unread > 0 ? `${counts.unread} unread` : undefined}
         actions={
           <>
-            <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
-              <Plus /> Add a guest message
+            <Button
+              variant="outline"
+              size="sm"
+              aria-label="Add a guest message"
+              title="Add a guest message"
+              onClick={() => setAdding(true)}
+            >
+              <Plus /> <span className="hidden sm:inline">Add a guest message</span>
             </Button>
             <Button size="sm" asChild>
               <Link to="/inbox/new">
@@ -115,8 +121,9 @@ export function InboxPage() {
 
         <aside
           className={cn(
-            'flex w-full shrink-0 flex-col border-r bg-surface-sunken md:w-[22rem]',
-            id && 'hidden md:flex',
+            'flex w-full shrink-0 flex-col border-r bg-surface-sunken lg:w-[22rem]',
+            // Below lg the list and the conversation take turns, as on a phone.
+            id && 'hidden lg:flex',
           )}
         >
           <div className="flex flex-col gap-2 border-b p-2">
@@ -165,7 +172,7 @@ export function InboxPage() {
         </aside>
 
         <section
-          className={cn('scrollbar-thin min-w-0 flex-1 overflow-y-auto', !id && 'hidden md:block')}
+          className={cn('scrollbar-thin min-w-0 flex-1 overflow-y-auto', !id && 'hidden lg:block')}
         >
           {composing ? (
             <ComposeEmail />

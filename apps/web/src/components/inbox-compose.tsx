@@ -27,7 +27,7 @@ export function ComposeEmail() {
   return (
     <article className="mx-auto flex min-h-full max-w-4xl flex-col gap-4 px-6 py-6">
       <header className="flex items-center gap-2">
-        <Button variant="ghost" size="icon-sm" asChild className="md:hidden">
+        <Button variant="ghost" size="icon-sm" asChild className="lg:hidden">
           <Link to="/inbox" aria-label="Back to the list">
             <ArrowLeft />
           </Link>
@@ -35,7 +35,7 @@ export function ComposeEmail() {
         <h2 className="min-w-0 flex-1 text-xl font-semibold tracking-tight">
           {subject.trim() || 'New email'}
         </h2>
-        <Button variant="ghost" size="icon-sm" asChild className="max-md:hidden">
+        <Button variant="ghost" size="icon-sm" asChild className="max-lg:hidden">
           <Link to="/inbox" aria-label="Discard" title="Discard">
             <X />
           </Link>
