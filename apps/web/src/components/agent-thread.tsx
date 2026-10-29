@@ -1,13 +1,3 @@
-import {
-  folioSchema,
-  quoteAddonsSchema,
-  quoteSchema,
-  roomOptionSchema,
-  type Folio,
-  type Quote,
-  type QuoteAddons,
-  type RoomOption,
-} from '@orbit/shared';
 import { getToolName, isToolUIPart, type UIMessage } from 'ai';
 import {
   BedDouble,
@@ -32,13 +22,10 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { BookingRow, Mention, RoomBadge } from '@/components/agent-mention';
+import { BookingRow, Mention } from '@/components/agent-mention';
+import { ResultCards } from '@/components/agent-result-cards';
 import { PendingActionCard } from '@/components/pending-action-card';
-import { Button } from '@/components/ui/button';
 import { AgentEntitiesContext } from '@/hooks/use-agent-entities';
-import { useBookingDrawer } from '@/hooks/use-booking-drawer';
-import { useBookingEditor } from '@/hooks/use-booking-editor';
-import { useCommandPalette } from '@/hooks/use-command-palette';
 import {
   asProposal,
   asToolError,
@@ -48,8 +35,6 @@ import {
   toolResultSummary,
 } from '@/lib/agent';
 import { collectEntities, type Inline, parseAnswer } from '@/lib/agent-answer';
-import { useRoomTypes } from '@/lib/api';
-import { formatMoney, formatParty, formatRange } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 type ToolPart = Extract<UIMessage['parts'][number], { toolCallId: string }>;
@@ -175,7 +160,13 @@ function AssistantMessage({ message, working }: { message: UIMessage; working: b
       {live}
       {!live && tools.length > 0 && <StepSummary tools={tools} narration={narration} />}
       {answer.trim() && <Answer text={answer} />}
-      <ResultCards tools={tools} />
+      <ResultCards
+        results={tools.flatMap((p) =>
+          p.state === 'output-available'
+            ? [{ id: p.toolCallId, name: getToolName(p), input: p.input, output: p.output }]
+            : [],
+        )}
+      />
       {proposals.map((p) => (
         <PendingActionCard key={p.pendingActionId} id={p.pendingActionId} summary={p.summary} />
       ))}
@@ -350,243 +341,5 @@ function Answer({ text }: { text: string }) {
         ),
       )}
     </div>
-  );
-}
-
-/**
- * Free rooms, prices and bills straight from the tools, so the amounts are exactly what the domain
- * worked out: one card per availability check and per quote asked for, and the latest bill of
- * each booking.
- */
-function ResultCards({ tools }: { tools: ToolPart[] }) {
-  const searches: { key: string; options: RoomOption[]; addons: QuoteAddons }[] = [];
-  const quotes: { key: string; quote: Quote; roomId: string | null }[] = [];
-  const bills = new Map<string, Folio>();
-  for (const p of tools) {
-    const name = getToolName(p);
-    const output = outputOf(p);
-    if (name === 'checkAvailability') {
-      const parsed = roomOptionSchema.array().safeParse(output);
-      const addons = quoteAddonsSchema.safeParse(
-        (p.input as { addons?: unknown } | undefined)?.addons ?? {},
-      );
-      if (parsed.success && parsed.data.length > 0) {
-        searches.push({
-          key: p.toolCallId,
-          options: parsed.data,
-          addons: addons.success ? addons.data : quoteAddonsSchema.parse({}),
-        });
-      }
-    }
-    if (name === 'quote') {
-      const parsed = quoteSchema.safeParse(output);
-      const input = (p.input ?? {}) as { roomId?: string };
-      if (parsed.success) {
-        quotes.push({ key: p.toolCallId, quote: parsed.data, roomId: input.roomId ?? null });
-      }
-    }
-    if (name === 'getBill') {
-      const parsed = folioSchema.safeParse(output);
-      if (parsed.success) bills.set(parsed.data.bookingId, parsed.data);
-    }
-  }
-  if (searches.length === 0 && quotes.length === 0 && bills.size === 0) return null;
-  return (
-    <div className="flex flex-col gap-2">
-      {searches.map((s) => (
-        <AvailabilityCard key={s.key} options={s.options} addons={s.addons} />
-      ))}
-      {quotes.map((q) => (
-        <QuoteCard key={q.key} quote={q.quote} roomId={q.roomId} />
-      ))}
-      {[...bills.values()].map((folio) => (
-        <BillCard key={folio.bookingId} folio={folio} />
-      ))}
-    </div>
-  );
-}
-
-function Card({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-2 rounded-stage bg-background p-3 text-sm shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit">
-      {children}
-    </div>
-  );
-}
-
-function Amounts({ lines }: { lines: { label: string; amount: number }[] }) {
-  return (
-    <ul className="flex flex-col gap-0.5 text-xs">
-      {lines.map((l, i) => (
-        <li key={i} className="flex items-baseline justify-between gap-4">
-          <span className="min-w-0 text-muted-foreground">{l.label}</span>
-          <span className="shrink-0 font-mono tabular-nums">{formatMoney(l.amount)}</span>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function QuoteCard({ quote, roomId }: { quote: Quote; roomId: string | null }) {
-  const roomTypes = useRoomTypes().data;
-  const typeName = roomTypes?.find((t) => t.id === quote.roomTypeId)?.name;
-  return (
-    <Card>
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="flex min-w-0 items-center gap-2 font-medium">
-          <Calculator className="size-3.5 shrink-0 text-muted-foreground" />
-          {roomId ? <Mention id={roomId} /> : (typeName ?? 'Price')}
-          <span className="truncate text-xs font-normal text-muted-foreground">
-            {formatRange(quote.checkIn, quote.checkOut)} ·{' '}
-            {formatParty(quote.adults, quote.childAges)}
-          </span>
-        </span>
-        <span className="shrink-0 font-mono text-base tabular-nums">
-          {formatMoney(quote.total)}
-        </span>
-      </div>
-      <Amounts lines={quote.lines} />
-    </Card>
-  );
-}
-
-function BillCard({ folio }: { folio: Folio }) {
-  const { open } = useBookingDrawer();
-  const { closePalette } = useCommandPalette();
-  const extras = folio.lines.filter((l) => l.kind === 'extra');
-  return (
-    <Card>
-      <div className="flex items-center justify-between gap-3">
-        <span className="flex min-w-0 items-center gap-2 font-medium">
-          <Receipt className="size-3.5 shrink-0 text-muted-foreground" />
-          <Mention id={folio.bookingId} />
-        </span>
-        <span
-          className={cn(
-            'shrink-0 font-mono text-base tabular-nums',
-            folio.balance > 0
-              ? 'text-warning'
-              : folio.balance < 0
-                ? 'text-primary-text'
-                : 'text-success',
-          )}
-        >
-          {folio.balance > 0
-            ? `${formatMoney(folio.balance)} due`
-            : folio.balance < 0
-              ? `${formatMoney(-folio.balance)} owed back`
-              : 'Paid in full'}
-        </span>
-      </div>
-      <Amounts
-        lines={[
-          { label: 'Charged', amount: folio.charged },
-          ...extras.map((l) => ({
-            label: l.quantity > 1 ? `${l.label} × ${l.quantity}` : l.label,
-            amount: l.amount,
-          })),
-          { label: 'Paid', amount: folio.paid },
-        ]}
-      />
-      <Button
-        variant="ghost"
-        size="xs"
-        className="self-start"
-        onClick={() => {
-          closePalette();
-          open(folio.bookingId);
-        }}
-      >
-        Open booking
-      </Button>
-    </Card>
-  );
-}
-
-/** How many free rooms show before "Show all". */
-const AVAILABILITY_ROWS = 4;
-
-/**
- * The rooms free for a stay, cheapest first, each with its total. A row opens into the line items;
- * Hold opens a new booking for that room with the stay already filled in.
- */
-function AvailabilityCard({ options, addons }: { options: RoomOption[]; addons: QuoteAddons }) {
-  const [all, setAll] = useState(false);
-  const [openRoom, setOpenRoom] = useState<string | null>(null);
-  const { openNew } = useBookingEditor();
-  const { closePalette } = useCommandPalette();
-  const { quote: stay } = options[0]!;
-  const shown = all ? options : options.slice(0, AVAILABILITY_ROWS);
-
-  return (
-    <Card>
-      <div className="flex items-baseline justify-between gap-3">
-        <span className="flex min-w-0 items-center gap-2 font-medium">
-          <CalendarSearch className="size-3.5 shrink-0 text-muted-foreground" />
-          {options.length === 1 ? '1 room free' : `${options.length} rooms free`}
-        </span>
-        <span className="truncate text-xs text-muted-foreground">
-          {formatRange(stay.checkIn, stay.checkOut)} · {formatParty(stay.adults, stay.childAges)}
-        </span>
-      </div>
-      <ul className="-mx-1.5 flex flex-col">
-        {shown.map((o) => {
-          const open = openRoom === o.roomId;
-          return (
-            <li key={o.roomId} className="flex flex-col">
-              <div className="flex items-center gap-1 rounded-control pr-1 transition-colors hover:bg-accent">
-                <button
-                  type="button"
-                  onClick={() => setOpenRoom(open ? null : o.roomId)}
-                  aria-expanded={open}
-                  className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control py-1.5 pl-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <RoomBadge name={o.roomName} />
-                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
-                    {o.roomType.name}
-                  </span>
-                  <span className="shrink-0 font-mono tabular-nums">
-                    {formatMoney(o.quote.total)}
-                  </span>
-                  <ChevronRight
-                    className={cn(
-                      'size-3.5 shrink-0 text-subtle-foreground transition-transform',
-                      open && 'rotate-90',
-                    )}
-                  />
-                </button>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => {
-                    closePalette();
-                    openNew({
-                      roomId: o.roomId,
-                      checkIn: o.quote.checkIn,
-                      checkOut: o.quote.checkOut,
-                      adults: o.quote.adults,
-                      childAges: o.quote.childAges,
-                      addons,
-                    });
-                  }}
-                >
-                  Hold
-                </Button>
-              </div>
-              {open && (
-                <div className="px-1.5 pt-1 pb-2">
-                  <Amounts lines={o.quote.lines} />
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-      {options.length > AVAILABILITY_ROWS && (
-        <Button variant="ghost" size="xs" className="self-start" onClick={() => setAll((a) => !a)}>
-          {all ? 'Show fewer' : `Show all ${options.length}`}
-        </Button>
-      )}
-    </Card>
   );
 }

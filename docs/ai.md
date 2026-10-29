@@ -28,7 +28,17 @@ sequenceDiagram
   A->>D: moveBooking (actor: agent) + audit log
 ```
 
-Staff talk to the agent in the ⌘K command bar. Answers are structured ([ADR 0011](decisions/0011-structured-agent-answers.md)): the agent writes bookings, rooms and guests as `[[bk_147]]`-style tokens, which the thread renders as chips and booking rows that open the booking and have its right-click menu (`components/agent-thread.tsx`, `components/agent-mention.tsx`, `lib/agent-answer.ts`); free rooms, quotes and bills it fetched appear as cards built from the tool output (the free-rooms card lists each room with its total, opens into the line items, and has a Hold button that opens a new booking with the room, stay, party and add-ons filled in); proposed changes appear as confirm cards. The steps of an answer fold into one line ("Checked arrivals and opened the bill") that opens into a timeline with a short result per step and the raw tool input and output one more click away. While the agent works, a thinking orb (`thinking-orbs`) shows the current step and a beam (`border-beam`) runs round the bar. The booking inspector's "Ask Orbit" button opens the bar with the booking as context. The conversation stays in memory until the page reloads or the user starts a new one.
+Staff talk to the agent in the ⌘K command bar. Answers are structured ([ADR 0011](decisions/0011-structured-agent-answers.md)): the agent writes bookings, rooms and guests as `[[bk_147]]`-style tokens, which the thread renders as chips and booking rows that open the booking and have its right-click menu (`components/agent-thread.tsx`, `components/agent-mention.tsx`, `lib/agent-answer.ts`); what some tools return appears as cards built from the tool output (see [Result cards](#result-cards)); proposed changes appear as confirm cards. The steps of an answer fold into one line ("Checked arrivals and opened the bill") that opens into a timeline with a short result per step and the raw tool input and output one more click away. While the agent works, a thinking orb (`thinking-orbs`) shows the current step and a beam (`border-beam`) runs round the bar. The booking inspector's "Ask Orbit" button opens the bar with the booking as context. The conversation stays in memory until the page reloads or the user starts a new one.
+
+### Result cards
+
+`components/agent-result-cards.tsx` turns finished tool steps into cards under the answer. Amounts come straight from the tool output, never from the model's text.
+
+| Tool                | Card                                                                                                                                         |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `checkAvailability` | Free rooms with their totals; a row opens into the line items, and Hold opens a new booking with the room, stay, party and add-ons filled in |
+| `quote`             | The quote's line items and total                                                                                                             |
+| `getBill`           | The latest bill of each booking: charged, extras, paid and the balance, with a button to open the booking                                    |
 
 `runAgent` (`packages/ai/src/agent.ts`) calls the AI SDK's `streamText` with the tools, stopping after at most 8 model calls per user message. `POST /api/agent` validates the incoming UI messages, converts them for the model and streams the result back as an AI SDK UI message stream (server-sent events).
 
