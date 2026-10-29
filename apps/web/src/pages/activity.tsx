@@ -53,7 +53,7 @@ export function ActivityPage() {
     <>
       <PageHeader title="Activity" meta="The latest 100 changes" />
       <PageBody>
-        <div className="mx-auto flex max-w-3xl flex-col gap-8">
+        <div className="flex max-w-3xl flex-col gap-8">
           <Segmented
             label="Who"
             value={filter}

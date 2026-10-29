@@ -24,7 +24,7 @@ import {
   preview,
   senderLabel,
 } from '@/lib/inbox';
-import { cn } from '@/lib/utils';
+import { cn, labelCaps } from '@/lib/utils';
 
 const folders: { id: InboxFolder; icon: ComponentType<{ className?: string }> }[] = [
   { id: 'inbox', icon: Inbox },
@@ -72,7 +72,7 @@ export function InboxPage() {
       <div className="flex min-h-0 flex-1">
         <nav
           aria-label="Folders"
-          className="hidden w-52 shrink-0 flex-col gap-0.5 border-r p-2 xl:flex"
+          className="hidden w-52 shrink-0 flex-col gap-0.5 border-r px-3.5 py-3 xl:flex"
         >
           {folders.map((f) => (
             <button
@@ -81,11 +81,11 @@ export function InboxPage() {
               onClick={() => setFolder(f.id)}
               aria-current={folder === f.id ? 'page' : undefined}
               className={cn(
-                'flex h-8 items-center gap-2.5 rounded-control px-2.5 text-left outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring',
-                folder === f.id && 'bg-accent font-medium',
+                'flex h-8 items-center gap-2.5 rounded-lg px-2.5 text-left text-muted-foreground outline-none transition-colors duration-150 ease-snap hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+                folder === f.id && 'bg-sidebar-accent text-foreground',
               )}
             >
-              <f.icon className="size-4 text-muted-foreground" />
+              <f.icon className="size-4" />
               <span className="flex-1">{folderLabels[f.id]}</span>
               {counts[f.id] > 0 && f.id !== 'archived' && (
                 <span className="text-xs text-muted-foreground tabular-nums">{counts[f.id]}</span>
@@ -94,9 +94,7 @@ export function InboxPage() {
           ))}
           {channels.length > 1 && (
             <>
-              <h2 className="mt-4 px-2.5 pb-1 text-xs font-medium text-subtle-foreground">
-                Channels
-              </h2>
+              <h2 className={cn(labelCaps, 'mt-4 flex h-7 items-center px-2.5')}>Channels</h2>
               {[null, ...channels].map((c) => (
                 <button
                   key={c ?? 'all'}
@@ -104,8 +102,8 @@ export function InboxPage() {
                   onClick={() => setChannel(c)}
                   aria-pressed={channel === c}
                   className={cn(
-                    'flex h-8 items-center rounded-control px-2.5 text-left text-sm outline-none transition-colors hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring',
-                    channel === c ? 'bg-accent font-medium' : 'text-muted-foreground',
+                    'flex h-8 items-center rounded-lg px-2.5 text-left text-sm text-muted-foreground outline-none transition-colors duration-150 ease-snap hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+                    channel === c && 'bg-sidebar-accent text-foreground',
                   )}
                 >
                   {c ?? 'All channels'}

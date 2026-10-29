@@ -9,11 +9,15 @@ interface PageHeaderProps {
   actions?: ReactNode;
 }
 
-/** The title bar at the top of every page's main panel. */
+/**
+ * The title bar at the top of every page's main panel. Pages share one gutter (`px-4 md:px-6`):
+ * the sidebar button's icon, page content and side rails all start on that line.
+ */
 export function PageHeader({ title, meta, actions }: PageHeaderProps) {
   return (
-    <header className="flex h-13 shrink-0 items-center gap-2 border-b px-3">
-      <SidebarTrigger className="text-muted-foreground" />
+    <header className="flex h-13 shrink-0 items-center gap-2 border-b px-4 md:px-6">
+      {/* Pulled into the gutter so its icon, not its hover area, lines up with the content. */}
+      <SidebarTrigger className="-ml-2 text-muted-foreground" />
       <h1 className="truncate text-[0.9375rem] font-medium tracking-tight">{title}</h1>
       {meta && (
         <span className="hidden truncate text-sm text-muted-foreground sm:inline">{meta}</span>
@@ -26,7 +30,7 @@ export function PageHeader({ title, meta, actions }: PageHeaderProps) {
 /** The scrollable area under a page header. */
 export function PageBody({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={className ?? 'scrollbar-thin min-h-0 flex-1 overflow-auto px-6 py-6 lg:px-8'}>
+    <div className={className ?? 'scrollbar-thin min-h-0 flex-1 overflow-auto px-4 py-6 md:px-6'}>
       {children}
     </div>
   );

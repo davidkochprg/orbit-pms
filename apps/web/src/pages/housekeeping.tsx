@@ -112,7 +112,7 @@ export function HousekeepingPage() {
       {error && (
         <ErrorNotice
           message={error.message}
-          className="mx-3 mt-3"
+          className="mx-4 mt-4 md:mx-6"
           onDismiss={() => {
             setStatus.reset();
             setTask.reset();
@@ -120,7 +120,7 @@ export function HousekeepingPage() {
         />
       )}
 
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-auto p-3">
+      <div className="scrollbar-thin min-h-0 flex-1 overflow-auto px-4 py-6 md:px-6">
         {board.isError ? (
           <ErrorNotice message={board.error.message} />
         ) : !board.data ? (

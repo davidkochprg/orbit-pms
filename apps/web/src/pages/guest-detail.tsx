@@ -59,7 +59,7 @@ export function GuestDetailPage() {
         ) : !g ? (
           <Skeleton className="h-64 w-full" />
         ) : (
-          <div className="mx-auto flex max-w-3xl flex-col gap-8">
+          <div className="flex max-w-3xl flex-col gap-8">
             <div className="flex items-center gap-4">
               <GuestAvatar name={g.name} size="lg" />
               <h2 className="text-xl font-semibold tracking-tight">{g.name}</h2>

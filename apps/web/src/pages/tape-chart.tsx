@@ -275,7 +275,7 @@ function TapeChart({ today }: { today: string }) {
       {error && (
         <ErrorNotice
           message={error.message}
-          className="mx-3 mt-3"
+          className="mx-4 mt-4 md:mx-6"
           onDismiss={() => {
             reschedule.reset();
             changeDates.reset();
@@ -335,7 +335,7 @@ function TapeChart({ today }: { today: string }) {
         )}
       </div>
 
-      <footer className="flex h-10 shrink-0 items-center gap-4 border-t bg-surface-sunken px-4 text-xs text-muted-foreground">
+      <footer className="flex h-10 shrink-0 items-center gap-4 border-t bg-surface-sunken px-4 text-xs text-muted-foreground md:px-6">
         <span className="hidden truncate md:inline">
           Click an empty night to book it. Drag a booking to move it, or its right edge to change
           the departure. Stays run from midday to midday, so turnovers share a day.
