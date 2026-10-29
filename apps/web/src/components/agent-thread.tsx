@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { BookingRow, Mention } from '@/components/agent-mention';
+import { BookingRow, Mention, RoomRow } from '@/components/agent-mention';
 import { ResultCards } from '@/components/agent-result-cards';
 import { ConfirmAllButton, PendingActionCard } from '@/components/pending-action-card';
 import { AgentEntitiesContext } from '@/hooks/use-agent-entities';
@@ -34,7 +34,13 @@ import {
   toolLabel,
   toolResultSummary,
 } from '@/lib/agent';
-import { type AnswerBlock, collectEntities, type Inline, parseAnswer } from '@/lib/agent-answer';
+import {
+  type AnswerBlock,
+  collectEntities,
+  entityKind,
+  type Inline,
+  parseAnswer,
+} from '@/lib/agent-answer';
 import { cn } from '@/lib/utils';
 
 type ToolPart = Extract<UIMessage['parts'][number], { toolCallId: string }>;
@@ -164,7 +170,10 @@ function AssistantMessage({ message, working }: { message: UIMessage; working: b
       <ResultCards
         listBookings={
           proposals.length === 0 &&
-          !blocks.some((b) => b.type === 'list' && b.items.some((i) => i.lead))
+          !blocks.some(
+            (b) =>
+              b.type === 'list' && b.items.some((i) => i.lead && entityKind(i.lead) === 'booking'),
+          )
         }
         results={tools.flatMap((p) =>
           p.state === 'output-available'
@@ -312,27 +321,39 @@ function InlineContent({ content }: { content: Inline[] }) {
   );
 }
 
-/** The answer: paragraphs with chips, and lists where a booking leads its item as a row. */
+/**
+ * The answer: paragraphs with chips, and lists where every item leads with a booking or every
+ * item with a room as rows; mixed lists stay bullets with chips.
+ */
 function Answer({ blocks }: { blocks: AnswerBlock[] }) {
   return (
     <div className="flex flex-col gap-3 leading-relaxed">
-      {blocks.map((block, i) =>
-        block.type === 'paragraph' ? (
-          <p key={i} className="whitespace-pre-wrap">
-            <InlineContent content={block.content} />
-          </p>
-        ) : block.items.every((item) => item.lead) ? (
-          <div
-            key={i}
-            className="-mx-1 flex flex-col rounded-stage bg-background p-1 shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit"
-          >
-            {block.items.map((item, j) => (
-              <BookingRow key={j} id={item.lead!}>
-                {item.content.length > 0 ? <InlineContent content={item.content} /> : undefined}
-              </BookingRow>
-            ))}
-          </div>
-        ) : (
+      {blocks.map((block, i) => {
+        if (block.type === 'paragraph') {
+          return (
+            <p key={i} className="whitespace-pre-wrap">
+              <InlineContent content={block.content} />
+            </p>
+          );
+        }
+        const kinds = new Set(block.items.map((item) => item.lead && entityKind(item.lead)));
+        const rowKind = kinds.size === 1 ? [...kinds][0] : null;
+        if (rowKind === 'booking' || rowKind === 'room') {
+          const Row = rowKind === 'booking' ? BookingRow : RoomRow;
+          return (
+            <div
+              key={i}
+              className="-mx-1 flex flex-col rounded-stage bg-background p-1 shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit"
+            >
+              {block.items.map((item, j) => (
+                <Row key={j} id={item.lead!}>
+                  {item.content.length > 0 ? <InlineContent content={item.content} /> : undefined}
+                </Row>
+              ))}
+            </div>
+          );
+        }
+        return (
           <ul key={i} className="flex flex-col gap-1.5">
             {block.items.map((item, j) => (
               <li
@@ -343,8 +364,8 @@ function Answer({ blocks }: { blocks: AnswerBlock[] }) {
               </li>
             ))}
           </ul>
-        ),
-      )}
+        );
+      })}
     </div>
   );
 }

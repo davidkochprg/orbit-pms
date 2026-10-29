@@ -107,7 +107,7 @@ export function collectEntities(outputs: unknown[]): Map<string, Entity> {
 export type Inline =
   { type: 'text'; text: string; strong?: boolean } | { type: 'mention'; id: string };
 
-/** A paragraph, or a list whose items may each lead with a booking (shown as a row). */
+/** A paragraph, or a list whose items may each lead with a booking or room (shown as a row). */
 export type AnswerBlock =
   | { type: 'paragraph'; content: Inline[] }
   | { type: 'list'; items: { lead: string | null; content: Inline[] }[] };
@@ -140,9 +140,12 @@ export function parseInline(text: string): Inline[] {
   return out;
 }
 
-/** "[[bk_147]] — 2 adults" → the booking and what follows, without the joining punctuation. */
+/**
+ * "[[bk_147]] — 2 adults" → the booking (or room) and what follows, without the joining
+ * punctuation.
+ */
 function splitLead(text: string): { lead: string | null; rest: string } {
-  const m = /^\s*(?:\[\[)?(bk_[A-Za-z0-9-]+)(?:\]\])?\s*(?:[—–:,-]\s*)?/.exec(text);
+  const m = /^\s*(?:\[\[)?((?:bk|rm)_[A-Za-z0-9-]+)(?:\]\])?\s*(?:[—–:,-]\s*)?/.exec(text);
   return m ? { lead: m[1]!, rest: text.slice(m[0].length) } : { lead: null, rest: text };
 }
 

@@ -113,6 +113,18 @@ describe('parseAnswer', () => {
     ]);
   });
 
+  it('leads list items with their room', () => {
+    expect(parseAnswer('- [[rm_104]] dirty, guest arriving at 3\n- rm_201: out of order')).toEqual([
+      {
+        type: 'list',
+        items: [
+          { lead: 'rm_104', content: [{ type: 'text', text: 'dirty, guest arriving at 3' }] },
+          { lead: 'rm_201', content: [{ type: 'text', text: 'out of order' }] },
+        ],
+      },
+    ]);
+  });
+
   it('keeps a booking-only item with no detail', () => {
     expect(parseAnswer('- [[bk_1]]')).toEqual([
       { type: 'list', items: [{ lead: 'bk_1', content: [] }] },

@@ -1,10 +1,20 @@
+import { BrushCleaning, CalendarPlus, CalendarRange } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { BookingContextMenu } from '@/components/booking-menu';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { StatusDot } from '@/components/status-dot';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useAgentEntity } from '@/hooks/use-agent-entities';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import {
   type BookingEntity,
@@ -12,7 +22,7 @@ import {
   type GuestEntity,
   type RoomEntity,
 } from '@/lib/agent-answer';
-import { useBookingDetail, useRooms } from '@/lib/api';
+import { useBookingDetail, useRooms, useRoomTypes } from '@/lib/api';
 import { formatParty, formatRange, statusLabels } from '@/lib/format';
 import { bookingStatusColor, roomStatusColor, roomStatusLabels } from '@/lib/status';
 import { cn } from '@/lib/utils';
@@ -78,25 +88,69 @@ function BookingChip({ id }: { id: string }) {
   );
 }
 
-function RoomChip({ id }: { id: string }) {
+/** A room from hotel data, named as the tools named it until rooms have loaded. */
+function useRoom(id: string) {
   const known = useAgentEntity(id) as RoomEntity | undefined;
   const room = useRooms().data?.find((r) => r.id === id);
+  const typeName = useRoomTypes().data?.find((t) => t.id === room?.roomTypeId)?.name;
+  return { room, typeName, name: room?.name ?? known?.name ?? id };
+}
+
+/** What a room's status and type are, and where to take it from here, opened from a chip or row. */
+function RoomMenu({ id, children }: { id: string; children: ReactNode }) {
+  const { room, typeName, name } = useRoom(id);
   const navigate = useNavigate();
   const { closePalette } = useCommandPalette();
-  const name = room?.name ?? known?.name ?? id;
+  const { openNew } = useBookingEditor();
+  const go = (path: string) => {
+    closePalette();
+    void navigate(path);
+  };
   return (
-    <button
-      type="button"
-      title={room ? roomStatusLabels[room.status] : undefined}
-      onClick={() => {
-        closePalette();
-        void navigate('/housekeeping');
-      }}
-      className={cn(chip, 'pl-2')}
-    >
-      {room && <StatusDot className={roomStatusColor[room.status]} />}
-      Room <span className="font-mono">{name}</span>
-    </button>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>{children}</DropdownMenuTrigger>
+      <DropdownMenuContent align="start">
+        <DropdownMenuLabel className="flex flex-col gap-0.5 font-normal">
+          <span className="font-medium">Room {name}</span>
+          {room && (
+            <span className="text-xs text-muted-foreground">
+              {[typeName, roomStatusLabels[room.status]].filter(Boolean).join(' · ')}
+            </span>
+          )}
+        </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          onSelect={() => {
+            closePalette();
+            openNew({ roomId: id });
+          }}
+        >
+          <CalendarPlus /> New booking in this room
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => go('/tape-chart')}>
+          <CalendarRange /> Tape chart
+        </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => go('/housekeeping')}>
+          <BrushCleaning /> Housekeeping
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function RoomChip({ id }: { id: string }) {
+  const { room, name } = useRoom(id);
+  return (
+    <RoomMenu id={id}>
+      <button
+        type="button"
+        title={room ? roomStatusLabels[room.status] : undefined}
+        className={cn(chip, 'pl-2')}
+      >
+        {room && <StatusDot className={roomStatusColor[room.status]} />}
+        Room <span className="font-mono">{name}</span>
+      </button>
+    </RoomMenu>
   );
 }
 
@@ -172,5 +226,33 @@ export function BookingRow({ id, children }: { id: string; children?: ReactNode 
         </span>
       </button>
     </BookingContextMenu>
+  );
+}
+
+/**
+ * A list item that leads with a room: its name, type and housekeeping status from hotel data, and
+ * what the agent said about it underneath. Click opens the room's menu.
+ */
+export function RoomRow({ id, children }: { id: string; children?: ReactNode }) {
+  const { room, typeName, name } = useRoom(id);
+  return (
+    <RoomMenu id={id}>
+      <button
+        type="button"
+        className="group flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left outline-none transition-colors hover:bg-accent focus-visible:bg-accent"
+      >
+        <RoomBadge name={name} />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="truncate">{typeName ?? `Room ${name}`}</span>
+          {children && <span className="text-xs text-muted-foreground">{children}</span>}
+        </span>
+        {room && (
+          <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+            <StatusDot className={roomStatusColor[room.status]} />
+            {roomStatusLabels[room.status]}
+          </span>
+        )}
+      </button>
+    </RoomMenu>
   );
 }
