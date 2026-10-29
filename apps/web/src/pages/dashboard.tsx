@@ -64,7 +64,7 @@ export function DashboardPage() {
               ))}
             </div>
           ) : (
-            <div className="grid flex-1 gap-4 lg:grid-cols-2 xl:min-h-80 xl:grid-cols-4">
+            <div className="grid flex-1 gap-4 lg:grid-cols-2 xl:min-h-48 xl:grid-cols-4">
               <Panel title="Arrivals" count={day.data.arrivals.length} contentClassName="p-0">
                 <ScrollBox className={listBox}>
                   <BookingList
