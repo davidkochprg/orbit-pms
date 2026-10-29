@@ -231,10 +231,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
           size="sm"
           className="ml-auto"
           onClick={() =>
-            openPalette({
-              mode: 'agent',
-              text: `About ${guest.name}'s booking ${booking.id} in room ${room.name}: `,
-            })
+            openPalette({ mode: 'agent', context: { kind: 'booking', id: booking.id } })
           }
         >
           <Sparkles className="text-primary-text" /> Ask Orbit

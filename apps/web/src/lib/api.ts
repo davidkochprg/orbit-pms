@@ -196,6 +196,7 @@ export function useGuest(id: string) {
   return useQuery({
     queryKey: ['guest', id],
     queryFn: () => apiGet(`/api/guests/${encodeURIComponent(id)}`, guestSchema),
+    enabled: id !== '',
   });
 }
 

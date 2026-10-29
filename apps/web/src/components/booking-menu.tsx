@@ -153,10 +153,7 @@ function BookingMenuItems({
       {d && (
         <Item
           onSelect={() =>
-            openPalette({
-              mode: 'agent',
-              text: `About ${d.guest.name}'s booking ${d.booking.id} in room ${d.room.name}: `,
-            })
+            openPalette({ mode: 'agent', context: { kind: 'booking', id: d.booking.id } })
           }
         >
           <Sparkles /> Ask Orbit

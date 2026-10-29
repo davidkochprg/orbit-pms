@@ -1,11 +1,17 @@
+import type { AgentContext } from '@orbit/shared';
 import { createContext, useContext } from 'react';
 
 export type PaletteMode = 'search' | 'agent';
 
 export interface OpenPaletteOptions {
   mode?: PaletteMode;
-  /** Text to put in the input, e.g. context about the booking the user is looking at. */
+  /** Text to put in the input. */
   text?: string;
+  /**
+   * What the questions are about, e.g. the booking whose "Ask Orbit" was clicked. Left out, it is
+   * what the page shows; null asks about nothing in particular.
+   */
+  context?: AgentContext | null;
 }
 
 export interface CommandPaletteContextValue {

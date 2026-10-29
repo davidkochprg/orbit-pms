@@ -1,4 +1,5 @@
 import { useChat } from '@ai-sdk/react';
+import type { AgentContext } from '@orbit/shared';
 import { DefaultChatTransport } from 'ai';
 import { BorderBeam } from 'border-beam';
 import { Command as CommandPrimitive, defaultFilter } from 'cmdk';
@@ -26,8 +27,9 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { AgentStatus } from '@/components/agent-status';
+import { AgentContextChip } from '@/components/agent-context-chip';
 import { FollowUps } from '@/components/agent-follow-ups';
 import { AgentThread } from '@/components/agent-thread';
 import { ErrorNotice } from '@/components/error-notice';
@@ -44,6 +46,7 @@ import {
 } from '@/hooks/use-command-palette';
 import { useDarkMode } from '@/hooks/use-dark-mode';
 import { agentErrorMessage, proposalIds, suggestedQuestions, toolResults } from '@/lib/agent';
+import { contextFromLocation } from '@/lib/agent-context';
 import { followUps } from '@/lib/agent-follow-ups';
 import {
   useDayOverview,
@@ -71,9 +74,23 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const dark = useDarkMode();
   const working = chat.status === 'submitted' || chat.status === 'streaming';
 
+  // What the next questions are about: the page's booking, guest or conversation, read when the
+  // bar opens; the staff member can leave it out.
+  const location = useLocation();
+  const pageContext = useRef<AgentContext | null>(null);
+  const [context, setContext] = useState<AgentContext | null>(null);
+  const isOpen = useRef(false);
+  useEffect(() => {
+    pageContext.current = contextFromLocation(location.pathname, location.search);
+  }, [location.pathname, location.search]);
+  useEffect(() => {
+    isOpen.current = open;
+  }, [open]);
+
   const openPalette = useCallback((options?: OpenPaletteOptions) => {
     setMode(options?.mode ?? 'search');
     setText(options?.text ?? '');
+    setContext(options?.context !== undefined ? options.context : pageContext.current);
     setOpen(true);
   }, []);
 
@@ -81,7 +98,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        setOpen((o) => !o);
+        if (!isOpen.current) setContext(pageContext.current);
+        setOpen(!isOpen.current);
       }
     };
     window.addEventListener('keydown', onKey);
@@ -93,7 +111,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     if (!q || chat.status === 'submitted' || chat.status === 'streaming') return;
     setMode('agent');
     setText('');
-    void chat.sendMessage({ text: q });
+    void chat.sendMessage({ text: q, ...(context && { metadata: { context } }) });
   };
 
   const closePalette = useCallback(() => setOpen(false), []);
@@ -160,6 +178,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
             <div className="relative flex max-h-[76vh] flex-col overflow-hidden rounded-card bg-popover shadow-floating backdrop-blur-2xl stroke-lit">
               {mode === 'search' ? (
                 <SearchView
+                  context={context}
                   text={text}
                   onTextChange={setText}
                   onAsk={ask}
@@ -169,6 +188,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
               ) : (
                 <AgentView
                   chat={chat}
+                  context={context}
+                  onClearContext={() => setContext(null)}
                   text={text}
                   onTextChange={setText}
                   onAsk={ask}
@@ -189,12 +210,14 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
 }
 
 function SearchView({
+  context,
   text,
   onTextChange,
   onAsk,
   onShowThread,
   close,
 }: {
+  context: AgentContext | null;
   text: string;
   onTextChange: (text: string) => void;
   onAsk: (question: string) => void;
@@ -254,6 +277,7 @@ function SearchView({
               <span className="truncate">
                 Ask Orbit: <span className="text-muted-foreground">{query}</span>
               </span>
+              {context && <AgentContextChip context={context} className="ml-1" />}
             </Item>
           </CommandPrimitive.Group>
         )}
@@ -371,6 +395,8 @@ const TURN_GAP = 16;
 
 function AgentView({
   chat,
+  context,
+  onClearContext,
   text,
   onTextChange,
   onAsk,
@@ -378,6 +404,8 @@ function AgentView({
   onNew,
 }: {
   chat: ReturnType<typeof useChat>;
+  context: AgentContext | null;
+  onClearContext: () => void;
   text: string;
   onTextChange: (text: string) => void;
   onAsk: (question: string) => void;
@@ -514,6 +542,7 @@ function AgentView({
         <p className="border-t px-5 py-2 text-xs text-destructive">{resolve.error.message}</p>
       )}
       <InputRow icon={<Sparkles className="size-[18px] text-primary-text" />} placement="bottom">
+        {context && <AgentContextChip context={context} onRemove={onClearContext} />}
         <input
           autoFocus
           value={text}

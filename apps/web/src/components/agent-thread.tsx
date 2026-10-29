@@ -21,7 +21,9 @@ import {
   Wrench,
 } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
+import { agentMessageMetadataSchema } from '@orbit/shared';
 import { ThinkingOrb } from 'thinking-orbs';
+import { AgentContextChip } from '@/components/agent-context-chip';
 import { BookingRow, Mention, RoomRow } from '@/components/agent-mention';
 import { ResultCards } from '@/components/agent-result-cards';
 import { ConfirmAllButton, PendingActionCard } from '@/components/pending-action-card';
@@ -119,11 +121,7 @@ export function AgentThread({
               className="flex flex-col gap-6"
               style={isLast && lastTurnMinHeight ? { minHeight: lastTurnMinHeight } : undefined}
             >
-              {turn.question && (
-                <p className="text-base font-medium tracking-tight">
-                  {turn.question.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')}
-                </p>
-              )}
+              {turn.question && <Question message={turn.question} />}
               {turn.answers.map((m) => (
                 <AssistantMessage
                   key={m.id}
@@ -142,6 +140,19 @@ export function AgentThread({
         })}
       </div>
     </AgentEntitiesContext>
+  );
+}
+
+/** A staff member's question, with what it was about when there was something. */
+function Question({ message }: { message: UIMessage }) {
+  const context = agentMessageMetadataSchema.safeParse(message.metadata).data?.context;
+  return (
+    <div className="flex flex-col items-start gap-1.5">
+      {context && <AgentContextChip context={context} />}
+      <p className="text-base font-medium tracking-tight">
+        {message.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')}
+      </p>
+    </div>
   );
 }
 
