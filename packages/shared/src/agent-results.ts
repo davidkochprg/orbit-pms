@@ -1,6 +1,8 @@
 import { z } from 'zod';
+import { isoDateSchema } from './dates';
 import { housekeepingTaskSchema } from './entities';
-import { housekeepingTaskStatusSchema, roomStatusSchema } from './enums';
+import { bookingStatusSchema, housekeepingTaskStatusSchema, roomStatusSchema } from './enums';
+import { moneySchema } from './quote';
 
 /**
  * What the agent's tools return where the app shows it as a card: the tools build these and the
@@ -30,3 +32,19 @@ export const agentTaskStatusResultSchema = agentTaskCreatedResultSchema.extend({
   from: housekeepingTaskStatusSchema,
 });
 export type AgentTaskStatusResult = z.infer<typeof agentTaskStatusResultSchema>;
+
+/** A booking as `getArrivals`, `getDepartures` and `searchBookings` list it. */
+export const agentBookingRowSchema = z.object({
+  bookingId: z.string(),
+  guestId: z.string(),
+  guestName: z.string(),
+  roomName: z.string(),
+  roomId: z.string(),
+  checkIn: isoDateSchema,
+  checkOut: isoDateSchema,
+  status: bookingStatusSchema,
+  adults: z.number().int(),
+  childAges: z.array(z.number().int()),
+  total: moneySchema.nullable(),
+});
+export type AgentBookingRow = z.infer<typeof agentBookingRowSchema>;

@@ -34,7 +34,7 @@ import {
   toolLabel,
   toolResultSummary,
 } from '@/lib/agent';
-import { collectEntities, type Inline, parseAnswer } from '@/lib/agent-answer';
+import { type AnswerBlock, collectEntities, type Inline, parseAnswer } from '@/lib/agent-answer';
 import { cn } from '@/lib/utils';
 
 type ToolPart = Extract<UIMessage['parts'][number], { toolCallId: string }>;
@@ -130,6 +130,7 @@ function AssistantMessage({ message, working }: { message: UIMessage; working: b
     .slice(lastTool + 1)
     .map((p) => (p.type === 'text' ? p.text : ''))
     .join('');
+  const blocks = useMemo(() => parseAnswer(answer), [answer]);
   const proposals = tools.flatMap((p) => {
     const proposal = asProposal(outputOf(p));
     return proposal ? [proposal] : [];
@@ -159,8 +160,9 @@ function AssistantMessage({ message, working }: { message: UIMessage; working: b
     <div className="-mt-3 flex flex-col gap-3">
       {live}
       {!live && tools.length > 0 && <StepSummary tools={tools} narration={narration} />}
-      {answer.trim() && <Answer text={answer} />}
+      {blocks.length > 0 && <Answer blocks={blocks} />}
       <ResultCards
+        listBookings={!blocks.some((b) => b.type === 'list' && b.items.some((i) => i.lead))}
         results={tools.flatMap((p) =>
           p.state === 'output-available'
             ? [{ id: p.toolCallId, name: getToolName(p), input: p.input, output: p.output }]
@@ -308,8 +310,7 @@ function InlineContent({ content }: { content: Inline[] }) {
 }
 
 /** The answer: paragraphs with chips, and lists where a booking leads its item as a row. */
-function Answer({ text }: { text: string }) {
-  const blocks = useMemo(() => parseAnswer(text), [text]);
+function Answer({ blocks }: { blocks: AnswerBlock[] }) {
   return (
     <div className="flex flex-col gap-3 leading-relaxed">
       {blocks.map((block, i) =>

@@ -8,6 +8,7 @@ import {
   type ReportService,
 } from '@orbit/domain';
 import {
+  type AgentBookingRow,
   type AgentRoomStatusResult,
   type AgentTaskCreatedResult,
   type AgentTaskStatusResult,
@@ -85,7 +86,7 @@ function optionsForModel({ output }: { output: unknown }): { type: 'json'; value
   };
 }
 
-function compact(s: BookingSummary) {
+function compact(s: BookingSummary): AgentBookingRow {
   const b = s.booking;
   return {
     bookingId: b.id,

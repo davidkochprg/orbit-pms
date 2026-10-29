@@ -1,4 +1,5 @@
 import {
+  agentBookingRowSchema,
   agentRoomStatusResultSchema,
   agentTaskCreatedResultSchema,
   agentTaskStatusResultSchema,
@@ -6,6 +7,7 @@ import {
   quoteAddonsSchema,
   quoteSchema,
   roomOptionSchema,
+  type AgentBookingRow,
   type Folio,
   type Quote,
   type QuoteAddons,
@@ -13,6 +15,7 @@ import {
 } from '@orbit/shared';
 import { Calculator, CalendarSearch, ChevronRight, Receipt } from 'lucide-react';
 import { useState } from 'react';
+import { type BookingListKind, BookingListCard } from '@/components/agent-booking-list-card';
 import { AgentCard, AgentCardHeader, Amounts } from '@/components/agent-card';
 import {
   type HousekeepingChangeResult,
@@ -36,16 +39,37 @@ export interface ToolResult {
 }
 
 /**
- * Cards straight from the tools, so the amounts are exactly what the domain worked out: one card
- * per availability check and per quote asked for, the latest bill of each booking, and the
- * housekeeping changes the agent made.
+ * Cards straight from the tools, so the amounts are exactly what the domain worked out: the
+ * bookings a list tool returned, one card per availability check and per quote asked for, the
+ * latest bill of each booking, and the housekeeping changes the agent made.
  */
-export function ResultCards({ results }: { results: ToolResult[] }) {
+const bookingLists: Record<string, BookingListKind> = {
+  getArrivals: 'arrivals',
+  getDepartures: 'departures',
+  searchBookings: 'search',
+};
+
+/** `listBookings` is false when the answer already lists the bookings as rows itself. */
+export function ResultCards({
+  results,
+  listBookings,
+}: {
+  results: ToolResult[];
+  listBookings: boolean;
+}) {
+  const lists: { key: string; kind: BookingListKind; rows: AgentBookingRow[] }[] = [];
   const searches: { key: string; options: RoomOption[]; addons: QuoteAddons }[] = [];
   const quotes: { key: string; quote: Quote; roomId: string | null }[] = [];
   const bills = new Map<string, Folio>();
   const housekeeping: HousekeepingChangeResult[] = [];
   for (const { id, name, input, output } of results) {
+    const listKind = bookingLists[name];
+    if (listKind && listBookings) {
+      const parsed = agentBookingRowSchema.array().safeParse(output);
+      if (parsed.success && parsed.data.length > 0) {
+        lists.push({ key: id, kind: listKind, rows: parsed.data });
+      }
+    }
     if (name === 'setRoomStatus') {
       const parsed = agentRoomStatusResultSchema.safeParse(output);
       if (parsed.success) housekeeping.push({ kind: 'room_status', key: id, result: parsed.data });
@@ -82,6 +106,7 @@ export function ResultCards({ results }: { results: ToolResult[] }) {
     }
   }
   if (
+    lists.length === 0 &&
     searches.length === 0 &&
     quotes.length === 0 &&
     bills.size === 0 &&
@@ -91,6 +116,9 @@ export function ResultCards({ results }: { results: ToolResult[] }) {
   }
   return (
     <div className="flex flex-col gap-2">
+      {lists.map((l) => (
+        <BookingListCard key={l.key} kind={l.kind} rows={l.rows} />
+      ))}
       {searches.map((s) => (
         <AvailabilityCard key={s.key} options={s.options} addons={s.addons} />
       ))}
