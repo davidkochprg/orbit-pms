@@ -111,7 +111,10 @@ function ReportView({
   period: ReportPeriod;
 }) {
   const vs = `vs the ${report.nights} nights before`;
-  const cityTaxLabel = usePricing().data?.cityTax.label ?? 'City tax';
+  const cityTax = usePricing().data?.cityTax;
+  const cityTaxLabel = cityTax?.label ?? 'City tax';
+  // A fee the hotel doesn't charge is noise; one it charged in the period still shows.
+  const showCityTax = (cityTax?.perPersonPerNight ?? 0) > 0 || report.cityTax > 0;
   const ahead = period === 'next30';
   return (
     <div className="flex flex-col gap-4">
@@ -150,7 +153,7 @@ function ReportView({
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t px-5 py-4 sm:grid-cols-4 xl:grid-cols-7">
           <Figure label="Add-ons" value={formatMoney(report.addonRevenue)} />
           <Figure label="Extras" value={formatMoney(report.extrasRevenue)} />
-          <Figure label={cityTaxLabel} value={formatMoney(report.cityTax)} />
+          {showCityTax && <Figure label={cityTaxLabel} value={formatMoney(report.cityTax)} />}
           <Figure label="Guest nights" value={report.guestNights} />
           <Figure label="Arrivals" value={report.arrivals} />
           <Figure label="Average stay" value={`${report.averageStay} nights`} />
