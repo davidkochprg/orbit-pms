@@ -1,4 +1,4 @@
-import type { DailyBrief } from '@orbit/shared';
+import type { BookingSummary, DailyBrief } from '@orbit/shared';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { roomStatusLabels } from '@/lib/status';
 
@@ -20,6 +20,15 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 /** Share of sellable rooms taken tonight, as a whole percentage. */
 export function occupancyPercent({ occupied, sellable }: DailyBrief['occupancy']): number {
   return sellable === 0 ? 0 : Math.round((occupied / sellable) * 100);
+}
+
+/** How many of today's arrivals are in, or departures out: "2 of 8". */
+export function doneOf(rows: BookingSummary[], done: 'checked_in' | 'checked_out'): string {
+  // A guest who arrived and already left today has arrived too.
+  const finished = rows.filter(
+    ({ booking }) => booking.status === done || booking.status === 'checked_out',
+  ).length;
+  return `${finished} of ${rows.length}`;
 }
 
 /** The brief's action items, most urgent first: rooms to get ready, IDs, decisions, repairs. */

@@ -67,11 +67,3 @@ export function houseFloors(rooms: HousekeepingRoom[]): HouseFloor[] {
         }),
     }));
 }
-
-/** Greeting for the time of day, from the minute of the day in the hotel's clock. */
-export function greeting(minute: number): string {
-  const hour = Math.floor(minute / 60);
-  if (hour >= 5 && hour < 12) return 'Good morning';
-  if (hour >= 12 && hour < 18) return 'Good afternoon';
-  return 'Good evening';
-}

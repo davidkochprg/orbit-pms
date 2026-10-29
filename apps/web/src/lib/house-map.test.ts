@@ -1,6 +1,6 @@
 import type { HousekeepingRoom, RoomOccupancy, RoomStatus } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
-import { greeting, houseFloors } from './house-map';
+import { houseFloors } from './house-map';
 
 function room(
   name: string,
@@ -55,14 +55,5 @@ describe('houseFloors', () => {
       'Room 205, turnover, Guest B',
       'Room 206, free',
     ]);
-  });
-});
-
-describe('greeting', () => {
-  it('follows the time of day', () => {
-    expect(greeting(4 * 60 + 59)).toBe('Good evening');
-    expect(greeting(5 * 60)).toBe('Good morning');
-    expect(greeting(12 * 60)).toBe('Good afternoon');
-    expect(greeting(18 * 60)).toBe('Good evening');
   });
 });

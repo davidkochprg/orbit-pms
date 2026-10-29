@@ -67,3 +67,11 @@ export function Count({ value }: { value: number }) {
     </span>
   );
 }
+
+/**
+ * Content that scrolls inside a panel's box (use with `contentClassName="p-0"`). The box keeps
+ * its lit edge, which would scroll away with the content if the box itself scrolled.
+ */
+export function ScrollBox({ children, className }: { children: ReactNode; className?: string }) {
+  return <div className={cn('scrollbar-thin overflow-y-auto p-1', className)}>{children}</div>;
+}

@@ -1,6 +1,6 @@
-import type { Booking, DailyBrief } from '@orbit/shared';
+import type { Booking, BookingSummary, DailyBrief } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
-import { attentionItems, gapItems, occupancyPercent } from './brief';
+import { attentionItems, doneOf, gapItems, occupancyPercent } from './brief';
 
 const hold: Booking = {
   id: 'bk_7',
@@ -95,5 +95,24 @@ describe('gapItems', () => {
         target: { path: '/tape-chart?from=2026-10-28' },
       },
     ]);
+  });
+});
+
+describe('doneOf', () => {
+  const row = (status: Booking['status']): BookingSummary => ({
+    booking: { ...hold, status },
+    guestName: 'Guest A',
+    roomName: '201',
+  });
+
+  it('counts arrivals that are in, including any that already left', () => {
+    expect(doneOf([row('confirmed'), row('checked_in'), row('checked_out')], 'checked_in')).toBe(
+      '2 of 3',
+    );
+  });
+
+  it('counts departures that are out', () => {
+    expect(doneOf([row('checked_in'), row('checked_out')], 'checked_out')).toBe('1 of 2');
+    expect(doneOf([], 'checked_out')).toBe('0 of 0');
   });
 });

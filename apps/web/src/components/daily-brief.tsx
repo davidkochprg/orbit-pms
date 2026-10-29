@@ -12,17 +12,12 @@ import {
   ScanLine,
   Wrench,
 } from 'lucide-react';
-import { useState } from 'react';
 import { Link } from 'react-router';
 import { EmptyState } from '@/components/empty-state';
-import { Panel } from '@/components/panel';
-import { Button } from '@/components/ui/button';
+import { Panel, ScrollBox } from '@/components/panel';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { type AttentionItem, type AttentionKind, attentionItems, gapItems } from '@/lib/brief';
 import { cn } from '@/lib/utils';
-
-/** Gaps beyond this are behind "Show all". */
-const GAPS_SHOWN = 6;
 
 const kindIcons: Record<AttentionKind, { icon: LucideIcon; className: string }> = {
   prepare: { icon: BrushCleaning, className: 'text-warning' },
@@ -34,43 +29,58 @@ const kindIcons: Record<AttentionKind, { icon: LucideIcon; className: string }> 
   gap: { icon: CalendarX2, className: 'text-muted-foreground' },
 };
 
-/** What needs attention today and the empty nights worth selling. */
-export function DailyBriefPanel({ brief }: { brief: DailyBrief }) {
+/** What needs attention today, most urgent first, each linking to where it is handled. */
+export function AttentionPanel({ brief, className }: { brief: DailyBrief; className?: string }) {
   const items = attentionItems(brief);
-  const gaps = gapItems(brief);
-  const [allGaps, setAllGaps] = useState(false);
-
   return (
-    <div className="grid items-start gap-4 lg:grid-cols-[3fr_2fr]">
-      <Panel title="Needs attention" count={items.length}>
+    <Panel
+      title="Needs attention"
+      count={items.length}
+      className={className}
+      contentClassName="p-0"
+    >
+      <ScrollBox className="max-h-80 xl:absolute xl:inset-0 xl:max-h-none">
         {items.length === 0 ? (
           <EmptyState icon={CircleCheck} title="Nothing needs attention" className="py-8" />
         ) : (
           <AttentionList items={items} />
         )}
-      </Panel>
-      <Panel
-        title="Empty nights to sell"
-        count={gaps.length}
-        actions={
-          gaps.length > GAPS_SHOWN && (
-            <Button variant="secondary" size="xs" onClick={() => setAllGaps((v) => !v)}>
-              {allGaps ? 'Show fewer' : 'Show all'}
-            </Button>
-          )
-        }
-      >
+      </ScrollBox>
+    </Panel>
+  );
+}
+
+/** Short empty runs between stays in the next two weeks, worth offering. */
+export function GapsPanel({
+  brief,
+  className,
+  listClassName,
+}: {
+  brief: DailyBrief;
+  className?: string;
+  /** Sizes the scrolling list. */
+  listClassName?: string;
+}) {
+  const gaps = gapItems(brief);
+  return (
+    <Panel
+      title="Empty nights to sell"
+      count={gaps.length}
+      className={className}
+      contentClassName="p-0"
+    >
+      <ScrollBox className={listClassName}>
         {gaps.length === 0 ? (
           <EmptyState
             icon={CalendarCheck}
             title="No short gaps in the next two weeks"
-            className="py-8"
+            className="h-full"
           />
         ) : (
-          <AttentionList items={allGaps ? gaps : gaps.slice(0, GAPS_SHOWN)} />
+          <AttentionList items={gaps} />
         )}
-      </Panel>
-    </div>
+      </ScrollBox>
+    </Panel>
   );
 }
 
