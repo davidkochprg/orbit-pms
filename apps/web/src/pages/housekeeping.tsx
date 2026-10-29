@@ -36,7 +36,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useHealth, useHousekeeping, useSetRoomStatus, useSetTaskStatus } from '@/lib/api';
 import { formatLongDate } from '@/lib/format';
-import { boardColumns } from '@/lib/housekeeping';
+import { boardColumns, needsAction } from '@/lib/housekeeping';
 import { roomStatusColor, roomStatusLabels } from '@/lib/status';
 import { cn } from '@/lib/utils';
 
@@ -131,12 +131,20 @@ export function HousekeepingPage() {
           </div>
         ) : (
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-            <div className="flex h-full snap-x gap-3 lg:grid lg:grid-cols-4">
+            {/* An empty out-of-order column only needs to be a drop target, not a quarter of the page. */}
+            <div
+              className={cn(
+                'flex h-full snap-x gap-3 lg:grid',
+                board.data.rooms.some((r) => r.room.status === 'out_of_order')
+                  ? 'lg:grid-cols-4'
+                  : 'lg:grid-cols-[1fr_1fr_1fr_11rem]',
+              )}
+            >
               {boardColumns.map((status) => (
                 <Column
                   key={status}
                   status={status}
-                  rooms={board.data.rooms.filter((r) => r.room.status === status)}
+                  rooms={sortForAction(board.data.rooms.filter((r) => r.room.status === status))}
                   busyRoomId={setStatus.isPending ? setStatus.variables.roomId : null}
                   onCompleteTask={completeTask}
                   onSetStatus={(roomId, s) => setStatus.mutate({ roomId, status: s })}
@@ -162,6 +170,11 @@ export function HousekeepingPage() {
       />
     </>
   );
+}
+
+/** Rooms someone has to see to today first, routine stayovers after; the board's order within. */
+function sortForAction(rooms: HousekeepingRoom[]): HousekeepingRoom[] {
+  return [...rooms.filter(needsAction), ...rooms.filter((r) => !needsAction(r))];
 }
 
 function Column({
@@ -197,6 +210,11 @@ function Column({
           isOver && 'bg-primary-soft',
         )}
       >
+        {rooms.length === 0 && (
+          <p className="px-3 py-6 text-center text-xs text-subtle-foreground">
+            {status === 'out_of_order' ? 'No rooms out of order' : 'None'}
+          </p>
+        )}
         {rooms.map((item) => (
           <RoomContextMenu
             key={item.room.id}

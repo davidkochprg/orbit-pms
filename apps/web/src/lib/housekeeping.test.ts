@@ -1,6 +1,6 @@
-import type { HousekeepingTask } from '@orbit/shared';
+import type { HousekeepingRoom, HousekeepingTask } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
-import { changeLabel, formatSeconds, nextRoomStep, taskLabel } from './housekeeping';
+import { changeLabel, formatSeconds, needsAction, nextRoomStep, taskLabel } from './housekeeping';
 
 const task = (overrides: Partial<HousekeepingTask>): HousekeepingTask => ({
   id: 'hk_1',
@@ -46,5 +46,30 @@ describe('nextRoomStep', () => {
     expect(nextRoomStep('clean')).toEqual({ status: 'inspected', label: 'Mark inspected' });
     expect(nextRoomStep('out_of_order')).toEqual({ status: 'dirty', label: 'Back in service' });
     expect(nextRoomStep('inspected')).toBeNull();
+  });
+});
+
+describe('needsAction', () => {
+  const room = (over: Partial<HousekeepingRoom> & { status?: 'clean' | 'dirty' }) =>
+    ({
+      room: { id: 'rm_1', name: '101', status: over.status ?? 'clean' },
+      occupancy: 'staying',
+      urgent: false,
+      openTasks: [],
+      ...over,
+    }) as HousekeepingRoom;
+
+  it('leaves a clean room with only its stayover service for later', () => {
+    expect(needsAction(room({ openTasks: [{ type: 'stayover' } as HousekeepingTask] }))).toBe(
+      false,
+    );
+  });
+
+  it('brings forward arrivals, repairs and rooms that are not clean', () => {
+    expect(needsAction(room({ occupancy: 'arriving' }))).toBe(true);
+    expect(needsAction(room({ openTasks: [{ type: 'maintenance' } as HousekeepingTask] }))).toBe(
+      true,
+    );
+    expect(needsAction(room({ status: 'dirty' }))).toBe(true);
   });
 });

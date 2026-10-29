@@ -1,5 +1,6 @@
 import type {
   HousekeepingChange,
+  HousekeepingRoom,
   HousekeepingTask,
   HousekeepingTaskStatus,
   RoomOccupancy,
@@ -22,6 +23,21 @@ export function nextRoomStep(status: RoomStatus): { status: RoomStatus; label: s
     case 'inspected':
       return null;
   }
+}
+
+/**
+ * Whether a room on the board needs someone today: an arrival, a turnover or departure, a
+ * repair, or not being clean. A clean room with only its daily stayover service does not.
+ */
+export function needsAction(r: HousekeepingRoom): boolean {
+  return (
+    r.urgent ||
+    r.room.status !== 'clean' ||
+    r.occupancy === 'arriving' ||
+    r.occupancy === 'turnover' ||
+    r.occupancy === 'departing' ||
+    r.openTasks.some((t) => t.type !== 'stayover')
+  );
 }
 
 /** Board columns, in the order rooms move through them. */
