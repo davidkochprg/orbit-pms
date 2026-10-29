@@ -1,3 +1,4 @@
+import { LogoMark } from '@/components/logo-mark';
 import { cn } from '@/lib/utils';
 
 const sizes = {
@@ -6,7 +7,7 @@ const sizes = {
   lg: 'text-[1.75rem]/none',
 };
 
-/** Orbit's logo: the name in lowercase Geist, set tight. `short` shows only the "o". */
+/** Orbit's logo: the mark, then the name in lowercase Geist, set tight. `short` shows the mark only. */
 export function Wordmark({
   size = 'md',
   short = false,
@@ -19,19 +20,13 @@ export function Wordmark({
   return (
     <span
       className={cn(
-        'inline-block shrink-0 font-semibold tracking-[-0.055em] text-foreground select-none',
+        'inline-flex shrink-0 items-center gap-[0.28em] font-semibold tracking-[-0.055em] text-foreground select-none',
         sizes[size],
         className,
       )}
     >
-      {short ? (
-        <>
-          <span aria-hidden>o</span>
-          <span className="sr-only">Orbit</span>
-        </>
-      ) : (
-        'orbit'
-      )}
+      <LogoMark className="size-[1.2em]" />
+      {short ? <span className="sr-only">Orbit</span> : 'orbit'}
     </span>
   );
 }

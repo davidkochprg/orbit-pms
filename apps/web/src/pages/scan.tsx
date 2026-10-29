@@ -45,7 +45,7 @@ export function ScanPage() {
 
   return (
     <main className="flex min-h-dvh flex-col bg-sidebar px-4 py-6 text-foreground">
-      <header className="flex items-baseline gap-2 text-sm font-medium">
+      <header className="flex items-center gap-2 text-sm font-medium">
         <Wordmark size="sm" />
         <span className="text-muted-foreground">ID scan</span>
       </header>

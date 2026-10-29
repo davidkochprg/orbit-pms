@@ -40,7 +40,7 @@ export function AppSidebar() {
       <SidebarHeader className="gap-4 px-3 pt-4">
         <div className="flex min-h-9 flex-col justify-center gap-1.5 px-1.5 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
           <Wordmark className="group-data-[collapsible=icon]:hidden" />
-          <Wordmark short className="hidden group-data-[collapsible=icon]:inline-block" />
+          <Wordmark short className="hidden group-data-[collapsible=icon]:inline-flex" />
           <span className="truncate text-xs text-muted-foreground group-data-[collapsible=icon]:hidden">
             {hotel.data?.name ?? ' '}
           </span>
