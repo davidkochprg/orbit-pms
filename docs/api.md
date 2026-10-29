@@ -2,7 +2,7 @@
 
 `apps/api` is a Hono server. Routes are thin: they validate input with zod schemas from `packages/shared` and call repositories or domain functions. In development the web app reaches it through the Vite proxy, so the browser only ever talks to its own origin.
 
-All responses are JSON. Dates are `YYYY-MM-DD`, timestamps are ISO 8601 UTC, money is whole units of the hotel's currency (`PricingConfig.currency`).
+All responses are JSON and carry `Cache-Control: private, no-store`. Dates are `YYYY-MM-DD`, timestamps are ISO 8601 UTC, money is whole units of the hotel's currency (`PricingConfig.currency`).
 
 ## Errors
 
@@ -13,11 +13,24 @@ All responses are JSON. Dates are `YYYY-MM-DD`, timestamps are ISO 8601 UTC, mon
 | Status | When                                                                                         |
 | ------ | -------------------------------------------------------------------------------------------- |
 | 400    | Invalid query (`invalid_query`), body (`invalid_json`, `bad_request`), dates or party        |
+| 401    | Demo access code missing (`access_required`) or wrong (`invalid_code`)                       |
 | 403    | The signed-in staff member may not do this (`forbidden`)                                     |
 | 404    | Unknown resource or route (`not_found`)                                                      |
 | 409    | Room taken or email in use (`conflict`), or status change not allowed (`invalid_transition`) |
 | 422    | Party does not fit the room (`over_capacity`)                                                |
 | 500    | Anything else (`internal`), logged server-side                                               |
+
+## Demo access
+
+With `DEMO_ACCESS_CODE` set, every `/api/*` route answers `401 access_required` until the browser has entered the code. The code sets an HttpOnly `orbit_access` cookie for 30 days: an HMAC keyed by the code, so changing the code signs every browser out. Open without the cookie: `/health`, `/api/access` and the phone scan routes `/api/scan/:scanId` and `/api/scan/:scanId/photo`, whose unguessable scan ID is the key. Without `DEMO_ACCESS_CODE` nothing is locked.
+
+### `GET /api/access`
+
+`{ "required": true, "granted": false }`: whether a code is needed, and whether this browser has entered it.
+
+### `POST /api/access`
+
+Body `{ "code": "…" }`. Sets the cookie and returns `{ "required": true, "granted": true }`, or `401 invalid_code`. After 10 wrong codes from one address in 15 minutes it answers `429 rate_limit`.
 
 ## Endpoints
 

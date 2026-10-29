@@ -139,3 +139,11 @@ export type TranslateResult = z.infer<typeof translateResultSchema>;
 export const translateMessageBodySchema = z.object({ to: languageSchema });
 
 export const inquiryListSchema = z.array(inquirySchema);
+
+/** `GET /api/access`: whether the deployment asks for an access code, and whether this browser has it. */
+export const accessStatusSchema = z.object({ required: z.boolean(), granted: z.boolean() });
+export type AccessStatus = z.infer<typeof accessStatusSchema>;
+
+/** `POST /api/access`: the demo access code. */
+export const accessBodySchema = z.object({ code: z.string().trim().min(1).max(200) });
+export type AccessBody = z.infer<typeof accessBodySchema>;

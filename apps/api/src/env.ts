@@ -21,6 +21,8 @@ export const envSchema = z.object({
   AI_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(20),
   /** Hard cap on real Meta spend per UTC month, from recorded usage. */
   AI_MONTHLY_BUDGET_USD: z.coerce.number().positive().default(100),
+  /** When set, the app asks for this code before showing anything. Unset leaves it open. */
+  DEMO_ACCESS_CODE: optional,
 });
 export type Env = z.infer<typeof envSchema>;
 

@@ -71,6 +71,32 @@ describe('GET /health', () => {
   });
 });
 
+describe('demo access', () => {
+  it('keeps API answers out of shared caches', async () => {
+    const res = await app.request('/api/rooms');
+    expect(res.headers.get('cache-control')).toBe('private, no-store');
+  });
+
+  it('asks for the access code when one is set', async () => {
+    const locked = createApp({
+      repos: createRepositories(handle.db),
+      ai: null,
+      usage: createUsageStore(handle.db),
+      accessCode: 'quiet-harbor-lantern',
+      clock: () => now,
+    });
+    expect((await locked.request('/api/rooms')).status).toBe(401);
+    expect((await locked.request('/health')).status).toBe(200);
+    const res = await locked.request('/api/access', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ code: 'quiet-harbor-lantern' }),
+    });
+    const cookie = res.headers.get('set-cookie')!.split(';')[0]!;
+    expect((await locked.request('/api/rooms', { headers: { cookie } })).status).toBe(200);
+  });
+});
+
 describe('rooms and guests', () => {
   it('lists rooms and room types', async () => {
     expect((await get<Room[]>('/api/rooms')).body).toHaveLength(50);

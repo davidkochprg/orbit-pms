@@ -31,6 +31,7 @@ import {
 import type { Health } from '@orbit/shared';
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
+import { createDemoAccess } from './access';
 import { createAiGate } from './ai-gate';
 import { errorBody, handleError } from './http';
 import { type AiLimitsConfig, createAiLimiter } from './limits';
@@ -56,6 +57,8 @@ export interface AppDeps {
   limits?: AiLimitsConfig;
   usage: UsageStore & { monthToDateByFeature?: UsageReport };
   monthlyBudgetUsd?: number;
+  /** When set, the API answers only browsers that entered this code. */
+  accessCode?: string;
   clock?: () => Date;
   newId?: (prefix: string) => string;
   log?: boolean;
@@ -71,6 +74,7 @@ export function createApp({
   limits = { perIpPerHour: 20, dailyTokenBudget: 2_000_000 },
   usage,
   monthlyBudgetUsd = 100,
+  accessCode,
   clock = () => new Date(),
   newId = defaultNewId,
   log = false,
@@ -141,8 +145,15 @@ export function createApp({
       listRooms: () => repos.rooms.listRooms(),
       usage,
     });
+  const access = createDemoAccess({ code: accessCode, clock });
   const app = new Hono();
   if (log) app.use(logger());
+  app.use('/api/*', access.guard);
+  // Private data behind an access code: never let a shared cache keep a copy.
+  app.use('/api/*', async (c, next) => {
+    await next();
+    if (!c.res.headers.has('cache-control')) c.header('cache-control', 'private, no-store');
+  });
 
   app.get('/health', (c) =>
     c.json<Health>({
@@ -151,6 +162,7 @@ export function createApp({
       hotel: { timezone: getHotelTimeZone() },
     }),
   );
+  app.route('/api', access.routes);
   app.route('/api', roomRoutes(repos));
   app.route('/api', bookingRoutes(repos, hotel));
   app.route('/api', billingRoutes(billing));
