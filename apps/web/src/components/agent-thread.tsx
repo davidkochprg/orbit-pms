@@ -87,10 +87,13 @@ export function AgentThread({
   messages,
   status,
   lastTurnMinHeight = 0,
+  targetActionId = null,
 }: {
   messages: UIMessage[];
   status: 'submitted' | 'streaming' | 'ready' | 'error';
   lastTurnMinHeight?: number;
+  /** The proposed change the keyboard shortcuts confirm or reject. */
+  targetActionId?: string | null;
 }) {
   const entities = useMemo(
     () =>
@@ -125,6 +128,7 @@ export function AgentThread({
                   key={m.id}
                   message={m}
                   working={m === last && (status === 'streaming' || status === 'submitted')}
+                  targetActionId={targetActionId}
                 />
               ))}
               {isLast && waiting && (
@@ -156,7 +160,15 @@ function toTurns(messages: UIMessage[]): Turn[] {
   return turns;
 }
 
-function AssistantMessage({ message, working }: { message: UIMessage; working: boolean }) {
+function AssistantMessage({
+  message,
+  working,
+  targetActionId,
+}: {
+  message: UIMessage;
+  working: boolean;
+  targetActionId: string | null;
+}) {
   const tools = message.parts.filter(isToolUIPart) as ToolPart[];
   // Text before the last tool step is the agent narrating its progress; only the rest is the answer.
   const lastTool = message.parts.findLastIndex((p) => isToolUIPart(p));
@@ -213,7 +225,12 @@ function AssistantMessage({ message, working }: { message: UIMessage; working: b
         )}
       />
       {proposals.map((p) => (
-        <PendingActionCard key={p.pendingActionId} id={p.pendingActionId} summary={p.summary} />
+        <PendingActionCard
+          key={p.pendingActionId}
+          id={p.pendingActionId}
+          summary={p.summary}
+          targeted={p.pendingActionId === targetActionId}
+        />
       ))}
       {proposals.length > 1 && <ConfirmAllButton ids={proposals.map((p) => p.pendingActionId)} />}
     </div>

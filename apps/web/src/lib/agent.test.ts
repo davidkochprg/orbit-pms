@@ -3,6 +3,7 @@ import {
   agentErrorMessage,
   asProposal,
   asToolError,
+  proposalIds,
   orbStateFor,
   toolLabel,
   toolResultSummary,
@@ -64,5 +65,36 @@ describe('agent helpers', () => {
     expect(orbStateFor('quote')).toBe('solving');
     expect(orbStateFor('removeCharge')).toBe('weaving');
     expect(orbStateFor('setRoomStatus')).toBe('weaving');
+  });
+});
+
+describe('proposalIds', () => {
+  it('lists the changes the agent proposed, oldest first, skipping other tool results', () => {
+    const proposal = (id: string) => ({
+      type: 'tool-addCharge' as const,
+      toolCallId: `call_${id}`,
+      state: 'output-available' as const,
+      input: {},
+      output: { pendingActionId: id, summary: 'Add', status: 'awaiting_confirmation' },
+    });
+    const messages = [
+      { id: 'u1', role: 'user' as const, parts: [{ type: 'text' as const, text: 'Add two' }] },
+      {
+        id: 'a1',
+        role: 'assistant' as const,
+        parts: [
+          {
+            type: 'tool-getBill' as const,
+            toolCallId: 'call_bill',
+            state: 'output-available' as const,
+            input: {},
+            output: { balance: 0 },
+          },
+          proposal('act_1'),
+          proposal('act_2'),
+        ],
+      },
+    ];
+    expect(proposalIds(messages)).toEqual(['act_1', 'act_2']);
   });
 });

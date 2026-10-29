@@ -1,3 +1,4 @@
+import { isToolUIPart, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { formatMoney } from '@/lib/format';
 
@@ -12,6 +13,16 @@ export type Proposal = z.infer<typeof proposalSchema>;
 export function asProposal(output: unknown): Proposal | null {
   const parsed = proposalSchema.safeParse(output);
   return parsed.success ? parsed.data : null;
+}
+
+/** The changes the agent proposed in a conversation, oldest first. */
+export function proposalIds(messages: UIMessage[]): string[] {
+  return messages.flatMap((m) =>
+    m.parts.filter(isToolUIPart).flatMap((p) => {
+      const proposal = asProposal(p.state === 'output-available' ? p.output : undefined);
+      return proposal ? [proposal.pendingActionId] : [];
+    }),
+  );
 }
 
 const toolErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });

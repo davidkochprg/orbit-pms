@@ -424,6 +424,16 @@ export function useResolvePendingAction(id: string) {
   });
 }
 
+/** Confirms or rejects whichever proposed change it is given, e.g. from a keyboard shortcut. */
+export function useResolveAnyPendingAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, decision }: { id: string; decision: 'confirm' | 'reject' }) =>
+      resolvePendingAction(id, decision),
+    onSettled: () => queryClient.invalidateQueries(),
+  });
+}
+
 /** Confirms several proposed changes one after another, in the order the agent proposed them. */
 export function useConfirmPendingActions() {
   const queryClient = useQueryClient();

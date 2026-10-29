@@ -4,6 +4,7 @@ import { ArrowRight, Check, CircleAlert, X } from 'lucide-react';
 import { Link } from 'react-router';
 import { BookingRow } from '@/components/agent-mention';
 import { Button } from '@/components/ui/button';
+import { Kbd } from '@/components/ui/kbd';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import {
@@ -45,7 +46,16 @@ const titles: Record<PendingAction['kind'], string> = {
  * to what, and the money it moves, as the domain worked them out. Nothing happens until the user
  * confirms.
  */
-export function PendingActionCard({ id, summary }: { id: string; summary: string }) {
+export function PendingActionCard({
+  id,
+  summary,
+  targeted = false,
+}: {
+  id: string;
+  summary: string;
+  /** The change ⌘↵ confirms and ⌘⌫ rejects: outlined, with the shortcuts on its buttons. */
+  targeted?: boolean;
+}) {
   const action = usePendingAction(id);
   const resolve = useResolvePendingAction(id);
   const { open } = useBookingDrawer();
@@ -60,7 +70,12 @@ export function PendingActionCard({ id, summary }: { id: string; summary: string
       : null;
 
   return (
-    <div className="relative flex flex-col gap-3 rounded-control fill-panel p-3.5 shadow-[0_1px_2px_var(--shadow-soft),0_10px_30px_-18px_var(--shadow-deep)] stroke-lit">
+    <div
+      className={cn(
+        'relative flex flex-col gap-3 rounded-control fill-panel p-3.5 shadow-[0_1px_2px_var(--shadow-soft),0_10px_30px_-18px_var(--shadow-deep)] stroke-lit',
+        targeted && current?.status === 'pending' && 'ring-2 ring-ring/40',
+      )}
+    >
       {details && current ? (
         <>
           <p className="text-xs font-medium text-muted-foreground">{titles[current.kind]}</p>
@@ -83,6 +98,7 @@ export function PendingActionCard({ id, summary }: { id: string; summary: string
               onClick={() => resolve.mutate('confirm')}
             >
               Confirm
+              {targeted && <Kbd className="ml-1 bg-white/15 text-inherit">⌘↵</Kbd>}
             </Button>
             <Button
               size="sm"
@@ -91,6 +107,7 @@ export function PendingActionCard({ id, summary }: { id: string; summary: string
               onClick={() => resolve.mutate('reject')}
             >
               Reject
+              {targeted && <Kbd className="ml-1">⌘⌫</Kbd>}
             </Button>
           </>
         )}

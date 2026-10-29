@@ -41,8 +41,14 @@ import {
   type PaletteMode,
 } from '@/hooks/use-command-palette';
 import { useDarkMode } from '@/hooks/use-dark-mode';
-import { agentErrorMessage, suggestedQuestions } from '@/lib/agent';
-import { useDayOverview, useGuests, useHealth } from '@/lib/api';
+import { agentErrorMessage, proposalIds, suggestedQuestions } from '@/lib/agent';
+import {
+  useDayOverview,
+  useGuests,
+  useHealth,
+  usePendingActions,
+  useResolveAnyPendingAction,
+} from '@/lib/api';
 import { navItems } from '@/lib/nav';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -357,6 +363,27 @@ function AgentView({
   const scroller = useRef<HTMLDivElement>(null);
   const [viewHeight, setViewHeight] = useState(0);
   const lastQuestion = chat.messages.findLast((m) => m.role === 'user')?.id;
+  const proposals = useMemo(() => proposalIds(chat.messages), [chat.messages]);
+  const statuses = usePendingActions(proposals);
+  // The shortcuts act on the newest change still waiting, the one just proposed.
+  const target = proposals.findLast((_, i) => statuses[i]?.data?.status === 'pending') ?? null;
+  const resolve = useResolveAnyPendingAction();
+
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (!target || resolve.isPending || !(e.metaKey || e.ctrlKey)) return;
+      const typing = e.target instanceof HTMLInputElement && e.target.value !== '';
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        resolve.mutate({ id: target, decision: 'confirm' });
+      } else if (e.key === 'Backspace' && !typing) {
+        e.preventDefault();
+        resolve.mutate({ id: target, decision: 'reject' });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [target, resolve]);
 
   useEffect(() => {
     const el = scroller.current;
@@ -375,7 +402,7 @@ function AgentView({
   }, [lastQuestion]);
 
   function onKeyDown(e: KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+    if (e.key === 'Enter' && !e.metaKey && !e.ctrlKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       onAsk(text);
     }
@@ -426,10 +453,14 @@ function AgentView({
           messages={chat.messages}
           status={chat.status}
           lastTurnMinHeight={Math.max(0, viewHeight - TURN_GAP * 2)}
+          targetActionId={target}
         />
         {chat.error && <ErrorNotice message={agentErrorMessage(chat.error)} className="mt-3" />}
       </div>
 
+      {resolve.isError && (
+        <p className="border-t px-5 py-2 text-xs text-destructive">{resolve.error.message}</p>
+      )}
       <InputRow icon={<Sparkles className="size-[18px] text-primary-text" />} placement="bottom">
         <input
           autoFocus
@@ -451,6 +482,11 @@ function AgentView({
           >
             Stop
           </button>
+        )}
+        {target && (
+          <span className="flex items-center gap-1.5">
+            <Kbd>⌘↵</Kbd> Confirm
+          </span>
         )}
         <span className="flex items-center gap-1.5">
           <Kbd>
