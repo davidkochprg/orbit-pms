@@ -62,12 +62,35 @@ export const documentTypeLabels: Record<DocumentType, string> = {
   passport: 'Passport',
 };
 
-/** "3 of 4 in the guest book", "All 2 in the guest book" or "3 listed for a party of 2". */
+/**
+ * How many people nobody has added yet the guest book still needs: all of them where the region
+ * records everyone, none where only the guest who booked shows an ID. The domain counts them in
+ * `missing` only in the first case.
+ */
+export function unaddedStillNeeded(
+  book: Pick<GuestBook, 'guests' | 'partySize' | 'missing'>,
+): number {
+  const incomplete = book.guests.filter((g) => g.missing.length > 0).length;
+  return Math.min(
+    Math.max(0, book.missing - incomplete),
+    Math.max(0, book.partySize - book.guests.length),
+  );
+}
+
+/**
+ * "3 of 4 in the guest book", "All 2 in the guest book" or "3 listed for a party of 2". Where only
+ * the guest who booked shows an ID and not everyone is listed, a count of the party would be
+ * wrong, so it says what is left to record: "Guest book complete" or "1 person still to record".
+ */
 export function guestBookProgress(
-  book: Pick<GuestBook, 'partySize' | 'missing' | 'extra'>,
+  book: Pick<GuestBook, 'guests' | 'partySize' | 'missing' | 'extra'>,
 ): string {
   if (book.extra > 0)
     return `${book.partySize + book.extra} listed for a party of ${book.partySize}`;
+  if (book.guests.length < book.partySize && unaddedStillNeeded(book) === 0) {
+    if (book.missing === 0) return 'Guest book complete';
+    return `${book.missing} ${book.missing === 1 ? 'person' : 'people'} still to record`;
+  }
   const done = book.partySize - book.missing;
   return book.missing === 0
     ? `All ${book.partySize} in the guest book`

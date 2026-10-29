@@ -5,7 +5,9 @@ import {
   guestBookProgress,
   missingSummary,
   needsAddress,
+  unaddedStillNeeded,
 } from './registration';
+import type { StayGuestView } from '@orbit/shared';
 
 describe('needsAddress', () => {
   it('asks guests from abroad for an address', () => {
@@ -56,18 +58,55 @@ describe('countryName', () => {
 });
 
 describe('guestBookProgress', () => {
-  it('counts the people with a complete entry', () => {
-    expect(guestBookProgress({ partySize: 4, missing: 1, extra: 0 })).toBe(
+  const people = (n: number, incomplete = 0) =>
+    Array.from(
+      { length: n },
+      (_, i) => ({ missing: i < incomplete ? ['nationality'] : [] }) as StayGuestView,
+    );
+
+  it('counts the people with a complete entry where everyone is recorded', () => {
+    expect(guestBookProgress({ guests: people(4, 1), partySize: 4, missing: 1, extra: 0 })).toBe(
       '3 of 4 in the guest book',
     );
-    expect(guestBookProgress({ partySize: 2, missing: 0, extra: 0 })).toBe(
+    // Nobody added yet counts as missing too.
+    expect(guestBookProgress({ guests: people(1), partySize: 4, missing: 3, extra: 0 })).toBe(
+      '1 of 4 in the guest book',
+    );
+    expect(guestBookProgress({ guests: people(2), partySize: 2, missing: 0, extra: 0 })).toBe(
       'All 2 in the guest book',
     );
   });
 
+  it('says what is left where only the guest who booked shows an ID', () => {
+    expect(guestBookProgress({ guests: people(1, 1), partySize: 4, missing: 1, extra: 0 })).toBe(
+      '1 person still to record',
+    );
+    expect(guestBookProgress({ guests: people(1), partySize: 4, missing: 0, extra: 0 })).toBe(
+      'Guest book complete',
+    );
+  });
+
   it('says when more people are listed than the party', () => {
-    expect(guestBookProgress({ partySize: 2, missing: 0, extra: 1 })).toBe(
+    expect(guestBookProgress({ guests: people(3), partySize: 2, missing: 0, extra: 1 })).toBe(
       '3 listed for a party of 2',
     );
+  });
+});
+
+describe('unaddedStillNeeded', () => {
+  const person = (missing: StayGuestView['missing']) => ({ missing }) as StayGuestView;
+
+  it('counts people not added yet where the region records everyone', () => {
+    // A party of 4, one person listed without an ID: the other three are missing too.
+    expect(
+      unaddedStillNeeded({ guests: [person(['documentNumber'])], partySize: 4, missing: 4 }),
+    ).toBe(3);
+  });
+
+  it('needs nobody else where only the guest who booked shows an ID', () => {
+    expect(
+      unaddedStillNeeded({ guests: [person(['documentNumber'])], partySize: 4, missing: 1 }),
+    ).toBe(0);
+    expect(unaddedStillNeeded({ guests: [person([])], partySize: 4, missing: 0 })).toBe(0);
   });
 });

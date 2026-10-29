@@ -8,7 +8,7 @@ import { IdScanDialog } from '@/components/id-scan-dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGuestBook } from '@/lib/api';
-import { missingSummary } from '@/lib/registration';
+import { missingSummary, unaddedStillNeeded } from '@/lib/registration';
 
 /**
  * A booking's guest book as it is now, one row per person, with a scan button for everyone still
@@ -23,9 +23,7 @@ export function GuestBookCard({ bookingId }: { bookingId: string }) {
     return book.isError ? null : <Skeleton className="h-24 rounded-stage" />;
   }
   const { guests, partySize, missing } = book.data;
-  // People nobody has added yet count as missing only where the region records everyone.
-  const incomplete = guests.filter((g) => g.missing.length > 0).length;
-  const notAdded = missing > incomplete ? Math.max(0, partySize - guests.length) : 0;
+  const notAdded = unaddedStillNeeded(book.data);
   return (
     <AgentCard>
       <AgentCardHeader

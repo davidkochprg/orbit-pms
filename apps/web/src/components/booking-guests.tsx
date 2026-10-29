@@ -22,6 +22,7 @@ import {
   countryOptions,
   documentTypeLabels,
   missingSummary,
+  unaddedStillNeeded,
 } from '@/lib/registration';
 import { INLINE_EDITOR } from '@/lib/inline-edit';
 import { cn } from '@/lib/utils';
@@ -53,6 +54,8 @@ export function BookingGuests({
   if (!book.data) return <Skeleton className="h-48" />;
   const { guests, partySize, extra } = book.data;
   const open = Math.max(0, partySize - guests.length);
+  // Where only the guest who booked shows an ID, companions can be added but aren't missing.
+  const openRequired = unaddedStillNeeded(book.data) > 0;
 
   return (
     <div className="flex flex-col gap-2">
@@ -76,16 +79,34 @@ export function BookingGuests({
           onScan={() => setScanning(g)}
         />
       ))}
-      {Array.from({ length: open }, (_, i) => (
-        <OpenSlot
-          key={`open-${i}`}
-          bookingId={bookingId}
-          position={guests.length + i + 1}
-          partySize={partySize}
-          editable={editable}
-          onScan={() => setScanning(null)}
-        />
-      ))}
+      {openRequired
+        ? Array.from({ length: open }, (_, i) => (
+            <OpenSlot
+              key={`open-${i}`}
+              bookingId={bookingId}
+              position={guests.length + i + 1}
+              label={`Guest ${guests.length + i + 1} of ${partySize}`}
+              required
+              editable={editable}
+              onScan={() => setScanning(null)}
+            />
+          ))
+        : // Companions the guest book doesn't need share one row: they can still be added.
+          open > 0 && (
+            <OpenSlot
+              bookingId={bookingId}
+              position={guests.length + 1}
+              label={
+                open === 1
+                  ? `Guest ${partySize} of ${partySize}`
+                  : `Guests ${guests.length + 1}–${partySize} of ${partySize}`
+              }
+              marker={open === 1 ? undefined : `+${open}`}
+              required={false}
+              editable={editable}
+              onScan={() => setScanning(null)}
+            />
+          )}
       <IdScanDialog
         bookingId={bookingId}
         stayGuest={scanning ?? null}
@@ -293,13 +314,21 @@ function Field({
 function OpenSlot({
   bookingId,
   position,
-  partySize,
+  label,
+  marker,
+  required,
   editable,
   onScan,
 }: {
   bookingId: string;
+  /** The place the next person added takes in the party. */
   position: number;
-  partySize: number;
+  /** "Guest 2 of 4", or "Guests 2–4 of 4" for companions sharing one row. */
+  label: string;
+  /** What the circle shows, the position by default, e.g. "+3" for a shared row. */
+  marker?: string;
+  /** Whether the guest book needs this person, or they may be added if staff like. */
+  required: boolean;
   editable: boolean;
   onScan: () => void;
 }) {
@@ -324,7 +353,7 @@ function OpenSlot({
     <div className="flex flex-col gap-2 rounded-stage border border-dashed border-border-strong p-3">
       <div className="flex flex-wrap items-center gap-3">
         <span className="grid size-9 shrink-0 place-items-center rounded-full border border-dashed border-border-strong text-xs text-muted-foreground">
-          {position}
+          {marker ?? position}
         </span>
         {naming ? (
           <form
@@ -347,11 +376,14 @@ function OpenSlot({
           </form>
         ) : (
           <>
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-muted-foreground">
-                Guest {position} of {partySize}
-              </span>
-              <span className="text-xs text-warning">Not added yet</span>
+            {/* At least wide enough for its words: narrower, the buttons go to the next line. */}
+            <div className="flex min-w-36 flex-1 flex-col whitespace-nowrap">
+              <span className="text-muted-foreground">{label}</span>
+              {required ? (
+                <span className="text-xs text-warning">Not added yet</span>
+              ) : (
+                <span className="text-xs text-subtle-foreground">Optional</span>
+              )}
             </div>
             {editable && (
               <div className="flex shrink-0 items-center gap-1">
