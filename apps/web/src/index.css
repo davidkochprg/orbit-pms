@@ -565,11 +565,15 @@
    * Lit hairlines: a 1px gradient ring drawn on ::after and masked to the border box, so it
    * follows the radius and needs no border. Brightest at the top center, like light from above.
    */
+  /* Positioned so the ring hugs this element, not the nearest positioned ancestor (it once
+     outlined the whole main panel). Zero specificity: fixed, absolute or sticky still win. */
+  :where(.stroke-lit, .stroke-bevel) {
+    position: relative;
+  }
   .stroke-lit,
   .stroke-bevel {
-    /* The element must be positioned (relative, fixed, …); this doesn't set it, so it never
-       overrides a dialog's fixed position. The ring sits above the element's own content (a
-       sticky table header would hide it otherwise), inside its own stacking context. */
+    /* The ring sits above the element's own content (a sticky table header would hide it
+       otherwise), inside its own stacking context. */
     isolation: isolate;
     &::after {
       content: '';
