@@ -15,6 +15,8 @@ function room(
     occupancy,
     guestName,
     urgent: false,
+    effort: null,
+    cues: [],
     openTasks: [],
   };
 }

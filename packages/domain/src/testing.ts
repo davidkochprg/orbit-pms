@@ -12,6 +12,7 @@ import type {
   PricingConfig,
   Room,
   RoomType,
+  SavedStayReading,
   StaffMember,
   StayGuest,
 } from '@orbit/shared';
@@ -72,6 +73,7 @@ export interface MemoryState {
   payments: Payment[];
   stayGuests: StayGuest[];
   idScans: IdScan[];
+  stayReadings: SavedStayReading[];
 }
 
 function inBilling<T extends { bookingId: string }>(
@@ -110,6 +112,7 @@ export function createMemoryRepositories(
     payments: [],
     stayGuests: [],
     idScans: [],
+    stayReadings: [],
     ...clone(initial),
   };
 
@@ -356,6 +359,16 @@ export function createMemoryRepositories(
       },
       deleteExpired: (at) => {
         state.idScans = state.idScans.filter((s) => s.expiresAt > at);
+        return Promise.resolve();
+      },
+    },
+    stayReadings: {
+      list: (ids) => Promise.resolve(state.stayReadings.filter((r) => ids.includes(r.bookingId))),
+      save: (reading) => {
+        state.stayReadings = [
+          ...state.stayReadings.filter((r) => r.bookingId !== reading.bookingId),
+          reading,
+        ];
         return Promise.resolve();
       },
     },

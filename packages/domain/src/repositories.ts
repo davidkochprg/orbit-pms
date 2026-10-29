@@ -18,6 +18,7 @@ import type {
   Room,
   RoomStatus,
   RoomType,
+  SavedStayReading,
   StaffMember,
   StayGuest,
 } from '@orbit/shared';
@@ -174,6 +175,13 @@ export interface IdScanRepository {
   deleteExpired(now: string): Promise<void>;
 }
 
+/** What the model read from stays' notes for housekeeping, one per booking. */
+export interface StayReadingRepository {
+  list(bookingIds: string[]): Promise<SavedStayReading[]>;
+  /** Creates or replaces the booking's reading. */
+  save(reading: SavedStayReading): Promise<void>;
+}
+
 export interface Repositories {
   rooms: RoomRepository;
   bookings: BookingRepository;
@@ -187,6 +195,7 @@ export interface Repositories {
   billing: BillingRepository;
   stayGuests: StayGuestRepository;
   idScans: IdScanRepository;
+  stayReadings: StayReadingRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

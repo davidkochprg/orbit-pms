@@ -26,6 +26,7 @@ import {
   type Quote,
   type Translation,
   type QuoteAddons,
+  type StayReading,
   vatBrackets,
 } from '@orbit/shared';
 import type { AiFeature } from '@orbit/ai';
@@ -311,6 +312,20 @@ export const idScans = pgTable(
   },
   (t) => [index('id_scans_expires_idx').on(t.expiresAt)],
 );
+
+/** What the model read from a stay's notes and messages for housekeeping, one row per booking. */
+export const stayReadings = pgTable('stay_readings', {
+  bookingId: text('booking_id')
+    .primaryKey()
+    .references(() => bookings.id, { onDelete: 'cascade' }),
+  pets: boolean('pets').notNull(),
+  mess: text('mess').$type<StayReading['mess']>().notNull(),
+  messReason: text('mess_reason'),
+  prepare: jsonb('prepare').$type<string[]>().notNull().default([]),
+  /** The text that was read; a different text means it needs reading again. */
+  source: text('source').notNull(),
+  readAt: timestamp('read_at', { withTimezone: true }).notNull(),
+});
 
 /** Rates from Settings: seasons, discounts and add-on prices. One row, `id = 'hotel'`. */
 export const pricing = pgTable('pricing', {

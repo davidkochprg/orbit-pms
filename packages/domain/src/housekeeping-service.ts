@@ -10,10 +10,13 @@ import type {
   IsoDate,
   Room,
   RoomStatus,
+  StayReading,
 } from '@orbit/shared';
+import { normalizeStayReading, staySource } from './cleaning-effort';
 import { addDays, hotelToday } from './dates';
 import { DomainError } from './errors';
 import {
+  boardStays,
   buildHousekeepingBoard,
   canChangeRoomStatus,
   completedByStatus,
@@ -26,6 +29,12 @@ export interface HousekeepingDeps {
   repos: Repositories;
   clock: () => Date;
   newId: (prefix: string) => string;
+}
+
+/** A stay's text for the model to read for housekeeping. */
+export interface StayToRead {
+  bookingId: string;
+  source: string;
 }
 
 export interface NewTask {
@@ -90,20 +99,67 @@ export function createHousekeepingService({ repos, clock, newId }: HousekeepingD
     return task;
   }
 
+  /** The board's data for `date`, with each stay's text and whether the model has read it. */
+  async function loadDay(date: IsoDate) {
+    const [rooms, roomTypes, bookings, guests, tasks, inquiries] = await Promise.all([
+      repos.rooms.listRooms(),
+      repos.rooms.listRoomTypes(),
+      // From the day before, so stays that leave on `date` are included.
+      repos.bookings.listBookings({ from: addDays(date, -1), to: addDays(date, 1) }),
+      repos.guests.listGuests(),
+      repos.housekeeping.listTasks({ status: ['open', 'in_progress'] }),
+      repos.inquiries.listInquiries(),
+    ]);
+    const stays = boardStays(rooms, bookings, date);
+    const readings = await repos.stayReadings.list(stays.map((b) => b.id));
+    const unread: StayToRead[] = stays
+      .map((b) => ({
+        bookingId: b.id,
+        source: staySource(
+          b,
+          guests.find((g) => g.id === b.guestId),
+          inquiries,
+        ),
+      }))
+      .filter(
+        ({ bookingId, source }) =>
+          source !== '' && readings.find((r) => r.bookingId === bookingId)?.source !== source,
+      );
+    return { rooms, roomTypes, bookings, guests, tasks, readings, unread };
+  }
+
   return {
     async board(date: IsoDate = hotelToday(clock())): Promise<HousekeepingBoard> {
-      const [rooms, roomTypes, bookings, guests, tasks] = await Promise.all([
-        repos.rooms.listRooms(),
-        repos.rooms.listRoomTypes(),
-        // From the day before, so stays that leave on `date` are included.
-        repos.bookings.listBookings({ from: addDays(date, -1), to: addDays(date, 1) }),
-        repos.guests.listGuests(),
-        repos.housekeeping.listTasks({ status: ['open', 'in_progress'] }),
-      ]);
+      const { unread, ...day } = await loadDay(date);
       return {
         date,
-        rooms: buildHousekeepingBoard({ rooms, roomTypes, bookings, guests, tasks, date }),
+        // A reading of an older text still counts until the new one is read.
+        rooms: buildHousekeepingBoard({ ...day, date }),
+        unreadStays: unread.length,
       };
+    },
+
+    /** Stays on the board whose notes or messages changed since the model last read them. */
+    async staysToRead(date: IsoDate = hotelToday(clock())): Promise<StayToRead[]> {
+      return (await loadDay(date)).unread;
+    },
+
+    /**
+     * Keeps what the model read from each stay's text. A stay the model skipped is saved as
+     * nothing unusual, so the same text is not sent again.
+     */
+    async saveStayReadings(stays: StayToRead[], readings: StayReading[]): Promise<void> {
+      const readAt = clock().toISOString();
+      for (const { bookingId, source } of stays) {
+        const read = readings.find((r) => r.bookingId === bookingId) ?? {
+          bookingId,
+          pets: false,
+          mess: 'usual' as const,
+          messReason: null,
+          prepare: [],
+        };
+        await repos.stayReadings.save({ ...normalizeStayReading(read), source, readAt });
+      }
     },
 
     setRoomStatus(roomId: string, status: RoomStatus, actor: AuditActor): Promise<Room> {

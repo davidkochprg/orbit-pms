@@ -16,6 +16,7 @@ import {
   roomTypes,
   staff,
   stayGuests,
+  stayReadings,
 } from '../schema';
 import type { SeedData } from './build';
 
@@ -24,6 +25,7 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.delete(pendingActions);
     await tx.delete(idScans);
+    await tx.delete(stayReadings);
     await tx.delete(stayGuests);
     await tx.delete(charges);
     await tx.delete(payments);

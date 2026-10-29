@@ -519,3 +519,23 @@ describe('guest writes (PGlite)', () => {
     await repos.guests.updateGuest(original);
   });
 });
+
+describe('stay readings (PGlite)', () => {
+  it('saves, replaces and lists readings by booking', async () => {
+    const bookingId = seed.bookings[0]!.id;
+    const reading = {
+      bookingId,
+      pets: true,
+      mess: 'more' as const,
+      messReason: 'Muddy boots',
+      prepare: ['Cot'],
+      source: 'Booking notes: Hiking trip with our dog.',
+      readAt: '2026-05-10T08:00:00.000Z',
+    };
+    await repos.stayReadings.save(reading);
+    expect(await repos.stayReadings.list([bookingId, 'nope'])).toEqual([reading]);
+    await repos.stayReadings.save({ ...reading, mess: 'usual', messReason: null, prepare: [] });
+    expect(await repos.stayReadings.list([bookingId])).toMatchObject([{ mess: 'usual' }]);
+    expect(await repos.stayReadings.list([])).toEqual([]);
+  });
+});

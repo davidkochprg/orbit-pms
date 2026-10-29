@@ -106,4 +106,52 @@ describe('housekeeping service', () => {
     expect(repos.state.tasks.filter((t) => t.type === 'maintenance')).toHaveLength(1);
     expect(repos.state.audit.every((a) => a.actor === 'agent')).toBe(true);
   });
+
+  it('lists the stays whose text the model has not read, and keeps what it read', async () => {
+    const { repos, service } = setup();
+    repos.state.bookings[0]!.notes = 'Bringing our dog Rex.';
+    expect((await service.board()).unreadStays).toBe(1);
+    const stays = await service.staysToRead();
+    expect(stays).toEqual([
+      { bookingId: repos.state.bookings[0]!.id, source: 'Booking notes: Bringing our dog Rex.' },
+    ]);
+
+    await service.saveStayReadings(stays, [
+      {
+        bookingId: stays[0]!.bookingId,
+        pets: true,
+        mess: 'usual',
+        messReason: 'none',
+        prepare: ['dog bowl'],
+      },
+    ]);
+    expect(repos.state.stayReadings).toEqual([
+      {
+        bookingId: stays[0]!.bookingId,
+        pets: true,
+        mess: 'usual',
+        messReason: null,
+        prepare: ['Dog bowl'],
+        source: stays[0]!.source,
+        readAt: now.toISOString(),
+      },
+    ]);
+    const board = await service.board();
+    expect(board.unreadStays).toBe(0);
+    expect(board.rooms[0]!.cues).toEqual(['Dog bowl']);
+
+    // A changed note is read again; until then the old reading still counts.
+    repos.state.bookings[0]!.notes = 'Bringing our dog Rex and a cat.';
+    const changed = await service.board();
+    expect(changed.unreadStays).toBe(1);
+    expect(changed.rooms[0]!.cues).toEqual(['Dog bowl']);
+  });
+
+  it('saves a stay the model skipped as nothing unusual, so it is not read again', async () => {
+    const { repos, service } = setup();
+    repos.state.bookings[0]!.notes = 'Quiet room please.';
+    await service.saveStayReadings(await service.staysToRead(), []);
+    expect(repos.state.stayReadings[0]).toMatchObject({ pets: false, mess: 'usual', prepare: [] });
+    expect(await service.staysToRead()).toEqual([]);
+  });
 });

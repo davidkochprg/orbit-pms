@@ -11,6 +11,7 @@ import type {
   PendingActionRepository,
   IdScanRepository,
   StayGuestRepository,
+  StayReadingRepository,
   Repositories,
   RoomRepository,
   SettingsRepository,
@@ -61,6 +62,7 @@ import {
   pricing,
   idScans,
   stayGuests,
+  stayReadings,
   rooms,
   roomTypes,
   staff,
@@ -552,6 +554,26 @@ function idScanRepository(db: Db): IdScanRepository {
   };
 }
 
+function stayReadingRepository(db: Db): StayReadingRepository {
+  return {
+    async list(bookingIds) {
+      if (bookingIds.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(stayReadings)
+        .where(inArray(stayReadings.bookingId, bookingIds));
+      return rows.map(({ readAt, ...row }) => ({ ...row, readAt: readAt.toISOString() }));
+    },
+    async save(reading) {
+      const row = { ...reading, readAt: new Date(reading.readAt) };
+      await db
+        .insert(stayReadings)
+        .values(row)
+        .onConflictDoUpdate({ target: stayReadings.bookingId, set: row });
+    },
+  };
+}
+
 export function createRepositories(db: Db): Repositories {
   return {
     rooms: roomRepository(db),
@@ -566,6 +588,7 @@ export function createRepositories(db: Db): Repositories {
     billing: billingRepository(db),
     stayGuests: stayGuestRepository(db),
     idScans: idScanRepository(db),
+    stayReadings: stayReadingRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

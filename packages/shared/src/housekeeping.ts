@@ -12,6 +12,11 @@ export const roomOccupancies = ['turnover', 'arriving', 'departing', 'staying', 
 export const roomOccupancySchema = z.enum(roomOccupancies);
 export type RoomOccupancy = z.infer<typeof roomOccupancySchema>;
 
+/** How much work a room is today, from who stayed, who arrives and what their notes say. */
+export const cleaningEfforts = ['light', 'standard', 'heavy'] as const;
+export const cleaningEffortSchema = z.enum(cleaningEfforts);
+export type CleaningEffort = z.infer<typeof cleaningEffortSchema>;
+
 /** One room on the housekeeping board. */
 export const housekeepingRoomSchema = z.object({
   room: roomSchema,
@@ -21,6 +26,10 @@ export const housekeepingRoomSchema = z.object({
   guestName: z.string().nullable(),
   /** True when a guest arrives today and the room is not inspected yet. */
   urgent: z.boolean(),
+  /** Null for a vacant room nobody stayed in or arrives to. */
+  effort: cleaningEffortSchema.nullable(),
+  /** Why, in a few words each, e.g. "Dog", "2 kids", "Cot". */
+  cues: z.array(z.string()),
   openTasks: z.array(housekeepingTaskSchema),
 });
 export type HousekeepingRoom = z.infer<typeof housekeepingRoomSchema>;
@@ -28,6 +37,8 @@ export type HousekeepingRoom = z.infer<typeof housekeepingRoomSchema>;
 export const housekeepingBoardSchema = z.object({
   date: isoDateSchema,
   rooms: z.array(housekeepingRoomSchema),
+  /** Stays on the board whose notes and messages changed since the model last read them. */
+  unreadStays: z.number().int().nonnegative(),
 });
 export type HousekeepingBoard = z.infer<typeof housekeepingBoardSchema>;
 
@@ -84,3 +95,30 @@ export const housekeepingNoteResultSchema = z.object({
   unclear: z.string().nullable(),
 });
 export type HousekeepingNoteResult = z.infer<typeof housekeepingNoteResultSchema>;
+
+/** What the model reads from one stay's notes and guest messages, for housekeeping. */
+export const stayReadingSchema = z.object({
+  bookingId: z.string(),
+  pets: z.boolean().describe('The guests bring a dog or another pet.'),
+  mess: z
+    .enum(['usual', 'more', 'much_more'])
+    .describe('How much more cleaning the room will need after this stay than a usual stay.'),
+  messReason: z
+    .string()
+    .nullable()
+    .describe('Why there is more mess, in at most three English words; null when usual.'),
+  prepare: z
+    .array(z.string())
+    .describe('Things to set up before arrival, at most three English words each; [] if none.'),
+});
+export type StayReading = z.infer<typeof stayReadingSchema>;
+
+export const stayReadingsSchema = z.object({ stays: z.array(stayReadingSchema) });
+export type StayReadings = z.infer<typeof stayReadingsSchema>;
+
+/** A stay's text as the model read it. A different text means it needs reading again. */
+export const savedStayReadingSchema = stayReadingSchema.extend({
+  source: z.string(),
+  readAt: z.iso.datetime(),
+});
+export type SavedStayReading = z.infer<typeof savedStayReadingSchema>;

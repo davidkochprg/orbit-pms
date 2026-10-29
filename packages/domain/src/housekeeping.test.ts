@@ -63,7 +63,12 @@ describe('roomDay', () => {
       booking({ roomId: 'r1', checkIn: '2026-05-07', checkOut: today, status: 'checked_in' }),
       booking({ roomId: 'r1', checkIn: today, checkOut: '2026-05-12', guestId: 'gst_next' }),
     ];
-    expect(roomDay('r1', bookings, today)).toEqual({ occupancy: 'turnover', guestId: 'gst_next' });
+    expect(roomDay('r1', bookings, today)).toMatchObject({
+      occupancy: 'turnover',
+      guestId: 'gst_next',
+      stay: { id: bookings[0]!.id },
+      arrival: { id: bookings[1]!.id },
+    });
   });
 
   it('distinguishes arriving, departing, staying and vacant', () => {
@@ -108,6 +113,7 @@ describe('buildHousekeepingBoard', () => {
       task({ roomId: 'r2', type: 'turnover' }),
       task({ roomId: 'r2', type: 'maintenance', status: 'done' }),
     ],
+    readings: [],
     date: today,
   });
 
@@ -125,6 +131,77 @@ describe('buildHousekeepingBoard', () => {
     expect(board.find((r) => r.room.name === '102')!.openTasks.map((t) => t.type)).toEqual([
       'turnover',
     ]);
+  });
+});
+
+describe('buildHousekeepingBoard effort', () => {
+  const departure = (roomId: string, overrides: Partial<Parameters<typeof booking>[0]> = {}) =>
+    booking({
+      roomId,
+      checkIn: '2026-05-08',
+      checkOut: today,
+      status: 'checked_out',
+      ...overrides,
+    });
+  const build = (rooms: ReturnType<typeof room>[], bookings: ReturnType<typeof booking>[]) =>
+    buildHousekeepingBoard({
+      rooms,
+      roomTypes: [double, apartment],
+      bookings,
+      guests: [],
+      tasks: [],
+      readings: [
+        {
+          bookingId: departure('r3').id,
+          pets: false,
+          mess: 'much_more',
+          messReason: 'Birthday party',
+          prepare: [],
+        },
+      ],
+      date: today,
+    });
+
+  it('puts heavier cleans first among rooms with the same deadline', () => {
+    const board = build(
+      [
+        room('r1', { name: '101', status: 'dirty' }),
+        room('r2', { name: '102', status: 'dirty' }),
+        room('r3', { name: '103', status: 'dirty' }),
+      ],
+      [
+        departure('r1', { adults: 1 }),
+        departure('r2', { childAges: [3, 6], addons: { wellness: false, dogs: 1, extraBeds: 0 } }),
+        departure('r3'),
+      ],
+    );
+    expect(board.map((r) => [r.room.name, r.effort, r.cues])).toEqual([
+      ['102', 'heavy', ['Dog', '2 kids']],
+      ['103', 'heavy', ['Birthday party']],
+      ['101', 'standard', []],
+    ]);
+  });
+
+  it('never lets effort jump an arrival that is not ready', () => {
+    const board = build(
+      [room('r1', { name: '101', status: 'clean' }), room('r2', { name: '102', status: 'dirty' })],
+      [
+        booking({ roomId: 'r1', checkIn: today, checkOut: '2026-05-12' }),
+        departure('r2', { addons: { wellness: false, dogs: 2, extraBeds: 0 } }),
+      ],
+    );
+    expect(board.map((r) => [r.room.name, r.urgent, r.effort])).toEqual([
+      ['101', true, 'light'],
+      ['102', false, 'heavy'],
+    ]);
+  });
+
+  it('has no effort once the room is done, but keeps the cues', () => {
+    const board = build(
+      [room('r1', { name: '101', status: 'inspected' })],
+      [departure('r1', { childAges: [4] })],
+    );
+    expect(board[0]).toMatchObject({ effort: null, cues: ['1 kid'] });
   });
 });
 

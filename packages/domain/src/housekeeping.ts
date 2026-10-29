@@ -8,7 +8,9 @@ import type {
   RoomOccupancy,
   RoomStatus,
   RoomType,
+  StayReading,
 } from '@orbit/shared';
+import { cleaningEffort, effortRank } from './cleaning-effort';
 import { arrivalsOn, departuresOn, stayingOver } from './day';
 import { normalizeText } from './text';
 
@@ -41,19 +43,38 @@ export interface RoomDay {
   occupancy: RoomOccupancy;
   /** The guest arriving today, or else the one staying or leaving. */
   guestId: string | null;
+  /** The stay whose room is cleaned today: the guest leaving, or staying over. */
+  stay: Booking | null;
+  /** The stay arriving today. */
+  arrival: Booking | null;
 }
 
 /** What happens in a room on `date`, from its bookings. */
 export function roomDay(roomId: string, bookings: Booking[], date: IsoDate): RoomDay {
   const own = bookings.filter((b) => b.roomId === roomId);
-  const arriving = arrivalsOn(own, date)[0];
-  const departing = departuresOn(own, date)[0];
-  const staying = stayingOver(own, date)[0];
-  if (arriving && departing) return { occupancy: 'turnover', guestId: arriving.guestId };
-  if (arriving) return { occupancy: 'arriving', guestId: arriving.guestId };
-  if (departing) return { occupancy: 'departing', guestId: departing.guestId };
-  if (staying) return { occupancy: 'staying', guestId: staying.guestId };
-  return { occupancy: 'vacant', guestId: null };
+  const arrival = arrivalsOn(own, date)[0] ?? null;
+  const departing = departuresOn(own, date)[0] ?? null;
+  const staying = stayingOver(own, date)[0] ?? null;
+  const stay = departing ?? staying;
+  const occupancy: RoomOccupancy =
+    arrival && departing
+      ? 'turnover'
+      : arrival
+        ? 'arriving'
+        : departing
+          ? 'departing'
+          : staying
+            ? 'staying'
+            : 'vacant';
+  return { occupancy, guestId: (arrival ?? stay)?.guestId ?? null, stay, arrival };
+}
+
+/** Every stay the board shows on `date`: those leaving, staying over and arriving. */
+export function boardStays(rooms: Room[], bookings: Booking[], date: IsoDate): Booking[] {
+  return rooms.flatMap((room) => {
+    const { stay, arrival } = roomDay(room.id, bookings, date);
+    return [stay, arrival].filter((b) => b !== null);
+  });
 }
 
 const occupancyOrder: Record<RoomOccupancy, number> = {
@@ -72,34 +93,49 @@ export interface BoardInput {
   guests: Guest[];
   /** Open and in-progress tasks. */
   tasks: HousekeepingTask[];
+  /** What the model read from stays' notes; stays without one count only their numbers. */
+  readings: StayReading[];
   date: IsoDate;
 }
 
 /**
- * Every room with today's situation and open tasks. Urgent rooms (an arrival today, not yet
- * inspected) come first, then by occupancy, then by room name.
+ * Every room with today's situation, cleaning effort and open tasks. Urgent rooms (an arrival
+ * today, not yet inspected) come first, then by occupancy, then the heavier cleans, then by room
+ * name. A room with no cleaning left (inspected, or clean with no cleaning task) has no effort.
  */
 export function buildHousekeepingBoard(input: BoardInput): HousekeepingRoom[] {
-  const { rooms, roomTypes, bookings, guests, tasks, date } = input;
+  const { rooms, roomTypes, bookings, guests, tasks, readings, date } = input;
+  const readingsById = new Map(readings.map((r) => [r.bookingId, r]));
   return rooms
     .map((room): HousekeepingRoom => {
       const day = roomDay(room.id, bookings, date);
       const arrivalToday = day.occupancy === 'arriving' || day.occupancy === 'turnover';
+      const urgent = arrivalToday && room.status !== 'inspected';
+      const openTasks = tasks
+        .filter((t) => t.roomId === room.id && t.status !== 'done')
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      const cleaningLeft =
+        urgent ||
+        room.status === 'dirty' ||
+        (room.status !== 'inspected' &&
+          openTasks.some((t) => t.type === 'turnover' || t.type === 'stayover'));
+      const { effort, cues } = cleaningEffort({ ...day, readings: readingsById });
       return {
         room,
         roomTypeName: roomTypes.find((t) => t.id === room.roomTypeId)?.name ?? '',
         occupancy: day.occupancy,
         guestName: guests.find((g) => g.id === day.guestId)?.name ?? null,
-        urgent: arrivalToday && room.status !== 'inspected',
-        openTasks: tasks
-          .filter((t) => t.roomId === room.id && t.status !== 'done')
-          .sort((a, b) => a.createdAt.localeCompare(b.createdAt)),
+        urgent,
+        effort: cleaningLeft ? effort : null,
+        cues,
+        openTasks,
       };
     })
     .sort(
       (a, b) =>
         Number(b.urgent) - Number(a.urgent) ||
         occupancyOrder[a.occupancy] - occupancyOrder[b.occupancy] ||
+        (b.effort ? effortRank[b.effort] : -1) - (a.effort ? effortRank[a.effort] : -1) ||
         a.room.name.localeCompare(b.room.name, 'en', { numeric: true }),
     );
 }
