@@ -1,4 +1,4 @@
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, type ReactNode, useEffect } from 'react';
 import { useHealth, useHotelProfile, usePricing } from '@/lib/api';
 import { type DisplayRegion, displayRegion, setDisplayRegion } from '@/lib/format';
 
@@ -20,6 +20,11 @@ export function RegionProvider({ children }: { children: ReactNode }) {
     taxAdded: pricing ? pricing.tax.mode === 'exclusive' : current.taxAdded,
   };
   setDisplayRegion(next);
+  // Lets the browser write dates the hotel's way where it can, e.g. date fields in Firefox.
+  const lang = next.usDates ? 'en-US' : 'en-GB';
+  useEffect(() => {
+    document.documentElement.lang = lang;
+  }, [lang]);
   return (
     <Fragment
       key={`${next.currency}:${next.usDates}:${next.timeZone}:${next.perRoom}:${next.taxAdded}`}

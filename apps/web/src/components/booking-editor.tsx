@@ -1,3 +1,4 @@
+import { differenceInCalendarDays, parseISO } from 'date-fns';
 import {
   type BookingDetail,
   bookingSources,
@@ -49,6 +50,7 @@ import {
   sourceLabels,
 } from '@/lib/booking-editor';
 import { formatMoney, formatPrice, formatRange, languageLabels } from '@/lib/format';
+import { isIsoDate } from '@/lib/tape-chart';
 import { cn } from '@/lib/utils';
 
 type EditorState =
@@ -307,6 +309,12 @@ function Group({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+/** Nights in a stay, 0 while the dates are incomplete or the wrong way round. */
+function stayNights(checkIn: string, checkOut: string): number {
+  if (!isIsoDate(checkIn) || !isIsoDate(checkOut)) return 0;
+  return Math.max(0, differenceInCalendarDays(parseISO(checkOut), parseISO(checkIn)));
+}
+
 function StayFields({
   form,
   onChange,
@@ -348,6 +356,15 @@ function StayFields({
             onChange={(e) => set({ checkOut: e.target.value })}
           />
         </FormField>
+        {/* Date fields follow the computer's locale; this line is in the hotel's own style. */}
+        {stayNights(form.checkIn, form.checkOut) > 0 && (
+          <p className="-mt-1.5 text-xs text-muted-foreground sm:col-span-2">
+            {formatRange(form.checkIn, form.checkOut)} ·{' '}
+            {stayNights(form.checkIn, form.checkOut) === 1
+              ? '1 night'
+              : `${stayNights(form.checkIn, form.checkOut)} nights`}
+          </p>
+        )}
       </div>
       <div className="flex flex-wrap items-start gap-x-8 gap-y-3">
         <div className="flex flex-col gap-1.5">
