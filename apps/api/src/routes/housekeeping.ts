@@ -1,4 +1,4 @@
-import { type HousekeepingNotePipeline, TranscriptionError } from '@orbit/ai';
+import { type HousekeepingNotePipeline, type StayNotesReader, TranscriptionError } from '@orbit/ai';
 import type { HousekeepingService } from '@orbit/domain';
 import {
   housekeepingNoteBodySchema,
@@ -18,6 +18,8 @@ export interface HousekeepingRouteDeps {
   housekeeping: HousekeepingService;
   /** Null when AI is not configured. */
   notes: HousekeepingNotePipeline | null;
+  /** Null when AI is not configured. */
+  stays: StayNotesReader | null;
   gate: AiGate;
 }
 
@@ -26,10 +28,25 @@ function isWav(bytes: Uint8Array): boolean {
   return bytes.length > 44 && tag(0) === 'RIFF' && tag(8) === 'WAVE';
 }
 
-/** Room status, housekeeping tasks, and notes the agent applies (ADR 0006). */
-export function housekeepingRoutes({ housekeeping, notes, gate }: HousekeepingRouteDeps) {
+/**
+ * Room status, housekeeping tasks, notes the agent applies (ADR 0006), and reading stays' notes
+ * for the board's cleaning effort.
+ */
+export function housekeepingRoutes({ housekeeping, notes, stays, gate }: HousekeepingRouteDeps) {
   return new Hono()
     .get('/housekeeping', async (c) => c.json(await housekeeping.board()))
+    .post('/housekeeping/read-stays', async (c) => {
+      if (!stays) {
+        return c.json(errorBody('ai_not_configured', 'The AI agent is not configured.'), 503);
+      }
+      const board = await housekeeping.board();
+      // Nothing new to read costs nothing and uses none of the demo's allowance.
+      if (board.unreadStays === 0) return c.json(board);
+      const blocked = await gate(c.req.header('x-forwarded-for'));
+      if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
+      await stays.read();
+      return c.json(await housekeeping.board());
+    })
     .post('/rooms/:id/status', validate('json', roomStatusBodySchema), async (c) =>
       c.json(
         await housekeeping.setRoomStatus(c.req.param('id'), c.req.valid('json').status, 'user'),

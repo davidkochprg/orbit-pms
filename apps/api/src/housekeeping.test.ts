@@ -226,3 +226,77 @@ describe('housekeeping notes', () => {
     expect(body.error.message).toBe('Transcription failed: Unsupported WAV');
   });
 });
+
+describe('reading stays for the board', () => {
+  /** Reads every stay as usual, except that the guest leaving 102 brought a dog and muddy boots. */
+  function appReading(bookingId: string) {
+    const stays = new MockLanguageModelV4({
+      doGenerate: () =>
+        Promise.resolve({
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                stays: [
+                  { bookingId, pets: true, mess: 'more', messReason: 'Muddy boots', prepare: [] },
+                ],
+              }),
+            },
+          ],
+          finishReason: { unified: 'stop', raw: undefined },
+          usage: {
+            inputTokens: { total: 500, noCache: 500, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: 60, text: 60, reasoning: undefined },
+          },
+          warnings: [],
+        }),
+    });
+    return createApp({
+      repos,
+      ai: {
+        agent: stays,
+        agentModelId: 'muse-spark-1.3',
+        translate: stays,
+        translateModelId: 'muse-spark-1.3',
+        draft: stays,
+        draftModelId: 'muse-spark-1.3',
+        vision: null,
+        visionModelId: null,
+        transcription: null,
+      },
+      usage: usageStore,
+      clock: () => now,
+    });
+  }
+
+  it("reads a changed stay's notes and ranks the room by what they say", async () => {
+    const [leaving] = await repos.bookings.listBookings({ roomId: 'rm_102', from: '2026-10-26' });
+    expect(leaving?.checkOut).toBe(today);
+    await repos.bookings.updateBooking({ ...leaving!, notes: 'Hiking trip with our dog.' });
+    const app = appReading(leaving!.id);
+
+    const before = await call<HousekeepingBoard>(app, 'GET', '/api/housekeeping');
+    expect(before.body.unreadStays).toBeGreaterThan(0);
+    const { status, body } = await call<HousekeepingBoard>(
+      app,
+      'POST',
+      '/api/housekeeping/read-stays',
+    );
+    expect(status).toBe(200);
+    expect(body.unreadStays).toBeLessThan(before.body.unreadStays);
+    expect(body.rooms.find((r) => r.room.id === 'rm_102')).toMatchObject({
+      effort: 'heavy',
+      cues: expect.arrayContaining(['Dog', 'Muddy boots']) as string[],
+    });
+    expect(await usageStore.monthToDateMicroUsd(now)).toBeGreaterThan(0);
+  });
+
+  it('needs AI configured', async () => {
+    const { status } = await call<ApiError>(
+      appWith({ ai: false }),
+      'POST',
+      '/api/housekeeping/read-stays',
+    );
+    expect(status).toBe(503);
+  });
+});

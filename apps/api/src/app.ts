@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
   createHousekeepingNotePipeline,
+  createStayNotesReader,
   createIdScanReader,
   createInboxPipeline,
   createTranslator,
@@ -146,6 +147,8 @@ export function createApp({
       listRooms: () => repos.rooms.listRooms(),
       usage,
     });
+  const stays =
+    ai && createStayNotesReader({ model: ai.agent, modelId: ai.agentModelId, housekeeping, usage });
   const access = createDemoAccess({ code: accessCode, clock });
   const app = new Hono();
   if (log) app.use(logger());
@@ -195,7 +198,7 @@ export function createApp({
       identify: (id) => staff.identify(id),
     }),
   );
-  app.route('/api', housekeepingRoutes({ housekeeping, notes, gate }));
+  app.route('/api', housekeepingRoutes({ housekeeping, notes, stays, gate }));
   app.route(
     '/api',
     agentRoutes({

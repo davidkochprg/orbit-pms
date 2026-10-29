@@ -3,4 +3,5 @@ export * from './housekeeping-notes';
 export * from './id-documents';
 export * from './inquiries';
 export * from './score';
+export * from './stay-notes';
 export * from './translations';

@@ -9,6 +9,7 @@ export * from './prompts/hotel';
 export * from './prompts/inbox';
 export * from './prompts/system';
 export * from './provider';
+export * from './stay-notes';
 export * from './tools';
 export * from './transcribe';
 export * from './usage';

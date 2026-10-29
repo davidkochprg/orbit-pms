@@ -146,6 +146,8 @@ function compactBoard(board: HousekeepingBoard) {
       occupancy: r.occupancy,
       guestName: r.guestName,
       urgent: r.urgent,
+      effort: r.effort,
+      cues: r.cues,
       openTasks: r.openTasks.map((t) => ({
         taskId: t.id,
         type: t.type,
@@ -403,7 +405,7 @@ export function createAgentTools({
     }),
     getHousekeeping: tool({
       description:
-        "The housekeeping board for today: every room's status (clean, dirty, inspected, out_of_order), whether it is occupied, arriving, leaving or free, the guest, whether it must be ready for an arrival, and its open tasks with their taskId.",
+        "The housekeeping board for today: every room's status (clean, dirty, inspected, out_of_order), whether it is occupied, arriving, leaving or free, the guest, whether it must be ready for an arrival, its cleaning effort (light, standard or heavy; null when nothing is left to clean) with short cues why, and its open tasks with their taskId. Rooms come in the order to clean them.",
       inputSchema: z.object({}),
       execute: () => safely(async () => compactBoard(await housekeeping.board())),
     }),

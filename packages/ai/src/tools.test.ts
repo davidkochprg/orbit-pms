@@ -306,6 +306,8 @@ describe('agent tools', () => {
     expect(board.rooms.find((r) => r.roomId === 'rm_104')).toMatchObject({
       status: 'dirty',
       guestName: 'Tomáš Novák',
+      effort: expect.any(String) as string,
+      cues: expect.any(Array) as string[],
     });
   });
 

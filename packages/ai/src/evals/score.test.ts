@@ -1,6 +1,6 @@
 import type { InquiryExtraction } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
-import { scoreExtraction, scoreHousekeepingNote } from './score';
+import { scoreExtraction, scoreHousekeepingNote, scoreStayReadings } from './score';
 
 const expected: InquiryExtraction = {
   kind: 'booking_request',
@@ -94,5 +94,59 @@ describe('scoreHousekeepingNote', () => {
       'unexpected 305',
       'unexpected unclear',
     ]);
+  });
+});
+
+describe('scoreStayReadings', () => {
+  const fixture = {
+    id: 't',
+    language: 'en',
+    stays: [
+      {
+        bookingId: 'bk_1',
+        source: 'x',
+        pets: true,
+        mess: ['usual' as const],
+        prepare: [['cot', 'crib']],
+      },
+      { bookingId: 'bk_2', source: 'y', pets: false, mess: ['more' as const], prepare: [] },
+    ],
+  };
+  const read = (bookingId: string, overrides = {}) => ({
+    bookingId,
+    pets: false,
+    mess: 'usual' as const,
+    messReason: null,
+    prepare: [] as string[],
+    ...overrides,
+  });
+
+  it('passes a matching reading, finding things to set up by any of their words', () => {
+    expect(
+      scoreStayReadings(fixture, {
+        stays: [
+          read('bk_1', { pets: true, prepare: ['Baby crib'] }),
+          read('bk_2', { mess: 'more', messReason: 'Muddy' }),
+        ],
+      }),
+    ).toEqual({ passed: true, problems: [] });
+  });
+
+  it('reports wrong pets, mess, prepare and missing or unknown stays', () => {
+    expect(
+      scoreStayReadings(fixture, {
+        stays: [read('bk_1', { prepare: ['Towels'] }), read('bk_9')],
+      }).problems,
+    ).toEqual([
+      'bk_1 pets false',
+      'bk_1 prepare misses cot',
+      'bk_2 read 0 times',
+      'unexpected bk_9',
+    ]);
+    expect(
+      scoreStayReadings(fixture, {
+        stays: [read('bk_1', { pets: true, prepare: ['Cot'] }), read('bk_2', { prepare: ['Cot'] })],
+      }).problems,
+    ).toEqual(['bk_2 mess usual', 'bk_2 prepare ["Cot"]']);
   });
 });

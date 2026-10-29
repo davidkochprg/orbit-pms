@@ -78,7 +78,7 @@ Defined in `packages/ai/src/tools.ts` with zod input schemas from `packages/shar
 | `getGuestBook`                                             | Everyone in a booking's room and what each still needs. Document numbers and addresses are left out; the model only sees whether they are recorded            | none        |
 | `addToGuestBook`, `updateGuestBook`, `removeFromGuestBook` | Add a companion, record or correct a person's ID details, take a companion off; the summary shows the values                                                  | proposal    |
 | `updateGuestProfile`                                       | A guest's name, email, phone, language or notes                                                                                                               | proposal    |
-| `getHousekeeping`                                          | Today's housekeeping board: room status, occupancy, guest, urgency and open tasks                                                                             | none        |
+| `getHousekeeping`                                          | Today's housekeeping board in cleaning order: room status, occupancy, guest, urgency, cleaning effort with its cues, and open tasks                           | none        |
 | `setRoomStatus`, `createHousekeepingTask`, `setTaskStatus` | Room status, a new maintenance or cleaning task, a task's progress; status changes return the status before (`from`)                                          | direct      |
 
 "Direct" tools change data straight away, logged in the audit log with actor `agent`: room status and housekeeping tasks are low-risk and reversible ([ADR 0006](decisions/0006-agent-autonomy-and-cost-budget.md)), the same rule as for voice notes. Everything else that changes data is a proposal.
@@ -134,6 +134,12 @@ A housekeeper records a voice note ("room 104 done, the bedside lamp is broken")
 
 Usage is recorded under the `voice` feature: audio seconds for the transcription, tokens for the reading.
 
+## Cleaning effort
+
+The housekeeping board ranks rooms with the same deadline by how much work they are ([domain.md](domain.md#housekeeping)). Children, booked dogs, extra beds and the length of stay come from the booking; the model adds what only the text says: a dog mentioned in a message but not booked, muddy gear or a celebration, a cot or feather-free bedding to set up. `createStayNotesReader` (`packages/ai/src/stay-notes.ts`) sends the board's unread stays, at most 12 per call, in one structured-output call (`stayReadingsSchema`, prompt in `prompts/stay-notes.ts`) and keeps the readings. It changes no booking or room, only what the board shows, so it needs no confirmation and is not in the audit log.
+
+The board asks for it by itself: when `unreadStays` is above zero and AI is configured, the page calls `POST /api/housekeeping/read-stays` in the background and shows the re-ranked board. A stay is read once per version of its text, so an unchanged board costs nothing. Usage is recorded under `stay_notes`, at `minimal` reasoning; a call costs about $0.0015 (the eval average).
+
 ## ID scans
 
 Staff scan a guest's ID card or passport with a phone at check-in, or later when it was missing ([domain.md](domain.md#id-scans)). The desk shows a QR code for a 15-minute link; the phone photographs the document and the browser re-encodes it as a JPEG of at most 1600 px. `readIdDocument` (`packages/ai/src/id-scan.ts`) sends it to `META_MODEL_VISION` as a file part in one structured-output call (`idDocumentReadingSchema`): whether an ID is readable, its type, the name as printed, nationality as ISO alpha-2, dates as `YYYY-MM-DD`, the document number and an address if printed. The prompt (`prompts/id-scan.ts`) says to copy, never guess, and to check dates against the machine-readable zone.
@@ -151,6 +157,8 @@ Hotel facts come from the **hotel profile** staff edit in Settings ([domain.md](
 `packages/ai/src/evals/inquiries.ts` holds fourteen synthetic messages in Czech, German, English and Polish, dated relative to today: ten booking requests and four OTA (Booking.com) messages, three of which are questions about an existing stay. Each has its expected extraction. The demo seed uses the same messages.
 
 `packages/ai/src/evals/housekeeping-notes.ts` holds ten synthetic housekeeping notes in Czech, English, German and Polish, including spelled-out numbers, an unknown room and a note too vague to act on. They are scored by `scoreHousekeepingNote`: the same rooms, status per room, whether an issue was reported, and whether something was flagged as unclear.
+
+`packages/ai/src/evals/stay-notes.ts` holds twelve synthetic stays in Czech, English, German, Polish and Spanish, one call with three stays: a work trip, dogs mentioned or only asked about for a later trip, a birthday, a cot, an allergy, muddy bikes, a sick child, a party, and early check-in and payment notes that are not for housekeeping. `scoreStayReadings` needs one reading per stay, pets exact, the mess within the allowed levels, and each thing to set up found by one of its words, with nothing listed where nothing is expected.
 
 `packages/ai/src/evals/id-documents.ts` holds three synthetic specimen documents drawn for the eval, each marked SPECIMEN and photographed slightly askew (`id-documents/*.jpg`, rendered from the SVGs beside them): a Czech-style ID card, a German-style passport with a machine-readable zone, and a café receipt that must be refused as unreadable. `scoreIdReading` needs every expected field exact (names case-insensitively). The suite runs when `META_MODEL_VISION` is set.
 
@@ -189,7 +197,7 @@ The Meta Model API is OpenAI-compatible, so `packages/ai/src/provider.ts` wraps 
 | `META_MODEL_VISION` | `muse-spark-1.3` (accepts images)    | Reading ID documents for the guest book                                                            |
 | `META_MODEL_VOICE`  | `muse-voice-transcribe-1.0`          | Housekeeping voice notes, through Meta's own `/v1/asr/transcribe` endpoint (not OpenAI-compatible) |
 
-Muse Spark is a reasoning model: it always reasons before answering (`reasoning_effort: "none"` is rejected), and reasoning tokens are billed as output. `packages/ai/src/reasoning.ts` sets the effort per feature through the AI SDK's `reasoning` option: `minimal` for inbox extraction, drafts, housekeeping notes and ID scans, `low` for the agent, which plans multi-step tool use. Each is the lowest level that keeps quality, measured with `pnpm eval` and live runs.
+Muse Spark is a reasoning model: it always reasons before answering (`reasoning_effort: "none"` is rejected), and reasoning tokens are billed as output. `packages/ai/src/reasoning.ts` sets the effort per feature through the AI SDK's `reasoning` option: `minimal` for inbox extraction, drafts, housekeeping notes, stay notes and ID scans, `low` for the agent, which plans multi-step tool use. Each is the lowest level that keeps quality, measured with `pnpm eval` and live runs.
 
 ### Muse Spark Open on Baseten
 

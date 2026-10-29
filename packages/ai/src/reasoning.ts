@@ -11,6 +11,7 @@ export const reasoningEffort = {
   extraction: 'minimal',
   draft: 'minimal',
   housekeeping: 'minimal',
+  stayNotes: 'minimal',
   idScan: 'minimal',
   translate: 'minimal',
   agent: 'low',

@@ -1,5 +1,11 @@
-import type { HousekeepingNoteReading, IdDocumentReading, InquiryExtraction } from '@orbit/shared';
+import type {
+  HousekeepingNoteReading,
+  IdDocumentReading,
+  InquiryExtraction,
+  StayReadings,
+} from '@orbit/shared';
 import type { HousekeepingNoteFixture } from './housekeeping-notes';
+import type { StayNotesFixture } from './stay-notes';
 
 export type ExtractionField = 'kind' | 'language' | 'dates' | 'adults' | 'childAges' | 'wishes';
 
@@ -68,6 +74,39 @@ export function scoreHousekeepingNote(
   for (const extra of byRoom.keys()) problems.push(`unexpected ${extra}`);
   if (Boolean(actual.unclear?.trim()) !== fixture.unclear) {
     problems.push(fixture.unclear ? 'unclear not reported' : 'unexpected unclear');
+  }
+  return { passed: problems.length === 0, problems };
+}
+
+/**
+ * Scores what the model read from stays' notes: one reading per stay, pets exactly, the mess
+ * within the allowed levels, and each thing to set up found by one of its words, with nothing
+ * listed where nothing is expected.
+ */
+export function scoreStayReadings(fixture: StayNotesFixture, actual: StayReadings): NoteScore {
+  const problems: string[] = [];
+  for (const want of fixture.stays) {
+    const got = actual.stays.filter((s) => s.bookingId === want.bookingId);
+    if (got.length !== 1) {
+      problems.push(`${want.bookingId} read ${got.length} times`);
+      continue;
+    }
+    const { pets, mess, prepare } = got[0]!;
+    if (pets !== want.pets) problems.push(`${want.bookingId} pets ${pets}`);
+    if (!want.mess.includes(mess)) problems.push(`${want.bookingId} mess ${mess}`);
+    const items = prepare.map((p) => p.toLowerCase());
+    if (want.prepare.length === 0 && items.length > 0) {
+      problems.push(`${want.bookingId} prepare ${JSON.stringify(prepare)}`);
+    }
+    for (const words of want.prepare) {
+      if (!items.some((item) => words.some((w) => item.includes(w)))) {
+        problems.push(`${want.bookingId} prepare misses ${words[0]}`);
+      }
+    }
+  }
+  const known = new Set(fixture.stays.map((s) => s.bookingId));
+  for (const extra of actual.stays.filter((s) => !known.has(s.bookingId))) {
+    problems.push(`unexpected ${extra.bookingId}`);
   }
   return { passed: problems.length === 0, problems };
 }

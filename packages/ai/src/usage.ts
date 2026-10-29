@@ -8,6 +8,7 @@ export const aiFeatures = [
   'id_scan',
   'voice',
   'brief',
+  'stay_notes',
 ] as const;
 export type AiFeature = (typeof aiFeatures)[number];
 

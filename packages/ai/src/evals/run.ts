@@ -19,14 +19,16 @@ import { createMetaProvider } from '../provider';
 import { reasoningEffort, type ReasoningEffort } from '../reasoning';
 import { readHousekeepingNote } from '../housekeeping';
 import { readIdDocument } from '../id-scan';
+import { readStayNotes } from '../stay-notes';
 import { agentFixtures, buildAgentEvalHotel } from './agent';
 import { evalRoomNames, housekeepingNoteFixtures } from './housekeeping-notes';
 import { idDocumentFixtures } from './id-documents';
 import { buildDraftEvalHotel } from './drafts';
 import { buildInquiryFixtures, type InquiryFixture } from './inquiries';
+import { stayNotesFixtures } from './stay-notes';
 import { translationFixtures } from './translations';
 import { createTranslator } from '../translate';
-import { scoreExtraction, scoreHousekeepingNote, scoreIdReading } from './score';
+import { scoreExtraction, scoreHousekeepingNote, scoreIdReading, scoreStayReadings } from './score';
 
 const {
   META_API_KEY,
@@ -56,7 +58,7 @@ const provider = createMetaProvider({
 });
 
 // EVAL_SUITES picks suites, e.g. "drafts,translations"; unset runs them all.
-const suiteKeys = ['inbox', 'notes', 'ids', 'agent', 'drafts', 'translations'] as const;
+const suiteKeys = ['inbox', 'notes', 'stays', 'ids', 'agent', 'drafts', 'translations'] as const;
 type SuiteKey = (typeof suiteKeys)[number];
 const only = process.env.EVAL_SUITES?.split(',')
   .map((k) => k.trim())
@@ -187,6 +189,27 @@ const notesOk = await suite(
         passed: score.passed,
         label: `${f.language}  ${score.problems.join(', ')}`,
         detail: `      note     ${f.note}\n      actual   ${JSON.stringify(reading)}`,
+        tokens,
+      };
+    },
+  })),
+);
+
+const stayEffort = reasoning ?? reasoningEffort.stayNotes;
+const staysOk = await suite(
+  'stays',
+  'Stay notes for housekeeping',
+  stayEffort,
+  META_MODEL_AGENT,
+  stayNotesFixtures.map((f) => ({
+    id: f.id,
+    run: async () => {
+      const { reading, tokens } = await readStayNotes(provider.agent, f.stays, stayEffort);
+      const score = scoreStayReadings(f, reading);
+      return {
+        passed: score.passed,
+        label: `${f.language}  ${score.problems.join(', ')}`,
+        detail: `      actual   ${JSON.stringify(reading)}`,
         tokens,
       };
     },
@@ -376,4 +399,4 @@ const translateOk = await suite(
   })),
 );
 
-process.exit(inboxOk && notesOk && idsOk && agentOk && draftsOk && translateOk ? 0 : 1);
+process.exit(inboxOk && notesOk && staysOk && idsOk && agentOk && draftsOk && translateOk ? 0 : 1);
