@@ -84,13 +84,24 @@ export function GapsPanel({
   );
 }
 
-/** Attention items as rows that open where each is handled; `onOpen` runs first, e.g. to close a dialog. */
-export function AttentionList({ items, onOpen }: { items: AttentionItem[]; onOpen?: () => void }) {
+/**
+ * Attention items as rows that open where each is handled. `onOpen` runs before a page opens, e.g.
+ * to close a dialog; `openBooking` replaces opening a booking's inspector.
+ */
+export function AttentionList({
+  items,
+  onOpen,
+  openBooking,
+}: {
+  items: AttentionItem[];
+  onOpen?: () => void;
+  openBooking?: (bookingId: string) => void;
+}) {
   return (
     <ul className="flex flex-col">
       {items.map((item) => (
         <li key={item.id}>
-          <AttentionRow item={item} onOpen={onOpen} />
+          <AttentionRow item={item} onOpen={onOpen} openBooking={openBooking} />
         </li>
       ))}
     </ul>
@@ -100,7 +111,15 @@ export function AttentionList({ items, onOpen }: { items: AttentionItem[]; onOpe
 const rowClass =
   'group flex w-full items-center gap-3 rounded-control px-2.5 py-2 text-left outline-none transition-colors duration-150 ease-snap hover:bg-accent focus-visible:bg-accent';
 
-function AttentionRow({ item, onOpen }: { item: AttentionItem; onOpen?: () => void }) {
+function AttentionRow({
+  item,
+  onOpen,
+  openBooking,
+}: {
+  item: AttentionItem;
+  onOpen?: () => void;
+  openBooking?: (bookingId: string) => void;
+}) {
   const { open } = useBookingDrawer();
   const { icon: Icon, className } = kindIcons[item.kind];
   const body = (
@@ -120,10 +139,7 @@ function AttentionRow({ item, onOpen }: { item: AttentionItem; onOpen?: () => vo
     return (
       <button
         type="button"
-        onClick={() => {
-          onOpen?.();
-          open(bookingId);
-        }}
+        onClick={() => (openBooking ? openBooking(bookingId) : open(bookingId))}
         className={rowClass}
       >
         {body}

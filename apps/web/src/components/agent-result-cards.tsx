@@ -30,7 +30,6 @@ import {
 } from '@/components/agent-housekeeping-card';
 import { Mention, RoomBadge } from '@/components/agent-mention';
 import { Button } from '@/components/ui/button';
-import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import { asToolError } from '@/lib/agent';
@@ -216,8 +215,7 @@ function QuoteCard({ quote, roomId }: { quote: Quote; roomId: string | null }) {
 }
 
 function BillCard({ folio }: { folio: Folio }) {
-  const { open } = useBookingDrawer();
-  const { closePalette } = useCommandPalette();
+  const { openBooking } = useCommandPalette();
   const extras = folio.lines.filter((l) => l.kind === 'extra');
   return (
     <AgentCard>
@@ -257,10 +255,7 @@ function BillCard({ folio }: { folio: Folio }) {
         variant="ghost"
         size="xs"
         className="self-start"
-        onClick={() => {
-          closePalette();
-          open(folio.bookingId);
-        }}
+        onClick={() => openBooking(folio.bookingId)}
       >
         Open booking
       </Button>

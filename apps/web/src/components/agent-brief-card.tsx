@@ -14,7 +14,7 @@ const ROWS = 4;
 /** The day's brief the agent read: tonight's figures, then what needs attention, as on Today. */
 export function BriefCard({ brief }: { brief: DailyBrief }) {
   const [all, setAll] = useState(false);
-  const { closePalette } = useCommandPalette();
+  const { closePalette, openBooking } = useCommandPalette();
   const items = attentionItems(brief);
   const shown = all ? items : items.slice(0, ROWS);
   const stats = [
@@ -53,7 +53,7 @@ export function BriefCard({ brief }: { brief: DailyBrief }) {
       </dl>
       {items.length > 0 && (
         <div className="-mx-1.5">
-          <AttentionList items={shown} onOpen={closePalette} />
+          <AttentionList items={shown} onOpen={closePalette} openBooking={openBooking} />
         </div>
       )}
       {items.length > ROWS && (

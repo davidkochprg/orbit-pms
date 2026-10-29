@@ -26,7 +26,7 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import { AgentStatus } from '@/components/agent-status';
 import { AgentThread } from '@/components/agent-thread';
 import { ErrorNotice } from '@/components/error-notice';
@@ -94,7 +94,31 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   };
 
   const closePalette = useCallback(() => setOpen(false), []);
-  const value = useMemo(() => ({ openPalette, closePalette }), [openPalette, closePalette]);
+
+  // A booking opened from the conversation brings the conversation back when its inspector closes.
+  const { open: openDrawer } = useBookingDrawer();
+  const [params] = useSearchParams();
+  const drawerBooking = params.get('booking');
+  const resumeAfter = useRef(false);
+  const openBooking = useCallback(
+    (bookingId: string) => {
+      resumeAfter.current = true;
+      setOpen(false);
+      openDrawer(bookingId);
+    },
+    [openDrawer],
+  );
+  useEffect(() => {
+    if (drawerBooking || !resumeAfter.current) return;
+    resumeAfter.current = false;
+    setMode('agent');
+    setOpen(true);
+  }, [drawerBooking]);
+
+  const value = useMemo(
+    () => ({ openPalette, closePalette, openBooking }),
+    [openPalette, closePalette, openBooking],
+  );
 
   return (
     <CommandPaletteContext value={value}>

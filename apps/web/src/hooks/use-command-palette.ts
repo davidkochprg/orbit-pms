@@ -12,6 +12,11 @@ export interface CommandPaletteContextValue {
   openPalette: (options?: OpenPaletteOptions) => void;
   /** Closes the bar; the conversation stays for the next ⌘K. */
   closePalette: () => void;
+  /**
+   * Opens a booking in the inspector from the conversation: the bar steps aside and comes back,
+   * on the conversation, when the inspector closes.
+   */
+  openBooking: (bookingId: string) => void;
 }
 
 export const CommandPaletteContext = createContext<CommandPaletteContextValue | null>(null);

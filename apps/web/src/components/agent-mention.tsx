@@ -13,7 +13,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAgentEntity } from '@/hooks/use-agent-entities';
-import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import {
@@ -47,14 +46,9 @@ function useBooking(id: string): BookingEntity {
   };
 }
 
-/** Opens a booking in the inspector, closing the command bar so the inspector is in view. */
+/** Opens a booking in the inspector; the conversation comes back when it closes. */
 function useOpenBooking() {
-  const { open } = useBookingDrawer();
-  const { closePalette } = useCommandPalette();
-  return (id: string) => {
-    closePalette();
-    open(id);
-  };
+  return useCommandPalette().openBooking;
 }
 
 export function RoomBadge({ name }: { name: string }) {

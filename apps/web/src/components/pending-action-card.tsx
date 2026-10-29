@@ -5,7 +5,6 @@ import { Link } from 'react-router';
 import { BookingRow } from '@/components/agent-mention';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
-import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import {
   useConfirmPendingActions,
@@ -58,8 +57,7 @@ export function PendingActionCard({
 }) {
   const action = usePendingAction(id);
   const resolve = useResolvePendingAction(id);
-  const { open } = useBookingDrawer();
-  const { closePalette } = useCommandPalette();
+  const { closePalette, openBooking } = useCommandPalette();
   const current = resolve.data ?? action.data;
   const result = current && current.status !== 'pending' ? outcome[current.status] : null;
   const details = current?.details ?? null;
@@ -124,10 +122,7 @@ export function PendingActionCard({
             size="sm"
             variant="ghost"
             className="ml-auto"
-            onClick={() => {
-              closePalette();
-              open(current.bookingId!);
-            }}
+            onClick={() => openBooking(current.bookingId!)}
           >
             Open booking
           </Button>
