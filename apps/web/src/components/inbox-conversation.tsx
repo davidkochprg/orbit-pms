@@ -49,7 +49,7 @@ import {
   useTranslateMessage,
   useTranslateText,
 } from '@/lib/api';
-import { formatMoney, formatDateTime, languageLabels, statusLabels } from '@/lib/format';
+import { formatDateTime, formatPrice, languageLabels, statusLabels } from '@/lib/format';
 import {
   analysisFacts,
   bookingPrefillFor,
@@ -499,7 +499,7 @@ function Options({
                   </span>
                 )}
               </span>
-              <span className="font-mono text-sm tabular-nums">{formatMoney(o.quote.total)}</span>
+              <span className="font-mono text-sm tabular-nums">{formatPrice(o.quote.total)}</span>
               {isHeld && booking ? (
                 <Button size="xs" variant="ghost" onClick={() => open(booking.id)}>
                   Open

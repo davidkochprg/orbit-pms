@@ -34,7 +34,7 @@ import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import { asToolError, type ToolResult } from '@/lib/agent';
 import { useRoomTypes } from '@/lib/api';
-import { formatMoney, formatParty, formatRange } from '@/lib/format';
+import { formatMoney, formatPrice, formatParty, formatRange } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 /**
@@ -197,7 +197,7 @@ function QuoteCard({ quote, roomId }: { quote: Quote; roomId: string | null }) {
         }
         aside={
           <span className="shrink-0 font-mono text-base tabular-nums">
-            {formatMoney(quote.total)}
+            {formatPrice(quote.total)}
           </span>
         }
       />
@@ -298,7 +298,7 @@ function AvailabilityCard({ options, addons }: { options: RoomOption[]; addons: 
                     {o.roomType.name}
                   </span>
                   <span className="shrink-0 font-mono tabular-nums">
-                    {formatMoney(o.quote.total)}
+                    {formatPrice(o.quote.total)}
                   </span>
                   <ChevronRight
                     className={cn(

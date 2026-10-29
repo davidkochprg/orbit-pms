@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   formatDateTime,
   formatMoney,
+  formatPrice,
   formatTimeOfDay,
   setDisplayRegion,
   formatDate,
@@ -19,12 +20,14 @@ const us = {
   usDates: true,
   timeZone: 'America/Los_Angeles',
   perRoom: true,
+  taxAdded: true,
 } as const;
 const czech = {
   currency: 'CZK',
   usDates: false,
   timeZone: 'Europe/Prague',
   perRoom: false,
+  taxAdded: false,
 } as const;
 
 describe('format', () => {
@@ -87,5 +90,16 @@ describe('orbShift', () => {
   it('turns different names differently', () => {
     const shifts = new Set(['Anna', 'Petr', 'Lucie', 'Jakub', 'Eva'].map(orbShift));
     expect(shifts.size).toBeGreaterThan(1);
+  });
+});
+
+describe('formatPrice', () => {
+  afterEach(() => setDisplayRegion(us));
+
+  it('says tax comes on top where it is added on the bill, and nothing where it is included', () => {
+    setDisplayRegion(us);
+    expect(formatPrice(159)).toBe('$159 + tax');
+    setDisplayRegion(czech);
+    expect(formatPrice(2000)).toBe(formatMoney(2000));
   });
 });

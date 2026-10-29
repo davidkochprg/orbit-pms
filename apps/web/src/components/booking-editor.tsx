@@ -48,7 +48,7 @@ import {
   roomOptionsQuery,
   sourceLabels,
 } from '@/lib/booking-editor';
-import { formatMoney, formatRange, languageLabels } from '@/lib/format';
+import { formatMoney, formatPrice, formatRange, languageLabels } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 type EditorState =
@@ -139,7 +139,7 @@ function NewBookingForm({ initial, onDone }: { initial: BookingForm; onDone: () 
           <PriceSummary
             text={
               chosen
-                ? `Room ${chosen.roomName}: ${formatMoney(chosen.quote.total)}`
+                ? `Room ${chosen.roomName}: ${formatPrice(chosen.quote.total)}`
                 : 'Choose a room to see the price'
             }
           />
@@ -318,7 +318,6 @@ function StayFields({
   disabled?: boolean;
   lockCheckIn?: boolean;
 }) {
-  const [childAge, setChildAge] = useState('8');
   const set = (patch: Partial<BookingForm>) => onChange({ ...form, ...patch, roomId: form.roomId });
 
   return (
@@ -362,14 +361,14 @@ function StayFields({
           />
         </div>
         <div className="flex min-w-0 flex-1 flex-col gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground">Children (age)</span>
+          <span className="text-xs font-medium text-muted-foreground">Children</span>
           <div className="flex flex-wrap items-center gap-1.5">
             {form.childAges.map((age, i) => (
               <span
                 key={i}
                 className="inline-flex h-9 items-center gap-1 rounded-control border bg-background pr-1 pl-3 text-sm tabular-nums"
               >
-                {age}
+                {age === 0 ? 'Baby' : `${age} y`}
                 <Button
                   type="button"
                   variant="ghost"
@@ -382,30 +381,26 @@ function StayFields({
                 </Button>
               </span>
             ))}
-            <span className="inline-flex items-center gap-1">
-              <NativeSelect
-                aria-label="Age of the child to add"
-                value={childAge}
-                disabled={disabled}
-                onChange={(e) => setChildAge(e.target.value)}
-                className="w-20"
-              >
-                {Array.from({ length: 18 }, (_, age) => (
-                  <option key={age} value={age}>
-                    {age === 0 ? 'Baby' : age}
-                  </option>
-                ))}
-              </NativeSelect>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={disabled}
-                onClick={() => set({ childAges: [...form.childAges, Number(childAge)] })}
-              >
-                Add child
-              </Button>
-            </span>
+            {/* Picking an age adds the child: there is no age chosen in advance. */}
+            <NativeSelect
+              aria-label="Add a child, by age"
+              value=""
+              disabled={disabled}
+              onChange={(e) =>
+                e.target.value !== '' &&
+                set({ childAges: [...form.childAges, Number(e.target.value)] })
+              }
+              className="w-36"
+            >
+              <option value="" disabled>
+                {form.childAges.length === 0 ? 'Add a child…' : 'Add another…'}
+              </option>
+              {Array.from({ length: 18 }, (_, age) => (
+                <option key={age} value={age}>
+                  {age === 0 ? 'Baby (under 1)' : `${age} ${age === 1 ? 'year' : 'years'} old`}
+                </option>
+              ))}
+            </NativeSelect>
           </div>
         </div>
       </div>
@@ -508,7 +503,7 @@ function RoomPicker({
                   {o.roomId === currentRoomId && ' · current room'}
                 </span>
                 <span className="shrink-0 font-medium tabular-nums">
-                  {formatMoney(o.quote.total)}
+                  {formatPrice(o.quote.total)}
                 </span>
               </button>
             );

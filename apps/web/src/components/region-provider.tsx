@@ -17,10 +17,13 @@ export function RegionProvider({ children }: { children: ReactNode }) {
     usDates: profile ? profile.country === 'US' : current.usDates,
     timeZone: health?.hotel.timezone ?? current.timeZone,
     perRoom: pricing ? pricing.pricingBasis === 'per_room' : current.perRoom,
+    taxAdded: pricing ? pricing.tax.mode === 'exclusive' : current.taxAdded,
   };
   setDisplayRegion(next);
   return (
-    <Fragment key={`${next.currency}:${next.usDates}:${next.timeZone}:${next.perRoom}`}>
+    <Fragment
+      key={`${next.currency}:${next.usDates}:${next.timeZone}:${next.perRoom}:${next.taxAdded}`}
+    >
       {children}
     </Fragment>
   );
