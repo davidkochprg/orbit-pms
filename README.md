@@ -2,7 +2,7 @@
 
 An AI-native property management system for small hotels: anything you can click, you can also just ask for.
 
-![Orbit's tape chart at night: rooms grouped by type, bookings as bars across two weeks](docs/images/tape-chart.jpg)
+![Orbit's Today page: tonight's house map floor by floor, occupancy, arrivals and departures, and what needs attention](docs/images/today.png)
 
 ## Why
 
@@ -18,23 +18,33 @@ Orbit is built the other way round. One set of hotel rules (availability, pricin
 
 Press <kbd>⌘K</kbd> and type what you need: "is a family room free from Friday?", "move the Schulz booking to 201", "who arrives today?". The agent picks tools, shows each step in plain words, and puts anything that would change a booking on a confirm card. Nothing changes until a person clicks Confirm, and every change lands in the audit log.
 
-![The command bar: the agent checks availability, quotes a price and prepares a hold for confirmation](docs/images/agent.png)
+![The command bar over the tape chart: asked who still needs an ID today, the agent reads the daily brief and lists four arriving stays with their rooms](docs/images/agent.png)
 
 ### An inbox that prepares the answer, in two languages
 
 Email, web forms, phone notes and Booking.com messages land in one mail client: conversations with their history, folders, channel filters and search. Opening a message costs nothing. When staff click "Prepare a reply", Orbit reads the conversation, pulls out the dates, party, children's ages and wishes, finds free rooms, prices them with the real pricing rules, and drafts a reply in the guest's language, shown side by side with the receptionist's own language. Either side can be edited and translated into the other. A price guard checks every amount in the draft and its translation against the quote, so a wrong price never reaches a guest. One click puts a hold on the room.
 
-![A German family's apartment request: the message translated, a priced apartment with a Hold button, and the German draft beside the receptionist's version](docs/images/inbox.png)
+![A web-form booking enquiry with a dog: Orbit pulls out the dates, party and wishes, prices a free cabin suite with a Hold button, and drafts the reply](docs/images/inbox.png)
 
 ### Housekeeping by voice
 
 Housekeepers record a note on their phone, in their own language: "205 je hotový, v 204 nefunguje televize". Meta's speech-to-text transcribes it, the model reads it into room updates, and Orbit sets the room statuses and creates repair tasks. These are low-risk and easy to undo, so they apply straight away and the note shows exactly what changed. The board highlights rooms where a guest arrives today but the room isn't inspected yet, and cards can be dragged between columns.
 
-![A typed Czech note applied to the housekeeping board: one room cleaned, one inspected, one repair task created](docs/images/housekeeping.png)
+![The housekeeping board: dirty, clean, inspected and out-of-order columns, with rooms where a guest arrives today but the room isn't inspected yet flagged](docs/images/housekeeping.png)
+
+### Check-in with a phone scan of the ID
+
+The booking panel keeps the guest book per person. "Scan ID" shows a QR code: a phone on the desk opens it, photographs the ID card or passport, and Meta's vision model reads it into the guest-book fields for staff to check before anything is saved. The photo is read in memory and never stored, and the link works for 15 minutes for that one guest. Check-in doesn't wait for the guest book: stays still missing an ID show up on Today and in the daily brief, and the agent can list them.
+
+![A booking open on the tape chart with its guest book: the main guest read from a scanned ID, and the QR code that scans the second guest's document with a phone](docs/images/id-scan.png)
 
 ### A tape chart that follows the day
 
-The Mews-style tape chart groups rooms by type. Drag a booking to another room or other dates, or drag its right edge to change the departure; every drag goes through the same rules as the agent. The optional daylight theme turns the app light at 06:30 and dark at 19:30, with a soft glow that follows the sky: pink dawn, pale midday, orange-violet sunset, then moonlight.
+The Mews-style tape chart groups rooms by type. Drag a booking to another room or other dates, or drag its right edge to change the departure; every drag goes through the same rules as the agent.
+
+![The tape chart: two weeks of bookings by room, with occupancy per night, holds dashed and checked-in stays in green](docs/images/tape-chart.png)
+
+The optional daylight theme turns the app light at 06:30 and dark at 19:30, with a soft glow that follows the sky: pink dawn, pale midday, orange-violet sunset, then moonlight.
 
 ![The tape chart at dawn, midday, sunset and night in the daylight theme](docs/images/daylight.jpg)
 
