@@ -188,6 +188,13 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
   // Every inquiry must be bookable, so the hero flow works on any day. Free up a room if needed.
   const kept = makeInquiriesBookable(bookings, inquiryFixtures, sorted, seedRoomTypes, now);
 
+  // Guest messages about a reservation belong to one: each gets an upcoming OTA booking, made the
+  // sender's, so the inbox opens that booking instead of offering to create one.
+  const {
+    bookings: linked,
+    guests,
+    links,
+  } = linkReservationMessages(kept, seedGuests, inquiryFixtures, today);
   const inquiries: Inquiry[] = inquiryFixtures.map((f) => {
     const receivedAt = new Date(now.getTime() - f.receivedHoursAgo * 3600_000).toISOString();
     return {
@@ -215,19 +222,19 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
       parsed: null,
       suggestion: null,
       status: 'new',
-      bookingId: null,
+      bookingId: links.get(f.id) ?? null,
       processedAt: null,
       processingError: null,
     };
   });
 
   const departingToday = new Set(
-    kept.filter((b) => b.checkOut === today && b.status === 'checked_in').map((b) => b.roomId),
+    linked.filter((b) => b.checkOut === today && b.status === 'checked_in').map((b) => b.roomId),
   );
   const arrivingToday = new Set(
-    kept.filter((b) => b.checkIn === today && b.status === 'confirmed').map((b) => b.roomId),
+    linked.filter((b) => b.checkIn === today && b.status === 'confirmed').map((b) => b.roomId),
   );
-  const inHouse = kept.filter((b) => b.status === 'checked_in' && b.checkOut > today);
+  const inHouse = linked.filter((b) => b.status === 'checked_in' && b.checkOut > today);
   // Departed rooms still need cleaning; rooms for today's arrivals are ready and inspected.
   const rooms = seedRooms.map((r) => ({
     ...r,
@@ -250,23 +257,23 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
     ...t,
   }));
 
-  const billing = buildBilling(kept, today, pricing, extras);
+  const billing = buildBilling(linked, today, pricing, extras);
   return {
     roomTypes: seedRoomTypes,
     rooms,
-    guests: seedGuests,
-    bookings: kept,
+    guests,
+    bookings: linked,
     inquiries: [
       ...inquiries,
-      ...buildConversations(kept, seedGuests, staff, hotelProfile, today, now),
+      ...buildConversations(linked, guests, staff, hotelProfile, today, now),
     ],
     housekeepingTasks,
     hotelProfile,
     pricing,
     staff,
     ...billing,
-    stayGuests: buildStayGuests(kept, seedGuests, today),
-    auditLog: buildActivity(kept, rooms, billing.payments, housekeepingTasks, today, now),
+    stayGuests: buildStayGuests(linked, guests, today),
+    auditLog: buildActivity(linked, rooms, billing.payments, housekeepingTasks, today, now),
   };
 }
 
@@ -321,4 +328,64 @@ function makeInquiriesBookable(
     );
   }
   return result;
+}
+
+/**
+ * Links each "Guest message about reservation …" to an upcoming OTA booking in the next two weeks
+ * and makes the sender its guest. The booking the seeded Booking.com conversation uses is left out.
+ */
+function linkReservationMessages(
+  bookings: Booking[],
+  guests: Guest[],
+  fixtures: ReturnType<typeof buildInquiryFixtures>,
+  today: IsoDate,
+): { bookings: Booking[]; guests: Guest[]; links: Map<string, string> } {
+  const guestOf = (b: Booking) => guests.find((g) => g.id === b.guestId);
+  const taken = bookings.find(
+    (b) =>
+      b.source === 'ota' &&
+      b.status === 'confirmed' &&
+      b.checkIn > today &&
+      guestOf(b)?.language === 'de',
+  );
+  const candidates = bookings.filter(
+    (b) =>
+      b !== taken &&
+      b.source === 'ota' &&
+      b.status === 'confirmed' &&
+      b.checkIn > today &&
+      b.checkIn <= addDays(today, 14),
+  );
+  const links = new Map<string, string>();
+  const senders: Guest[] = [];
+  const owner = new Map<string, string>();
+  for (const f of fixtures) {
+    if (!f.partner || !/reservation \d+/.test(f.subject ?? '')) continue;
+    const name = f.senderName ?? f.expected.guestName;
+    // A sender who is already a guest keeps their own stays; only new names get a booking.
+    if (!name || guests.some((g) => g.name === name)) continue;
+    const booking = candidates.shift();
+    if (!booking) break;
+    const id = `gst_${f.id}`;
+    senders.push({
+      id,
+      name,
+      email: `${name
+        .normalize('NFD')
+        .replace(/[^a-zA-Z ]/g, '')
+        .trim()
+        .toLowerCase()
+        .replace(/ +/g, '.')}@example.com`,
+      phone: null,
+      language: f.expected.language,
+      notes: null,
+    });
+    owner.set(booking.id, id);
+    links.set(f.id, booking.id);
+  }
+  return {
+    bookings: bookings.map((b) => (owner.has(b.id) ? { ...b, guestId: owner.get(b.id)! } : b)),
+    guests: [...guests, ...senders],
+    links,
+  };
 }

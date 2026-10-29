@@ -134,6 +134,16 @@ describe('buildSeed', () => {
     }
   });
 
+  it('links each guest message about a reservation to an upcoming booking of the sender', () => {
+    const messages = seed.inquiries.filter((i) => /reservation \d+/.test(i.subject ?? ''));
+    expect(messages.length).toBeGreaterThan(0);
+    for (const m of messages) {
+      const booking = seed.bookings.find((b) => b.id === m.bookingId);
+      expect(booking).toMatchObject({ source: 'ota', status: 'confirmed' });
+      expect(seed.guests.find((g) => g.id === booking?.guestId)?.name).toBe(m.senderName);
+    }
+  });
+
   it('opens with a recent activity feed from staff and Orbit', () => {
     expect(seed.auditLog.length).toBeGreaterThan(10);
     expect(new Set(seed.auditLog.map((e) => e.actor))).toEqual(new Set(['user', 'agent']));
