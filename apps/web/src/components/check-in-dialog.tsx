@@ -115,8 +115,14 @@ function Flow({ detail, onDone }: { detail: BookingDetail; onDone: () => void })
         {step === 'Guests & IDs' && (
           <div className="flex flex-col gap-3">
             <p className="text-sm text-muted-foreground">
-              Scan each guest&apos;s ID card or passport with a phone, or type the details. Guests
-              without an ID can still check in; you&apos;ll be reminded on the booking.
+              Scan each guest&apos;s ID card or passport with a phone, or type the details.
+              {book.data && book.data.missing > 0 && (
+                <>
+                  {' '}
+                  You can continue without {book.data.missing === 1 ? 'it' : 'them'} and scan{' '}
+                  {book.data.missing === 1 ? 'it' : 'them'} later from the booking.
+                </>
+              )}
             </p>
             <BookingGuests bookingId={booking.id} editable compact />
           </div>
@@ -211,9 +217,8 @@ function Flow({ detail, onDone }: { detail: BookingDetail; onDone: () => void })
           </Button>
         ) : (
           <Button onClick={() => setStep(steps[index + 1]!)}>
-            {step === 'Guests & IDs' && book.data && book.data.missing > 0
-              ? 'Continue without all IDs'
-              : 'Continue'}
+            {/* Checking in without every ID is normal; the summary and the booking keep reminding. */}
+            Continue
           </Button>
         )}
       </DialogFooter>
