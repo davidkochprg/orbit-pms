@@ -1,9 +1,8 @@
 /**
- * GLSL for the welcome scene, in two passes. The scene pass paints a blurred dusk over a mountain
- * ridge, like a night photo from a moving car, at low resolution into a texture. The post pass
- * runs at full resolution: halation, colour fringing, glitch windows (pixel-sort smears and ASCII
- * made from the image itself), a vignette and fine film grain. The palette lives here because it
- * is painted, not UI chrome.
+ * GLSL for the welcome scene, in two passes. The scene pass draws the hero photo, cover-fitted
+ * and slowly moving, into a texture. The post pass runs at full resolution: halation, colour
+ * fringing, glitch windows (pixel-sort smears and ASCII made from the image itself), a vignette
+ * and fine film grain.
  */
 
 export const FULLSCREEN_VERTEX = `
@@ -28,103 +27,49 @@ float grainHash(vec2 p) {
 }
 `;
 
-/** Stored at half brightness, so lights can glow past white for the halation in the post pass. */
+/**
+ * The photo (a storm over a meadow), cover-fitted with its light break under the storm kept in
+ * the part of the page the panel leaves open. It breathes in and out slowly, shifts a little
+ * with the pointer, and the grass in front sways in the wind. Stored so that the post pass's
+ * tone curve gives the photo back, at half brightness for headroom.
+ */
 export const SCENE_FRAGMENT = `
 precision highp float;
 
+uniform sampler2D uPhoto;
+uniform vec2 uPhotoSize;
 uniform vec2 uRes;
 uniform float uTime;
 /** Pointer, -1..1 on each axis, for a little parallax. */
 uniform vec2 uPointer;
-/**
- * The share of the width not covered by the page's panel. The light leak, town glow and planets
- * are composed within it, so the best of the picture stays in view.
- */
+/** The share of the width not covered by the page's panel, where the picture is composed. */
 uniform float uFrame;
 
-${HASHES}
-
-float noise(vec2 p) {
-  vec2 i = floor(p);
-  vec2 f = fract(p);
-  vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(
-    mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),
-    mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x),
-    u.y
-  );
-}
-
-float fbm(vec2 p) {
-  float v = 0.0;
-  float a = 0.5;
-  for (int i = 0; i < 4; i++) {
-    v += a * noise(p);
-    p *= 2.03;
-    a *= 0.5;
-  }
-  return v;
-}
-
-/** An out-of-focus light: a bright core and a wide, faint halo. */
-vec3 glow(vec2 p, vec2 centre, vec2 radius, vec3 color) {
-  vec2 d = (p - centre) / radius;
-  float q = dot(d, d);
-  return color * (exp(-q * 2.5) + 0.25 * exp(-q * 0.25));
-}
+/** Across the photo: the bright break in the clouds and the rain falling in front of it. */
+const float FOCUS = 0.36;
 
 void main() {
   vec2 uv = gl_FragCoord.xy / uRes;
-  float aspect = uRes.x / uRes.y;
-  float t = uTime;
-  float fx = uv.x / uFrame;
-  vec2 par = uPointer * vec2(0.02, 0.012);
-  // The camera drifts slowly sideways, as if from a moving car.
-  float drift = t * 0.01;
+  float screen = uRes.x / uRes.y;
+  float photo = uPhotoSize.x / uPhotoSize.y;
+  // The visible part of the photo, in its own 0..1 coordinates, with room to drift.
+  vec2 span = screen > photo ? vec2(1.0, photo / screen) : vec2(screen / photo, 1.0);
+  span /= 1.08 + 0.025 * sin(uTime * 0.045);
+  vec2 slack = 1.0 - span;
+  float left = clamp(FOCUS - span.x * uFrame * 0.5, 0.0, slack.x);
+  vec2 origin = vec2(left, slack.y * 0.5);
+  origin = clamp(origin - uPointer * vec2(0.012, 0.008), vec2(0.0), slack);
+  vec2 p = origin + uv * span;
 
-  // Sky: night blue overhead, dusty blue, then a lavender haze towards the hills.
-  vec3 col = mix(vec3(0.16, 0.27, 0.52), vec3(0.03, 0.07, 0.18), smoothstep(0.45, 1.0, uv.y));
-  col = mix(col, vec3(0.5, 0.42, 0.66), smoothstep(0.62, 0.36, uv.y) * 0.75);
-  col *= 0.78 + 0.4 * fbm(vec2(uv.x * 1.8 + drift * 0.6, uv.y * 3.5) + par);
+  // Wind through the grass: a gentle sideways sway, strongest in the foreground.
+  float grass = smoothstep(0.5, 0.0, p.y);
+  float gust = 0.6 + 0.4 * sin(uTime * 0.31 + p.x * 3.0);
+  p.x += grass * gust * 0.0022 * sin(p.y * 46.0 + uTime * 1.7 + 2.0 * sin(p.x * 11.0 + uTime * 0.6));
 
-  // Warm town glow behind the ridge, stronger to the right.
-  float horizon = exp(-pow((uv.y - 0.36) * 7.0, 2.0));
-  col += vec3(1.0, 0.48, 0.3) * horizon * (0.25 + 0.35 * smoothstep(0.2, 1.0, fx));
-
-  // A light leak sweeping down from the top right.
-  float x = fx + par.x;
-  float bandY = 0.64 + (x - 0.78) * 0.6 + 0.03 * sin(t * 0.13);
-  float band = exp(-pow((uv.y - bandY) * 6.0, 2.0)) * smoothstep(0.3, 1.0, x);
-  col = mix(col, vec3(0.92, 0.5, 0.58), band * 0.5);
-  col += vec3(1.0, 0.58, 0.3) * pow(band, 2.2) * 0.9 * (0.85 + 0.15 * sin(t * 0.4));
-  col += vec3(0.8, 1.0, 0.86) * pow(band, 8.0) * 0.8 * smoothstep(0.65, 1.0, x);
-
-  // Two red planets.
-  vec2 sq = uv * vec2(aspect, 1.0);
-  col += glow(sq, vec2(0.2 * uFrame * aspect, 0.86) + par, vec2(0.012), vec3(1.0, 0.32, 0.26)) * 1.4;
-  col += glow(sq, vec2(0.3 * uFrame * aspect, 0.78) + par * 1.3, vec2(0.015), vec3(1.0, 0.42, 0.3)) * 1.2;
-
-  // A far, hazy ridge and a near, dark one, both out of focus.
-  float far = 0.4 + 0.08 * fbm(vec2((uv.x + drift * 0.5 + par.x * 0.5) * 3.0, 2.0));
-  col = mix(col, vec3(0.16, 0.12, 0.26), smoothstep(far + 0.02, far - 0.03, uv.y) * 0.85);
-  float near = 0.3 + 0.15 * fbm(vec2((uv.x + drift + par.x) * 1.8 + 5.0, 0.4)) - 0.05 * uv.x;
-  vec3 ground = mix(vec3(0.04, 0.025, 0.06), vec3(0.008, 0.006, 0.016), smoothstep(0.28, 0.0, uv.y));
-  col = mix(col, ground, smoothstep(near + 0.03, near - 0.05, uv.y));
-
-  // Head and tail lights streaking past on the road below.
-  for (int i = 0; i < 12; i++) {
-    float fi = float(i);
-    float h1 = hash(vec2(fi, 1.3));
-    float h2 = hash(vec2(fi, 7.1));
-    float h3 = hash(vec2(fi, 3.9));
-    float speed = (0.01 + h3 * 0.03) * (h1 > 0.5 ? 1.0 : -1.0);
-    vec2 pos = vec2(fract(h1 + t * speed) * 1.3 - 0.15 + par.x * (1.5 + h3), 0.04 + h2 * 0.2);
-    vec3 c = h3 > 0.7 ? vec3(0.45, 1.0, 0.9) : (h3 > 0.4 ? vec3(1.0, 0.86, 0.62) : vec3(1.0, 0.38, 0.14));
-    vec2 size = vec2(0.04 + h2 * 0.07, 0.012 + h1 * 0.012);
-    col += glow(uv, pos, size, c) * (0.7 + 0.3 * sin(t * (0.5 + h1) + fi)) * 1.1;
-  }
-
-  gl_FragColor = vec4(min(col * 0.5, 1.0), 1.0);
+  vec3 c = texture2D(uPhoto, clamp(p, vec2(0.001), vec2(0.999))).rgb;
+  // The inverse of the post pass's tone curve, so the photo comes out as it was shot.
+  vec3 linear = -log(max(1.0 - c * 0.97, 0.001)) / 1.25;
+  gl_FragColor = vec4(min(linear * 0.5, 1.0), 1.0);
 }
 `;
 

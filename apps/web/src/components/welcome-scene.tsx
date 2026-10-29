@@ -1,9 +1,10 @@
 import { type RefObject, useEffect, useRef } from 'react';
-import { FULLSCREEN_VERTEX, POST_FRAGMENT, SCENE_FRAGMENT } from '@/lib/dusk-shader';
+import photoUrl from '@/assets/welcome-field.webp';
 import { type Cell, type GlitchWindow, MAX_WINDOWS, windowsAt } from '@/lib/glitch-windows';
+import { FULLSCREEN_VERTEX, POST_FRAGMENT, SCENE_FRAGMENT } from '@/lib/welcome-shader';
 
-/** The scene pass renders at this share of the panel's CSS pixels; its softness reads as blur. */
-const SCENE_SCALE = 0.5;
+/** Where the photo's focus sits, for the plain image shown without WebGL. */
+const PHOTO_POSITION = '36% center';
 const FRAME_MS = 1000 / 24;
 const CELL_W = 10;
 const CELL_H = 16;
@@ -103,12 +104,23 @@ function createRenderer(canvas: HTMLCanvasElement, scale: number) {
   const atlasTex = texture(gl, gl.LINEAR);
   gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, glyphAtlas(scale));
 
+  const photoTex = texture(gl, gl.LINEAR);
+  let photoSize: [number, number] = [1, 1];
   let sceneW = 1;
   let sceneH = 1;
   return {
+    /** Uploads the photo, bottom row first, as the scene pass reads it with y up. */
+    setPhoto(image: HTMLImageElement) {
+      gl.bindTexture(gl.TEXTURE_2D, photoTex);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+      photoSize = [image.naturalWidth, image.naturalHeight];
+    },
     resize(cssW: number, cssH: number) {
-      sceneW = Math.max(1, Math.round(cssW * SCENE_SCALE));
-      sceneH = Math.max(1, Math.round(cssH * SCENE_SCALE));
+      // The photo is drawn at the canvas's own resolution, so it stays sharp.
+      sceneW = Math.max(1, Math.round(cssW * scale));
+      sceneH = Math.max(1, Math.round(cssH * scale));
       gl.bindTexture(gl.TEXTURE_2D, sceneTex);
       gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, sceneW, sceneH, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
     },
@@ -123,6 +135,10 @@ function createRenderer(canvas: HTMLCanvasElement, scale: number) {
       gl.bindFramebuffer(gl.FRAMEBUFFER, framebuffer);
       gl.viewport(0, 0, sceneW, sceneH);
       select(scene);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, photoTex);
+      gl.uniform1i(at(scene, 'uPhoto'), 0);
+      gl.uniform2f(at(scene, 'uPhotoSize'), photoSize[0], photoSize[1]);
       gl.uniform2f(at(scene, 'uRes'), sceneW, sceneH);
       gl.uniform1f(at(scene, 'uTime'), time);
       gl.uniform2f(at(scene, 'uPointer'), pointer[0], pointer[1]);
@@ -151,10 +167,11 @@ function createRenderer(canvas: HTMLCanvasElement, scale: number) {
 }
 
 /**
- * The welcome page's left panel: a grainy, out-of-focus dusk painted by a shader. Every few
- * seconds the picture glitches into pixel-sort smears and ASCII made from the image itself, a
- * line of live hotel data scrolls in, and the pointer is a lens that turns the sky into
- * characters. One still frame with reduced motion; a plain gradient without WebGL.
+ * The welcome page's scene: the hero photo, a storm over a meadow, slowly moving under film
+ * grain. Every few seconds the picture glitches into pixel-sort smears and ASCII made from the
+ * image itself, a line of live hotel data scrolls in, and the pointer is a lens that turns the
+ * picture into characters. It starts once the photo has loaded, resolving out of ASCII. One
+ * still frame with reduced motion; the plain photo without WebGL.
  */
 export function WelcomeScene({ data, cover }: WelcomeSceneProps) {
   const container = useRef<HTMLDivElement>(null);
@@ -176,7 +193,10 @@ export function WelcomeScene({ data, cover }: WelcomeSceneProps) {
     const glScale = Math.min(window.devicePixelRatio || 1, 1.5);
     const textScale = Math.min(window.devicePixelRatio || 1, 2);
     const renderer = createRenderer(canvas, glScale);
-    if (!renderer) canvas.style.display = 'none';
+    if (!renderer) {
+      canvas.style.display = 'none';
+      box.style.backgroundImage = `url(${photoUrl})`;
+    }
     const glyphColor = getComputedStyle(box).getPropertyValue('--scene-glyph').trim() || '#fff';
     const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const rects = new Float32Array(MAX_WINDOWS * 4);
@@ -185,7 +205,9 @@ export function WelcomeScene({ data, cover }: WelcomeSceneProps) {
     let height = 0;
     let raf = 0;
     let last = 0;
-    const start = performance.now();
+    // Set once the photo has loaded; nothing is drawn before, so the intro plays over the photo.
+    let start = 0;
+    let stopped = false;
     const pointer: [number, number] = [0, 0];
     let target: [number, number] = [0, 0];
     // The lens keeps its last cell while it wipes off after the pointer leaves.
@@ -297,26 +319,41 @@ export function WelcomeScene({ data, cover }: WelcomeSceneProps) {
       target = [(x / rect.width) * 2 - 1, 1 - (y / rect.height) * 2];
       lensCell = { col: Math.floor(x / CELL_W), row: Math.floor(y / CELL_H) };
       lensTarget = 1;
-      if (still) draw(7);
+      if (still && start) draw(7);
     }
     function onLeave() {
       target = [0, 0];
       lensTarget = 0;
-      if (still) draw(7);
+      if (still && start) draw(7);
     }
 
     resize();
     const observer = new ResizeObserver(() => {
       resize();
-      if (still) draw(7);
+      if (still && start) draw(7);
     });
     observer.observe(box);
     if (cover?.current) observer.observe(cover.current);
     box.addEventListener('pointermove', onPointer);
     box.addEventListener('pointerleave', onLeave);
-    if (still) draw(7);
-    else raf = requestAnimationFrame(loop);
+    const photo = new Image();
+    photo.src = photoUrl;
+    photo
+      .decode()
+      .then(() => {
+        if (stopped || !renderer) return;
+        renderer.setPhoto(photo);
+        canvas.style.opacity = '1';
+        start = performance.now();
+        if (still) draw(7);
+        else raf = requestAnimationFrame(loop);
+      })
+      .catch(() => {
+        // Without the photo, the gradient behind the canvas stays.
+        canvas.style.display = 'none';
+      });
     return () => {
+      stopped = true;
       cancelAnimationFrame(raf);
       observer.disconnect();
       box.removeEventListener('pointermove', onPointer);
@@ -330,11 +367,15 @@ export function WelcomeScene({ data, cover }: WelcomeSceneProps) {
       aria-hidden
       className="relative h-full w-full cursor-crosshair overflow-hidden"
       style={{
-        background:
+        backgroundColor: 'var(--scene-ground)',
+        backgroundImage:
           'linear-gradient(to bottom, var(--scene-sky) 0%, var(--scene-haze) 55%, var(--scene-ground) 100%)',
+        backgroundSize: 'cover',
+        backgroundPosition: PHOTO_POSITION,
       }}
     >
-      <canvas ref={glCanvas} className="absolute inset-0 h-full w-full" />
+      {/* Hidden until the photo is in, so the scene doesn't start on an empty texture. */}
+      <canvas ref={glCanvas} className="absolute inset-0 h-full w-full opacity-0" />
       <canvas ref={textCanvas} className="absolute inset-0 h-full w-full" />
     </div>
   );

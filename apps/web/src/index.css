@@ -360,8 +360,8 @@
     color-mix(in oklab, var(--ink) 14%, transparent) 100%
   );
 
-  /* The welcome page's dusk scene: its fallback gradient, the glyphs drawn over it, and the
-     dark page around it. The same in both themes; the scene itself is painted by a shader. */
+  /* The welcome scene: the gradient shown until its photo loads, the glyphs drawn over it, and
+     the dark page around it. The same in both themes; the photo itself is drawn by a shader. */
   --scene-sky: oklch(0.3 0.09 260);
   --scene-haze: oklch(0.45 0.08 290);
   --scene-ground: oklch(0.13 0.03 280);
