@@ -140,8 +140,8 @@ export function ResultCards({
     quotes.length +
     bills.size +
     housekeeping.length;
-  // A search the agent ran to find the booking another card is about was only a step.
-  const shownLists = others > 0 ? lists.filter((l) => l.kind !== 'search') : lists;
+  // A list the agent read to find the booking another card is about was only a step.
+  const shownLists = others > 0 ? [] : lists;
   if (others === 0 && shownLists.length === 0) return null;
   return (
     <div className="flex flex-col gap-2">
