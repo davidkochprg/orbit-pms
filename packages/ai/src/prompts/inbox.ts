@@ -6,6 +6,7 @@ import {
   type Language,
   type StayOption,
 } from '@orbit/shared';
+import { getHotelTimeZone } from '@orbit/domain';
 import { type HotelContext, hotelFacts } from './hotel';
 
 export const languageNames: Record<Language, string> = {
@@ -67,14 +68,35 @@ Rules:
 - Output only the message body, without a subject line. Sign off as the reception of ${name}, in the guest's language.`;
 }
 
+/** When a hold runs out, as the hotel writes it: "Friday, October 30 at 2:10 PM" in the US. */
+export function holdExpiry(iso: string, country: string, timeZone = getHotelTimeZone()): string {
+  const us = country === 'US';
+  const date = new Date(iso);
+  const day = new Intl.DateTimeFormat(us ? 'en-US' : 'en-GB', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone,
+  }).format(date);
+  const time = new Intl.DateTimeFormat(us ? 'en-US' : 'en-GB', {
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: us,
+    timeZone,
+  }).format(date);
+  return `${day} at ${time}`;
+}
+
 export function draftPrompt(params: {
   inquiry: Inquiry;
   analysis: InquiryExtraction;
   options: StayOption[];
   note: string | null;
+  /** A room staff already hold for this guest: the only option, and when the hold ends. */
+  held?: { until: string | null } | null;
   feedback?: string;
 }): string {
-  const { inquiry, analysis, options, note, feedback } = params;
+  const { inquiry, analysis, options, note, held, feedback } = params;
   const offer =
     options.length > 0
       ? options
@@ -87,9 +109,9 @@ export function draftPrompt(params: {
   return `Write the reply in ${languageNames[analysis.language]}.
 Guest name: ${analysis.guestName ?? inquiry.senderName ?? 'unknown'}
 ${analysis.question ? `They ask: ${analysis.question}\n` : ''}
-Options to offer:
+${held ? 'Already on hold for the guest' : 'Options to offer'}:
 ${offer}
-${feedback ? `\nYour previous draft was rejected: ${feedback} Use only the amounts listed above.\n` : ''}
+${held ? `This room is held for them${held.until ? ` until ${held.until}` : ''}. Say so, and ask them to reply to confirm the booking.\n` : ''}${feedback ? `\nYour previous draft was rejected: ${feedback} Use only the amounts listed above.\n` : ''}
 Reply to the guest's latest message. The conversation, oldest first:
 
 ${transcript(inquiry)}`;

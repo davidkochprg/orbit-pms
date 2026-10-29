@@ -7,8 +7,10 @@ import {
   usDemoPricing,
 } from '@orbit/domain';
 import { conversation } from '@orbit/domain/testing';
+import type { StayOption } from '@orbit/shared';
 import { runAgent } from '../agent';
 import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from '../cost';
+import { holdExpiry } from '../prompts/inbox';
 import { buildSystemPrompt } from '../prompts/system';
 import { draftReply, extractMessage } from '../inbox';
 import { amountsInText, checkDraftPrices } from '../price-guard';
@@ -268,42 +270,67 @@ const draftHotel: HotelContext = {
   policy: hotelPolicy,
   pricing: usDemoPricing,
 };
+const draftFixtures = buildInquiryFixtures(today).filter((f) => f.expected.kind !== 'other');
+// A few requests again with their first room already held, as after staff click Hold: the
+// draft should present that room alone, at its exact total.
+const heldFixtures: { fixture: InquiryFixture; option: StayOption }[] = [];
+for (const fixture of draftFixtures) {
+  if (heldFixtures.length === 3) break;
+  const { options } = await buildDraftEvalHotel(today).inboxOptions(fixture.expected);
+  if (options[0]) heldFixtures.push({ fixture, option: options[0] });
+}
+const holdEnds = new Date(Date.parse(`${today}T21:00:00Z`) + 2 * 86_400_000).toISOString();
+
+async function runDraft(
+  f: InquiryFixture,
+  options: StayOption[],
+  note: string | null,
+  held = false,
+) {
+  const { draft, tokens, modelId } = await draftReply(provider.draft, draftHotel, {
+    inquiry: inquiryFor(f),
+    analysis: f.expected,
+    options,
+    note,
+    held: held ? { until: holdExpiry(holdEnds, draftHotel.profile.country) } : null,
+  });
+  const check = checkDraftPrices(draft, options, amountsInText(hotelFacts(draftHotel)));
+  const problems = [
+    ...(draft ? [] : ['empty draft']),
+    ...(check.ok
+      ? []
+      : [
+          ...check.unexpected.map((a) => `unexpected amount ${a}`),
+          ...check.missing.map((a) => `missing total ${a}`),
+        ]),
+  ];
+  return {
+    passed: problems.length === 0,
+    label: `${f.expected.language}  ${modelId}  ${problems.join(', ')}`,
+    detail: `      options  ${options.map((o) => `${o.roomName} ${o.quote.total}`).join(', ') || 'none'}\n      draft    ${draft.replace(/\n/g, ' ')}`,
+    tokens,
+  };
+}
+
 const draftsOk = await suite(
   'drafts',
   'Reply drafts',
   reasoningEffort.draft,
   provider.draftModelId,
-  buildInquiryFixtures(today)
-    .filter((f) => f.expected.kind !== 'other')
-    .map((f) => ({
+  [
+    ...draftFixtures.map((f) => ({
       id: f.id,
       run: async () => {
         // The expected extraction stands in for the model's, so only the draft is measured.
         const { options, note } = await buildDraftEvalHotel(today).inboxOptions(f.expected);
-        const { draft, tokens, modelId } = await draftReply(provider.draft, draftHotel, {
-          inquiry: inquiryFor(f),
-          analysis: f.expected,
-          options,
-          note,
-        });
-        const check = checkDraftPrices(draft, options, amountsInText(hotelFacts(draftHotel)));
-        const problems = [
-          ...(draft ? [] : ['empty draft']),
-          ...(check.ok
-            ? []
-            : [
-                ...check.unexpected.map((a) => `unexpected amount ${a}`),
-                ...check.missing.map((a) => `missing total ${a}`),
-              ]),
-        ];
-        return {
-          passed: problems.length === 0,
-          label: `${f.expected.language}  ${modelId}  ${problems.join(', ')}`,
-          detail: `      options  ${options.map((o) => `${o.roomName} ${o.quote.total}`).join(', ') || 'none'}\n      draft    ${draft.replace(/\n/g, ' ')}`,
-          tokens,
-        };
+        return runDraft(f, options, note);
       },
     })),
+    ...heldFixtures.map(({ fixture, option }) => ({
+      id: `${fixture.id}-held`,
+      run: () => runDraft(fixture, [option], null, true),
+    })),
+  ],
 );
 
 const translateEffort = reasoningEffort.translate;

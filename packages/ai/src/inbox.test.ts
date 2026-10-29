@@ -144,6 +144,28 @@ describe('inbox pipeline', () => {
     expect(calls[1]).toContain(TOTAL);
   });
 
+  it('writes about the held room once staff hold one, keeping it first in the options', async () => {
+    const heldDraft = `Pokoj 101 vám držíme, cena ${TOTAL}. Potvrďte prosím rezervaci.`;
+    const { inbox, pipeline, calls } = setup([
+      JSON.stringify(request),
+      `Cena ${TOTAL}.`,
+      JSON.stringify(request),
+      heldDraft,
+    ]);
+    const msg = await inbox.create(message);
+    await pipeline.process(msg.id);
+    await inbox.createHold(msg.id, 'rm_1', 'user');
+    const result = await pipeline.process(msg.id, { force: true });
+
+    // The held room is taken now, but stays on offer to this guest at its quoted price.
+    expect(result.suggestion?.options.map((o) => [o.roomName, o.quote.total])).toEqual([
+      ['101', 5000],
+    ]);
+    expect(result.suggestion?.draft).toBe(heldDraft);
+    expect(calls[3]).toContain('Already on hold for the guest');
+    expect(calls[3]).toMatch(/held for them until \w+day/);
+  });
+
   it('retries once when the draft states a wrong price', async () => {
     const good = `Pokoj stojí ${TOTAL}.`;
     const { inbox, pipeline, records, calls } = setup([

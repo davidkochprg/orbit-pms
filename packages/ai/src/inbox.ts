@@ -18,9 +18,16 @@ import {
   draftSystemPrompt,
   extractionPrompt,
   extractionSystemPrompt,
+  holdExpiry,
 } from './prompts/inbox';
 import type { Translator } from './translate';
 import type { AiFeature, UsageStore } from './usage';
+
+/** A room held for the guest from this message, and when the hold ends (ISO). */
+interface HeldRoom {
+  option: StayOption;
+  until: string | null;
+}
 
 export interface InboxPipelineDeps {
   /** Extracts the request; needs structured output. */
@@ -101,13 +108,32 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
     });
   }
 
+  /** The message's hold, while it is one, as an option priced at its quote. */
+  async function heldRoom(inquiry: Inquiry): Promise<HeldRoom | null> {
+    if (!inquiry.bookingId) return null;
+    const { booking, room, roomType } = await hotel.getBookingDetail(inquiry.bookingId);
+    if (booking.status !== 'hold' || !booking.priceSnapshot) return null;
+    return {
+      option: {
+        roomId: room.id,
+        roomName: room.name,
+        roomTypeName: roomType.name,
+        kind: room.kind,
+        quote: booking.priceSnapshot,
+      },
+      until: booking.holdExpiresAt,
+    };
+  }
+
   async function draftWithGuard(
     inquiry: Inquiry,
     analysis: InquiryExtraction,
     options: StayOption[],
     note: string | null,
+    held: HeldRoom | null,
   ): Promise<{ draft: string | null; note: string | null }> {
     const context = await hotelContext();
+    const until = held?.until ? holdExpiry(held.until, context.profile.country) : null;
     // Fees the profile states may be repeated; every other amount must come from a quote.
     const stated = amountsInText(hotelFacts(context));
     let feedback: string | undefined;
@@ -121,6 +147,7 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
         analysis,
         options,
         note,
+        held: held && { until },
         ...(feedback && { feedback }),
       });
       await record('inbox_draft', tokens, servedBy);
@@ -163,11 +190,17 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
       try {
         const { analysis, tokens } = await extractMessage(model, inquiry, today());
         await record('inbox_extract', tokens);
-        const { options, note } = await hotel.inboxOptions(analysis);
+        const { options: free, note } = await hotel.inboxOptions(analysis);
+        // A room staff already hold is no longer free; it leads the options, and the draft
+        // tells the guest it is held for them instead of offering every room again.
+        const held = await heldRoom(inquiry);
+        const options = held
+          ? [held.option, ...free.filter((o) => o.roomId !== held.option.roomId)]
+          : free;
         const { draft, note: finalNote } =
           analysis.kind === 'other'
             ? { draft: null, note }
-            : await draftWithGuard(inquiry, analysis, options, note);
+            : await draftWithGuard(inquiry, analysis, held ? [held.option] : options, note, held);
         let draftTranslation: Translation | null = null;
         if (draft && language && language !== analysis.language) {
           // The draft is the result; without its translation staff still have it to send.
