@@ -34,6 +34,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useSession } from '@/hooks/use-session';
+import { useToast } from '@/hooks/use-toast';
 import {
   useBookingDetail,
   useDeclineInquiry,
@@ -222,6 +223,7 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
   const setArchived = useSetArchived(m.id);
   const decline = useDeclineInquiry(m.id);
   const [receiving, setReceiving] = useState(false);
+  const { toast } = useToast();
   const archived = m.archivedAt !== null;
   const error = setUnread.error ?? setArchived.error ?? decline.error;
 
@@ -240,12 +242,31 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
           <IconButton label="Add the guest's reply" onClick={() => setReceiving(true)}>
             <MessageSquarePlus />
           </IconButton>
-          <IconButton label="Mark as unread" onClick={() => setUnread.mutate(true)}>
+          <IconButton
+            label="Mark as unread"
+            onClick={() =>
+              setUnread.mutate(true, {
+                onSuccess: () =>
+                  toast({
+                    title: 'Marked as unread',
+                    action: { label: 'Undo', run: () => setUnread.mutate(false) },
+                  }),
+              })
+            }
+          >
             <Mail />
           </IconButton>
           <IconButton
             label={archived ? 'Move back to the inbox' : 'Archive'}
-            onClick={() => setArchived.mutate(!archived)}
+            onClick={() =>
+              setArchived.mutate(!archived, {
+                onSuccess: () =>
+                  toast({
+                    title: archived ? 'Moved back to the inbox' : 'Archived',
+                    action: { label: 'Undo', run: () => setArchived.mutate(archived) },
+                  }),
+              })
+            }
           >
             {archived ? <ArchiveRestore /> : <Archive />}
           </IconButton>

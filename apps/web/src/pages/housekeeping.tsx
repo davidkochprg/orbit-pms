@@ -34,9 +34,10 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useToast } from '@/hooks/use-toast';
 import { useHealth, useHousekeeping, useSetRoomStatus, useSetTaskStatus } from '@/lib/api';
 import { formatLongDate } from '@/lib/format';
-import { boardColumns, needsAction } from '@/lib/housekeeping';
+import { boardColumns, needsAction, taskLabel } from '@/lib/housekeeping';
 import { roomStatusColor, roomStatusLabels } from '@/lib/status';
 import { cn } from '@/lib/utils';
 
@@ -45,6 +46,7 @@ export function HousekeepingPage() {
   const health = useHealth();
   const setStatus = useSetRoomStatus();
   const setTask = useSetTaskStatus();
+  const { toast } = useToast();
   const [noteOpen, setNoteOpen] = useState(false);
   const [noteMode, setNoteMode] = useState<NoteMode>('voice');
   // Undefined: closed. A room ID or null: open, with or without a room chosen.
@@ -62,15 +64,61 @@ export function HousekeepingPage() {
     setNoteOpen(true);
   }
 
-  function onDragEnd({ active, over }: DragEndEvent) {
-    const item = board.data?.rooms.find((r) => r.room.id === active.id);
-    const status = over?.id as RoomStatus | undefined;
-    if (item && status && status !== item.room.status) {
-      setStatus.mutate({ roomId: item.room.id, status });
-    }
+  /** Sets a room's status and says so, with Undo back to what it was. */
+  function changeStatus(roomId: string, status: RoomStatus) {
+    const item = board.data?.rooms.find((r) => r.room.id === roomId);
+    if (!item || status === item.room.status) return;
+    const from = item.room.status;
+    // Marking a room clean or inspected completes its cleaning tasks; Undo opens them again.
+    const completes = item.openTasks.filter(
+      (t) =>
+        (status === 'clean' || status === 'inspected') &&
+        (t.type === 'turnover' || t.type === 'stayover'),
+    );
+    setStatus.mutate(
+      { roomId, status },
+      {
+        onSuccess: () =>
+          toast({
+            title: `Room ${item.room.name} marked ${roomStatusLabels[status].toLowerCase()}`,
+            action: {
+              label: 'Undo',
+              run: () =>
+                setStatus.mutate(
+                  { roomId, status: from },
+                  {
+                    onSuccess: () => {
+                      for (const t of completes) setTask.mutate({ id: t.id, status: t.status });
+                    },
+                  },
+                ),
+            },
+          }),
+      },
+    );
   }
 
-  const completeTask = (task: HousekeepingTask) => setTask.mutate({ id: task.id, status: 'done' });
+  function onDragEnd({ active, over }: DragEndEvent) {
+    const status = over?.id as RoomStatus | undefined;
+    if (status) changeStatus(String(active.id), status);
+  }
+
+  const completeTask = (task: HousekeepingTask) =>
+    setTask.mutate(
+      { id: task.id, status: 'done' },
+      {
+        onSuccess: () => {
+          const room = board.data?.rooms.find((r) => r.room.id === task.roomId)?.room.name;
+          toast({
+            title: `${taskLabel(task)} done${room ? ` in ${room}` : ''}`,
+            action: {
+              label: 'Undo',
+              run: () => setTask.mutate({ id: task.id, status: task.status }),
+            },
+          });
+        },
+      },
+    );
   const error = setStatus.error ?? setTask.error;
 
   return (
@@ -147,7 +195,7 @@ export function HousekeepingPage() {
                   rooms={sortForAction(board.data.rooms.filter((r) => r.room.status === status))}
                   busyRoomId={setStatus.isPending ? setStatus.variables.roomId : null}
                   onCompleteTask={completeTask}
-                  onSetStatus={(roomId, s) => setStatus.mutate({ roomId, status: s })}
+                  onSetStatus={changeStatus}
                   onAddTask={setTaskRoom}
                 />
               ))}

@@ -1,6 +1,7 @@
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router';
 import { ThemeProvider } from '@/components/theme-provider';
+import { ToastProvider } from '@/components/toast-provider';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { ApiRequestError } from '@/lib/api';
 import { router } from '@/router';
@@ -23,7 +24,9 @@ export function App() {
     <ThemeProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <RouterProvider router={router} />
+          <ToastProvider>
+            <RouterProvider router={router} />
+          </ToastProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </ThemeProvider>
