@@ -18,6 +18,7 @@ import type {
   Inquiry,
   IsoDate,
   Payment,
+  QuoteAddons,
   StayGuest,
   Room,
   RoomType,
@@ -57,6 +58,8 @@ interface Draft {
   anchor?: boolean;
   adults?: number;
   childAges?: number[];
+  addons?: Partial<QuoteAddons>;
+  notes?: string;
 }
 
 // Two months back, so a report and the period before it both have stays to compare.
@@ -90,8 +93,29 @@ function anchors(today: IsoDate): Draft[] {
       anchor: true,
       adults: 2,
       childAges: [2, 7],
+      notes: 'Cot for our 2-year-old, please.',
     },
-    { roomId: 'rm_102', checkIn: addDays(today, -3), checkOut: today, anchor: true },
+    // Two departures housekeeping should tell apart: a short work trip, and a family with a dog
+    // back from the trails.
+    {
+      roomId: 'rm_102',
+      checkIn: addDays(today, -2),
+      checkOut: today,
+      anchor: true,
+      adults: 1,
+      childAges: [],
+      notes: 'Business trip. Invoice to the company.',
+    },
+    {
+      roomId: 'rm_a4',
+      checkIn: addDays(today, -5),
+      checkOut: today,
+      anchor: true,
+      adults: 2,
+      childAges: [3, 6],
+      addons: { dogs: 1 },
+      notes: 'Hiking holiday with our dog. Asked where to rinse muddy boots.',
+    },
     { roomId: 'rm_205', checkIn: addDays(today, -4), checkOut: today, anchor: true },
     { roomId: 'rm_202', checkIn: addDays(today, -2), checkOut: addDays(today, 2), anchor: true },
   ];
@@ -153,6 +177,7 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
       wellness: random.chance(0.4),
       dogs: room.kind === 'apartment' && random.chance(0.3) ? 1 : 0,
       extraBeds: 0,
+      ...draft.addons,
     };
     // One guest is never in two rooms at once.
     const guest = pickFreeGuest(random, stays, draft);
@@ -181,7 +206,7 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
       source: random.pick(sources),
       addons,
       priceSnapshot: quote({ ...draft, roomType, adults, childAges, addons }, pricing),
-      notes: addons.dogs > 0 ? 'Travelling with a dog.' : null,
+      notes: draft.notes ?? (addons.dogs > 0 ? 'Travelling with a dog.' : null),
     });
   }
 
