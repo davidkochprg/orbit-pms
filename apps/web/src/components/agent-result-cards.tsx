@@ -32,18 +32,10 @@ import { Mention, RoomBadge } from '@/components/agent-mention';
 import { Button } from '@/components/ui/button';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
-import { asToolError } from '@/lib/agent';
+import { asToolError, type ToolResult } from '@/lib/agent';
 import { useRoomTypes } from '@/lib/api';
 import { formatMoney, formatParty, formatRange } from '@/lib/format';
 import { cn } from '@/lib/utils';
-
-/** A finished tool step: what the agent asked for and what came back. */
-export interface ToolResult {
-  id: string;
-  name: string;
-  input: unknown;
-  output: unknown;
-}
 
 /**
  * Cards straight from the tools, so the amounts are exactly what the domain worked out: reports,

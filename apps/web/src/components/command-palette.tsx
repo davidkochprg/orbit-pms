@@ -28,6 +28,7 @@ import {
 } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { AgentStatus } from '@/components/agent-status';
+import { FollowUps } from '@/components/agent-follow-ups';
 import { AgentThread } from '@/components/agent-thread';
 import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
@@ -37,11 +38,13 @@ import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import {
   CommandPaletteContext,
+  useCommandPalette,
   type OpenPaletteOptions,
   type PaletteMode,
 } from '@/hooks/use-command-palette';
 import { useDarkMode } from '@/hooks/use-dark-mode';
-import { agentErrorMessage, proposalIds, suggestedQuestions } from '@/lib/agent';
+import { agentErrorMessage, proposalIds, suggestedQuestions, toolResults } from '@/lib/agent';
+import { followUps } from '@/lib/agent-follow-ups';
 import {
   useDayOverview,
   useGuests,
@@ -392,6 +395,17 @@ function AgentView({
   // The shortcuts act on the newest change still waiting, the one just proposed.
   const target = proposals.findLast((_, i) => statuses[i]?.data?.status === 'pending') ?? null;
   const resolve = useResolveAnyPendingAction();
+  const navigate = useNavigate();
+  const { closePalette } = useCommandPalette();
+  // Next steps come from what the latest answer showed, once it is finished.
+  const lastMessage = chat.messages.at(-1);
+  const next = useMemo(
+    () =>
+      chat.status === 'ready' && lastMessage?.role === 'assistant'
+        ? followUps(toolResults(lastMessage))
+        : [],
+    [chat.status, lastMessage],
+  );
 
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
@@ -482,6 +496,20 @@ function AgentView({
         {chat.error && <ErrorNotice message={agentErrorMessage(chat.error)} className="mt-3" />}
       </div>
 
+      {next.length > 0 && (
+        <div className="shrink-0 border-t px-5 py-2.5">
+          <FollowUps
+            followUps={next}
+            onPick={(f) => {
+              if ('ask' in f) onAsk(f.ask);
+              else {
+                closePalette();
+                void navigate(f.path);
+              }
+            }}
+          />
+        </div>
+      )}
       {resolve.isError && (
         <p className="border-t px-5 py-2 text-xs text-destructive">{resolve.error.message}</p>
       )}

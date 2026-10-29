@@ -32,6 +32,7 @@ import {
   type AgentOrbState,
   orbStateFor,
   toolLabel,
+  toolResults,
   toolResultSummary,
 } from '@/lib/agent';
 import {
@@ -218,11 +219,7 @@ function AssistantMessage({
               b.type === 'list' && b.items.some((i) => i.lead && entityKind(i.lead) === 'booking'),
           )
         }
-        results={tools.flatMap((p) =>
-          p.state === 'output-available'
-            ? [{ id: p.toolCallId, name: getToolName(p), input: p.input, output: p.output }]
-            : [],
-        )}
+        results={toolResults(message)}
       />
       {proposals.map((p) => (
         <PendingActionCard

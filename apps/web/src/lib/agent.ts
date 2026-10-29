@@ -1,4 +1,4 @@
-import { isToolUIPart, type UIMessage } from 'ai';
+import { getToolName, isToolUIPart, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { formatMoney } from '@/lib/format';
 
@@ -23,6 +23,25 @@ export function proposalIds(messages: UIMessage[]): string[] {
       return proposal ? [proposal.pendingActionId] : [];
     }),
   );
+}
+
+/** A finished tool step: what the agent asked for and what came back. */
+export interface ToolResult {
+  id: string;
+  name: string;
+  input: unknown;
+  output: unknown;
+}
+
+/** The finished steps of an assistant message, in order. */
+export function toolResults(message: UIMessage): ToolResult[] {
+  return message.parts
+    .filter(isToolUIPart)
+    .flatMap((p) =>
+      p.state === 'output-available'
+        ? [{ id: p.toolCallId, name: getToolName(p), input: p.input, output: p.output }]
+        : [],
+    );
 }
 
 const toolErrorSchema = z.object({ error: z.object({ code: z.string(), message: z.string() }) });
