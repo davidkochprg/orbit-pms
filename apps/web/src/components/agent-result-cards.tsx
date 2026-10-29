@@ -8,6 +8,8 @@ import {
   folioSchema,
   quoteAddonsSchema,
   quoteSchema,
+  type Report,
+  reportSchema,
   roomOptionSchema,
   type AgentBookingRow,
   type Folio,
@@ -20,6 +22,7 @@ import { useState } from 'react';
 import { type BookingListKind, BookingListCard } from '@/components/agent-booking-list-card';
 import { BriefCard } from '@/components/agent-brief-card';
 import { AgentCard, AgentCardHeader, Amounts } from '@/components/agent-card';
+import { ReportCard } from '@/components/agent-report-card';
 import {
   type HousekeepingChangeResult,
   HousekeepingCard,
@@ -42,8 +45,8 @@ export interface ToolResult {
 }
 
 /**
- * Cards straight from the tools, so the amounts are exactly what the domain worked out: the
- * day's brief, the bookings a list tool returned, one card per availability check and per quote
+ * Cards straight from the tools, so the amounts are exactly what the domain worked out: reports,
+ * the day's brief, the bookings a list tool returned, one card per availability check and per quote
  * asked for, the latest bill of each booking, and the housekeeping changes the agent made.
  */
 const bookingLists: Record<string, BookingListKind> = {
@@ -62,11 +65,16 @@ export function ResultCards({
 }) {
   const lists: { key: string; kind: BookingListKind; rows: AgentBookingRow[] }[] = [];
   const briefs = new Map<string, DailyBrief>();
+  const reports: Report[] = [];
   const searches: { key: string; options: RoomOption[]; addons: QuoteAddons }[] = [];
   const quotes: { key: string; quote: Quote; roomId: string | null }[] = [];
   const bills = new Map<string, Folio>();
   const housekeeping: HousekeepingChangeResult[] = [];
   for (const { id, name, input, output } of results) {
+    if (name === 'getReport') {
+      const parsed = reportSchema.safeParse(output);
+      if (parsed.success) reports.push(parsed.data);
+    }
     if (name === 'getDailyBrief') {
       const parsed = dailyBriefSchema.safeParse(output);
       if (parsed.success) briefs.set(parsed.data.date, parsed.data);
@@ -114,6 +122,7 @@ export function ResultCards({
     }
   }
   if (
+    reports.length === 0 &&
     briefs.size === 0 &&
     lists.length === 0 &&
     searches.length === 0 &&
@@ -125,6 +134,9 @@ export function ResultCards({
   }
   return (
     <div className="flex flex-col gap-2">
+      {reportPairs(reports).map(({ report, previous }) => (
+        <ReportCard key={`${report.from}-${report.to}`} report={report} previous={previous} />
+      ))}
       {[...briefs.values()].map((brief) => (
         <BriefCard key={brief.date} brief={brief} />
       ))}
@@ -143,6 +155,23 @@ export function ResultCards({
       {housekeeping.length > 0 && <HousekeepingCard changes={housekeeping} />}
     </div>
   );
+}
+
+/**
+ * Reports to show: when the agent ran a period and the one just before it, as it does to compare,
+ * they make one card with the change; any other report gets its own.
+ */
+function reportPairs(reports: Report[]): { report: Report; previous: Report | null }[] {
+  const pairs: { report: Report; previous: Report | null }[] = [];
+  const used = new Set<Report>();
+  for (const report of [...reports].sort((a, b) => b.from.localeCompare(a.from))) {
+    if (used.has(report)) continue;
+    const previous = reports.find((r) => r.to === report.from && !used.has(r)) ?? null;
+    used.add(report);
+    if (previous) used.add(previous);
+    pairs.push({ report, previous });
+  }
+  return pairs;
 }
 
 function QuoteCard({ quote, roomId }: { quote: Quote; roomId: string | null }) {

@@ -1,7 +1,8 @@
 import type { Report, ReportDay } from '@orbit/shared';
-import { ArrowDownRight, ArrowUpRight, ChevronRight, Minus } from 'lucide-react';
+import { ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
+import { ChangeBadge } from '@/components/change-badge';
 import { ErrorNotice } from '@/components/error-notice';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Panel } from '@/components/panel';
@@ -210,26 +211,6 @@ function ReportView({
         <UnpaidDepartures report={report} />
       </div>
     </div>
-  );
-}
-
-function ChangeBadge({ change, vs }: { change: Change; vs: string }) {
-  const Icon =
-    change.direction === 'up' ? ArrowUpRight : change.direction === 'down' ? ArrowDownRight : Minus;
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-0.5 text-xs tabular-nums',
-        change.direction === 'up' && 'text-success',
-        change.direction === 'down' && 'text-destructive',
-        change.direction === 'flat' && 'text-muted-foreground',
-      )}
-      title={vs}
-    >
-      <Icon className="size-3.5" aria-hidden />
-      {change.label}
-      <span className="sr-only"> {vs}</span>
-    </span>
   );
 }
 

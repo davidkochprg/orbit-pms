@@ -1,3 +1,4 @@
+import { currencySchema, reportSchema } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { callOptions, setup } from './test-setup';
 
@@ -131,14 +132,22 @@ describe('agent tools', () => {
     expect(repos.state.bookings.find((b) => b.id === 'bk_1')?.notes).toBeNull();
   });
 
-  it('reports a period without the daily series', async () => {
+  it('reports a period, with the daily series for the app but not for the model', async () => {
     const { tools } = setup();
-    const report = await tools.getReport.execute(
-      { from: '2026-05-10', to: '2026-05-12' },
-      callOptions,
-    );
+    const input = { from: '2026-05-10', to: '2026-05-12' };
+    const report = await tools.getReport.execute(input, callOptions);
     expect(report).toMatchObject({ roomNightsSold: 2, roomNightsAvailable: 4, occupancy: 0.5 });
-    expect(report).not.toHaveProperty('days');
+    expect(report).toHaveProperty('days', [
+      expect.objectContaining({ date: '2026-05-10' }),
+      expect.objectContaining({ date: '2026-05-11' }),
+    ]);
+    const forModel = await tools.getReport.toModelOutput?.({
+      toolCallId: 'call_1',
+      input,
+      output: reportSchema.extend({ currency: currencySchema }).parse(report),
+    });
+    expect(forModel).toMatchObject({ type: 'json', value: { occupancy: 0.5, currency: 'CZK' } });
+    expect((forModel as { value: object }).value).not.toHaveProperty('days');
   });
 
   it('reads a bill with city tax and the open balance', async () => {

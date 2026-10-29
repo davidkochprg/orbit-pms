@@ -17,6 +17,7 @@ import {
   bookingSearchSchema,
   chargePatchSchema,
   createHoldInputSchema,
+  currencySchema,
   type GuestBook,
   guestPatchSchema,
   type HousekeepingBoard,
@@ -32,6 +33,7 @@ import {
   roomOptionSchema,
   roomOptionsQuerySchema,
   reportQuerySchema,
+  reportSchema,
   roomStatusSchema,
   stayGuestPatchSchema,
 } from '@orbit/shared';
@@ -84,6 +86,14 @@ function optionsForModel({ output }: { output: unknown }): { type: 'json'; value
       currency: quote.currency,
     })),
   };
+}
+
+/** The daily series is for the app's chart; the model gets the totals and slices. */
+function reportForModel({ output }: { output: unknown }): { type: 'json'; value: JSONValue } {
+  const report = reportSchema.extend({ currency: currencySchema }).safeParse(output);
+  if (!report.success) return { type: 'json', value: output as JSONValue };
+  const { days: _, ...rest } = report.data;
+  return { type: 'json', value: rest };
 }
 
 function compact(s: BookingSummary): AgentBookingRow {
@@ -322,11 +332,11 @@ export function createAgentTools({
         'Performance for a period of nights [from, to): occupancy, ADR, RevPAR, room/add-on/extras revenue, city tax, guest nights, arrivals, average stay, cancellations, by booking source and room type, payments by method, departed guests who still owe, and a daily series. Occupancy is a fraction (0.5 = 50%). For "last month" use the first of that month to the first of this month. Compare periods by calling it twice. Repeat figures verbatim.',
       inputSchema: reportQuerySchema,
       execute: (query) =>
-        safely(async () => {
-          // The daily series is for charts; the model gets the totals and slices.
-          const { days: _, ...report } = await reports.getReport(query);
-          return report;
-        }),
+        safely(async () => ({
+          ...(await reports.getReport(query)),
+          currency: (await billing.pricing()).currency,
+        })),
+      toModelOutput: reportForModel,
     }),
     getBill: tool({
       description:
