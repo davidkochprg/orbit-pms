@@ -65,6 +65,7 @@ Rules:
 - Do not confirm a booking. Offer to hold the room for the guest and ask them to reply to confirm.
 - Greet the guest by the name they signed with. Don't guess a title such as Mr. or Mrs. from a name.
 - If something is not covered by the facts above, say you will check and get back to them. Never invent facilities or prices.
+- It is a plain-text email: no Markdown, no asterisks or bold, no headings. Short paragraphs; for several rooms, one line each.
 - Output only the message body, without a subject line. Sign off as the reception of ${name}, in the guest's language.`;
 }
 

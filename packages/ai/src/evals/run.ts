@@ -297,6 +297,8 @@ async function runDraft(
   const check = checkDraftPrices(draft, options, amountsInText(hotelFacts(draftHotel)));
   const problems = [
     ...(draft ? [] : ['empty draft']),
+    // It goes out as a plain-text email, where Markdown shows as stray symbols.
+    ...(/\*\*|^#{1,6} /m.test(draft) ? ['Markdown in the email'] : []),
     ...(check.ok
       ? []
       : [
