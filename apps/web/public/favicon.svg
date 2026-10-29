@@ -1,8 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
   <!-- Orbit's mark (logo-mark.tsx) in white on a dark tile, so it reads on light and dark tabs. -->
   <rect width="32" height="32" rx="8" fill="#111113" />
-  <g transform="translate(16 16) rotate(-45) scale(0.82)" fill="#fff">
-    <path id="M5.57 -0.62A5.6 5.6 0 0 0 -5.57 -0.62L-15.1 -0.62A0.3 0.3 0 0 1 -15.1 -1.22C-10.1 -2.42 -9.59 -3.48 -6.02 -6.69A9 9 0 0 1 6.02 -6.69C9.59 -3.48 10.1 -2.42 15.1 -1.22A0.3 0.3 0 0 1 15.1 -0.62Z" d="M5.57 -0.62A5.6 5.6 0 0 0 -5.57 -0.62L-15.1 -0.62A0.3 0.3 0 0 1 -15.1 -1.22C-10.1 -2.42 -9.59 -3.48 -6.02 -6.69A9 9 0 0 1 6.02 -6.69C9.59 -3.48 10.1 -2.42 15.1 -1.22A0.3 0.3 0 0 1 15.1 -0.62Z" />
+  <g transform="translate(16 16) rotate(-45) scale(0.9)" fill="#fff">
+    <path id="half" d="M5.57 -0.62A5.6 5.6 0 0 0 -5.57 -0.62L-15.1 -0.62A0.3 0.3 0 0 1 -15.1 -1.22C-10.1 -2.42 -9.59 -3.48 -6.02 -6.69A9 9 0 0 1 6.02 -6.69C9.59 -3.48 10.1 -2.42 15.1 -1.22A0.3 0.3 0 0 1 15.1 -0.62Z" />
     <use href="#half" transform="rotate(180)" />
   </g>
 </svg>
