@@ -127,6 +127,13 @@
       "when": 1793194110751,
       "tag": "0017_drop_inquiry_text",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1793278104351,
+      "tag": "0018_pending_action_details",
+      "breakpoints": true
     }
   ]
 }

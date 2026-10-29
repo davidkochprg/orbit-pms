@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { chargePatchSchema, newChargeBodySchema, newPaymentBodySchema } from './billing';
 import { isoDateSchema } from './dates';
 import { bookingPatchSchema, createHoldInputSchema, guestPatchSchema } from './operations';
+import { moneySchema } from './quote';
 import { newStayGuestBodySchema, stayGuestPatchSchema } from './registration';
 
 const stayGuestRef = z.object({ bookingId: z.string(), stayGuestId: z.string() });
@@ -56,6 +57,36 @@ export const pendingActionInputSchema = z.discriminatedUnion('kind', [
 export type PendingActionInput = z.infer<typeof pendingActionInputSchema>;
 export type PendingActionKind = PendingActionInput['kind'];
 
+/** One side of a change on a confirm card: words, or a stay the app formats as dates. */
+export const pendingValueSchema = z.union([
+  z.object({ text: z.string() }),
+  z.object({ checkIn: isoDateSchema, checkOut: isoDateSchema }),
+]);
+export type PendingValue = z.infer<typeof pendingValueSchema>;
+
+/**
+ * What a proposed change does, for the confirm card: worked out by the domain when the change is
+ * proposed, so the card shows the data as it was then.
+ */
+export const pendingActionDetailsSchema = z.object({
+  /** One row per thing that changes, e.g. Room 104 → 201. `before` is null for something new,
+   * `after` null for something removed. */
+  changes: z.array(
+    z.object({
+      label: z.string(),
+      before: pendingValueSchema.nullable(),
+      after: pendingValueSchema.nullable(),
+    }),
+  ),
+  /** The money it moves: the stay's total or the bill's balance, before and after. */
+  amount: z
+    .object({ label: z.string(), before: moneySchema.nullable(), after: moneySchema })
+    .nullable(),
+  /** What the staff member should know before confirming, e.g. IDs still missing. */
+  note: z.string().nullable(),
+});
+export type PendingActionDetails = z.infer<typeof pendingActionDetailsSchema>;
+
 export const pendingActionStatuses = ['pending', 'confirmed', 'rejected', 'failed'] as const;
 export const pendingActionStatusSchema = z.enum(pendingActionStatuses);
 export type PendingActionStatus = z.infer<typeof pendingActionStatusSchema>;
@@ -66,6 +97,8 @@ export const pendingActionSchema = z.intersection(
     id: z.string(),
     /** One line the confirm card shows, e.g. "Move Tomáš Novák from 104 to 201". */
     summary: z.string(),
+    /** Null for actions proposed before details were recorded. */
+    details: pendingActionDetailsSchema.nullable().default(null),
     status: pendingActionStatusSchema,
     /** The booking created or changed, once confirmed; null for a guest profile edit. */
     bookingId: z.string().nullable(),

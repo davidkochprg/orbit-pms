@@ -80,7 +80,7 @@ Defined in `packages/ai/src/tools.ts` with zod input schemas from `packages/shar
 See [ADR 0004](decisions/0004-human-approval-for-mutations.md). A proposal tool:
 
 1. Runs the domain operation's `preview*` function, which applies every rule against current data without saving. An invalid change fails here and the model hears why.
-2. Stores a `PendingAction` with the exact arguments and a one-line summary, e.g. `Move Tomáš Novák (2026-10-27 to 2026-10-29 (2 nights)) from room 104 to room 201`.
+2. Stores a `PendingAction` with the exact arguments, a one-line summary for the model, e.g. `Move Tomáš Novák (2026-10-27 to 2026-10-29 (2 nights)) from room 104 to room 201`, and `details` for the confirm card: one row per thing that changes with its value before and after (Room 104 → 201), the stay total or bill balance before and after, and a note such as IDs still missing.
 3. Returns `{ pendingActionId, summary, status: 'awaiting_confirmation' }`.
 
 The UI shows a confirm card. `POST /api/pending-actions/:id/confirm` runs the stored arguments (never ones sent by the browser) through the domain service with actor `agent`, writing the audit log. If the data changed in the meantime and the action is no longer valid, it is marked `failed` with the reason. Each action can be resolved once: confirming claims it with a conditional update first, so two clicks at the same time run the change only once.

@@ -99,6 +99,11 @@ describe('pending actions', () => {
     expect(action.summary).toBe(
       'Move Tomáš Novák (2026-05-12 to 2026-05-14 (2 nights)) from room 1 to room 2',
     );
+    expect(action.details).toEqual({
+      changes: [{ label: 'Room', before: { text: '1' }, after: { text: '2' } }],
+      amount: null,
+      note: null,
+    });
     expect(repos.state.bookings.find((b) => b.id === 'bk_a')?.roomId).toBe('rm_1');
     expect(repos.state.audit).toEqual([]);
   });
@@ -112,6 +117,15 @@ describe('pending actions', () => {
     expect(proposed.summary).toMatch(
       /^Update Tomáš Novák in room 1: party 2 adults → 1 adult, notes "Vegetarian breakfast", total 2 000 CZK \(was \?\)$/,
     );
+    // The seeded booking has no price snapshot, so there is no total before.
+    expect(proposed.details).toEqual({
+      changes: [
+        { label: 'Party', before: { text: '2 adults' }, after: { text: '1 adult' } },
+        { label: 'Notes', before: null, after: { text: 'Vegetarian breakfast' } },
+      ],
+      amount: { label: 'Total', before: null, after: 2000 },
+      note: null,
+    });
     expect(repos.state.bookings.find((b) => b.id === 'bk_a')?.adults).toBe(2);
     await actions.confirm(proposed.id);
     expect(repos.state.bookings.find((b) => b.id === 'bk_a')).toMatchObject({
@@ -172,6 +186,13 @@ describe('pending actions', () => {
       /^Hold room 2 for Jana Testová, 2026-05-11 to 2026-05-13 \(2 nights\), 2 adults, total [\d ]+ CZK$/,
     );
     expect(proposed.bookingId).toBeNull();
+    expect(proposed.details?.changes).toEqual([
+      { label: 'Guest', before: null, after: { text: 'Jana Testová' } },
+      { label: 'Room', before: null, after: { text: '2' } },
+      { label: 'Stay', before: null, after: { checkIn: '2026-05-11', checkOut: '2026-05-13' } },
+      { label: 'Party', before: null, after: { text: '2 adults' } },
+    ]);
+    expect(proposed.details?.amount).toMatchObject({ label: 'Total', before: null });
     const confirmed = await actions.confirm(proposed.id);
     expect(confirmed.bookingId).toBeTruthy();
     expect(repos.state.bookings.find((b) => b.id === confirmed.bookingId)?.status).toBe('hold');
@@ -210,6 +231,17 @@ describe('pending actions', () => {
     expect(proposed.summary).toBe(
       'Add 2 × Sauna at 150 CZK (300 CZK) to the bill of Tomáš Novák, room 1; balance then 500 CZK',
     );
+    expect(proposed.details).toEqual({
+      changes: [
+        {
+          label: 'Extra',
+          before: null,
+          after: { text: '2 × Sauna at 150 CZK (300 CZK), VAT 21%' },
+        },
+      ],
+      amount: { label: 'Balance', before: 200, after: 500 },
+      note: null,
+    });
     expect(repos.state.charges).toEqual([]);
     await actions.confirm(proposed.id);
     expect(repos.state.charges).toHaveLength(1);
@@ -275,6 +307,11 @@ describe('pending actions', () => {
     expect(proposed.summary).toBe(
       'Check in Tomáš Novák to room 1, 2026-05-10 to 2026-05-12 (2 nights); 1 guest still needs an ID in the guest book',
     );
+    expect(proposed.details).toEqual({
+      changes: [{ label: 'Status', before: { text: 'Confirmed' }, after: { text: 'Checked in' } }],
+      amount: null,
+      note: '1 guest still needs an ID in the guest book',
+    });
     await actions.confirm(proposed.id);
     expect(repos.state.bookings.find((b) => b.id === 'bk_today')?.status).toBe('checked_in');
   });
@@ -286,6 +323,10 @@ describe('pending actions', () => {
       input: { bookingId: 'bk_leaving' },
     });
     expect(proposed.summary).toBe('Check out Tomáš Novák from room 2; 150 CZK still due');
+    expect(proposed.details).toMatchObject({
+      amount: { label: 'Balance', before: null, after: 150 },
+      note: '150 CZK still due.',
+    });
   });
 
   it('can be rejected, and cannot be resolved twice', async () => {
@@ -437,6 +478,10 @@ describe('pending actions', () => {
     expect(proposed.summary).toBe(
       'Update the profile of Tomáš Novák: email tomas@example.com, language en',
     );
+    expect(proposed.details?.changes).toEqual([
+      { label: 'Email', before: null, after: { text: 'tomas@example.com' } },
+      { label: 'Language', before: { text: 'cs' }, after: { text: 'en' } },
+    ]);
     const confirmed = await actions.confirm(proposed.id);
     expect(confirmed).toMatchObject({ status: 'confirmed', bookingId: null });
     expect(repos.state.guests[0]).toMatchObject({ email: 'tomas@example.com', language: 'en' });

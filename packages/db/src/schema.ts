@@ -20,6 +20,7 @@ import {
   type IdScanResult,
   type InquiryExtraction,
   type InquirySuggestion,
+  type PendingActionDetails,
   type PendingActionInput,
   type PricingConfig,
   type Quote,
@@ -195,6 +196,8 @@ export const pendingActions = pgTable('pending_actions', {
   kind: text('kind').$type<PendingActionInput['kind']>().notNull(),
   input: jsonb('input').$type<PendingActionInput['input']>().notNull(),
   summary: text('summary').notNull(),
+  /** What the confirm card shows; null for actions proposed before it was recorded. */
+  details: jsonb('details').$type<PendingActionDetails>(),
   status: pendingActionStatus('status').notNull().default('pending'),
   bookingId: text('booking_id'),
   error: text('error'),

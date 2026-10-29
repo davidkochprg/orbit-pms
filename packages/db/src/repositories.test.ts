@@ -161,6 +161,11 @@ describe('creating records (PGlite)', () => {
       kind: 'move_booking' as const,
       input: { bookingId: seed.bookings[0]!.id, roomId: 'rm_201' },
       summary: 'Move someone',
+      details: {
+        changes: [{ label: 'Room', before: { text: '104' }, after: { text: '201' } }],
+        amount: null,
+        note: null,
+      },
       status: 'pending' as const,
       bookingId: seed.bookings[0]!.id,
       error: null,

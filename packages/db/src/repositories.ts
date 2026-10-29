@@ -281,6 +281,7 @@ function toPendingRow(action: PendingAction): PendingRow {
     kind: action.kind,
     input: action.input,
     summary: action.summary,
+    details: action.details,
     status: action.status,
     bookingId: action.bookingId,
     error: action.error,

@@ -1,12 +1,17 @@
 import type {
   Booking,
   BookingPatch,
+  BookingSource,
+  BookingStatus,
   Charge,
   Currency,
   GuestPatch,
   PendingAction,
+  PendingActionDetails,
   PendingActionInput,
+  PendingValue,
   PricingConfig,
+  QuoteAddons,
   StayGuestPatch,
 } from '@orbit/shared';
 import { formatMoney } from '@orbit/shared';
@@ -115,6 +120,117 @@ function profileText(patch: GuestPatch): string {
     .join(', ');
 }
 
+interface Description {
+  summary: string;
+  details: PendingActionDetails;
+}
+
+const text = (t: string): PendingValue => ({ text: t });
+const dates = (b: Pick<Booking, 'checkIn' | 'checkOut'>): PendingValue => ({
+  checkIn: b.checkIn,
+  checkOut: b.checkOut,
+});
+type Change = PendingActionDetails['changes'][number];
+const changed = (
+  label: string,
+  before: PendingValue | null,
+  after: PendingValue | null,
+): Change => ({
+  label,
+  before,
+  after,
+});
+const added = (label: string, after: PendingValue): Change => changed(label, null, after);
+const removed = (label: string, before: PendingValue): Change => changed(label, before, null);
+
+function details(
+  changes: Change[],
+  amount: PendingActionDetails['amount'] = null,
+  note: string | null = null,
+): PendingActionDetails {
+  return { changes, amount, note };
+}
+
+const bookingStatusLabels: Record<BookingStatus, string> = {
+  hold: 'Hold',
+  confirmed: 'Confirmed',
+  checked_in: 'Checked in',
+  checked_out: 'Checked out',
+  cancelled: 'Cancelled',
+};
+
+const statusChange = (from: BookingStatus, to: BookingStatus) =>
+  changed('Status', text(bookingStatusLabels[from]), text(bookingStatusLabels[to]));
+
+const profileLabels: Record<keyof GuestPatch, string> = {
+  name: 'Name',
+  email: 'Email',
+  phone: 'Phone',
+  language: 'Language',
+  notes: 'Notes',
+};
+
+const sourceLabels: Record<BookingSource, string> = {
+  phone: 'Phone',
+  email: 'Email',
+  walk_in: 'Walk-in',
+  web: 'Website',
+  ota: 'OTA',
+};
+
+const hasAddons = (a: QuoteAddons) => a.wellness || a.dogs > 0 || a.extraBeds > 0;
+
+/** "Wellness, 1 dog" for a confirm card; "None" without add-ons. */
+function addonsText(a: QuoteAddons): string {
+  const parts = [
+    ...(a.wellness ? ['Wellness'] : []),
+    ...(a.dogs ? [`${a.dogs} dog${a.dogs === 1 ? '' : 's'}`] : []),
+    ...(a.extraBeds ? [`${a.extraBeds} extra bed${a.extraBeds === 1 ? '' : 's'}`] : []),
+  ];
+  return parts.length ? parts.join(', ') : 'None';
+}
+
+/** The stay total before and after a change that re-prices it, if the new total is known. */
+function totalChange(before: Booking, after: Booking): PendingActionDetails['amount'] {
+  const total = after.priceSnapshot?.total;
+  if (total === undefined) return null;
+  return { label: 'Total', before: before.priceSnapshot?.total ?? null, after: total };
+}
+
+/** One confirm-card row per booking field an edit changes. */
+function bookingChanges(before: Booking, after: Booking, patch: BookingPatch): Change[] {
+  const rows = changedBookingFields(before, patch).flatMap((field): Change[] => {
+    switch (field) {
+      case 'adults':
+      case 'childAges':
+        return [changed('Party', text(party(before)), text(party(after)))];
+      case 'checkIn':
+      case 'checkOut':
+        return [changed('Stay', dates(before), dates(after))];
+      case 'addons':
+        return [
+          changed('Add-ons', text(addonsText(before.addons)), text(addonsText(after.addons))),
+        ];
+      case 'source':
+        return [
+          changed('Source', text(sourceLabels[before.source]), text(sourceLabels[after.source])),
+        ];
+      case 'notes':
+        return [
+          changed(
+            'Notes',
+            before.notes ? text(before.notes) : null,
+            after.notes ? text(after.notes) : null,
+          ),
+        ];
+      case 'roomId':
+        return [];
+    }
+  });
+  // Adults and children, or both dates, are one row each.
+  return rows.filter((r, i) => rows.findIndex((o) => o.label === r.label) === i);
+}
+
 /**
  * Agent mutations are proposed, not executed. `propose` validates the change against current
  * data and stores it; only `confirm` (a user click) runs it, using the stored arguments.
@@ -132,121 +248,237 @@ export function createPendingActionService({
     return (await repos.guests.getGuest(guestId))?.name ?? 'Unknown guest';
   }
 
-  async function describe(action: PendingActionInput): Promise<string> {
+  /** The one-line summary the model repeats, and the details the confirm card shows. */
+  async function describe(action: PendingActionInput): Promise<Description> {
     const pricing = await billing.pricing();
     const money = moneyIn(pricing.currency);
+    const balanceOf = async (bookingId: string) => (await billing.getFolio(bookingId)).balance;
     switch (action.kind) {
       case 'create_hold': {
         const { booking, room, newGuest } = await hotel.previewHold(action.input);
         const name = newGuest?.name ?? (await guestName(booking.guestId));
-        return `Hold room ${room.name} for ${name}, ${stay(booking)}, ${party(booking)}, total ${money(booking.priceSnapshot?.total)}`;
+        const total = booking.priceSnapshot?.total;
+        return {
+          summary: `Hold room ${room.name} for ${name}, ${stay(booking)}, ${party(booking)}, total ${money(total)}`,
+          details: details(
+            [
+              added('Guest', text(name)),
+              added('Room', text(room.name)),
+              added('Stay', dates(booking)),
+              added('Party', text(party(booking))),
+              ...(hasAddons(booking.addons)
+                ? [added('Add-ons', text(addonsText(booking.addons)))]
+                : []),
+            ],
+            total === undefined ? null : { label: 'Total', before: null, after: total },
+          ),
+        };
       }
       case 'confirm_booking':
       case 'cancel_booking': {
         const verb = action.kind === 'confirm_booking' ? 'confirm' : 'cancel';
+        const before = await hotel.getBookingDetail(action.input.bookingId);
         const { booking, room } = await hotel.previewBookingAction(action.input.bookingId, verb);
-        return `${verb === 'confirm' ? 'Confirm' : 'Cancel'} ${await guestName(booking.guestId)} in room ${room.name}, ${stay(booking)}`;
+        return {
+          summary: `${verb === 'confirm' ? 'Confirm' : 'Cancel'} ${await guestName(booking.guestId)} in room ${room.name}, ${stay(booking)}`,
+          details: details([statusChange(before.booking.status, booking.status)]),
+        };
       }
       case 'check_in': {
         const { booking, room } = await hotel.previewBookingAction(
           action.input.bookingId,
           'check_in',
         );
-        const { missingIds } = await hotel.getBookingDetail(booking.id);
-        const ids = missingIds
-          ? `; ${missingIds} ${missingIds === 1 ? 'guest still needs' : 'guests still need'} an ID in the guest book`
-          : '';
-        return `Check in ${await guestName(booking.guestId)} to room ${room.name}, ${stay(booking)}${ids}`;
+        const { missingIds, booking: before } = await hotel.getBookingDetail(booking.id);
+        const missing = missingIds
+          ? `${missingIds} ${missingIds === 1 ? 'guest still needs' : 'guests still need'} an ID in the guest book`
+          : null;
+        return {
+          summary: `Check in ${await guestName(booking.guestId)} to room ${room.name}, ${stay(booking)}${missing ? `; ${missing}` : ''}`,
+          details: details([statusChange(before.status, booking.status)], null, missing),
+        };
       }
       case 'check_out': {
+        const before = await hotel.getBookingDetail(action.input.bookingId);
         const { booking, room } = await hotel.previewBookingAction(
           action.input.bookingId,
           'check_out',
         );
-        const { balance } = await billing.getFolio(booking.id);
+        const balance = await balanceOf(booking.id);
         const bill =
           balance > 0
             ? `${money(balance)} still due`
             : balance < 0
               ? `${money(-balance)} owed to the guest`
               : 'bill paid in full';
-        return `Check out ${await guestName(booking.guestId)} from room ${room.name}; ${bill}`;
+        return {
+          summary: `Check out ${await guestName(booking.guestId)} from room ${room.name}; ${bill}`,
+          details: details(
+            [statusChange(before.booking.status, booking.status)],
+            { label: 'Balance', before: null, after: balance },
+            balance !== 0 ? `${bill[0]!.toUpperCase()}${bill.slice(1)}.` : null,
+          ),
+        };
       }
       case 'move_booking': {
         const before = await hotel.getBookingDetail(action.input.bookingId);
         const { room } = await hotel.previewMove(action.input.bookingId, action.input.roomId);
-        return `Move ${before.guest.name} (${stay(before.booking)}) from room ${before.room.name} to room ${room.name}`;
+        return {
+          summary: `Move ${before.guest.name} (${stay(before.booking)}) from room ${before.room.name} to room ${room.name}`,
+          details: details([changed('Room', text(before.room.name), text(room.name))]),
+        };
       }
       case 'change_dates': {
         const before = await hotel.getBookingDetail(action.input.bookingId);
         const { booking } = await hotel.previewDates(action.input.bookingId, action.input);
-        return `Change ${before.guest.name} in room ${before.room.name} to ${stay(booking)}, total ${money(booking.priceSnapshot?.total)} (was ${money(before.booking.priceSnapshot?.total)})`;
+        return {
+          summary: `Change ${before.guest.name} in room ${before.room.name} to ${stay(booking)}, total ${money(booking.priceSnapshot?.total)} (was ${money(before.booking.priceSnapshot?.total)})`,
+          details: details(
+            [changed('Stay', dates(before.booking), dates(booking))],
+            totalChange(before.booking, booking),
+          ),
+        };
       }
       case 'update_booking': {
         const { bookingId, ...patch } = action.input;
         const before = await hotel.getBookingDetail(bookingId);
         const { booking, room } = await hotel.previewUpdate(bookingId, patch);
         const moved = room.id !== before.room.id ? `, move to room ${room.name}` : '';
-        const details = changes(before.booking, booking, patch);
-        return `Update ${before.guest.name} in room ${before.room.name}${details ? `: ${details}` : ''}${moved}, total ${money(booking.priceSnapshot?.total)} (was ${money(before.booking.priceSnapshot?.total)})`;
+        const summary = changes(before.booking, booking, patch);
+        return {
+          summary: `Update ${before.guest.name} in room ${before.room.name}${summary ? `: ${summary}` : ''}${moved}, total ${money(booking.priceSnapshot?.total)} (was ${money(before.booking.priceSnapshot?.total)})`,
+          details: details(
+            [
+              ...(room.id !== before.room.id
+                ? [changed('Room', text(before.room.name), text(room.name))]
+                : []),
+              ...bookingChanges(before.booking, booking, patch),
+            ],
+            totalChange(before.booking, booking),
+          ),
+        };
       }
       case 'add_charge': {
         const { bookingId, ...body } = action.input;
         const before = await hotel.getBookingDetail(bookingId);
+        const balance = await balanceOf(bookingId);
         const { charge, balanceAfter } = await billing.previewCharge(bookingId, body);
-        return `Add ${charge.quantity} × ${charge.label} at ${money(charge.unitPrice)} (${money(charge.amount)}) to the bill of ${before.guest.name}, room ${before.room.name}; balance then ${money(balanceAfter)}`;
+        return {
+          summary: `Add ${charge.quantity} × ${charge.label} at ${money(charge.unitPrice)} (${money(charge.amount)}) to the bill of ${before.guest.name}, room ${before.room.name}; balance then ${money(balanceAfter)}`,
+          details: details([added('Extra', text(extra(charge, money, pricing)))], {
+            label: 'Balance',
+            before: balance,
+            after: balanceAfter,
+          }),
+        };
       }
       case 'record_payment': {
         const { bookingId, ...body } = action.input;
         const before = await hotel.getBookingDetail(bookingId);
+        const balance = await balanceOf(bookingId);
         const { payment, balanceAfter } = await billing.previewPayment(bookingId, body);
         const method = payment.method.replace('_', ' ');
         const what =
           payment.kind === 'refund'
             ? `Refund ${money(payment.amount)} by ${method} to`
             : `Record a ${method} payment of ${money(payment.amount)} from`;
-        return `${what} ${before.guest.name}, room ${before.room.name}; balance then ${money(balanceAfter)}`;
+        return {
+          summary: `${what} ${before.guest.name}, room ${before.room.name}; balance then ${money(balanceAfter)}`,
+          details: details(
+            [
+              added(
+                payment.kind === 'refund' ? 'Refund' : 'Payment',
+                text(`${money(payment.amount)} by ${method}`),
+              ),
+            ],
+            { label: 'Balance', before: balance, after: balanceAfter },
+          ),
+        };
       }
       case 'update_charge': {
         const { bookingId, chargeId, ...patch } = action.input;
         const before = await hotel.getBookingDetail(bookingId);
+        const balance = await balanceOf(bookingId);
         const { charge, updated, balanceAfter } = await billing.previewChargeUpdate(
           bookingId,
           chargeId,
           patch,
         );
-        return `Change ${charge.label} on the bill of ${before.guest.name}, room ${before.room.name}, to ${extra(updated, money, pricing)} (was ${extra(charge, money, pricing)}); balance then ${money(balanceAfter)}`;
+        return {
+          summary: `Change ${charge.label} on the bill of ${before.guest.name}, room ${before.room.name}, to ${extra(updated, money, pricing)} (was ${extra(charge, money, pricing)}); balance then ${money(balanceAfter)}`,
+          details: details(
+            [
+              changed(
+                'Extra',
+                text(extra(charge, money, pricing)),
+                text(extra(updated, money, pricing)),
+              ),
+            ],
+            { label: 'Balance', before: balance, after: balanceAfter },
+          ),
+        };
       }
       case 'remove_charge': {
         const { bookingId, chargeId } = action.input;
         const before = await hotel.getBookingDetail(bookingId);
+        const balance = await balanceOf(bookingId);
         const { charge, balanceAfter } = await billing.previewChargeRemoval(bookingId, chargeId);
-        return `Remove ${extra(charge, money, pricing)} from the bill of ${before.guest.name}, room ${before.room.name}; balance then ${money(balanceAfter)}`;
+        return {
+          summary: `Remove ${extra(charge, money, pricing)} from the bill of ${before.guest.name}, room ${before.room.name}; balance then ${money(balanceAfter)}`,
+          details: details([removed('Extra', text(extra(charge, money, pricing)))], {
+            label: 'Balance',
+            before: balance,
+            after: balanceAfter,
+          }),
+        };
       }
       case 'add_stay_guest': {
         const { bookingId, ...body } = action.input;
         const before = await hotel.getBookingDetail(bookingId);
-        const { added } = await registrations.previewAdd(bookingId, body);
+        const { added: person } = await registrations.previewAdd(bookingId, body);
         const { name: _, ...identity } = body;
-        const details = identityText(identity);
-        return `Add ${added.name} to the guest book of room ${before.room.name} (${before.guest.name}'s booking)${details ? `: ${details}` : ''}`;
+        const id = identityText(identity);
+        return {
+          summary: `Add ${person.name} to the guest book of room ${before.room.name} (${before.guest.name}'s booking)${id ? `: ${id}` : ''}`,
+          details: details([added('Guest book', text(id ? `${person.name}: ${id}` : person.name))]),
+        };
       }
       case 'update_stay_guest': {
         const { bookingId, stayGuestId, ...patch } = action.input;
         const before = await hotel.getBookingDetail(bookingId);
         const { current } = await registrations.previewUpdate(bookingId, stayGuestId, patch);
-        return `Record in the guest book of room ${before.room.name} for ${current.name}: ${identityText(patch) || 'no changes'}`;
+        const id = identityText(patch) || 'no changes';
+        return {
+          summary: `Record in the guest book of room ${before.room.name} for ${current.name}: ${id}`,
+          details: details([added(current.name, text(id))]),
+        };
       }
       case 'remove_stay_guest': {
         const { bookingId, stayGuestId } = action.input;
         const before = await hotel.getBookingDetail(bookingId);
-        const { removed } = await registrations.previewRemove(bookingId, stayGuestId);
-        return `Remove ${removed.name} from the guest book of room ${before.room.name} (${before.guest.name}'s booking)`;
+        const { removed: person } = await registrations.previewRemove(bookingId, stayGuestId);
+        return {
+          summary: `Remove ${person.name} from the guest book of room ${before.room.name} (${before.guest.name}'s booking)`,
+          details: details([removed('Guest book', text(person.name))]),
+        };
       }
       case 'update_guest': {
         const { guestId, ...patch } = action.input;
         const { guest } = await guests.previewUpdate(guestId, patch);
-        return `Update the profile of ${guest.name}: ${profileText(patch)}`;
+        return {
+          summary: `Update the profile of ${guest.name}: ${profileText(patch)}`,
+          details: details(
+            (Object.keys(patch) as (keyof GuestPatch)[]).map((key) => {
+              const was = guest[key];
+              const now = patch[key];
+              return changed(
+                profileLabels[key],
+                was === null || was === '' ? null : text(String(was)),
+                now === null || now === undefined || now === '' ? null : text(String(now)),
+              );
+            }),
+          ),
+        };
       }
     }
   }
@@ -343,7 +575,7 @@ export function createPendingActionService({
       const action = {
         ...input,
         id: newId('act'),
-        summary: await describe(input),
+        ...(await describe(input)),
         status: 'pending',
         bookingId: 'bookingId' in input.input ? input.input.bookingId : null,
         error: null,

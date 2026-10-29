@@ -242,7 +242,7 @@ Body: `{ "messages": UIMessage[] }`, the chat so far in AI SDK UI message format
 
 ### `GET /api/pending-actions/:id`
 
-`PendingAction`: `id`, `kind` (`create_hold`, `confirm_booking`, `cancel_booking`, `move_booking`, `change_dates`), `input` (the stored arguments), `summary`, `status` (`pending`, `confirmed`, `rejected`, `failed`), `bookingId`, `error`, `createdAt`, `resolvedAt`.
+`PendingAction`: `id`, `kind` (`create_hold`, `confirm_booking`, `cancel_booking`, `check_in`, `check_out`, `move_booking`, `change_dates`, `update_booking`, `add_charge`, `record_payment`, `update_charge`, `remove_charge`, `add_stay_guest`, `update_stay_guest`, `remove_stay_guest`, `update_guest`), `input` (the stored arguments), `summary`, `details` (`changes`: `{ label, before, after }` where each side is `{ text }`, `{ checkIn, checkOut }` or null; `amount`: `{ label, before, after }` or null; `note`; null for actions proposed before details were recorded), `status` (`pending`, `confirmed`, `rejected`, `failed`), `bookingId`, `error`, `createdAt`, `resolvedAt`.
 
 ### `POST /api/pending-actions/:id/confirm`
 
