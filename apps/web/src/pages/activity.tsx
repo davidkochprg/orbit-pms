@@ -51,16 +51,21 @@ export function ActivityPage() {
 
   return (
     <>
-      <PageHeader title="Activity" meta="The latest 100 changes" />
-      <PageBody>
-        <div className="flex max-w-3xl flex-col gap-8">
+      <PageHeader
+        title="Activity"
+        meta="The latest 100 changes"
+        actions={
           <Segmented
             label="Who"
+            size="sm"
             value={filter}
             options={filters}
             onChange={(f) => setParams(f === 'all' ? {} : { actor: f }, { replace: true })}
-            className="self-start"
           />
+        }
+      />
+      <PageBody>
+        <div className="flex max-w-3xl flex-col gap-8">
           {activity.isError ? (
             <ErrorNotice message={activity.error.message} />
           ) : !activity.data ? (

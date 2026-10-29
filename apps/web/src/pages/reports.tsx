@@ -6,6 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Panel } from '@/components/panel';
 import { Segmented } from '@/components/segmented';
+import { NativeSelect } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
@@ -42,19 +43,43 @@ export function ReportsPage() {
   const previousRange = useMemo(() => range && comparisonRange(range), [range]);
   const report = useReport(range);
   const previous = useReport(previousRange);
+  const choose = (p: ReportPeriod) => setParams({ period: p }, { replace: true });
 
   return (
     <>
-      <PageHeader title="Reports" meta={range && formatRange(range.from, range.to)} />
+      <PageHeader
+        title="Reports"
+        meta={range && formatRange(range.from, range.to)}
+        actions={
+          <>
+            <Segmented
+              label="Period"
+              size="sm"
+              value={period}
+              options={reportPeriods}
+              onChange={choose}
+              className="max-md:hidden"
+            />
+            {/* NativeSelect wraps itself in a div, so hide the wrapper. */}
+            <div className="md:hidden">
+              <NativeSelect
+                aria-label="Period"
+                value={period}
+                onChange={(e) => isReportPeriod(e.target.value) && choose(e.target.value)}
+                className="h-8 w-40"
+              >
+                {reportPeriods.map((p) => (
+                  <option key={p.value} value={p.value}>
+                    {p.label}
+                  </option>
+                ))}
+              </NativeSelect>
+            </div>
+          </>
+        }
+      />
       <PageBody>
         <div className="flex flex-col gap-5">
-          <Segmented
-            label="Period"
-            value={period}
-            options={reportPeriods}
-            onChange={(p) => setParams({ period: p }, { replace: true })}
-            className="max-w-full self-start overflow-x-auto"
-          />
           {report.isError ? (
             <ErrorNotice message={report.error.message} />
           ) : !report.data ? (

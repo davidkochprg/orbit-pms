@@ -230,9 +230,6 @@ function TapeChart({ today }: { today: string }) {
         actions={
           <>
             {busy && <LoaderCircle className="size-4 animate-spin text-muted-foreground" />}
-            <Button size="sm" onClick={() => openNew({ checkIn: start < today ? today : start })}>
-              <Plus /> <span className="hidden sm:inline">New booking</span>
-            </Button>
             <input
               type="date"
               aria-label="Jump to date"
@@ -268,6 +265,9 @@ function TapeChart({ today }: { today: string }) {
                 <ChevronRight />
               </Button>
             </div>
+            <Button size="sm" onClick={() => openNew({ checkIn: start < today ? today : start })}>
+              <Plus /> <span className="hidden sm:inline">New booking</span>
+            </Button>
           </>
         }
       />

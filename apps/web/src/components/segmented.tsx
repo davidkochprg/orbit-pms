@@ -6,6 +6,8 @@ interface SegmentedProps<T extends string> {
   options: { value: T; label: string }[];
   onChange: (value: T) => void;
   disabled?: boolean;
+  /** `sm` is button height, for a page header. */
+  size?: 'default' | 'sm';
   className?: string;
 }
 
@@ -16,6 +18,7 @@ export function Segmented<T extends string>({
   options,
   onChange,
   disabled = false,
+  size = 'default',
   className,
 }: SegmentedProps<T>) {
   return (
@@ -23,7 +26,8 @@ export function Segmented<T extends string>({
       role="radiogroup"
       aria-label={label}
       className={cn(
-        'inline-flex gap-1 rounded-[0.625rem] border border-ink/6 bg-ink/4 p-1',
+        'inline-flex border border-ink/6 bg-ink/4',
+        size === 'sm' ? 'h-8 gap-0.5 rounded-control p-0.5' : 'gap-1 rounded-[0.625rem] p-1',
         className,
       )}
     >
@@ -36,7 +40,8 @@ export function Segmented<T extends string>({
           disabled={disabled}
           onClick={() => onChange(o.value)}
           className={cn(
-            'relative flex-1 rounded-md px-3.5 py-1.5 text-[0.8125rem] whitespace-nowrap text-muted-foreground outline-none transition-[color,background-color,box-shadow] duration-150 ease-snap hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
+            'relative flex-1 text-[0.8125rem] whitespace-nowrap text-muted-foreground outline-none transition-[color,background-color,box-shadow] duration-150 ease-snap hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50',
+            size === 'sm' ? 'rounded-[0.3125rem] px-2.5' : 'rounded-md px-3.5 py-1.5',
             value === o.value && 'fill-action text-foreground shadow-action stroke-lit',
           )}
         >

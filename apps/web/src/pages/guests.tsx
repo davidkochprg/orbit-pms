@@ -11,13 +11,14 @@ import {
   tableFeatures,
   useTable,
 } from '@tanstack/react-table';
-import { ArrowDown, ArrowUp, Plus, Search, Users } from 'lucide-react';
+import { ArrowDown, ArrowUp, Plus, Users } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { GuestEditorDialog } from '@/components/guest-editor';
 import { PageHeader } from '@/components/page-header';
+import { SearchField } from '@/components/search-field';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useGuests } from '@/lib/api';
@@ -89,15 +90,13 @@ export function GuestsPage() {
         meta={guests.data && `${rows.length}`}
         actions={
           <>
-            <label className="relative flex h-8 w-56 items-center gap-2 rounded-control bg-ink/4 px-3 text-muted-foreground ring-1 ring-ink/6 focus-within:ring-2 focus-within:ring-ring">
-              <Search className="size-3.5 shrink-0" />
-              <input
-                placeholder="Filter by name or email"
-                value={String(table.state.globalFilter ?? '')}
-                onChange={(e) => table.setGlobalFilter(e.target.value)}
-                className="min-w-0 flex-1 bg-transparent text-sm text-foreground outline-none placeholder:text-subtle-foreground"
-              />
-            </label>
+            <SearchField
+              label="Filter guests"
+              placeholder="Filter by name or email"
+              value={String(table.state.globalFilter ?? '')}
+              onChange={(v) => table.setGlobalFilter(v)}
+              className="w-56"
+            />
             <Button size="sm" onClick={() => setCreating(true)}>
               <Plus /> <span className="hidden sm:inline">New guest</span>
             </Button>

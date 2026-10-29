@@ -1,5 +1,5 @@
 import type { Inquiry } from '@orbit/shared';
-import { Archive, Inbox, Mail, MailOpen, PenSquare, Plus, Reply, Search } from 'lucide-react';
+import { Archive, Inbox, Mail, MailOpen, PenSquare, Plus, Reply } from 'lucide-react';
 import { type ComponentType, useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { EmptyState } from '@/components/empty-state';
@@ -9,8 +9,8 @@ import { ComposeEmail } from '@/components/inbox-compose';
 import { IncomingDialog } from '@/components/inbox-dialogs';
 import { Conversation } from '@/components/inbox-conversation';
 import { PageHeader } from '@/components/page-header';
+import { SearchField } from '@/components/search-field';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useInbox } from '@/lib/api';
 import { formatDateTime } from '@/lib/format';
@@ -58,7 +58,7 @@ export function InboxPage() {
         meta={counts.unread > 0 ? `${counts.unread} unread` : undefined}
         actions={
           <>
-            <Button variant="ghost" size="sm" onClick={() => setAdding(true)}>
+            <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
               <Plus /> Add a guest message
             </Button>
             <Button size="sm" asChild>
@@ -120,16 +120,12 @@ export function InboxPage() {
           )}
         >
           <div className="flex flex-col gap-2 border-b p-2">
-            <label className="relative">
-              <span className="sr-only">Search messages</span>
-              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                placeholder="Search guests and messages"
-                className="h-8 bg-background pl-8"
-              />
-            </label>
+            <SearchField
+              label="Search messages"
+              placeholder="Search guests and messages"
+              value={query}
+              onChange={setQuery}
+            />
             {/* Folders and channels as chips where the rail doesn't fit. */}
             <div className="flex flex-wrap gap-1 xl:hidden">
               {folders.map((f) => (

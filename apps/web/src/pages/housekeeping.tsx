@@ -81,7 +81,7 @@ export function HousekeepingPage() {
         actions={
           <>
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
               aria-label="New task"
               onClick={() => setTaskRoom(null)}
@@ -91,7 +91,7 @@ export function HousekeepingPage() {
             {aiOn && (
               <>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="sm"
                   aria-label="Type a note"
                   onClick={() => openNote('text')}

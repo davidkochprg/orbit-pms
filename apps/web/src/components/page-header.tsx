@@ -5,7 +5,11 @@ interface PageHeaderProps {
   title: ReactNode;
   /** Secondary text next to the title, e.g. a count or date. */
   meta?: ReactNode;
-  /** Controls on the right of the title bar. */
+  /**
+   * Controls on the right of the title bar, in one order on every page: view controls (search,
+   * filters, period, dates) first, then secondary actions (`outline`), and the page's primary
+   * action (the ink button) last.
+   */
   actions?: ReactNode;
 }
 
