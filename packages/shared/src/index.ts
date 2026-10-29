@@ -1,4 +1,5 @@
 export * from './activity';
+export * from './agent-results';
 export * from './api';
 export * from './billing';
 export * from './brief';

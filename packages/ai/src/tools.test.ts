@@ -265,14 +265,25 @@ describe('agent tools', () => {
     const { tools, repos } = setup();
     expect(
       await tools.setRoomStatus.execute({ roomId: 'rm_104', status: 'dirty' }, callOptions),
-    ).toEqual({ done: true, roomId: 'rm_104', roomName: '104', status: 'dirty' });
+    ).toEqual({ done: true, roomId: 'rm_104', roomName: '104', from: 'clean', status: 'dirty' });
     const created = await tools.createHousekeepingTask.execute(
       { roomId: 'rm_201', type: 'maintenance', notes: 'Lamp broken' },
       callOptions,
     );
-    expect(created).toMatchObject({ done: true, task: { roomId: 'rm_201', status: 'open' } });
+    expect(created).toMatchObject({
+      done: true,
+      roomName: '201',
+      task: { roomId: 'rm_201', status: 'open' },
+    });
     const taskId = repos.state.tasks[0]!.id;
-    await tools.setTaskStatus.execute({ taskId, status: 'done' }, callOptions);
+    expect(
+      await tools.setTaskStatus.execute({ taskId, status: 'done' }, callOptions),
+    ).toMatchObject({
+      done: true,
+      roomName: '201',
+      from: 'open',
+      task: { id: taskId, status: 'done' },
+    });
     expect(repos.state.tasks[0]?.status).toBe('done');
     expect(repos.state.pendingActions).toEqual([]);
     expect(repos.state.audit.map((e) => [e.actor, e.action])).toEqual([

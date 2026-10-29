@@ -34,11 +34,12 @@ Staff talk to the agent in the ⌘K command bar. Answers are structured ([ADR 00
 
 `components/agent-result-cards.tsx` turns finished tool steps into cards under the answer. Amounts come straight from the tool output, never from the model's text.
 
-| Tool                | Card                                                                                                                                         |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| `checkAvailability` | Free rooms with their totals; a row opens into the line items, and Hold opens a new booking with the room, stay, party and add-ons filled in |
-| `quote`             | The quote's line items and total                                                                                                             |
-| `getBill`           | The latest bill of each booking: charged, extras, paid and the balance, with a button to open the booking                                    |
+| Tool                                                       | Card                                                                                                                                                                                                                                              |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `checkAvailability`                                        | Free rooms with their totals; a row opens into the line items, and Hold opens a new booking with the room, stay, party and add-ons filled in                                                                                                      |
+| `quote`                                                    | The quote's line items and total                                                                                                                                                                                                                  |
+| `getBill`                                                  | The latest bill of each booking: charged, extras, paid and the balance, with a button to open the booking                                                                                                                                         |
+| `setRoomStatus`, `createHousekeepingTask`, `setTaskStatus` | What the agent changed, one row per room: old → new status, or the new task. A status change has a button that sets it back, through the same endpoints as the board. A created task can't be undone from the card; it has a link to Housekeeping |
 
 `runAgent` (`packages/ai/src/agent.ts`) calls the AI SDK's `streamText` with the tools, stopping after at most 8 model calls per user message. `POST /api/agent` validates the incoming UI messages, converts them for the model and streams the result back as an AI SDK UI message stream (server-sent events).
 
@@ -70,7 +71,7 @@ Defined in `packages/ai/src/tools.ts` with zod input schemas from `packages/shar
 | `addToGuestBook`, `updateGuestBook`, `removeFromGuestBook` | Add a companion, record or correct a person's ID details, take a companion off; the summary shows the values                                       | proposal    |
 | `updateGuestProfile`                                       | A guest's name, email, phone, language or notes                                                                                                    | proposal    |
 | `getHousekeeping`                                          | Today's housekeeping board: room status, occupancy, guest, urgency and open tasks                                                                  | none        |
-| `setRoomStatus`, `createHousekeepingTask`, `setTaskStatus` | Room status, a new maintenance or cleaning task, a task's progress                                                                                 | direct      |
+| `setRoomStatus`, `createHousekeepingTask`, `setTaskStatus` | Room status, a new maintenance or cleaning task, a task's progress; status changes return the status before (`from`)                               | direct      |
 
 "Direct" tools change data straight away, logged in the audit log with actor `agent`: room status and housekeeping tasks are low-risk and reversible ([ADR 0006](decisions/0006-agent-autonomy-and-cost-budget.md)), the same rule as for voice notes. Everything else that changes data is a proposal.
 

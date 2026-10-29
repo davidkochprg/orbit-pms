@@ -80,6 +80,12 @@ describe('housekeeping service', () => {
     await expect(service.setTaskStatus('hk_x', 'done', 'user')).rejects.toThrow('not found');
   });
 
+  it('reads one task', async () => {
+    const { service } = setup();
+    expect(await service.getTask('hk_1')).toMatchObject({ id: 'hk_1' });
+    await expect(service.getTask('hk_x')).rejects.toThrow('not found');
+  });
+
   it('applies a note: status changes and maintenance tasks, skipping what it cannot do', async () => {
     const { repos, service } = setup();
     const result = await service.applyNote(

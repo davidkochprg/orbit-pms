@@ -8,6 +8,9 @@ import {
   type ReportService,
 } from '@orbit/domain';
 import {
+  type AgentRoomStatusResult,
+  type AgentTaskCreatedResult,
+  type AgentTaskStatusResult,
   type BookingSummary,
   bookingPatchSchema,
   bookingSearchSchema,
@@ -208,6 +211,8 @@ export function createAgentTools({
 }: ToolDeps) {
   const propose = (input: PendingActionInput) =>
     safely(async () => toProposal(await actions.propose(input)));
+  const roomName = async (roomId: string) =>
+    (await listRooms()).find((r) => r.id === roomId)?.name ?? roomId;
 
   return {
     listRooms: tool({
@@ -400,8 +405,16 @@ export function createAgentTools({
       }),
       execute: ({ roomId, status }) =>
         safely(async () => {
+          const before = (await listRooms()).find((r) => r.id === roomId);
           const room = await housekeeping.setRoomStatus(roomId, status, 'agent');
-          return { done: true, roomId: room.id, roomName: room.name, status: room.status };
+          const result: AgentRoomStatusResult = {
+            done: true,
+            roomId: room.id,
+            roomName: room.name,
+            from: before ? roomStatusSchema.parse(before.status) : room.status,
+            status: room.status,
+          };
+          return result;
         }),
     }),
     createHousekeepingTask: tool({
@@ -409,10 +422,15 @@ export function createAgentTools({
         'Create a housekeeping task for a room: "maintenance" for something to repair (notes must say what), "turnover" or "stayover" for cleaning. This takes effect immediately, without a confirm card, and is logged; say that it is done.',
       inputSchema: newTaskBodySchema,
       execute: (input) =>
-        safely(async () => ({
-          done: true,
-          task: await housekeeping.createTask(input, 'agent'),
-        })),
+        safely(async () => {
+          const task = await housekeeping.createTask(input, 'agent');
+          const result: AgentTaskCreatedResult = {
+            done: true,
+            roomName: await roomName(task.roomId),
+            task,
+          };
+          return result;
+        }),
     }),
     setTaskStatus: tool({
       description:
@@ -422,10 +440,17 @@ export function createAgentTools({
         status: housekeepingTaskStatusSchema,
       }),
       execute: ({ taskId, status }) =>
-        safely(async () => ({
-          done: true,
-          task: await housekeeping.setTaskStatus(taskId, status, 'agent'),
-        })),
+        safely(async () => {
+          const { status: from } = await housekeeping.getTask(taskId);
+          const task = await housekeeping.setTaskStatus(taskId, status, 'agent');
+          const result: AgentTaskStatusResult = {
+            done: true,
+            roomName: await roomName(task.roomId),
+            from,
+            task,
+          };
+          return result;
+        }),
     }),
   };
 }

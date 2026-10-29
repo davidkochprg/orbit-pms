@@ -1,4 +1,7 @@
 import {
+  agentRoomStatusResultSchema,
+  agentTaskCreatedResultSchema,
+  agentTaskStatusResultSchema,
   folioSchema,
   quoteAddonsSchema,
   quoteSchema,
@@ -11,6 +14,10 @@ import {
 import { Calculator, CalendarSearch, ChevronRight, Receipt } from 'lucide-react';
 import { useState } from 'react';
 import { AgentCard, AgentCardHeader, Amounts } from '@/components/agent-card';
+import {
+  type HousekeepingChangeResult,
+  HousekeepingCard,
+} from '@/components/agent-housekeeping-card';
 import { Mention, RoomBadge } from '@/components/agent-mention';
 import { Button } from '@/components/ui/button';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
@@ -29,15 +36,28 @@ export interface ToolResult {
 }
 
 /**
- * Free rooms, prices and bills straight from the tools, so the amounts are exactly what the domain
- * worked out: one card per availability check and per quote asked for, and the latest bill of
- * each booking.
+ * Cards straight from the tools, so the amounts are exactly what the domain worked out: one card
+ * per availability check and per quote asked for, the latest bill of each booking, and the
+ * housekeeping changes the agent made.
  */
 export function ResultCards({ results }: { results: ToolResult[] }) {
   const searches: { key: string; options: RoomOption[]; addons: QuoteAddons }[] = [];
   const quotes: { key: string; quote: Quote; roomId: string | null }[] = [];
   const bills = new Map<string, Folio>();
+  const housekeeping: HousekeepingChangeResult[] = [];
   for (const { id, name, input, output } of results) {
+    if (name === 'setRoomStatus') {
+      const parsed = agentRoomStatusResultSchema.safeParse(output);
+      if (parsed.success) housekeeping.push({ kind: 'room_status', key: id, result: parsed.data });
+    }
+    if (name === 'createHousekeepingTask') {
+      const parsed = agentTaskCreatedResultSchema.safeParse(output);
+      if (parsed.success) housekeeping.push({ kind: 'task_created', key: id, result: parsed.data });
+    }
+    if (name === 'setTaskStatus') {
+      const parsed = agentTaskStatusResultSchema.safeParse(output);
+      if (parsed.success) housekeeping.push({ kind: 'task_status', key: id, result: parsed.data });
+    }
     if (name === 'checkAvailability') {
       const parsed = roomOptionSchema.array().safeParse(output);
       const addons = quoteAddonsSchema.safeParse(
@@ -61,7 +81,14 @@ export function ResultCards({ results }: { results: ToolResult[] }) {
       if (parsed.success) bills.set(parsed.data.bookingId, parsed.data);
     }
   }
-  if (searches.length === 0 && quotes.length === 0 && bills.size === 0) return null;
+  if (
+    searches.length === 0 &&
+    quotes.length === 0 &&
+    bills.size === 0 &&
+    housekeeping.length === 0
+  ) {
+    return null;
+  }
   return (
     <div className="flex flex-col gap-2">
       {searches.map((s) => (
@@ -73,6 +100,7 @@ export function ResultCards({ results }: { results: ToolResult[] }) {
       {[...bills.values()].map((folio) => (
         <BillCard key={folio.bookingId} folio={folio} />
       ))}
+      {housekeeping.length > 0 && <HousekeepingCard changes={housekeeping} />}
     </div>
   );
 }

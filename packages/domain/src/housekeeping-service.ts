@@ -124,6 +124,12 @@ export function createHousekeepingService({ repos, clock, newId }: HousekeepingD
       });
     },
 
+    async getTask(id: string): Promise<HousekeepingTask> {
+      const task = await repos.housekeeping.getTask(id);
+      if (!task) throw new DomainError('not_found', `Task ${id} not found`);
+      return task;
+    },
+
     setTaskStatus(
       id: string,
       status: HousekeepingTaskStatus,

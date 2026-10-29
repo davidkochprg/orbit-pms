@@ -1,6 +1,7 @@
 import type {
   HousekeepingChange,
   HousekeepingTask,
+  HousekeepingTaskStatus,
   RoomOccupancy,
   RoomStatus,
 } from '@orbit/shared';
@@ -15,6 +16,12 @@ export const occupancyLabels: Record<RoomOccupancy, string> = {
   departing: 'Departure',
   staying: 'Stayover',
   vacant: 'Vacant',
+};
+
+export const taskStatusLabels: Record<HousekeepingTaskStatus, string> = {
+  open: 'Open',
+  in_progress: 'In progress',
+  done: 'Done',
 };
 
 export function taskLabel(task: HousekeepingTask): string {
