@@ -84,6 +84,7 @@ export function Conversation({ id }: { id: string }) {
   const edited = editedKey === draftKey;
   // A room held after staff edited the reply: the reply doesn't say so until they update it.
   const [heldSinceEdit, setHeldSinceEdit] = useState<string | null>(null);
+  const [writing, setWriting] = useState(false);
   const heldRoom = useHeldRoomName(m?.bookingId ?? null);
 
   // Opening a conversation reads it, as in any mail client.
@@ -113,6 +114,10 @@ export function Conversation({ id }: { id: string }) {
   };
   const read = isRead(m);
   const busy = reading.isPending || drafting.isPending;
+  // Before Orbit has read the guest's latest message, preparing is the main step; the empty
+  // reply box waits behind "Write it yourself".
+  const offerPrepare =
+    m.status !== 'declined' && aiOn && !read && m.messages.at(-1)?.direction === 'in';
 
   return (
     <article className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-6">
@@ -128,12 +133,12 @@ export function Conversation({ id }: { id: string }) {
           />
         ))}
       </ol>
-      {m.status !== 'declined' && aiOn && !read && (
+      {offerPrepare && (
         <Prepare
           reading={reading.isPending}
-          lastFromGuest={m.messages.at(-1)?.direction === 'in'}
           forBooking={m.bookingId !== null}
           onPrepare={prepare}
+          onWrite={writing ? undefined : () => setWriting(true)}
         />
       )}
       {read && m.suggestion?.note && m.suggestion.options.length === 0 && (
@@ -150,7 +155,7 @@ export function Conversation({ id }: { id: string }) {
           onHeld={onHeld}
         />
       )}
-      {m.status !== 'declined' && (
+      {m.status !== 'declined' && (!offerPrepare || writing || reading.isPending) && (
         <ReplyEditor
           key={draftKey}
           inquiry={m}
@@ -178,17 +183,17 @@ function useHeldRoomName(bookingId: string | null): string | null {
 /** Before Orbit has read the latest message: what preparing does, and the button. */
 function Prepare({
   reading,
-  lastFromGuest,
   forBooking,
   onPrepare,
+  onWrite,
 }: {
   reading: boolean;
-  lastFromGuest: boolean;
   /** The conversation is about a booking the guest already has. */
   forBooking: boolean;
   onPrepare: () => void;
+  /** Opens the reply box without Orbit; absent once it is open. */
+  onWrite?: () => void;
 }) {
-  if (!lastFromGuest && !reading) return null;
   return (
     <section
       aria-label="Prepare a reply"
@@ -201,14 +206,22 @@ function Prepare({
         </p>
       ) : (
         <>
-          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+          {/* Wide enough to read; narrower, the buttons go below it. */}
+          <p className="min-w-56 flex-1 text-sm text-muted-foreground">
             {forBooking
               ? 'Orbit reads the message and drafts the reply, with the booking in mind.'
               : 'Orbit reads the message and drafts the reply. If the guest asks for a stay, you see the free rooms with their prices first; hold one and the reply says so.'}
           </p>
-          <Button size="sm" onClick={onPrepare}>
-            <PenLine /> Prepare reply
-          </Button>
+          <span className="flex shrink-0 items-center gap-1.5">
+            {onWrite && (
+              <Button variant="ghost" size="sm" onClick={onWrite}>
+                Write it yourself
+              </Button>
+            )}
+            <Button size="sm" onClick={onPrepare}>
+              <PenLine /> Prepare reply
+            </Button>
+          </span>
         </>
       )}
     </section>
