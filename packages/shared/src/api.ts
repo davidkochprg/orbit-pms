@@ -86,6 +86,20 @@ export const aiUsageSummarySchema = z.object({
 });
 export type AiUsageSummary = z.infer<typeof aiUsageSummarySchema>;
 
+/**
+ * What the staff member was looking at when they asked: a booking, a guest or an inbox
+ * conversation. Only the ID travels; the server reads the rest from its own data.
+ */
+export const agentContextSchema = z.object({
+  kind: z.enum(['booking', 'guest', 'inquiry']),
+  id: z.string().min(1).max(100),
+});
+export type AgentContext = z.infer<typeof agentContextSchema>;
+
+/** The metadata of a staff member's message to the agent. */
+export const agentMessageMetadataSchema = z.object({ context: agentContextSchema.optional() });
+export type AgentMessageMetadata = z.infer<typeof agentMessageMetadataSchema>;
+
 /** `POST /api/agent`: the chat so far as AI SDK UI messages, validated further by the SDK. */
 export const agentRequestSchema = z.object({
   messages: z.array(z.unknown()).min(1).max(100),

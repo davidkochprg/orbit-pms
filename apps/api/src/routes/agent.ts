@@ -1,5 +1,6 @@
 import {
   buildSystemPrompt,
+  contextNote,
   createAgentTools,
   type HotelContext,
   type MetaProvider,
@@ -9,6 +10,7 @@ import {
 } from '@orbit/ai';
 import {
   type BillingService,
+  DomainError,
   getHotelTimeZone,
   hotelToday,
   type HotelService,
@@ -18,7 +20,12 @@ import {
   type ReportService,
   type Repositories,
 } from '@orbit/domain';
-import { agentRequestSchema } from '@orbit/shared';
+import {
+  type AgentContext,
+  type AgentMessageMetadata,
+  agentMessageMetadataSchema,
+  agentRequestSchema,
+} from '@orbit/shared';
 import {
   convertToModelMessages,
   createUIMessageStreamResponse,
@@ -79,6 +86,69 @@ export function agentRoutes({
     listRoomTypes: () => repos.rooms.listRoomTypes(),
   });
 
+  /** What the staff member was looking at, from the hotel's own data; null if it is gone. */
+  async function describeContext(context: AgentContext): Promise<string | null> {
+    try {
+      switch (context.kind) {
+        case 'booking': {
+          const { booking, guest, room } = await hotel.getBookingDetail(context.id);
+          return contextNote({
+            kind: 'booking',
+            bookingId: booking.id,
+            guestName: guest.name,
+            roomName: room.name,
+            checkIn: booking.checkIn,
+            checkOut: booking.checkOut,
+            status: booking.status,
+          });
+        }
+        case 'guest': {
+          const guest = await repos.guests.getGuest(context.id);
+          return guest
+            ? contextNote({
+                kind: 'guest',
+                guestId: guest.id,
+                name: guest.name,
+                email: guest.email,
+                language: guest.language,
+              })
+            : null;
+        }
+        case 'inquiry': {
+          const inquiry = await repos.inquiries.getInquiry(context.id);
+          if (!inquiry) return null;
+          return contextNote({
+            kind: 'inquiry',
+            senderName: inquiry.senderName,
+            senderAddress: inquiry.senderAddress,
+            request: inquiry.parsed,
+            lastMessage: inquiry.messages.findLast((m) => m.direction === 'in')?.body ?? null,
+          });
+        }
+      }
+    } catch (err) {
+      if (err instanceof DomainError) return null;
+      throw err;
+    }
+  }
+
+  /** Puts what each question was asked about in front of it, for the model only. */
+  async function withContext(messages: UIMessage<AgentMessageMetadata>[]) {
+    const notes = new Map<string, Promise<string | null>>();
+    return Promise.all(
+      messages.map(async (m) => {
+        const context = m.role === 'user' ? m.metadata?.context : undefined;
+        if (!context) return m;
+        const key = `${context.kind}:${context.id}`;
+        if (!notes.has(key)) notes.set(key, describeContext(context));
+        const note = await notes.get(key);
+        return note
+          ? { ...m, parts: [{ type: 'text' as const, text: `[${note}]` }, ...m.parts] }
+          : m;
+      }),
+    );
+  }
+
   return new Hono().post('/agent', validate('json', agentRequestSchema), async (c) => {
     if (!ai) {
       return c.json(
@@ -89,9 +159,13 @@ export function agentRoutes({
     const blocked = await gate(c.req.header('x-forwarded-for'));
     if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
 
-    let messages: UIMessage[];
+    let messages: UIMessage<AgentMessageMetadata>[];
     try {
-      messages = await validateUIMessages({ messages: c.req.valid('json').messages, tools });
+      messages = await validateUIMessages<UIMessage<AgentMessageMetadata>>({
+        messages: c.req.valid('json').messages,
+        tools,
+        metadataSchema: agentMessageMetadataSchema.optional(),
+      });
     } catch (err) {
       return c.json(
         errorBody('invalid_messages', err instanceof Error ? err.message : 'Invalid messages'),
@@ -106,7 +180,9 @@ export function agentRoutes({
         today: hotelToday(clock()),
         timezone: getHotelTimeZone(),
       }),
-      messages: await convertToModelMessages(messages.slice(-MAX_HISTORY), { tools }),
+      messages: await convertToModelMessages(await withContext(messages.slice(-MAX_HISTORY)), {
+        tools,
+      }),
       tools,
       abortSignal: c.req.raw.signal,
       onUsage: async (tokens) => {

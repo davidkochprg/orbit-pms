@@ -168,6 +168,29 @@ describe('POST /api/agent', () => {
     expect(system).toContain(seed.hotelProfile.name);
   });
 
+  it('tells the agent which booking the staff member is looking at, from its own data', async () => {
+    const model = scriptedModel([{ text: 'Done.' }]);
+    const message = {
+      ...userMessage('When do they leave?'),
+      metadata: { context: { kind: 'booking', id: arrival.id } },
+    };
+    await (await post(appWith(model), '/api/agent', { messages: [message] })).text();
+    const prompt = JSON.stringify(model.doStreamCalls[0]?.prompt);
+    expect(prompt).toContain(`looking at booking [[${arrival.id}]]`);
+    expect(prompt).toContain(arrival.checkOut);
+  });
+
+  it('refuses context it does not know the shape of', async () => {
+    const message = {
+      ...userMessage('hi'),
+      metadata: { context: { kind: 'invoice', id: 'x' } },
+    };
+    const res = await post(appWith(scriptedModel([{ text: 'Hi.' }])), '/api/agent', {
+      messages: [message],
+    });
+    expect(res.status).toBe(400);
+  });
+
   it('rejects a proposal without changing anything', async () => {
     const app = appWith(
       scriptedModel([

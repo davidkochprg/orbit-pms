@@ -4,6 +4,7 @@ export * from './housekeeping';
 export * from './id-scan';
 export * from './inbox';
 export * from './price-guard';
+export * from './prompts/context';
 export * from './prompts/hotel';
 export * from './prompts/inbox';
 export * from './prompts/system';
