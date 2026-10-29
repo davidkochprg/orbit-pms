@@ -109,6 +109,8 @@ Environment variables in the Vercel project:
 - `META_API_KEY`, `META_API_BASE_URL`, `META_MODEL_*`, `AI_*` and `HOTEL_TIMEZONE` as in `.env.example`.
 - `ENABLE_EXPERIMENTAL_COREPACK=1`, so the build uses the pnpm version from `packageManager`.
 
+The project (`geist-systems/orbit-pms`) deploys `main` from GitHub; `vercel deploy --prod` deploys from a laptop and uploads the source minus `.vercelignore`, which keeps `.env` and local data out.
+
 Migrations and the seed don't run on deploy. Run them from a laptop against Neon's direct (unpooled) connection string:
 
 ```sh

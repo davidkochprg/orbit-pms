@@ -1,0 +1,10 @@
+# Never upload local secrets, databases or build output with `vercel deploy`.
+.env
+.env.*
+.data/
+.claude/
+.vercel/
+node_modules/
+**/node_modules/
+**/dist/
+coverage/
