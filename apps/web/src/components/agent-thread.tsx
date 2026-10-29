@@ -1,4 +1,13 @@
-import { folioSchema, quoteSchema, type Folio, type Quote } from '@orbit/shared';
+import {
+  folioSchema,
+  quoteAddonsSchema,
+  quoteSchema,
+  roomOptionSchema,
+  type Folio,
+  type Quote,
+  type QuoteAddons,
+  type RoomOption,
+} from '@orbit/shared';
 import { getToolName, isToolUIPart, type UIMessage } from 'ai';
 import {
   BedDouble,
@@ -23,11 +32,12 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useMemo, useState } from 'react';
 import { ThinkingOrb } from 'thinking-orbs';
-import { BookingRow, Mention } from '@/components/agent-mention';
+import { BookingRow, Mention, RoomBadge } from '@/components/agent-mention';
 import { PendingActionCard } from '@/components/pending-action-card';
 import { Button } from '@/components/ui/button';
 import { AgentEntitiesContext } from '@/hooks/use-agent-entities';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import {
   asProposal,
@@ -78,7 +88,8 @@ const outputOf = (p: ToolPart) => (p.state === 'output-available' ? p.output : u
 /**
  * The conversation: each question as a heading, then what the agent did (one line, opening into
  * the steps) and its answer, where the bookings, rooms and guests it names are chips and rows
- * that open them. Quotes and bills it fetched show as cards; changes it proposed as confirm cards.
+ * that open them. Free rooms, quotes and bills it fetched show as cards; changes it proposed as
+ * confirm cards.
  */
 export function AgentThread({
   messages,
@@ -343,15 +354,30 @@ function Answer({ text }: { text: string }) {
 }
 
 /**
- * Prices and bills straight from the tools, so the amounts are exactly what the domain worked
- * out: one card per quote asked for, and the latest bill of each booking.
+ * Free rooms, prices and bills straight from the tools, so the amounts are exactly what the domain
+ * worked out: one card per availability check and per quote asked for, and the latest bill of
+ * each booking.
  */
 function ResultCards({ tools }: { tools: ToolPart[] }) {
+  const searches: { key: string; options: RoomOption[]; addons: QuoteAddons }[] = [];
   const quotes: { key: string; quote: Quote; roomId: string | null }[] = [];
   const bills = new Map<string, Folio>();
   for (const p of tools) {
     const name = getToolName(p);
     const output = outputOf(p);
+    if (name === 'checkAvailability') {
+      const parsed = roomOptionSchema.array().safeParse(output);
+      const addons = quoteAddonsSchema.safeParse(
+        (p.input as { addons?: unknown } | undefined)?.addons ?? {},
+      );
+      if (parsed.success && parsed.data.length > 0) {
+        searches.push({
+          key: p.toolCallId,
+          options: parsed.data,
+          addons: addons.success ? addons.data : quoteAddonsSchema.parse({}),
+        });
+      }
+    }
     if (name === 'quote') {
       const parsed = quoteSchema.safeParse(output);
       const input = (p.input ?? {}) as { roomId?: string };
@@ -364,9 +390,12 @@ function ResultCards({ tools }: { tools: ToolPart[] }) {
       if (parsed.success) bills.set(parsed.data.bookingId, parsed.data);
     }
   }
-  if (quotes.length === 0 && bills.size === 0) return null;
+  if (searches.length === 0 && quotes.length === 0 && bills.size === 0) return null;
   return (
     <div className="flex flex-col gap-2">
+      {searches.map((s) => (
+        <AvailabilityCard key={s.key} options={s.options} addons={s.addons} />
+      ))}
       {quotes.map((q) => (
         <QuoteCard key={q.key} quote={q.quote} roomId={q.roomId} />
       ))}
@@ -470,6 +499,94 @@ function BillCard({ folio }: { folio: Folio }) {
       >
         Open booking
       </Button>
+    </Card>
+  );
+}
+
+/** How many free rooms show before "Show all". */
+const AVAILABILITY_ROWS = 4;
+
+/**
+ * The rooms free for a stay, cheapest first, each with its total. A row opens into the line items;
+ * Hold opens a new booking for that room with the stay already filled in.
+ */
+function AvailabilityCard({ options, addons }: { options: RoomOption[]; addons: QuoteAddons }) {
+  const [all, setAll] = useState(false);
+  const [openRoom, setOpenRoom] = useState<string | null>(null);
+  const { openNew } = useBookingEditor();
+  const { closePalette } = useCommandPalette();
+  const { quote: stay } = options[0]!;
+  const shown = all ? options : options.slice(0, AVAILABILITY_ROWS);
+
+  return (
+    <Card>
+      <div className="flex items-baseline justify-between gap-3">
+        <span className="flex min-w-0 items-center gap-2 font-medium">
+          <CalendarSearch className="size-3.5 shrink-0 text-muted-foreground" />
+          {options.length === 1 ? '1 room free' : `${options.length} rooms free`}
+        </span>
+        <span className="truncate text-xs text-muted-foreground">
+          {formatRange(stay.checkIn, stay.checkOut)} · {formatParty(stay.adults, stay.childAges)}
+        </span>
+      </div>
+      <ul className="-mx-1.5 flex flex-col">
+        {shown.map((o) => {
+          const open = openRoom === o.roomId;
+          return (
+            <li key={o.roomId} className="flex flex-col">
+              <div className="flex items-center gap-1 rounded-control pr-1 transition-colors hover:bg-accent">
+                <button
+                  type="button"
+                  onClick={() => setOpenRoom(open ? null : o.roomId)}
+                  aria-expanded={open}
+                  className="flex min-w-0 flex-1 items-center gap-2.5 rounded-control py-1.5 pl-1.5 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <RoomBadge name={o.roomName} />
+                  <span className="min-w-0 flex-1 truncate text-muted-foreground">
+                    {o.roomType.name}
+                  </span>
+                  <span className="shrink-0 font-mono tabular-nums">
+                    {formatMoney(o.quote.total)}
+                  </span>
+                  <ChevronRight
+                    className={cn(
+                      'size-3.5 shrink-0 text-subtle-foreground transition-transform',
+                      open && 'rotate-90',
+                    )}
+                  />
+                </button>
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  onClick={() => {
+                    closePalette();
+                    openNew({
+                      roomId: o.roomId,
+                      checkIn: o.quote.checkIn,
+                      checkOut: o.quote.checkOut,
+                      adults: o.quote.adults,
+                      childAges: o.quote.childAges,
+                      addons,
+                    });
+                  }}
+                >
+                  Hold
+                </Button>
+              </div>
+              {open && (
+                <div className="px-1.5 pt-1 pb-2">
+                  <Amounts lines={o.quote.lines} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {options.length > AVAILABILITY_ROWS && (
+        <Button variant="ghost" size="xs" className="self-start" onClick={() => setAll((a) => !a)}>
+          {all ? 'Show fewer' : `Show all ${options.length}`}
+        </Button>
+      )}
     </Card>
   );
 }

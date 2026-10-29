@@ -47,7 +47,7 @@ function useOpenBooking() {
   };
 }
 
-function RoomBadge({ name }: { name: string }) {
+export function RoomBadge({ name }: { name: string }) {
   return (
     <span className="rounded-[5px] border border-ink/7 bg-background px-1 py-px font-mono text-[0.6875rem] text-foreground">
       {name}
