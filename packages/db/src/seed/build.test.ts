@@ -134,9 +134,17 @@ describe('buildSeed', () => {
     }
   });
 
+  it('opens with a recent activity feed from staff and Orbit', () => {
+    expect(seed.auditLog.length).toBeGreaterThan(10);
+    expect(new Set(seed.auditLog.map((e) => e.actor))).toEqual(new Set(['user', 'agent']));
+    const ids = new Set([...seed.bookings.map((b) => b.id), ...seed.rooms.map((r) => r.id)]);
+    expect(seed.auditLog.every((e) => e.subjectId !== null && ids.has(e.subjectId))).toBe(true);
+    expect(seed.auditLog.every((e) => e.createdAt <= now.toISOString())).toBe(true);
+  });
+
   it('has a few hundred bookings in the past, present and future', () => {
     expect(seed.bookings.length).toBeGreaterThanOrEqual(300);
-    expect(seed.bookings.length).toBeLessThanOrEqual(600);
+    expect(seed.bookings.length).toBeLessThanOrEqual(900);
     expect(seed.bookings.some((b) => b.status === 'checked_out')).toBe(true);
     expect(seed.bookings.some((b) => b.status === 'checked_in')).toBe(true);
     expect(seed.bookings.some((b) => b.status === 'hold')).toBe(true);

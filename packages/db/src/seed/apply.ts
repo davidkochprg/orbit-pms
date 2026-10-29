@@ -76,6 +76,11 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
           i.messages.map((m) => ({ ...m, sentAt: new Date(m.sentAt) })),
         ),
       );
+    if (seed.auditLog.length > 0) {
+      await tx
+        .insert(auditLog)
+        .values(seed.auditLog.map((e) => ({ ...e, createdAt: new Date(e.createdAt) })));
+    }
     await tx
       .insert(housekeepingTasks)
       .values(seed.housekeepingTasks.map((t) => ({ ...t, createdAt: new Date(t.createdAt) })));

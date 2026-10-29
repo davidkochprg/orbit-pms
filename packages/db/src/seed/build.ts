@@ -8,6 +8,7 @@ import {
   rangesOverlap,
 } from '@orbit/domain';
 import type {
+  AuditLogEntry,
   Booking,
   BookingSource,
   Charge,
@@ -22,6 +23,7 @@ import type {
   RoomType,
   StaffMember,
 } from '@orbit/shared';
+import { buildActivity } from './activity';
 import { buildBilling } from './billing';
 import { seedGuests, seedRooms } from './catalog';
 import { buildConversations } from './conversations';
@@ -43,6 +45,8 @@ export interface SeedData {
   charges: Charge[];
   payments: Payment[];
   stayGuests: StayGuest[];
+  /** The recent activity feed. */
+  auditLog: AuditLogEntry[];
 }
 
 interface Draft {
@@ -55,7 +59,8 @@ interface Draft {
   childAges?: number[];
 }
 
-const WINDOW_START = -21;
+// Two months back, so a report and the period before it both have stays to compare.
+const WINDOW_START = -63;
 const WINDOW_END = 45;
 const sources: BookingSource[] = ['email', 'email', 'phone', 'web', 'web', 'ota', 'walk_in'];
 
@@ -245,6 +250,7 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
     ...t,
   }));
 
+  const billing = buildBilling(kept, today, pricing, extras);
   return {
     roomTypes: seedRoomTypes,
     rooms,
@@ -258,8 +264,9 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
     hotelProfile,
     pricing,
     staff,
-    ...buildBilling(kept, today, pricing, extras),
+    ...billing,
     stayGuests: buildStayGuests(kept, seedGuests, today),
+    auditLog: buildActivity(kept, rooms, billing.payments, housekeepingTasks, today, now),
   };
 }
 

@@ -78,13 +78,14 @@ A PGlite directory can only be open in one process at a time; two processes writ
 
 - 50 rooms of six types: double, family, single, superior double and junior suite rooms on floors 1–4 (101–111, 201–211, 301–311, 401–411), and apartments A1–A6 on the ground floor.
 - 240 synthetic guests in Czech, German, Polish and English: a few hand-picked names plus first name and surname combinations. Emails use `example.com`. No guest has two stays at once.
-- About 440 bookings from three weeks ago to six weeks ahead, filling about half the hotel on a typical night, priced with `quote()`. There are always arrivals and departures today, at least one family arrival, and some open holds.
+- About 740 bookings from two months ago to six weeks ahead, so a report and the period before it both have stays to compare, filling about half the hotel on a typical night, priced with `quote()`. There are always arrivals and departures today, at least one family arrival, and some open holds.
 - 14 open guest messages in mixed languages (from `packages/ai/src/evals/inquiries.ts`), unread. The seed makes sure each booking request has at least one free room.
 - Three conversations with history (`packages/db/src/seed/conversations.ts`): a Booking.com exchange about a late arrival, linked to its booking; an archived thank-you about a lost charger; and a welcome email the hotel wrote first.
 - The team reads English (Czech for `cz`), so drafts and guest messages translate into it; change it per person in Settings › Team. Guests stay multinational either way.
 - Bills: extras on past and current stays, deposits by bank transfer on some bookings, and settled bills for guests who left. Guests leaving today still owe something. Extra prices are placeholders.
 - Guest-book registrations for every stay that has started, with synthetic `DEMO-` document numbers and placeholder addresses. Today's arrivals are not registered yet; returning guests prefill from an earlier stay.
 - Housekeeping tasks: turnovers for today's departures, stayovers for in-house guests, one maintenance task.
+- A day and a half of activity (`packages/db/src/seed/activity.ts`): yesterday's check-ins, check-outs, payments and cleaning by staff, and a hold, a maintenance task and this morning's inspections by Orbit.
 - The hotel profile of the fictional "Orbit Demo Lodge" or "Orbit Demo Penzion" (`packages/db/src/seed/hotel.ts`): policies, amenities and guest information, without prices. Seeding replaces any profile edited in Settings.
 - The rates from `packages/domain/src/pricing/config.ts`: `usDemoPricing` (illustrative) or the Czech placeholders. Seeding replaces any rates, room types and rooms edited on the Rates and Rooms pages.
 
