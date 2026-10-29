@@ -20,12 +20,13 @@ export function Wordmark({
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center gap-[0.28em] font-semibold tracking-[-0.055em] text-foreground select-none',
+        'inline-flex shrink-0 items-baseline gap-[0.3em] font-semibold tracking-[-0.055em] text-foreground select-none',
         sizes[size],
         className,
       )}
     >
-      <LogoMark className="size-[1.2em]" />
+      {/* Beside the name: as tall as the "b" (0.705em in Geist), on the baseline with the "o"'s overshoot. */}
+      <LogoMark className={short ? 'size-[1.2em]' : 'relative top-[0.012em] size-[0.74em]'} />
       {short ? <span className="sr-only">Orbit</span> : 'orbit'}
     </span>
   );
