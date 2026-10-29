@@ -64,7 +64,11 @@ export function attentionItems(brief: DailyBrief): AttentionItem[] {
     items.push({
       id: `prepare:${r.roomId}`,
       kind: 'prepare',
-      title: `Room ${r.roomName} is ${roomStatusLabels[r.status].toLowerCase()}`,
+      // A clean room only waits for its inspection; any other status means work to do.
+      title:
+        r.status === 'clean'
+          ? `Room ${r.roomName} needs inspecting`
+          : `Room ${r.roomName} is ${roomStatusLabels[r.status].toLowerCase()}`,
       detail: `${r.guestName} arrives today`,
       target: { path: '/housekeeping' },
     });

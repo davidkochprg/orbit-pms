@@ -108,6 +108,14 @@ describe('attentionItems', () => {
     expect(items.filter((i) => i.kind === 'ids' || i.kind === 'hold')).toHaveLength(2);
   });
 
+  it("asks for an inspection when an arrival's room is clean but not inspected", () => {
+    const clean = attentionItems({
+      ...brief,
+      roomsToPrepare: [{ ...brief.roomsToPrepare[0]!, status: 'clean' }],
+    });
+    expect(clean[0]?.title).toBe('Room 104 needs inspecting');
+  });
+
   it('says when a hold already lapsed', () => {
     const lapsed = attentionItems({ ...brief, holds: [{ ...brief.holds[0]!, expired: true }] });
     expect(lapsed.find((i) => i.kind === 'hold')).toMatchObject({
