@@ -188,3 +188,11 @@ export function sendLabel(m: Inquiry): string {
   if (m.channel === 'ota') return `Send via ${m.partner ?? 'the OTA'}`;
   return m.senderAddress ? 'Send email' : 'Send reply';
 }
+
+/**
+ * Whether Orbit has read the guest's latest message: a new message from the guest clears the
+ * reading's time, and the request has to be read again.
+ */
+export function isRead(m: Inquiry): boolean {
+  return m.parsed !== null && m.processedAt !== null && !m.processingError;
+}

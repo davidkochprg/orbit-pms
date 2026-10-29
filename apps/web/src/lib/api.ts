@@ -502,9 +502,17 @@ export function useComposeMessage() {
  * Lets the agent prepare a reply, on request only. `language` is the staff member's, for the
  * draft side by side. Already prepared conversations come back without a model call.
  */
-export function useProcessInquiry(id: string) {
-  return useInboxMutation(({ force, language }: { force: boolean; language: Language | null }) =>
-    apiPost(`${inboxPath(id)}/process`, { force, language }, inquirySchema),
+/** Reads the guest's request and finds rooms for it; nothing is written yet. */
+export function useReadInquiry(id: string) {
+  return useInboxMutation(({ force }: { force: boolean }) =>
+    apiPost(`${inboxPath(id)}/read`, { force }, inquirySchema),
+  );
+}
+
+/** Writes the reply from the reading and the room held now, side by side in `language`. */
+export function useDraftInquiry(id: string) {
+  return useInboxMutation(({ language }: { language: Language | null }) =>
+    apiPost(`${inboxPath(id)}/draft`, { language }, inquirySchema),
   );
 }
 

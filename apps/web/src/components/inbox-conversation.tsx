@@ -39,9 +39,10 @@ import {
   useDeclineInquiry,
   useGuests,
   useHealth,
+  useDraftInquiry,
   useInboxHold,
   useInquiry,
-  useProcessInquiry,
+  useReadInquiry,
   useSendReply,
   useSetArchived,
   useSetUnread,
@@ -55,22 +56,34 @@ import {
   canDecline,
   channelLabel,
   guestLanguage,
+  isRead,
   sendLabel,
   senderLabel,
 } from '@/lib/inbox';
 import { cn } from '@/lib/utils';
 
-/** One conversation: its history, Orbit's help when asked for, and the reply. */
+/**
+ * One conversation: its history, Orbit's help when asked for, and the reply. Preparing reads the
+ * request and shows its rooms first, then writes the reply; holding a room rewrites the reply to
+ * say so, unless staff have edited it, when they are asked first.
+ */
 export function Conversation({ id }: { id: string }) {
   const inquiry = useInquiry(id);
   const health = useHealth();
   const { current } = useSession();
   const setUnread = useSetUnread(id);
-  // Shared by the reply box and the rooms panel, so a redraft from either shows in the box.
-  const drafting = useProcessInquiry(id);
+  const reading = useReadInquiry(id);
+  const drafting = useDraftInquiry(id);
   const aiOn = health.data?.ai.configured ?? false;
   const myLanguage: Language = current?.language ?? 'en';
   const m = inquiry.data;
+  // The reply box starts again from each new draft; staff edits are tracked per draft.
+  const draftKey = `${m?.suggestion?.draft ?? ''}|${m?.messages.length ?? 0}`;
+  const [editedKey, setEditedKey] = useState<string | null>(null);
+  const edited = editedKey === draftKey;
+  // A room held after staff edited the reply: the reply doesn't say so until they update it.
+  const [heldSinceEdit, setHeldSinceEdit] = useState<string | null>(null);
+  const heldRoom = useHeldRoomName(m?.bookingId ?? null);
 
   // Opening a conversation reads it, as in any mail client.
   const marked = useRef(false);
@@ -84,7 +97,21 @@ export function Conversation({ id }: { id: string }) {
 
   if (inquiry.isError) return <ErrorNotice message={inquiry.error.message} className="m-6" />;
   if (!m) return <Skeleton className="m-6 h-96" />;
-  const draft = () => drafting.mutate({ force: m.processedAt !== null, language: myLanguage });
+
+  const draft = () => {
+    setHeldSinceEdit(null);
+    drafting.mutate({ language: myLanguage });
+  };
+  // Rooms first, from the reading, then the reply written for them.
+  const prepare = () =>
+    reading.mutate({ force: false }, { onSuccess: (r) => isRead(r) && draft() });
+  const onHeld = (roomName: string) => {
+    if (!aiOn) return;
+    if (edited) setHeldSinceEdit(roomName);
+    else draft();
+  };
+  const read = isRead(m);
+  const busy = reading.isPending || drafting.isPending;
 
   return (
     <article className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-6">
@@ -100,27 +127,85 @@ export function Conversation({ id }: { id: string }) {
           />
         ))}
       </ol>
-      {m.suggestion && m.suggestion.options.length > 0 && (
+      {m.status !== 'declined' && aiOn && !read && (
+        <Prepare
+          reading={reading.isPending}
+          lastFromGuest={m.messages.at(-1)?.direction === 'in'}
+          onPrepare={prepare}
+        />
+      )}
+      {read && m.suggestion?.note && m.suggestion.options.length === 0 && (
+        <p className="rounded-stage bg-background px-4 py-3 text-sm text-muted-foreground shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit">
+          {m.suggestion.note}
+        </p>
+      )}
+      {read && m.suggestion && m.suggestion.options.length > 0 && (
         <Options
           inquiry={m}
           options={m.suggestion.options}
           note={m.suggestion.note}
-          canRedraft={aiOn && m.status !== 'declined'}
-          redrafting={drafting.isPending}
-          onRedraft={draft}
+          locked={drafting.isPending}
+          onHeld={onHeld}
         />
       )}
       {m.status !== 'declined' && (
         <ReplyEditor
-          key={`${m.processedAt ?? 'none'}:${m.messages.length}`}
+          key={draftKey}
           inquiry={m}
           myLanguage={myLanguage}
           aiOn={aiOn}
-          drafting={drafting}
-          onDraft={draft}
+          drafting={drafting.isPending}
+          draftingAbout={heldRoom}
+          busy={busy}
+          error={reading.error ?? drafting.error}
+          heldSinceEdit={heldSinceEdit}
+          onEdit={() => setEditedKey(draftKey)}
+          onDraft={read ? draft : prepare}
         />
       )}
     </article>
+  );
+}
+
+/** The room the conversation's hold is in, while it is a hold. */
+function useHeldRoomName(bookingId: string | null): string | null {
+  const held = useBookingDetail(bookingId).data;
+  return held?.booking.status === 'hold' ? held.room.name : null;
+}
+
+/** Before Orbit has read the latest message: what preparing does, and the button. */
+function Prepare({
+  reading,
+  lastFromGuest,
+  onPrepare,
+}: {
+  reading: boolean;
+  lastFromGuest: boolean;
+  onPrepare: () => void;
+}) {
+  if (!lastFromGuest && !reading) return null;
+  return (
+    <section
+      aria-label="Prepare a reply"
+      className="flex flex-wrap items-center gap-3 rounded-stage bg-background p-4 shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit"
+    >
+      {reading ? (
+        <p role="status" className="flex items-center gap-3 text-sm text-muted-foreground">
+          <ThinkingOrb state="searching" size={20} aria-hidden />
+          Reading the request and checking free rooms…
+        </p>
+      ) : (
+        <>
+          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
+            Orbit reads the request, shows the free rooms with their prices and drafts the reply.
+            Hold a room and the reply says so.
+          </p>
+          <Button size="sm" onClick={onPrepare}>
+            <PenLine /> Prepare reply
+          </Button>
+        </>
+      )}
+    </section>
   );
 }
 
@@ -340,23 +425,23 @@ function Message({
 }
 
 /**
- * The rooms for the request with their exact prices. Holding one reserves it for the guest; the
- * held room is marked and listed first, and holding another moves the hold there.
+ * The rooms for the request with their exact prices. Holding one reserves it for the guest and
+ * rewrites the reply to say so; the held room is marked and listed first, and holding another
+ * moves the hold there.
  */
 function Options({
   inquiry,
   options,
   note,
-  canRedraft,
-  redrafting,
-  onRedraft,
+  locked,
+  onHeld,
 }: {
   inquiry: Inquiry;
   options: StayOption[];
   note: string | null;
-  canRedraft: boolean;
-  redrafting: boolean;
-  onRedraft: () => void;
+  /** While the reply is being written, the choice it is about stays put. */
+  locked: boolean;
+  onHeld: (roomName: string) => void;
 }) {
   const hold = useInboxHold(inquiry.id);
   const held = useBookingDetail(inquiry.bookingId);
@@ -367,7 +452,18 @@ function Options({
   const rows = heldFirst(options, held.data);
 
   return (
-    <Panel title="Rooms for this stay" count={rows.length} contentClassName="p-0">
+    <Panel
+      title="Rooms for this stay"
+      count={rows.length}
+      actions={
+        canHold && (
+          <span className="text-xs text-muted-foreground">
+            {booking ? 'The reply tells the guest about the held room' : 'Hold one to offer it'}
+          </span>
+        )
+      }
+      contentClassName="p-0"
+    >
       {note && <p className="border-b px-3 py-2 text-sm text-muted-foreground">{note}</p>}
       <ul className="flex flex-col">
         {rows.map((o) => {
@@ -408,8 +504,8 @@ function Options({
                   <Button
                     size="xs"
                     variant="outline"
-                    disabled={hold.isPending}
-                    onClick={() => hold.mutate(o.roomId)}
+                    disabled={hold.isPending || locked}
+                    onClick={() => hold.mutate(o.roomId, { onSuccess: () => onHeld(o.roomName) })}
                   >
                     {holding ? 'Holding…' : booking ? 'Hold instead' : 'Hold'}
                   </Button>
@@ -419,24 +515,6 @@ function Options({
           );
         })}
       </ul>
-      {hold.isSuccess && canRedraft && (
-        <div className="flex items-center gap-2 border-t px-3 py-2 text-sm text-muted-foreground">
-          <span className="min-w-0 flex-1">
-            Room {hold.data.room.name} is held. Redraft the reply to tell the guest.
-          </span>
-          <Button
-            size="xs"
-            variant="outline"
-            disabled={redrafting}
-            onClick={() => {
-              hold.reset();
-              onRedraft();
-            }}
-          >
-            <RotateCw /> Redraft
-          </Button>
-        </div>
-      )}
       {hold.isError && <ErrorNotice message={hold.error.message} className="m-2" />}
     </Panel>
   );
@@ -472,13 +550,28 @@ function ReplyEditor({
   inquiry: m,
   myLanguage,
   aiOn,
-  drafting: process,
+  drafting,
+  draftingAbout,
+  busy,
+  error: prepareError,
+  heldSinceEdit,
+  onEdit,
   onDraft,
 }: {
   inquiry: Inquiry;
   myLanguage: Language;
   aiOn: boolean;
-  drafting: ReturnType<typeof useProcessInquiry>;
+  /** A draft is being written; it replaces the text. */
+  drafting: boolean;
+  /** The room the draft is about, when one is held. */
+  draftingAbout: string | null;
+  /** Reading or drafting: sending waits. */
+  busy: boolean;
+  error: Error | null;
+  /** A room held after the staff member edited the reply, which doesn't mention it yet. */
+  heldSinceEdit: string | null;
+  /** The staff member changed the reply. */
+  onEdit: () => void;
   onDraft: () => void;
 }) {
   const suggestion = m.suggestion;
@@ -499,7 +592,6 @@ function ReplyEditor({
   const translating = toTheirs.isPending || toMine.isPending;
   // Edits in the staff's language that the guest's text doesn't have yet.
   const behind = bilingual && edited === 'mine';
-  const lastFromGuest = m.messages.at(-1)?.direction === 'in';
   const theirName = languageLabels[theirLanguage];
   const myName = languageLabels[myLanguage];
 
@@ -529,7 +621,7 @@ function ReplyEditor({
     if (theirs.trim() && (!mine.trim() || edited === 'theirs') && !translating) translateToMine();
   };
 
-  const error = process.error ?? toTheirs.error ?? toMine.error ?? send.error;
+  const error = prepareError ?? toTheirs.error ?? toMine.error ?? send.error;
 
   return (
     <section
@@ -571,6 +663,16 @@ function ReplyEditor({
         )}
       </div>
 
+      {heldSinceEdit && (
+        <div className="mb-1 flex flex-wrap items-center gap-2 rounded-stage bg-primary-soft px-3 py-2 text-sm">
+          <span className="min-w-0 flex-1">
+            Room {heldSinceEdit} is held for the guest, but your edited reply doesn't say so yet.
+          </span>
+          <Button size="xs" variant="outline" disabled={busy} onClick={onDraft}>
+            <RotateCw /> Rewrite for room {heldSinceEdit}
+          </Button>
+        </div>
+      )}
       <div className="relative flex flex-col rounded-stage bg-background shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit">
         {/* While a draft is written, it covers the old text, which it is about to replace. */}
         <div className="relative flex flex-col">
@@ -583,24 +685,27 @@ function ReplyEditor({
               if (showing === 'mine') setMine(e.target.value);
               else setTheirs(e.target.value);
               setEdited(showing);
+              onEdit();
             }}
             placeholder={
-              process.isPending
+              drafting
                 ? undefined
                 : showing === 'mine'
                   ? `Write in ${myName}, then translate it into ${theirName}.`
                   : 'Write a reply…'
             }
-            disabled={process.isPending || (showing === 'mine' && toMine.isPending)}
+            disabled={drafting || (showing === 'mine' && toMine.isPending)}
             className="min-h-56 resize-none rounded-stage border-0 bg-transparent px-4 py-3 leading-relaxed shadow-none focus-visible:ring-0 disabled:bg-transparent"
           />
-          {process.isPending && (
+          {drafting && (
             <div
               role="status"
               className="absolute inset-0 flex items-start gap-3 rounded-t-stage bg-background/90 px-4 py-3 text-sm text-muted-foreground"
             >
-              <ThinkingOrb state="searching" size={20} aria-hidden />
-              Reading the conversation, checking free rooms and prices…
+              <ThinkingOrb state="composing" size={20} aria-hidden />
+              {draftingAbout
+                ? `Writing the reply about room ${draftingAbout}, held for the guest…`
+                : 'Writing the reply…'}
             </div>
           )}
         </div>
@@ -608,9 +713,7 @@ function ReplyEditor({
         <div className="flex items-center gap-2 border-t px-2 py-2">
           <Button
             size="sm"
-            disabled={
-              !theirs.trim() || send.isPending || behind || translating || process.isPending
-            }
+            disabled={!theirs.trim() || send.isPending || behind || translating || busy}
             title={behind ? `Translate your ${myName} changes first` : undefined}
             onClick={() => send.mutate(theirs)}
           >
@@ -654,10 +757,9 @@ function ReplyEditor({
                 <span className="truncate">Only the {theirName} reply is sent</span>
               )
             )}
-            {aiOn && (lastFromGuest || m.processedAt) && (
-              <Button variant="ghost" size="xs" disabled={process.isPending} onClick={onDraft}>
-                {m.processedAt ? <RotateCw /> : <PenLine />}
-                {m.processedAt ? 'Redraft' : 'Draft reply'}
+            {aiOn && m.suggestion?.draft && (
+              <Button variant="ghost" size="xs" disabled={busy} onClick={onDraft}>
+                <RotateCw /> Redraft
               </Button>
             )}
           </span>
