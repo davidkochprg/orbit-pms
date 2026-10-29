@@ -1,6 +1,13 @@
 import type { HousekeepingRoom, HousekeepingTask } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
-import { changeLabel, formatSeconds, needsAction, nextRoomStep, taskLabel } from './housekeeping';
+import {
+  changeLabel,
+  effortSummary,
+  formatSeconds,
+  needsAction,
+  nextRoomStep,
+  taskLabel,
+} from './housekeeping';
 
 const task = (overrides: Partial<HousekeepingTask>): HousekeepingTask => ({
   id: 'hk_1',
@@ -37,6 +44,13 @@ describe('housekeeping labels', () => {
   it('formats a recording timer', () => {
     expect(formatSeconds(0)).toBe('0:00');
     expect(formatSeconds(65)).toBe('1:05');
+  });
+});
+
+describe('effortSummary', () => {
+  it('names the effort and why', () => {
+    expect(effortSummary('heavy', ['Dog', '2 kids'])).toBe('Heavy clean: Dog, 2 kids');
+    expect(effortSummary('light', [])).toBe('Light clean');
   });
 });
 

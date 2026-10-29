@@ -1,4 +1,5 @@
 import type {
+  CleaningEffort,
   HousekeepingChange,
   HousekeepingRoom,
   HousekeepingTask,
@@ -50,6 +51,20 @@ export const occupancyLabels: Record<RoomOccupancy, string> = {
   staying: 'Stayover',
   vacant: 'Vacant',
 };
+
+export const effortLabels: Record<CleaningEffort, string> = {
+  light: 'Light clean',
+  standard: 'Standard clean',
+  heavy: 'Heavy clean',
+};
+
+/** Bars lit on a card's effort meter, out of three. */
+export const effortBars: Record<CleaningEffort, number> = { light: 1, standard: 2, heavy: 3 };
+
+/** "Heavy clean: Dog, 2 kids" */
+export function effortSummary(effort: CleaningEffort, cues: string[]): string {
+  return cues.length > 0 ? `${effortLabels[effort]}: ${cues.join(', ')}` : effortLabels[effort];
+}
 
 export const taskStatusLabels: Record<HousekeepingTaskStatus, string> = {
   open: 'Open',

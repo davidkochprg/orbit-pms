@@ -608,6 +608,17 @@ export function useHousekeeping() {
   });
 }
 
+/**
+ * Has the model read stays whose notes changed since it last did, and shows the board it re-ranked.
+ */
+export function useReadStays() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost('/api/housekeeping/read-stays', {}, housekeepingBoardSchema),
+    onSuccess: (board) => queryClient.setQueryData(['housekeeping'], board),
+  });
+}
+
 function useRefreshingMutation<T, R>(fn: (input: T) => Promise<R>) {
   const queryClient = useQueryClient();
   return useMutation({

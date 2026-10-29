@@ -1,4 +1,5 @@
 import {
+  type CleaningEffort,
   type HousekeepingRoom,
   type HousekeepingTask,
   type RoomOccupancy,
@@ -20,6 +21,7 @@ import {
 import type { ComponentProps, PointerEvent } from 'react';
 import { StatusDot } from '@/components/status-dot';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,7 +29,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { nextRoomStep, occupancyLabels, taskLabel } from '@/lib/housekeeping';
+import {
+  effortBars,
+  effortSummary,
+  nextRoomStep,
+  occupancyLabels,
+  taskLabel,
+} from '@/lib/housekeeping';
 import { roomStatusColor, roomStatusLabels } from '@/lib/status';
 import { cn } from '@/lib/utils';
 
@@ -66,7 +74,7 @@ export function HousekeepingRoomCard({
   className,
   ...props
 }: RoomCardProps) {
-  const { room, roomTypeName, occupancy, guestName, urgent, openTasks } = item;
+  const { room, roomTypeName, occupancy, guestName, urgent, effort, cues, openTasks } = item;
   const Icon = occupancyIcons[occupancy];
   const next = nextRoomStep(room.status);
   return (
@@ -85,6 +93,7 @@ export function HousekeepingRoomCard({
         <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
           {roomTypeName}
         </span>
+        {effort && <EffortMeter effort={effort} cues={cues} />}
         {onSetStatus && (
           <span className="-my-1 -mr-1 flex shrink-0 items-center gap-0.5">
             {next && (
@@ -147,6 +156,9 @@ export function HousekeepingRoomCard({
             {occupancyLabels[occupancy]}
             {guestName && <span className="truncate text-foreground">{guestName}</span>}
           </span>
+          {cues.length > 0 && (
+            <span className="truncate text-muted-foreground">{cues.join(' · ')}</span>
+          )}
           {urgent && (
             <span className="font-medium text-warning">Guest arrives today, not inspected yet</span>
           )}
@@ -178,5 +190,38 @@ export function HousekeepingRoomCard({
         </ul>
       )}
     </div>
+  );
+}
+
+/** Three small bars, lit by how much work the room is today; the reasons on hover. */
+function EffortMeter({ effort, cues }: { effort: CleaningEffort; cues: string[] }) {
+  const summary = effortSummary(effort, cues);
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          role="img"
+          aria-label={summary}
+          className="flex h-3.5 shrink-0 items-end gap-[2px] px-0.5"
+          {...noDrag}
+        >
+          {[1, 2, 3].map((bar) => (
+            <span
+              key={bar}
+              className={cn(
+                'w-[3px] rounded-full',
+                bar === 1 ? 'h-1.5' : bar === 2 ? 'h-2.5' : 'h-3.5',
+                bar <= effortBars[effort]
+                  ? effort === 'heavy'
+                    ? 'bg-warning'
+                    : 'bg-muted-foreground'
+                  : 'bg-border-strong',
+              )}
+            />
+          ))}
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top">{summary}</TooltipContent>
+    </Tooltip>
   );
 }

@@ -15,7 +15,7 @@ import {
   roomStatuses,
 } from '@orbit/shared';
 import { CalendarRange, Keyboard, Mic, Plus } from 'lucide-react';
-import { type ComponentProps, type ReactElement, type Ref, useState } from 'react';
+import { type ComponentProps, type ReactElement, type Ref, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { HousekeepingNoteDialog, type NoteMode } from '@/components/housekeeping-note-dialog';
@@ -35,7 +35,13 @@ import {
 } from '@/components/ui/context-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { useHealth, useHousekeeping, useSetRoomStatus, useSetTaskStatus } from '@/lib/api';
+import {
+  useHealth,
+  useHousekeeping,
+  useReadStays,
+  useSetRoomStatus,
+  useSetTaskStatus,
+} from '@/lib/api';
 import { formatLongDate } from '@/lib/format';
 import { boardColumns, needsAction, taskLabel } from '@/lib/housekeeping';
 import { roomStatusColor, roomStatusLabels } from '@/lib/status';
@@ -53,6 +59,13 @@ export function HousekeepingPage() {
   const [taskRoom, setTaskRoom] = useState<string | null | undefined>(undefined);
   const aiOn = health.data?.ai.configured ?? false;
   const voiceOn = health.data?.ai.voice ?? false;
+  const { mutate: readStays, isPending: readingStays, isError: readStaysFailed } = useReadStays();
+  const unreadStays = board.data?.unreadStays ?? 0;
+  // Stays whose notes changed are read in the background, a batch at a time; the board re-ranks
+  // when they are. A failure (e.g. the demo limit) stops it until the page is opened again.
+  useEffect(() => {
+    if (aiOn && unreadStays > 0 && !readingStays && !readStaysFailed) readStays();
+  }, [aiOn, unreadStays, readingStays, readStaysFailed, readStays]);
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     // On phones a short press starts the drag, so the board still scrolls.
@@ -125,7 +138,16 @@ export function HousekeepingPage() {
     <>
       <PageHeader
         title="Housekeeping"
-        meta={board.data && formatLongDate(board.data.date)}
+        meta={
+          board.data && (
+            <>
+              {formatLongDate(board.data.date)}
+              {readingStays && (
+                <span className="text-subtle-foreground"> · Reading guest notes…</span>
+              )}
+            </>
+          )
+        }
         actions={
           <>
             <Button
