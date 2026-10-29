@@ -74,6 +74,7 @@ pnpm eval           # AI extraction evals, prints pass rate
 - `pnpm typecheck && pnpm lint && pnpm test` must pass before committing code.
 
 ## Git
+- **Work on `dev`, never on `main`.** `main` is production: every push to it builds and deploys on Vercel. Commit to `dev` (or a branch off it) and merge `dev` into `main` only when David asks to deploy. Pushes to `dev` don't build on Vercel.
 - **Conventional Commits:** `type(scope): summary`, imperative, lowercase, no trailing period, ≤ 72 chars.
   - Types: `feat` `fix` `refactor` `perf` `test` `docs` `style` `build` `ci` `chore`
   - Scopes: `web` `api` `domain` `db` `ai` `shared` `docs` `repo` `deploy`
