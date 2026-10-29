@@ -131,6 +131,7 @@ export function Conversation({ id }: { id: string }) {
         <Prepare
           reading={reading.isPending}
           lastFromGuest={m.messages.at(-1)?.direction === 'in'}
+          forBooking={m.bookingId !== null}
           onPrepare={prepare}
         />
       )}
@@ -177,10 +178,13 @@ function useHeldRoomName(bookingId: string | null): string | null {
 function Prepare({
   reading,
   lastFromGuest,
+  forBooking,
   onPrepare,
 }: {
   reading: boolean;
   lastFromGuest: boolean;
+  /** The conversation is about a booking the guest already has. */
+  forBooking: boolean;
   onPrepare: () => void;
 }) {
   if (!lastFromGuest && !reading) return null;
@@ -192,13 +196,14 @@ function Prepare({
       {reading ? (
         <p role="status" className="flex items-center gap-3 text-sm text-muted-foreground">
           <ThinkingOrb state="searching" size={20} aria-hidden />
-          Reading the request and checking free rooms…
+          Reading the message…
         </p>
       ) : (
         <>
           <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-            Orbit reads the request, shows the free rooms with their prices and drafts the reply.
-            Hold a room and the reply says so.
+            {forBooking
+              ? 'Orbit reads the message and drafts the reply, with the booking in mind.'
+              : 'Orbit reads the message and drafts the reply. If the guest asks for a stay, you see the free rooms with their prices first; hold one and the reply says so.'}
           </p>
           <Button size="sm" onClick={onPrepare}>
             <PenLine /> Prepare reply

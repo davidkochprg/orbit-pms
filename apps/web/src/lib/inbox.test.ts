@@ -103,10 +103,19 @@ describe('bookingPrefillFor', () => {
 
 describe('canDecline', () => {
   it('is false once the message is declined or led to a booking', () => {
-    const m = { status: 'new', bookingId: null } as Inquiry;
+    const m = { status: 'new', bookingId: null, parsed: null } as Inquiry;
     expect(canDecline(m)).toBe(true);
     expect(canDecline({ ...m, status: 'declined' })).toBe(false);
     expect(canDecline({ ...m, bookingId: 'bk_1' })).toBe(false);
+  });
+
+  it('is only offered for booking requests once Orbit has read the message', () => {
+    const m = { status: 'new', bookingId: null } as Inquiry;
+    const read = (kind: 'booking_request' | 'question' | 'other') =>
+      ({ ...m, parsed: { kind } }) as Inquiry;
+    expect(canDecline(read('booking_request'))).toBe(true);
+    expect(canDecline(read('question'))).toBe(false);
+    expect(canDecline(read('other'))).toBe(false);
   });
 });
 
