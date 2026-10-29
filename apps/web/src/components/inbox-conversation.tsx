@@ -1,4 +1,5 @@
 import {
+  type BookingDetail,
   type InboxMessage,
   type Inquiry,
   type Language,
@@ -34,6 +35,7 @@ import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useSession } from '@/hooks/use-session';
 import {
+  useBookingDetail,
   useDeclineInquiry,
   useGuests,
   useHealth,
@@ -46,7 +48,7 @@ import {
   useTranslateMessage,
   useTranslateText,
 } from '@/lib/api';
-import { formatMoney, formatDateTime, languageLabels } from '@/lib/format';
+import { formatMoney, formatDateTime, languageLabels, statusLabels } from '@/lib/format';
 import {
   analysisFacts,
   bookingPrefillFor,
@@ -64,6 +66,8 @@ export function Conversation({ id }: { id: string }) {
   const health = useHealth();
   const { current } = useSession();
   const setUnread = useSetUnread(id);
+  // Shared by the reply box and the rooms panel, so a redraft from either shows in the box.
+  const drafting = useProcessInquiry(id);
   const aiOn = health.data?.ai.configured ?? false;
   const myLanguage: Language = current?.language ?? 'en';
   const m = inquiry.data;
@@ -80,6 +84,7 @@ export function Conversation({ id }: { id: string }) {
 
   if (inquiry.isError) return <ErrorNotice message={inquiry.error.message} className="m-6" />;
   if (!m) return <Skeleton className="m-6 h-96" />;
+  const draft = () => drafting.mutate({ force: m.processedAt !== null, language: myLanguage });
 
   return (
     <article className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-6">
@@ -96,7 +101,14 @@ export function Conversation({ id }: { id: string }) {
         ))}
       </ol>
       {m.suggestion && m.suggestion.options.length > 0 && (
-        <Options inquiry={m} options={m.suggestion.options} note={m.suggestion.note} />
+        <Options
+          inquiry={m}
+          options={m.suggestion.options}
+          note={m.suggestion.note}
+          canRedraft={aiOn && m.status !== 'declined'}
+          redrafting={drafting.isPending}
+          onRedraft={draft}
+        />
       )}
       {m.status !== 'declined' && (
         <ReplyEditor
@@ -104,6 +116,8 @@ export function Conversation({ id }: { id: string }) {
           inquiry={m}
           myLanguage={myLanguage}
           aiOn={aiOn}
+          drafting={drafting}
+          onDraft={draft}
         />
       )}
     </article>
@@ -325,46 +339,125 @@ function Message({
   );
 }
 
-/** Free rooms for the request with their exact prices, each of which can be held. */
+/**
+ * The rooms for the request with their exact prices. Holding one reserves it for the guest; the
+ * held room is marked and listed first, and holding another moves the hold there.
+ */
 function Options({
   inquiry,
   options,
   note,
+  canRedraft,
+  redrafting,
+  onRedraft,
 }: {
   inquiry: Inquiry;
   options: StayOption[];
   note: string | null;
+  canRedraft: boolean;
+  redrafting: boolean;
+  onRedraft: () => void;
 }) {
   const hold = useInboxHold(inquiry.id);
+  const held = useBookingDetail(inquiry.bookingId);
+  const { open } = useBookingDrawer();
+  const booking = held.data?.booking;
+  // Rooms can change hands until the guest confirms; after that the booking is what counts.
+  const canHold = !inquiry.bookingId || booking?.status === 'hold';
+  const rows = heldFirst(options, held.data);
+
   return (
-    <Panel title="Free rooms" count={options.length} contentClassName="p-0">
+    <Panel title="Rooms for this stay" count={rows.length} contentClassName="p-0">
       {note && <p className="border-b px-3 py-2 text-sm text-muted-foreground">{note}</p>}
       <ul className="flex flex-col">
-        {options.map((o) => (
-          <li key={o.roomId} className="flex items-center gap-3 border-b px-3 py-2 last:border-b-0">
-            <span className="rounded-[5px] border border-ink/7 px-1.5 py-px font-mono text-xs">
-              {o.roomName}
-            </span>
-            <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-              {o.roomTypeName} · {o.quote.nights} {o.quote.nights === 1 ? 'night' : 'nights'}
-            </span>
-            <span className="font-mono text-sm tabular-nums">{formatMoney(o.quote.total)}</span>
-            {!inquiry.bookingId && (
-              <Button
-                size="xs"
-                variant="outline"
-                disabled={hold.isPending}
-                onClick={() => hold.mutate(o.roomId)}
-              >
-                Hold
-              </Button>
-            )}
-          </li>
-        ))}
+        {rows.map((o) => {
+          const isHeld = booking?.roomId === o.roomId;
+          const holding = hold.isPending && hold.variables === o.roomId;
+          return (
+            <li
+              key={o.roomId}
+              className={cn(
+                'flex items-center gap-3 border-b px-3 py-2 last:border-b-0',
+                isHeld && 'bg-primary-soft first:rounded-t-stage last:rounded-b-stage',
+              )}
+            >
+              <span className="rounded-[5px] border border-ink/7 bg-background px-1.5 py-px font-mono text-xs">
+                {o.roomName}
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-sm text-muted-foreground">
+                  {o.roomTypeName} · {o.quote.nights} {o.quote.nights === 1 ? 'night' : 'nights'}
+                </span>
+                {isHeld && booking && (
+                  <span className="truncate text-xs text-primary-text">
+                    {booking.status === 'hold'
+                      ? booking.holdExpiresAt
+                        ? `Held for the guest until ${formatDateTime(booking.holdExpiresAt)}`
+                        : 'Held for the guest'
+                      : `${statusLabels[booking.status]} booking`}
+                  </span>
+                )}
+              </span>
+              <span className="font-mono text-sm tabular-nums">{formatMoney(o.quote.total)}</span>
+              {isHeld && booking ? (
+                <Button size="xs" variant="ghost" onClick={() => open(booking.id)}>
+                  Open
+                </Button>
+              ) : (
+                canHold && (
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    disabled={hold.isPending}
+                    onClick={() => hold.mutate(o.roomId)}
+                  >
+                    {holding ? 'Holding…' : booking ? 'Hold instead' : 'Hold'}
+                  </Button>
+                )
+              )}
+            </li>
+          );
+        })}
       </ul>
+      {hold.isSuccess && canRedraft && (
+        <div className="flex items-center gap-2 border-t px-3 py-2 text-sm text-muted-foreground">
+          <span className="min-w-0 flex-1">
+            Room {hold.data.room.name} is held. Redraft the reply to tell the guest.
+          </span>
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={redrafting}
+            onClick={() => {
+              hold.reset();
+              onRedraft();
+            }}
+          >
+            <RotateCw /> Redraft
+          </Button>
+        </div>
+      )}
       {hold.isError && <ErrorNotice message={hold.error.message} className="m-2" />}
     </Panel>
   );
+}
+
+/** The offer with the held room first, added from the booking if the offer doesn't have it. */
+function heldFirst(options: StayOption[], held: BookingDetail | undefined): StayOption[] {
+  if (!held) return options;
+  const { booking, room, roomType } = held;
+  const fromOffer = options.find((o) => o.roomId === room.id);
+  const first =
+    fromOffer ??
+    (booking.priceSnapshot && {
+      roomId: room.id,
+      roomName: room.name,
+      roomTypeName: roomType.name,
+      kind: room.kind,
+      quote: booking.priceSnapshot,
+    });
+  if (!first) return options;
+  return [first, ...options.filter((o) => o.roomId !== room.id)];
 }
 
 type Side = 'theirs' | 'mine';
@@ -379,13 +472,16 @@ function ReplyEditor({
   inquiry: m,
   myLanguage,
   aiOn,
+  drafting: process,
+  onDraft,
 }: {
   inquiry: Inquiry;
   myLanguage: Language;
   aiOn: boolean;
+  drafting: ReturnType<typeof useProcessInquiry>;
+  onDraft: () => void;
 }) {
   const suggestion = m.suggestion;
-  const process = useProcessInquiry(m.id);
   const toTheirs = useTranslateText();
   const toMine = useTranslateText();
   const send = useSendReply(m.id);
@@ -476,40 +572,45 @@ function ReplyEditor({
       </div>
 
       <div className="relative flex flex-col rounded-stage bg-background shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit">
-        <Textarea
-          aria-label={
-            showing === 'mine' ? `Reply in ${myName}` : `Reply to the guest in ${theirName}`
-          }
-          value={showing === 'mine' ? mine : theirs}
-          onChange={(e) => {
-            if (showing === 'mine') setMine(e.target.value);
-            else setTheirs(e.target.value);
-            setEdited(showing);
-          }}
-          placeholder={
-            process.isPending
-              ? undefined
-              : showing === 'mine'
-                ? `Write in ${myName}, then translate it into ${theirName}.`
-                : 'Write a reply…'
-          }
-          disabled={process.isPending || (showing === 'mine' && toMine.isPending)}
-          className="min-h-56 resize-none rounded-stage border-0 bg-transparent px-4 py-3 leading-relaxed shadow-none focus-visible:ring-0 disabled:bg-transparent"
-        />
-        {process.isPending && (
-          <div
-            role="status"
-            className="absolute inset-x-0 top-0 flex items-center gap-3 px-4 py-3 text-sm text-muted-foreground"
-          >
-            <ThinkingOrb state="searching" size={20} aria-hidden />
-            Reading the conversation, checking free rooms and prices…
-          </div>
-        )}
+        {/* While a draft is written, it covers the old text, which it is about to replace. */}
+        <div className="relative flex flex-col">
+          <Textarea
+            aria-label={
+              showing === 'mine' ? `Reply in ${myName}` : `Reply to the guest in ${theirName}`
+            }
+            value={showing === 'mine' ? mine : theirs}
+            onChange={(e) => {
+              if (showing === 'mine') setMine(e.target.value);
+              else setTheirs(e.target.value);
+              setEdited(showing);
+            }}
+            placeholder={
+              process.isPending
+                ? undefined
+                : showing === 'mine'
+                  ? `Write in ${myName}, then translate it into ${theirName}.`
+                  : 'Write a reply…'
+            }
+            disabled={process.isPending || (showing === 'mine' && toMine.isPending)}
+            className="min-h-56 resize-none rounded-stage border-0 bg-transparent px-4 py-3 leading-relaxed shadow-none focus-visible:ring-0 disabled:bg-transparent"
+          />
+          {process.isPending && (
+            <div
+              role="status"
+              className="absolute inset-0 flex items-start gap-3 rounded-t-stage bg-background/90 px-4 py-3 text-sm text-muted-foreground"
+            >
+              <ThinkingOrb state="searching" size={20} aria-hidden />
+              Reading the conversation, checking free rooms and prices…
+            </div>
+          )}
+        </div>
 
         <div className="flex items-center gap-2 border-t px-2 py-2">
           <Button
             size="sm"
-            disabled={!theirs.trim() || send.isPending || behind || translating}
+            disabled={
+              !theirs.trim() || send.isPending || behind || translating || process.isPending
+            }
             title={behind ? `Translate your ${myName} changes first` : undefined}
             onClick={() => send.mutate(theirs)}
           >
@@ -554,14 +655,7 @@ function ReplyEditor({
               )
             )}
             {aiOn && (lastFromGuest || m.processedAt) && (
-              <Button
-                variant="ghost"
-                size="xs"
-                disabled={process.isPending}
-                onClick={() =>
-                  process.mutate({ force: m.processedAt !== null, language: myLanguage })
-                }
-              >
+              <Button variant="ghost" size="xs" disabled={process.isPending} onClick={onDraft}>
                 {m.processedAt ? <RotateCw /> : <PenLine />}
                 {m.processedAt ? 'Redraft' : 'Draft reply'}
               </Button>
