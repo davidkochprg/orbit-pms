@@ -1,5 +1,5 @@
-import { Check, ChevronsUpDown, LogOut, Settings } from 'lucide-react';
-import { Link, useNavigate } from 'react-router';
+import { Check, ChevronsUpDown, LogOut } from 'lucide-react';
+import { useNavigate } from 'react-router';
 import { GuestAvatar } from '@/components/guest-avatar';
 import {
   DropdownMenu,
@@ -57,11 +57,6 @@ export function UserCard() {
           ))}
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/settings">
-            <Settings /> Settings
-          </Link>
-        </DropdownMenuItem>
         <DropdownMenuItem
           onSelect={() => {
             signOut();
