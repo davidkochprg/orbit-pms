@@ -75,6 +75,39 @@ describe('attentionItems', () => {
     });
   });
 
+  it('puts three or more stays missing IDs, or holds, in one row that opens into them', () => {
+    const many = (n: number) => Array.from({ length: n }, (_, i) => i);
+    const crowded: DailyBrief = {
+      ...brief,
+      missingIds: many(4).map((i) => ({
+        ...brief.missingIds[0]!,
+        summary: {
+          ...brief.missingIds[0]!.summary,
+          booking: { ...hold, id: `bk_id${i}` },
+          roomName: `10${i}`,
+        },
+      })),
+      holds: many(3).map((i) => ({
+        ...brief.holds[0]!,
+        summary: { ...brief.holds[0]!.summary, booking: { ...hold, id: `bk_h${i}` } },
+      })),
+    };
+    const items = attentionItems(crowded);
+    const ids = items.find((i) => i.kind === 'ids')!;
+    expect(ids).toMatchObject({
+      title: '4 stays still need an ID',
+      detail: 'Rooms 100, 101, 102 and 1 more',
+    });
+    expect('items' in ids.target && ids.target.items.map((i) => i.id)).toEqual([
+      'ids:bk_id0',
+      'ids:bk_id1',
+      'ids:bk_id2',
+      'ids:bk_id3',
+    ]);
+    expect(items.find((i) => i.kind === 'hold')?.title).toBe('3 holds waiting for a decision');
+    expect(items.filter((i) => i.kind === 'ids' || i.kind === 'hold')).toHaveLength(2);
+  });
+
   it('says when a hold already lapsed', () => {
     const lapsed = attentionItems({ ...brief, holds: [{ ...brief.holds[0]!, expired: true }] });
     expect(lapsed.find((i) => i.kind === 'hold')).toMatchObject({

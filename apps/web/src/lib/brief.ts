@@ -11,8 +11,34 @@ export interface AttentionItem {
   kind: AttentionKind;
   title: string;
   detail: string;
-  /** `?booking=` opens the booking inspector on the current page. */
-  target: { path: string } | { bookingId: string };
+  /**
+   * `?booking=` opens the booking inspector on the current page; `items` opens into the rows it
+   * stands for, when several of one kind would crowd the list.
+   */
+  target: { path: string } | { bookingId: string } | { items: AttentionItem[] };
+}
+
+/** From this many items of one kind they share a row that opens into them. */
+const GROUP_FROM = 3;
+
+/** "Rooms 101, 104, 201 and 2 more". */
+function roomList(all: string[]): string {
+  // Two holds can be for one room on different dates.
+  const names = [...new Set(all)];
+  if (names.length === 1) return `Room ${names[0]}`;
+  const shown = names.slice(0, 3).join(', ');
+  return names.length > 3 ? `Rooms ${shown} and ${names.length - 3} more` : `Rooms ${shown}`;
+}
+
+/** Several items of one kind as one row, e.g. "8 stays still need an ID", or the items as they are. */
+function grouped(
+  items: AttentionItem[],
+  kind: AttentionKind,
+  title: string,
+  roomNames: string[],
+): AttentionItem[] {
+  if (items.length < GROUP_FROM) return items;
+  return [{ id: `${kind}:all`, kind, title, detail: roomList(roomNames), target: { items } }];
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -43,18 +69,25 @@ export function attentionItems(brief: DailyBrief): AttentionItem[] {
       target: { path: '/housekeeping' },
     });
   }
-  for (const { summary, missing, arriving } of brief.missingIds) {
-    items.push({
-      id: `ids:${summary.booking.id}`,
-      kind: 'ids',
-      title: `Room ${summary.roomName}: ${plural(missing, 'ID')} missing`,
-      detail: `${summary.guestName} ${arriving ? 'arrives today' : 'is in house'}`,
-      target: { bookingId: summary.booking.id },
-    });
-  }
+  const ids: AttentionItem[] = brief.missingIds.map(({ summary, missing, arriving }) => ({
+    id: `ids:${summary.booking.id}`,
+    kind: 'ids',
+    title: `Room ${summary.roomName}: ${plural(missing, 'ID')} missing`,
+    detail: `${summary.guestName} ${arriving ? 'arrives today' : 'is in house'}`,
+    target: { bookingId: summary.booking.id },
+  }));
+  items.push(
+    ...grouped(
+      ids,
+      'ids',
+      `${plural(ids.length, 'stay')} still ${ids.length === 1 ? 'needs' : 'need'} an ID`,
+      brief.missingIds.map((m) => m.summary.roomName),
+    ),
+  );
+  const holds: AttentionItem[] = [];
   for (const { summary, expired } of brief.holds) {
     const { booking } = summary;
-    items.push({
+    holds.push({
       id: `hold:${booking.id}`,
       kind: 'hold',
       title: `Hold for ${summary.guestName} ${expired ? 'lapsed' : 'not confirmed'}`,
@@ -67,6 +100,14 @@ export function attentionItems(brief: DailyBrief): AttentionItem[] {
       target: { bookingId: booking.id },
     });
   }
+  items.push(
+    ...grouped(
+      holds,
+      'hold',
+      `${plural(holds.length, 'hold')} waiting for a decision`,
+      brief.holds.map((h) => h.summary.roomName),
+    ),
+  );
   if (brief.unansweredMessages > 0) {
     items.push({
       id: 'messages',

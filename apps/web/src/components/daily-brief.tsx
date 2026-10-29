@@ -12,6 +12,7 @@ import {
   ScanLine,
   Wrench,
 } from 'lucide-react';
+import { type ReactNode, useState } from 'react';
 import { Link } from 'react-router';
 import { EmptyState } from '@/components/empty-state';
 import { Panel, ScrollBox } from '@/components/panel';
@@ -134,6 +135,17 @@ function AttentionRow({
       <ChevronRight className="size-4 shrink-0 text-subtle-foreground opacity-0 transition-[opacity,transform] duration-150 ease-snap group-hover:translate-x-0.5 group-hover:opacity-100 group-focus-visible:opacity-100" />
     </>
   );
+  if ('items' in item.target) {
+    return (
+      <AttentionGroup
+        item={item}
+        items={item.target.items}
+        onOpen={onOpen}
+        openBooking={openBooking}
+        body={body}
+      />
+    );
+  }
   if ('bookingId' in item.target) {
     const { bookingId } = item.target;
     return (
@@ -150,5 +162,44 @@ function AttentionRow({
     <Link to={item.target.path} onClick={onOpen} className={rowClass}>
       {body}
     </Link>
+  );
+}
+
+/** A row standing for several items of one kind, opening into them in place. */
+function AttentionGroup({
+  item,
+  items,
+  body,
+  onOpen,
+  openBooking,
+}: {
+  item: AttentionItem;
+  items: AttentionItem[];
+  body: ReactNode;
+  onOpen?: () => void;
+  openBooking?: (bookingId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-label={`${item.title}: ${open ? 'hide' : 'show'} them`}
+        onClick={() => setOpen((o) => !o)}
+        className={cn(
+          rowClass,
+          '[&>svg:last-child]:transition-transform',
+          open && '[&>svg:last-child]:rotate-90 [&>svg:last-child]:opacity-100',
+        )}
+      >
+        {body}
+      </button>
+      {open && (
+        <div className="ml-6 border-l pl-2">
+          <AttentionList items={items} onOpen={onOpen} openBooking={openBooking} />
+        </div>
+      )}
+    </>
   );
 }
