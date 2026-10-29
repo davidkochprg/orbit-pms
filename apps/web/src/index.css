@@ -333,14 +333,16 @@
   --shadow-panel:
     0 0 0 1px var(--shadow-ring), 0 1px 3px var(--shadow-soft),
     0 0 48px -8px color-mix(in oklab, var(--glow), transparent 40%);
-  /* Pill buttons lifted off the surface: a lit top edge and a soft drop well below. */
+  /* Raised white buttons: a lit top edge and a short, tight drop, just off the surface. */
   --shadow-action:
     inset 0 1px 0 color-mix(in oklab, var(--ink) 7%, transparent),
-    0 7px 16px -6px color-mix(in oklab, black calc(28% + var(--night) * 30%), transparent);
+    0 1px 2px color-mix(in oklab, black calc(8% + var(--night) * 30%), transparent),
+    0 2px 5px -3px color-mix(in oklab, black calc(14% + var(--night) * 30%), transparent);
   /* Ink buttons and the brand mark: lit from above, with a short drop. */
   --shadow-button:
     inset 0 1px 0 rgb(255 255 255 / 18%), inset 0 -1px 0 rgb(0 0 0 / 20%),
-    0 4px 10px -3px color-mix(in oklab, black calc(35% + var(--night) * 30%), transparent);
+    0 1px 2px color-mix(in oklab, black calc(14% + var(--night) * 30%), transparent),
+    0 2px 6px -3px color-mix(in oklab, black calc(22% + var(--night) * 30%), transparent);
 
   --radius: 0.5rem;
 
