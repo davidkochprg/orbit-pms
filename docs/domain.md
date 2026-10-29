@@ -216,7 +216,7 @@ An unknown, expired or already saved scan is `not_found`.
 
 ## Pricing rules
 
-`quote(input, pricing)` returns a line-item breakdown whose amounts sum to `total`. The rates are edited in Settings → Rates ([Rates and rooms](#rates-and-rooms)); the defaults in `packages/domain/src/pricing/config.ts` and the seeded base prices **are placeholders until replaced with real prices.**
+`quote(input, pricing)` returns a line-item breakdown whose amounts sum to `total`. The rates are edited on the Rates page ([Rates and rooms](#rates-and-rooms)); the defaults in `packages/domain/src/pricing/config.ts` and the seeded base prices **are placeholders until replaced with real prices.**
 
 1. **Accommodation**: `basePrice × season multiplier`, rounded to whole units, per guest per night (`per_person`) or per room per night (`per_room`). One line per season the stay touches. Taxes are not part of a quote: they are included in the prices or added on the bill.
 2. **Seasons** are `MM-DD` ranges, inclusive of both nights, and may wrap the new year (`12-20` → `03-15`). The first matching season wins; other nights use multiplier 1.

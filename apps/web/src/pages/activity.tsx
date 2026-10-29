@@ -155,10 +155,7 @@ function Subject({ subject }: { subject: NonNullable<ActivityItem['subject']> })
     case 'room_type':
     case 'staff':
       return (
-        <Link
-          to={subject.kind === 'staff' ? '/settings/team' : '/settings/rooms'}
-          className={linkClass}
-        >
+        <Link to={subject.kind === 'staff' ? '/settings/team' : '/rooms'} className={linkClass}>
           {subject.label}
         </Link>
       );

@@ -3,7 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   fromPercent,
   fromSurcharge,
-  isProfileSection,
   isSettingsSection,
   newEntry,
   newSeason,
@@ -24,6 +23,9 @@ describe('isSettingsSection', () => {
     expect(isSettingsSection('team')).toBe(true);
     expect(isSettingsSection('amenity')).toBe(true);
     expect(isSettingsSection('billing')).toBe(false);
+    // Rooms and rates have their own pages.
+    expect(isSettingsSection('rooms')).toBe(false);
+    expect(isSettingsSection('rates')).toBe(false);
     expect(isSettingsSection(undefined)).toBe(false);
   });
 });
@@ -58,16 +60,6 @@ describe('sameSettings', () => {
   it('compares by value', () => {
     expect(sameSettings(profile, structuredClone(profile))).toBe(true);
     expect(sameSettings(profile, { ...profile, entries: [] })).toBe(false);
-  });
-});
-
-describe('isProfileSection', () => {
-  it('groups the sections saved as the hotel profile', () => {
-    expect(isProfileSection('property')).toBe(true);
-    expect(isProfileSection('info')).toBe(true);
-    expect(isProfileSection('rates')).toBe(false);
-    expect(isProfileSection('rooms')).toBe(false);
-    expect(isProfileSection('team')).toBe(false);
   });
 });
 

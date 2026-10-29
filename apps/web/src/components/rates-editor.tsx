@@ -26,7 +26,7 @@ interface Props {
 }
 
 /** Seasons, child and long-stay discounts, and add-on prices: everything `quote()` reads. */
-export function RatesSettings({ pricing, onChange, readOnly }: Props) {
+export function RatesEditor({ pricing, onChange, readOnly }: Props) {
   const set = <K extends keyof PricingConfig>(key: K, value: PricingConfig[K]) =>
     onChange({ ...pricing, [key]: value });
   const replaceAt = <T,>(list: T[], index: number, item: T) =>
@@ -39,7 +39,7 @@ export function RatesSettings({ pricing, onChange, readOnly }: Props) {
         Every quote, in the app and from the agent, is computed from these rates. New quotes use
         them as soon as you save; existing bookings keep their price. Base prices per room type are
         under{' '}
-        <Link to="/settings/rooms" className="text-foreground underline underline-offset-2">
+        <Link to="/rooms" className="text-foreground underline underline-offset-2">
           Rooms
         </Link>
         .

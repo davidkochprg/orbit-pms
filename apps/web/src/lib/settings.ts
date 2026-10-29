@@ -1,11 +1,10 @@
 import type { HotelInfoCategory, HotelInfoEntry, Season } from '@orbit/shared';
 
-export type SettingsSection = 'property' | 'rates' | 'rooms' | HotelInfoCategory | 'team';
+/** The hotel profile (property, policies, amenities, guest info), saved together, and the team. */
+export type SettingsSection = 'property' | HotelInfoCategory | 'team';
 
 export const settingsSections: { id: SettingsSection; label: string }[] = [
   { id: 'property', label: 'Property' },
-  { id: 'rates', label: 'Rates' },
-  { id: 'rooms', label: 'Rooms' },
   { id: 'policy', label: 'Policies' },
   { id: 'amenity', label: 'Amenities' },
   { id: 'info', label: 'Guest info' },
@@ -14,13 +13,6 @@ export const settingsSections: { id: SettingsSection; label: string }[] = [
 
 export function isSettingsSection(value: string | undefined): value is SettingsSection {
   return settingsSections.some((s) => s.id === value);
-}
-
-/** Sections edited as part of the hotel profile, saved together. */
-export function isProfileSection(section: SettingsSection): boolean {
-  return (
-    section === 'property' || section === 'policy' || section === 'amenity' || section === 'info'
-  );
 }
 
 /** What each kind of entry is for, shown above its list. */

@@ -39,13 +39,13 @@ function capacity(t: RoomType): string {
   return `${adults} + ${t.maxChildren} child${t.maxChildren === 1 ? '' : 'ren'}`;
 }
 
-/** Room types with their base prices, and the rooms. Changes save right away. */
-
 /** "per room" or "per adult", as the hotel's rates are set up. */
 function basisText(): string {
   return displayRegion().perRoom ? 'per room' : 'per adult';
 }
-export function RoomSettings({ readOnly }: Props) {
+
+/** Room types with their base prices, and the rooms. Changes save right away. */
+export function RoomsEditor({ readOnly }: Props) {
   const roomTypes = useRoomTypes();
   const rooms = useRooms();
   const [editingType, setEditingType] = useState<Editing<RoomType>>(null);

@@ -86,7 +86,7 @@ A PGlite directory can only be open in one process at a time; two processes writ
 - Guest-book registrations for every stay that has started, with synthetic `DEMO-` document numbers and placeholder addresses. Today's arrivals are not registered yet; returning guests prefill from an earlier stay.
 - Housekeeping tasks: turnovers for today's departures, stayovers for in-house guests, one maintenance task.
 - The hotel profile of the fictional "Orbit Demo Lodge" or "Orbit Demo Penzion" (`packages/db/src/seed/hotel.ts`): policies, amenities and guest information, without prices. Seeding replaces any profile edited in Settings.
-- The rates from `packages/domain/src/pricing/config.ts`: `usDemoPricing` (illustrative) or the Czech placeholders. Seeding replaces any rates, room types and rooms edited in Settings.
+- The rates from `packages/domain/src/pricing/config.ts`: `usDemoPricing` (illustrative) or the Czech placeholders. Seeding replaces any rates, room types and rooms edited on the Rates and Rooms pages.
 
 The generator is deterministic (fixed PRNG seed), and its invariants are tested in `packages/db/src/seed/build.test.ts`.
 

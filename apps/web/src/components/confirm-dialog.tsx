@@ -15,6 +15,8 @@ interface ConfirmDialogProps {
   title: string;
   description: ReactNode;
   confirmLabel: string;
+  /** The button that closes the dialog without acting. */
+  cancelLabel?: string;
   onConfirm: () => void;
   destructive?: boolean;
   busy?: boolean;
@@ -27,6 +29,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  cancelLabel = 'Keep it',
   onConfirm,
   destructive = false,
   busy = false,
@@ -40,7 +43,7 @@ export function ConfirmDialog({
         </DialogHeader>
         <DialogFooter>
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
-            Keep it
+            {cancelLabel}
           </Button>
           <Button
             variant={destructive ? 'destructive' : 'default'}

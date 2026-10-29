@@ -10,6 +10,8 @@ import { GuestsPage } from '@/pages/guests';
 import { InboxPage } from '@/pages/inbox';
 import { HousekeepingPage } from '@/pages/housekeeping';
 import { ScanPage } from '@/pages/scan';
+import { RatesPage } from '@/pages/rates';
+import { RoomsPage } from '@/pages/rooms';
 import { NotFoundPage } from '@/pages/sections';
 import { SettingsPage } from '@/pages/settings';
 import { TapeChartPage } from '@/pages/tape-chart';
@@ -37,6 +39,8 @@ export const router = createBrowserRouter([
               { path: 'housekeeping', element: <HousekeepingPage /> },
               { path: 'guests', element: <GuestsPage /> },
               { path: 'guests/:id', element: <GuestDetailPage /> },
+              { path: 'rooms', element: <RoomsPage /> },
+              { path: 'rates', element: <RatesPage /> },
               { path: 'reports', element: <ReportsPage /> },
               { path: 'activity', element: <ActivityPage /> },
               { path: 'settings/:section?', element: <SettingsPage /> },
