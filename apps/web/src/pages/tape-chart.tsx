@@ -18,6 +18,7 @@ import {
   Clock,
   Dog,
   Globe,
+  Info,
   LoaderCircle,
   type LucideIcon,
   Plus,
@@ -40,6 +41,7 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useElementWidth } from '@/hooks/use-element-width';
@@ -645,10 +647,15 @@ function BookingBar({
   const place = placeBooking({ ...booking, checkOut: resizeTo ?? booking.checkOut }, start);
   if (!place || booking.status === 'cancelled') return null;
 
-  const label = `${name}, ${formatRange(booking.checkIn, booking.checkOut)}, ${statusLabels[booking.status]}`;
   const { left, width } = barGeometry(place, dayWidth);
   const dragging = moving || resizing;
-  const icons = width >= ICONS_MIN_WIDTH ? bookingIcons(booking) : [];
+  const marks = bookingIcons(booking);
+  // The hover text spells out what the icons mean, and names the guest on bars too short to.
+  const label = [
+    `${name}, ${formatRange(booking.checkIn, booking.checkOut)}, ${statusLabels[booking.status]}`,
+    ...marks.map((m) => m.label),
+  ].join(' · ');
+  const icons = width >= ICONS_MIN_WIDTH ? marks : [];
 
   return (
     <>
@@ -723,6 +730,16 @@ function BookingBar({
   );
 }
 
+/** Every icon a booking bar can carry, for the legend. */
+const iconKey: { icon: LucideIcon; label: string }[] = [
+  { icon: Clock, label: 'Hold, not yet confirmed' },
+  { icon: Baby, label: 'Children' },
+  { icon: Dog, label: 'Dog' },
+  { icon: Bath, label: 'Wellness' },
+  { icon: Globe, label: 'Booked via OTA' },
+  { icon: StickyNote, label: 'Has notes' },
+];
+
 function Legend() {
   const items: VisibleStatus[] = ['hold', 'confirmed', 'checked_in', 'checked_out'];
   return (
@@ -733,6 +750,25 @@ function Legend() {
           {statusLabels[status]}
         </li>
       ))}
+      <li>
+        <Popover>
+          <PopoverTrigger asChild>
+            <button
+              type="button"
+              className="flex items-center gap-1 rounded px-1 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <Info className="size-3.5" /> Icons
+            </button>
+          </PopoverTrigger>
+          <PopoverContent side="top" align="end" className="flex w-auto flex-col gap-2 p-3 text-xs">
+            {iconKey.map(({ icon: Icon, label }) => (
+              <span key={label} className="flex items-center gap-2">
+                <Icon className="size-3.5 text-muted-foreground" /> {label}
+              </span>
+            ))}
+          </PopoverContent>
+        </Popover>
+      </li>
     </ul>
   );
 }
