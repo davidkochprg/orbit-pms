@@ -6,6 +6,7 @@ describe('parseEnv', () => {
     expect(parseEnv({})).toEqual({
       PORT: 3001,
       META_API_BASE_URL: 'https://api.meta.ai/v1',
+      BASETEN_BASE_URL: 'https://inference.baseten.co/v1',
       AI_DAILY_TOKEN_BUDGET: 2_000_000,
       AI_RATE_LIMIT_PER_HOUR: 20,
       AI_MONTHLY_BUDGET_USD: 100,

@@ -93,7 +93,7 @@ flowchart LR
 
 1. **Extract**: `generateText` with `Output.object(inquiryExtractionSchema)` (Meta `response_format: json_schema`, `strictJsonSchema: false` because strict mode only adds a server check that may reject keywords zod emits). Classifies the message (`booking_request`, `question`, `other`), its language, stay, party and wishes.
 2. **Options** (no model): for a complete booking request, `hotel.inboxOptions` finds free rooms (an apartment if asked for, or if a dog comes, per `hotelPolicy.dogsAllowedIn`) and quotes up to three, one per room type, with wished add-ons.
-3. **Draft**: the model writes a reply in the guest's language, given the exact totals as text in the hotel's currency (e.g. `$1,156` or `12 500 CZK`). When taxes are added on the bill it says so, without working them out. It greets guests by the name they signed with, never a guessed title.
+3. **Draft**: the model (Muse Spark Open when Baseten is configured, see [below](#muse-spark-open-on-baseten)) writes a reply in the guest's language, given the exact totals as text in the hotel's currency (e.g. `$1,156` or `12 500 CZK`). When taxes are added on the bill it says so, without working them out. It greets guests by the name they signed with, never a guessed title.
 4. **Price guard** (`price-guard.ts`): every money amount in the draft must be one of the quoted totals, line amounts or unit prices, or an amount the hotel profile states, and every option's total must appear. Czech, German, Polish and English number formats are recognised. A failing draft is regenerated once; if it fails again, no draft is shown, so a wrong price never reaches a guest.
 
 5. **Side by side** (`translate.ts`): when the staff member who asked reads another language than the guest writes, the draft is translated into theirs (`draftTranslation`). The UI shows both; staff edit either side and translate it into the other, and only the guest's side is sent.
@@ -102,7 +102,7 @@ The pipeline checks the monthly budget before calling the model and records `inb
 
 ### Translation
 
-`createTranslator` (`packages/ai/src/translate.ts`) translates guest messages into the reader's language and reply texts both ways, only when staff ask. It runs on `META_MODEL_TRANSLATE` (the agent model when unset; Meta has no cheaper Standard-tier text model yet) at `minimal` reasoning. The prompt keeps names, dates, room numbers and every amount with its currency as written; `sameAmounts` checks that the translation states the same amounts as the source, and one that doesn't is redone once and otherwise refused (`translation_failed`). A guest message's translation is stored with the message. A translation costs about $0.002.
+`createTranslator` (`packages/ai/src/translate.ts`) translates guest messages into the reader's language and reply texts both ways, only when staff ask. It runs on Muse Spark Open when Baseten is configured, otherwise on `META_MODEL_TRANSLATE` (the agent model when unset; Meta has no cheaper Standard-tier text model yet), at `minimal` reasoning. The prompt keeps names, dates, room numbers and every amount with its currency as written; `sameAmounts` checks that the translation states the same amounts as the source, and one that doesn't is redone once and otherwise refused (`translation_failed`). A guest message's translation is stored with the message. A translation costs about $0.002.
 
 ## Housekeeping notes
 
@@ -136,9 +136,11 @@ Hotel facts come from the **hotel profile** staff edit in Settings ([domain.md](
 
 `packages/ai/src/evals/agent.ts` holds nine staff requests for the agent (one in Czech) against a four-room in-memory hotel dated relative to today: mark a room clean, log a repair, who still needs an ID, add a companion from spoken ID details, record the main guest's ID, remove and correct a bill extra, change a guest's email, and a guest-book question. Each runs the real agent with the real tools and is checked by its effect: the room status or task it created, or exactly one proposal of the right kind with the right arguments, or no change at all for a question (plus the tool it should read, and that the answer names the right guests with their diacritics and without booking IDs).
 
+The reply draft suite (`evals/drafts.ts`) drafts a reply to every inbox message except `other`, from its expected extraction and real quoted options on an empty four-room lodge at the US demo rates, and passes when the draft is not empty and the price guard accepts it: every total stated, no amount that wasn't quoted. Each line names the model that answered, so a fallback to Meta shows.
+
 `packages/ai/src/evals/translations.ts` holds four texts to translate: a Czech reply draft with a price into German and English, and a German and a Polish guest message into Czech. Each must keep its amounts, names and numbers, read as the target language, and come without a preamble.
 
-`pnpm eval` runs all suites: the real extraction on each inbox message and scores it with `scoreExtraction`: exact match on kind, language, dates, adults, child ages (any order) and wishes; guest name and question wording are not scored. It prints PASS/FAIL per message, the pass rate, the cost, and output tokens and seconds per message. It needs `META_API_KEY` and `META_MODEL_AGENT`. `EVAL_REASONING=<level>` overrides the reasoning effort to compare levels.
+`pnpm eval` runs all suites: the real extraction on each inbox message and scores it with `scoreExtraction`: exact match on kind, language, dates, adults, child ages (any order) and wishes; guest name and question wording are not scored. It prints PASS/FAIL per message, the pass rate, the cost, and output tokens and seconds per message. It needs `META_API_KEY` and `META_MODEL_AGENT`. `EVAL_REASONING=<level>` overrides the reasoning effort to compare levels. `EVAL_SUITES` runs some suites only, e.g. `EVAL_SUITES=drafts,translations` (`inbox`, `notes`, `ids`, `agent`, `drafts`, `translations`). With `BASETEN_API_KEY` and `BASETEN_MODEL` set, drafts and translations are measured on Muse Spark Open, as in the app.
 
 Latest results with `muse-spark-1.3` (2026-10-27):
 
@@ -149,6 +151,13 @@ Latest results with `muse-spark-1.3` (2026-10-27):
 | `minimal` (in use) | 14/14 (100%) | $0.0021–0.0025   | ~300          | 1.4 s |
 
 ID scans with `muse-spark-1.3` at `minimal` (2026-10-28): 3/3 (100%), about $0.0026 per scan, 1.7 s.
+
+Reply drafts and translations at `minimal` (2026-10-29):
+
+| Model                                               | Drafts       | Per draft      | Translations |
+| --------------------------------------------------- | ------------ | -------------- | ------------ |
+| `muse-spark-1.3` (Meta Model API)                   | 14/14 (100%) | $0.0025, 2.6 s | 4/4 (100%)   |
+| `meta-models/muse-spark-open-1026` (Baseten, `low`) | 14/14 (100%) | $0.0040, 3.2 s | 4/4 (100%)   |
 
 ## Meta models
 
@@ -161,6 +170,15 @@ The Meta Model API is OpenAI-compatible, so `packages/ai/src/provider.ts` wraps 
 | `META_MODEL_VOICE`  | `muse-voice-transcribe-1.0`          | Housekeeping voice notes, through Meta's own `/v1/asr/transcribe` endpoint (not OpenAI-compatible) |
 
 Muse Spark is a reasoning model: it always reasons before answering (`reasoning_effort: "none"` is rejected), and reasoning tokens are billed as output. `packages/ai/src/reasoning.ts` sets the effort per feature through the AI SDK's `reasoning` option: `minimal` for inbox extraction, drafts, housekeeping notes and ID scans, `low` for the agent, which plans multi-step tool use. Each is the lowest level that keeps quality, measured with `pnpm eval` and live runs.
+
+### Muse Spark Open on Baseten
+
+Muse Spark Open is Meta's open-weight release of Muse Spark; Orbit uses the dated `meta-models/muse-spark-open-1026` (`BASETEN_MODEL`). With `BASETEN_API_KEY` and `BASETEN_MODEL` set, reply drafts and translations run on it through Baseten's OpenAI-compatible Model API (`BASETEN_BASE_URL`, default `https://inference.baseten.co/v1`); the agent, inbox extraction, housekeeping notes and ID scans stay on the Meta Model API ([ADR 0015](decisions/0015-muse-spark-open-on-baseten.md)).
+
+- Baseten serves it without structured output or JSON mode, so it takes only the two plain-text features.
+- It always reasons and defaults to `xhigh`; the features send `minimal`, which Baseten runs as `low`, its lowest level.
+- `withFallback` (`packages/ai/src/fallback.ts`) wraps it: a call that fails (credits used up, rate limit, outage) is sent again to Meta's model, the agent model for drafts and `META_MODEL_TRANSLATE` for translations. Usage is recorded under the model that answered.
+- Prices are the same as Meta's Standard tier, and its spend counts towards the same `AI_MONTHLY_BUDGET_USD`.
 
 Constraints from Meta's tool-calling docs that the agent respects: `tool_choice` only accepts `"auto"` (the SDK default), and tool arguments are not guaranteed to match the schema, so the SDK validates them with the zod schemas.
 
@@ -187,5 +205,7 @@ The public demo is protected in `apps/api/src/limits.ts` (in memory, reset on re
 - `AI_RATE_LIMIT_PER_HOUR` agent requests per client IP per rolling hour (IP from `x-forwarded-for`).
 - `AI_DAILY_TOKEN_BUDGET` tokens per UTC day across all visitors, counted from model usage after each turn. The default of 2,000,000 is about 100 agent turns, or roughly $2 a day.
 - `AI_MONTHLY_BUDGET_USD` real spend per UTC month, from the `ai_usage` table. Persisted, so it survives restarts.
+
+Baseten allows 15 requests a minute on an unverified account and 120 once verified; beyond that a draft or translation falls back to Meta's API.
 
 When a limit is hit, `POST /api/agent` returns 429 `demo_limit` with a message the command bar can show as is.

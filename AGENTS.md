@@ -43,7 +43,7 @@ pnpm eval           # AI extraction evals, prints pass rate
 - Validate every external input (HTTP bodies, tool arguments, LLM output) with zod schemas from `packages/shared`.
 
 ## AI rules
-- Runtime AI uses **Meta models only**, via the Meta Model API. Never call OpenAI, Anthropic or Google models from the app.
+- Runtime AI uses **Meta models only**: Muse Spark via the Meta Model API, and Meta's open-weight Muse Spark Open via Baseten for reply drafts and translations ([ADR 0015](docs/decisions/0015-muse-spark-open-on-baseten.md)). Never call OpenAI, Anthropic or Google models from the app.
 - Model IDs, API base URL and keys come from env vars. Never hardcode them.
 - The API key is server-side only. Never expose it to the web bundle (no `VITE_` env vars for secrets).
 - The LLM never computes prices or availability. It calls `quote` and `checkAvailability` and repeats their results.

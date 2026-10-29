@@ -60,6 +60,8 @@ function appWith({ ai = true, voice = true } = {}) {
           agentModelId: 'muse-spark-1.3',
           translate: model,
           translateModelId: 'muse-spark-1.3',
+          draft: model,
+          draftModelId: 'muse-spark-1.3',
           vision: null,
           visionModelId: null,
           transcription: voice

@@ -52,16 +52,16 @@ All guests, bookings and messages in the demo and the screenshots are synthetic.
 
 ## How it uses Meta's models
 
-Every AI feature runs on the Meta Model API through the Vercel AI SDK. The models do language, the domain does the facts:
+Every AI feature runs on Meta's models through the Vercel AI SDK: Muse Spark on the Meta Model API, and its open-weight sibling Muse Spark Open on Baseten for reply drafts and translations. The models do language, the domain does the facts:
 
-| Feature            | Model                                          | What the model does                                                      | What it never does                                                           |
-| ------------------ | ---------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| ⌘K agent           | `muse-spark-1.3`                               | Plans multi-step tool use over 31 typed tools, writes the answer         | Computes a price or availability, or changes a booking without a click       |
-| Inbox extraction   | `muse-spark-1.3`                               | Structured output: kind, language, dates, party, child ages, wishes      | Picks rooms or prices                                                        |
-| Reply drafts       | `muse-spark-1.3`                               | Writes the reply in the guest's language around the exact quoted totals  | Runs before staff ask, or sends a reply; a wrong amount is redone or dropped |
-| Translation        | `muse-spark-1.3` (`META_MODEL_TRANSLATE`)      | Puts drafts and guest messages into the staff member's language and back | Changes an amount: such a translation is redone or refused                   |
-| Housekeeping notes | `muse-voice-transcribe-1.0` + `muse-spark-1.3` | Transcribes the recording, reads it into room/status/issue updates       | Changes bookings; unknown rooms and forbidden changes are skipped            |
-| ID scans           | `muse-spark-1.3` (vision)                      | Reads a phone photo of an ID card or passport into guest-book fields     | Saves them: staff review every value; the photo is never stored              |
+| Feature            | Model                                               | What the model does                                                      | What it never does                                                           |
+| ------------------ | --------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| ⌘K agent           | `muse-spark-1.3`                                    | Plans multi-step tool use over 31 typed tools, writes the answer         | Computes a price or availability, or changes a booking without a click       |
+| Inbox extraction   | `muse-spark-1.3`                                    | Structured output: kind, language, dates, party, child ages, wishes      | Picks rooms or prices                                                        |
+| Reply drafts       | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Writes the reply in the guest's language around the exact quoted totals  | Runs before staff ask, or sends a reply; a wrong amount is redone or dropped |
+| Translation        | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Puts drafts and guest messages into the staff member's language and back | Changes an amount: such a translation is redone or refused                   |
+| Housekeeping notes | `muse-voice-transcribe-1.0` + `muse-spark-1.3`      | Transcribes the recording, reads it into room/status/issue updates       | Changes bookings; unknown rooms and forbidden changes are skipped            |
+| ID scans           | `muse-spark-1.3` (vision)                           | Reads a phone photo of an ID card or passport into guest-book fields     | Saves them: staff review every value; the photo is never stored              |
 
 Muse Spark always reasons before answering, so the reasoning effort is set per feature to the lowest level that keeps quality, measured with the evals and live runs: `minimal` for extraction, drafts, notes and ID scans, `low` for the agent, which plans multi-step tool use.
 

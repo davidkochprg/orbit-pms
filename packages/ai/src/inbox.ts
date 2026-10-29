@@ -23,7 +23,10 @@ import type { Translator } from './translate';
 import type { AiFeature, UsageStore } from './usage';
 
 export interface InboxPipelineDeps {
+  /** Extracts the request; needs structured output. */
   model: LanguageModel;
+  /** Writes the reply; the extraction model when unset. */
+  draftModel?: LanguageModel;
   modelId: string;
   hotel: HotelService;
   inbox: InboxService;
@@ -69,7 +72,11 @@ export async function draftReply(
     temperature: 0.3,
     reasoning: reasoningEffort.draft,
   });
-  return { draft: result.text.trim(), tokens: fromSdkUsage(result.usage) };
+  return {
+    draft: result.text.trim(),
+    tokens: fromSdkUsage(result.usage),
+    modelId: result.response.modelId,
+  };
 }
 
 /**
@@ -81,11 +88,13 @@ export async function draftReply(
  */
 export function createInboxPipeline(deps: InboxPipelineDeps) {
   const { model, modelId, hotel, inbox, hotelContext, usage, canSpend, today, translator } = deps;
+  const draftModel = deps.draftModel ?? model;
 
-  async function record(feature: AiFeature, tokens: TokenUsage) {
+  /** `servedBy` is the model that answered, which differs from `modelId` after a fallback. */
+  async function record(feature: AiFeature, tokens: TokenUsage, servedBy = modelId) {
     await usage.record({
       feature,
-      model: modelId,
+      model: servedBy,
       tokens,
       audioSeconds: 0,
       costMicroUsd: tokenCostMicroUsd(tokens),
@@ -103,14 +112,18 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
     const stated = amountsInText(hotelFacts(context));
     let feedback: string | undefined;
     for (let attempt = 0; attempt < 2; attempt++) {
-      const { draft, tokens } = await draftReply(model, context, {
+      const {
+        draft,
+        tokens,
+        modelId: servedBy,
+      } = await draftReply(draftModel, context, {
         inquiry,
         analysis,
         options,
         note,
         ...(feedback && { feedback }),
       });
-      await record('inbox_draft', tokens);
+      await record('inbox_draft', tokens, servedBy);
       const check = checkDraftPrices(draft, options, stated);
       if (check.ok) return { draft, note };
       feedback = [

@@ -126,6 +126,7 @@ export function createApp({
     translator &&
     createInboxPipeline({
       model: ai.agent,
+      draftModel: ai.draft,
       modelId: ai.agentModelId,
       hotel,
       inbox,

@@ -38,10 +38,11 @@ export interface TranslatorDeps {
  * reasoning, and a translation that changes an amount is redone once and otherwise refused.
  */
 export function createTranslator({ model, modelId, usage, canSpend }: TranslatorDeps) {
-  async function record(tokens: TokenUsage) {
+  /** `servedBy` is the model that answered, which differs from `modelId` after a fallback. */
+  async function record(tokens: TokenUsage, servedBy = modelId) {
     await usage.record({
       feature: 'translate',
-      model: modelId,
+      model: servedBy,
       tokens,
       audioSeconds: 0,
       costMicroUsd: tokenCostMicroUsd(tokens),
@@ -61,7 +62,7 @@ export function createTranslator({ model, modelId, usage, canSpend }: Translator
           temperature: 0,
           reasoning: reasoningEffort.translate,
         });
-        await record(fromSdkUsage(result.usage));
+        await record(fromSdkUsage(result.usage), result.response.modelId);
         const translation = result.text.trim();
         if (sameAmounts(text, translation)) return translation;
         prompt = `${text}\n\n(Your previous translation changed an amount. Copy every amount and currency exactly.)`;

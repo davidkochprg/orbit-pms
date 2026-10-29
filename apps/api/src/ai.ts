@@ -13,5 +13,14 @@ export function createAi(env: Env): MetaProvider | null {
       ...(env.META_MODEL_VOICE ? { voice: env.META_MODEL_VOICE } : {}),
       ...(env.META_MODEL_VISION ? { vision: env.META_MODEL_VISION } : {}),
     },
+    ...(env.BASETEN_API_KEY && env.BASETEN_MODEL
+      ? {
+          open: {
+            apiKey: env.BASETEN_API_KEY,
+            baseURL: env.BASETEN_BASE_URL,
+            model: env.BASETEN_MODEL,
+          },
+        }
+      : {}),
   });
 }

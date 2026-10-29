@@ -17,6 +17,10 @@ export const envSchema = z.object({
   HOTEL_TIMEZONE: z.string().default('America/Los_Angeles'),
   META_MODEL_VOICE: optional,
   META_MODEL_VISION: optional,
+  /** Muse Spark Open on Baseten, for reply drafts and translations. Both unset keeps them on Meta. */
+  BASETEN_API_KEY: optional,
+  BASETEN_BASE_URL: z.url().default('https://inference.baseten.co/v1'),
+  BASETEN_MODEL: optional,
   AI_DAILY_TOKEN_BUDGET: z.coerce.number().int().positive().default(2_000_000),
   AI_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(20),
   /** Hard cap on real Meta spend per UTC month, from recorded usage. */

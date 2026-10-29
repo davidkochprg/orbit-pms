@@ -10,7 +10,9 @@ import { conversation } from '@orbit/domain/testing';
 import { runAgent } from '../agent';
 import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from '../cost';
 import { buildSystemPrompt } from '../prompts/system';
-import { extractMessage } from '../inbox';
+import { draftReply, extractMessage } from '../inbox';
+import { amountsInText, checkDraftPrices } from '../price-guard';
+import { hotelFacts, type HotelContext } from '../prompts/hotel';
 import { createMetaProvider } from '../provider';
 import { reasoningEffort, type ReasoningEffort } from '../reasoning';
 import { readHousekeepingNote } from '../housekeeping';
@@ -18,7 +20,8 @@ import { readIdDocument } from '../id-scan';
 import { agentFixtures, buildAgentEvalHotel } from './agent';
 import { evalRoomNames, housekeepingNoteFixtures } from './housekeeping-notes';
 import { idDocumentFixtures } from './id-documents';
-import { buildInquiryFixtures } from './inquiries';
+import { buildDraftEvalHotel } from './drafts';
+import { buildInquiryFixtures, type InquiryFixture } from './inquiries';
 import { translationFixtures } from './translations';
 import { createTranslator } from '../translate';
 import { scoreExtraction, scoreHousekeepingNote, scoreIdReading } from './score';
@@ -28,6 +31,9 @@ const {
   META_MODEL_AGENT,
   META_MODEL_VISION,
   META_API_BASE_URL = 'https://api.meta.ai/v1',
+  BASETEN_API_KEY,
+  BASETEN_MODEL,
+  BASETEN_BASE_URL = 'https://inference.baseten.co/v1',
 } = process.env;
 if (!META_API_KEY || !META_MODEL_AGENT) {
   console.error(
@@ -40,7 +46,23 @@ const provider = createMetaProvider({
   apiKey: META_API_KEY,
   baseURL: META_API_BASE_URL,
   models: { agent: META_MODEL_AGENT, ...(META_MODEL_VISION && { vision: META_MODEL_VISION }) },
+  // With Baseten set, drafts and translations are measured on Muse Spark Open, as in the app.
+  ...(BASETEN_API_KEY &&
+    BASETEN_MODEL && {
+      open: { apiKey: BASETEN_API_KEY, baseURL: BASETEN_BASE_URL, model: BASETEN_MODEL },
+    }),
 });
+
+// EVAL_SUITES picks suites, e.g. "drafts,translations"; unset runs them all.
+const suiteKeys = ['inbox', 'notes', 'ids', 'agent', 'drafts', 'translations'] as const;
+type SuiteKey = (typeof suiteKeys)[number];
+const only = process.env.EVAL_SUITES?.split(',')
+  .map((k) => k.trim())
+  .filter(Boolean);
+if (only?.some((k) => !suiteKeys.includes(k as SuiteKey))) {
+  console.error(`EVAL_SUITES must list some of: ${suiteKeys.join(', ')}`);
+  process.exit(1);
+}
 // EVAL_REASONING overrides the configured effort, to compare levels before changing the default.
 const levels: ReasoningEffort[] = [
   'provider-default',
@@ -66,12 +88,18 @@ interface CaseResult {
   tokens: TokenUsage;
 }
 
-/** Runs one suite, prints a line per case and a summary; returns whether every case passed. */
+/**
+ * Runs one suite, prints a line per case and a summary; returns whether every case passed.
+ * A suite left out of EVAL_SUITES counts as passed.
+ */
 async function suite(
+  key: SuiteKey,
   name: string,
   effort: ReasoningEffort,
+  model: string,
   cases: { id: string; run: () => Promise<CaseResult> }[],
 ): Promise<boolean> {
+  if (only && !only.includes(key)) return true;
   console.log(`\n${name} (reasoning ${effort})`);
   let passed = 0;
   let costMicroUsd = 0;
@@ -91,7 +119,7 @@ async function suite(
   }
   const rate = Math.round((passed / cases.length) * 100);
   const seconds = (Date.now() - started) / 1000;
-  console.log(`${passed}/${cases.length} passed (${rate}%) with ${META_MODEL_AGENT}`);
+  console.log(`${passed}/${cases.length} passed (${rate}%) with ${model}`);
   console.log(
     `cost $${(costMicroUsd / 1e6).toFixed(4)}, ${Math.round(outputTokens / cases.length)} output tokens and ${(seconds / cases.length).toFixed(1)} s per case`,
   );
@@ -99,22 +127,27 @@ async function suite(
 }
 
 const extractionEffort = reasoning ?? reasoningEffort.extraction;
+const inquiryFor = (f: InquiryFixture) =>
+  conversation({
+    id: f.id,
+    body: f.rawText,
+    channel: f.channel,
+    partner: f.partner,
+    subject: f.subject,
+    senderName: f.senderName,
+    senderAddress: f.senderAddress,
+    receivedAt: new Date().toISOString(),
+  });
+
 const inboxOk = await suite(
+  'inbox',
   'Inbox extraction',
   extractionEffort,
+  META_MODEL_AGENT,
   buildInquiryFixtures(today).map((f) => ({
     id: f.id,
     run: async () => {
-      const inquiry = conversation({
-        id: f.id,
-        body: f.rawText,
-        channel: f.channel,
-        partner: f.partner,
-        subject: f.subject,
-        senderName: f.senderName,
-        senderAddress: f.senderAddress,
-        receivedAt: new Date().toISOString(),
-      });
+      const inquiry = inquiryFor(f);
       const { analysis, tokens } = await extractMessage(
         provider.agent,
         inquiry,
@@ -134,8 +167,10 @@ const inboxOk = await suite(
 
 const noteEffort = reasoning ?? reasoningEffort.housekeeping;
 const notesOk = await suite(
+  'notes',
   'Housekeeping notes',
   noteEffort,
+  META_MODEL_AGENT,
   housekeepingNoteFixtures.map((f) => ({
     id: f.id,
     run: async () => {
@@ -160,8 +195,10 @@ const vision = provider.vision;
 const idEffort = reasoning ?? reasoningEffort.idScan;
 const idsOk = vision
   ? await suite(
+      'ids',
       'ID scans',
       idEffort,
+      provider.visionModelId ?? '',
       idDocumentFixtures.map((f) => ({
         id: f.id,
         run: async () => {
@@ -187,8 +224,10 @@ const idsOk = vision
 
 const agentEffort = reasoning ?? reasoningEffort.agent;
 const agentOk = await suite(
+  'agent',
   'Agent tools',
   agentEffort,
+  META_MODEL_AGENT,
   agentFixtures.map((f) => ({
     id: f.id,
     run: async () => {
@@ -224,10 +263,55 @@ const agentOk = await suite(
   })),
 );
 
+const draftHotel: HotelContext = {
+  profile: { ...emptyHotelProfile, name: 'Eval Lodge' },
+  policy: hotelPolicy,
+  pricing: usDemoPricing,
+};
+const draftsOk = await suite(
+  'drafts',
+  'Reply drafts',
+  reasoningEffort.draft,
+  provider.draftModelId,
+  buildInquiryFixtures(today)
+    .filter((f) => f.expected.kind !== 'other')
+    .map((f) => ({
+      id: f.id,
+      run: async () => {
+        // The expected extraction stands in for the model's, so only the draft is measured.
+        const { options, note } = await buildDraftEvalHotel(today).inboxOptions(f.expected);
+        const { draft, tokens, modelId } = await draftReply(provider.draft, draftHotel, {
+          inquiry: inquiryFor(f),
+          analysis: f.expected,
+          options,
+          note,
+        });
+        const check = checkDraftPrices(draft, options, amountsInText(hotelFacts(draftHotel)));
+        const problems = [
+          ...(draft ? [] : ['empty draft']),
+          ...(check.ok
+            ? []
+            : [
+                ...check.unexpected.map((a) => `unexpected amount ${a}`),
+                ...check.missing.map((a) => `missing total ${a}`),
+              ]),
+        ];
+        return {
+          passed: problems.length === 0,
+          label: `${f.expected.language}  ${modelId}  ${problems.join(', ')}`,
+          detail: `      options  ${options.map((o) => `${o.roomName} ${o.quote.total}`).join(', ') || 'none'}\n      draft    ${draft.replace(/\n/g, ' ')}`,
+          tokens,
+        };
+      },
+    })),
+);
+
 const translateEffort = reasoningEffort.translate;
 const translateOk = await suite(
+  'translations',
   'Translations',
   translateEffort,
+  provider.translateModelId,
   translationFixtures.map((f) => ({
     id: f.id,
     run: async () => {
@@ -263,4 +347,4 @@ const translateOk = await suite(
   })),
 );
 
-process.exit(inboxOk && notesOk && idsOk && agentOk && translateOk ? 0 : 1);
+process.exit(inboxOk && notesOk && idsOk && agentOk && draftsOk && translateOk ? 0 : 1);
