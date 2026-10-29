@@ -1,7 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
 import { Outlet } from 'react-router';
-import { BrandMark } from '@/components/brand-mark';
+import { Wordmark } from '@/components/wordmark';
 import { ErrorNotice } from '@/components/error-notice';
 import { FormField } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
@@ -31,10 +31,7 @@ function AccessPage() {
   return (
     <div className="flex min-h-svh items-center justify-center bg-background px-6 py-16">
       <form onSubmit={submit} className="flex w-full max-w-sm flex-col gap-8">
-        <div className="flex items-center gap-2.5">
-          <BrandMark size="lg" />
-          <span className="text-lg font-semibold tracking-tight">Orbit</span>
-        </div>
+        <Wordmark size="lg" />
 
         <div className="flex flex-col gap-3">
           <h1 className="text-3xl font-semibold tracking-tight text-balance">

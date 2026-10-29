@@ -1,7 +1,7 @@
 import { Camera, CircleCheck, ImageUp, LoaderCircle } from 'lucide-react';
 import { useRef, useState } from 'react';
 import { useParams } from 'react-router';
-import { BrandMark } from '@/components/brand-mark';
+import { Wordmark } from '@/components/wordmark';
 import { ErrorNotice } from '@/components/error-notice';
 import { Button } from '@/components/ui/button';
 import { usePhoneScan, usePhoneUpload } from '@/lib/api';
@@ -45,8 +45,9 @@ export function ScanPage() {
 
   return (
     <main className="flex min-h-dvh flex-col bg-sidebar px-4 py-6 text-foreground">
-      <header className="flex items-center gap-2 text-sm font-medium">
-        <BrandMark /> Orbit · ID scan
+      <header className="flex items-baseline gap-2 text-sm font-medium">
+        <Wordmark size="sm" />
+        <span className="text-muted-foreground">ID scan</span>
       </header>
 
       <section className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center gap-6 py-8">

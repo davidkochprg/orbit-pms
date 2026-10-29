@@ -1,7 +1,7 @@
 import { ArrowRight, Inbox, type LucideIcon, Mic, Sparkles } from 'lucide-react';
 import { useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
-import { BrandMark } from '@/components/brand-mark';
+import { Wordmark } from '@/components/wordmark';
 import { ErrorNotice } from '@/components/error-notice';
 import { WelcomeScene } from '@/components/welcome-scene';
 import { Button } from '@/components/ui/button';
@@ -67,10 +67,7 @@ export function WelcomePage() {
 
         <div className="flex flex-1 items-center justify-center px-6 pb-16">
           <div className="flex w-full max-w-sm flex-col gap-8">
-            <div className="flex items-center gap-2.5">
-              <BrandMark size="lg" />
-              <span className="text-lg font-semibold tracking-tight">Orbit</span>
-            </div>
+            <Wordmark size="lg" />
 
             <div className="flex flex-col gap-3">
               <h1 className="text-3xl font-semibold tracking-tight text-balance">
