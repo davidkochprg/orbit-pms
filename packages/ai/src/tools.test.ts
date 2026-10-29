@@ -25,11 +25,17 @@ describe('agent tools', () => {
 
   it('checks availability and quotes through the domain', async () => {
     const { tools } = setup();
-    const rooms = await tools.checkAvailability.execute(
-      { checkIn: '2026-05-10', checkOut: '2026-05-12', adults: 2, childAges: [] },
-      callOptions,
-    );
-    expect(rooms).toEqual([expect.objectContaining({ roomId: 'rm_201', roomName: '201' })]);
+    const input = {
+      checkIn: '2026-05-10',
+      checkOut: '2026-05-12',
+      adults: 2,
+      childAges: [],
+      addons: { wellness: false, dogs: 0, extraBeds: 0 },
+    };
+    const rooms = await tools.checkAvailability.execute(input, callOptions);
+    expect(rooms).toMatchObject([
+      { roomId: 'rm_201', roomName: '201', quote: { nights: 2, currency: 'CZK' } },
+    ]);
     const quote = await tools.quote.execute(
       {
         roomId: 'rm_201',
@@ -42,6 +48,39 @@ describe('agent tools', () => {
       callOptions,
     );
     expect(quote).toMatchObject({ nights: 2, currency: 'CZK' });
+  });
+
+  it('gives the model each free room with its total, not the line items', async () => {
+    const { tools } = setup();
+    const input = {
+      checkIn: '2026-05-10',
+      checkOut: '2026-05-12',
+      adults: 2,
+      childAges: [],
+      addons: { wellness: false, dogs: 0, extraBeds: 0 },
+    };
+    const output = await tools.checkAvailability.execute(input, callOptions);
+    if (!Array.isArray(output)) throw new Error('expected free rooms');
+    const forModel = await tools.checkAvailability.toModelOutput?.({
+      toolCallId: 'call_1',
+      input,
+      output,
+    });
+    const { roomType } = output[0]!;
+    expect(forModel).toEqual({
+      type: 'json',
+      value: [
+        {
+          roomId: 'rm_201',
+          roomName: '201',
+          kind: 'room',
+          roomType: { id: roomType.id, name: roomType.name, description: roomType.description },
+          nights: 2,
+          total: output[0]!.quote.total,
+          currency: 'CZK',
+        },
+      ],
+    });
   });
 
   it('proposes a move instead of executing it', async () => {

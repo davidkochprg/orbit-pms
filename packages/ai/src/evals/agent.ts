@@ -319,6 +319,30 @@ export const agentFixtures: AgentFixture[] = [
     ],
   },
   {
+    id: 'free-rooms',
+    prompt: 'Which rooms are free tomorrow night for two adults?',
+    check: ({ hotel, calls, answer }) => {
+      // Jan Dvořák arrives today, so his check-in is the eval's today.
+      const today = hotel.repos.state.bookings.find((b) => b.id === 'bk_jan')!.checkIn;
+      const search = calls.find((c) => c.toolName === 'checkAvailability')?.input as
+        { checkIn?: string; checkOut?: string; adults?: number } | undefined;
+      const expected = { checkIn: addDays(today, 1), checkOut: addDays(today, 2), adults: 2 };
+      return [
+        ...readOnly(hotel),
+        ...called(calls, 'checkAvailability'),
+        ...(search &&
+        (search.checkIn !== expected.checkIn ||
+          search.checkOut !== expected.checkOut ||
+          search.adults !== expected.adults)
+          ? [`searched ${JSON.stringify(search)}, expected ${JSON.stringify(expected)}`]
+          : []),
+        // 104 and 201 are taken tomorrow night.
+        ...(/\[\[rm_(?:104|201)\]\]/.test(answer) ? ['answer offers a taken room'] : []),
+        ...bareIds(answer),
+      ];
+    },
+  },
+  {
     id: 'guest-book-question',
     prompt: 'Kdo je zapsaný v knize hostů pokoje 104?',
     check: ({ hotel, calls, answer }) => [

@@ -8,7 +8,6 @@ import {
   type ReportService,
 } from '@orbit/domain';
 import {
-  availabilityQuerySchema,
   type BookingSummary,
   bookingPatchSchema,
   bookingSearchSchema,
@@ -26,11 +25,13 @@ import {
   type PendingAction,
   type PendingActionInput,
   quoteInputSchema,
+  roomOptionSchema,
+  roomOptionsQuerySchema,
   reportQuerySchema,
   roomStatusSchema,
   stayGuestPatchSchema,
 } from '@orbit/shared';
-import { tool } from 'ai';
+import { type JSONValue, tool } from 'ai';
 import { z } from 'zod';
 
 export interface ToolDeps {
@@ -60,6 +61,25 @@ async function safely<T>(run: () => Promise<T>): Promise<T | ToolError> {
     if (err instanceof DomainError) return { error: { code: err.code, message: err.message } };
     throw err;
   }
+}
+
+/**
+ * Free rooms as the model sees them: the full quotes go to the app's availability card, the model
+ * gets each room's total to name the best fit.
+ */
+function optionsForModel({ output }: { output: unknown }): { type: 'json'; value: JSONValue } {
+  const options = z.array(roomOptionSchema).safeParse(output);
+  if (!options.success) return { type: 'json', value: output as JSONValue };
+  return {
+    type: 'json',
+    value: options.data.map(({ quote, roomType, ...room }) => ({
+      ...room,
+      roomType: { id: roomType.id, name: roomType.name, description: roomType.description },
+      nights: quote.nights,
+      total: quote.total,
+      currency: quote.currency,
+    })),
+  };
 }
 
 function compact(s: BookingSummary) {
@@ -213,9 +233,11 @@ export function createAgentTools({
       execute: ({ bookingId }) => safely(() => hotel.getBookingDetail(bookingId)),
     }),
     checkAvailability: tool({
-      description: 'Rooms that are free for the whole stay and fit the party, cheapest first.',
-      inputSchema: availabilityQuerySchema,
-      execute: (query) => safely(() => hotel.findAvailableRooms(query)),
+      description:
+        'Rooms that are free for the whole stay and fit the party, cheapest first, each with its exact total including add-ons. Staff see them as a card with prices and a hold button.',
+      inputSchema: roomOptionsQuerySchema.omit({ excludeBookingId: true }),
+      execute: (query) => safely(() => hotel.roomOptions(query)),
+      toModelOutput: optionsForModel,
     }),
     quote: tool({
       description:
