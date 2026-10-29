@@ -38,11 +38,24 @@ interface Props {
 export function TeamSettings({ staff, currentId, readOnly }: Props) {
   const update = useUpdateStaff();
   const error = update.error;
+  // The team comes first; adding someone is a step you ask for.
+  const [adding, setAdding] = useState(false);
 
   return (
     <div className="flex flex-col gap-8">
-      {!readOnly && <AddMember />}
-      <Section title="Team" count={staff.filter((s) => s.active).length}>
+      <Section
+        title="Team"
+        count={staff.filter((s) => s.active).length}
+        actions={
+          !readOnly &&
+          !adding && (
+            <Button variant="ghost" size="sm" onClick={() => setAdding(true)}>
+              <UserPlus /> Add
+            </Button>
+          )
+        }
+      >
+        {adding && <AddMember onDone={() => setAdding(false)} />}
         {error && (
           <ErrorNotice message={error.message} onDismiss={() => update.reset()} className="mb-2" />
         )}
@@ -133,7 +146,7 @@ export function TeamSettings({ staff, currentId, readOnly }: Props) {
   );
 }
 
-function AddMember() {
+function AddMember({ onDone }: { onDone: () => void }) {
   const add = useAddStaff();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -148,18 +161,20 @@ function AddMember() {
         onSuccess: () => {
           setName('');
           setEmail('');
+          onDone();
         },
       },
     );
   }
 
   return (
-    <Section title="Add a team member">
+    <div className="mb-3 rounded-stage bg-background p-3 shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit">
       <form onSubmit={submit} className="flex flex-col gap-3">
         <div className="grid gap-3 sm:grid-cols-2">
           <FormField label="Name" htmlFor="staff-name">
             <Input
               id="staff-name"
+              autoFocus
               required
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -196,12 +211,17 @@ function AddMember() {
               </button>
             ))}
           </div>
-          <Button type="submit" size="sm" disabled={add.isPending || name.trim() === ''}>
-            <UserPlus /> Add
-          </Button>
+          <span className="ml-auto flex items-center gap-1.5">
+            <Button type="button" variant="ghost" size="sm" onClick={onDone}>
+              Cancel
+            </Button>
+            <Button type="submit" size="sm" disabled={add.isPending || name.trim() === ''}>
+              <UserPlus /> Add to the team
+            </Button>
+          </span>
         </div>
         {add.error && <ErrorNotice message={add.error.message} onDismiss={() => add.reset()} />}
       </form>
-    </Section>
+    </div>
   );
 }
