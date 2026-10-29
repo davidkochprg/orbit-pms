@@ -7,6 +7,7 @@ import {
   canDecline,
   channelLabel,
   channelsOf,
+  conversationsOf,
   filterConversations,
   folderCounts,
   guessLanguage,
@@ -116,6 +117,25 @@ describe('canDecline', () => {
     expect(canDecline(read('booking_request'))).toBe(true);
     expect(canDecline(read('question'))).toBe(false);
     expect(canDecline(read('other'))).toBe(false);
+  });
+});
+
+describe('conversationsOf', () => {
+  it("finds a guest's conversations by their booking or email, latest first", () => {
+    const all = [
+      conversation({
+        id: 'a',
+        senderAddress: 'Ruby@Example.com',
+        lastMessageAt: '2026-10-27T10:00:00.000Z',
+      }),
+      conversation({ id: 'b', bookingId: 'bk_1', lastMessageAt: '2026-10-28T10:00:00.000Z' }),
+      conversation({ id: 'c', senderAddress: 'other@example.com' }),
+    ];
+    expect(conversationsOf(all, { email: 'ruby@example.com' }, ['bk_1']).map((m) => m.id)).toEqual([
+      'b',
+      'a',
+    ]);
+    expect(conversationsOf(all, { email: null }, []).map((m) => m.id)).toEqual([]);
   });
 });
 

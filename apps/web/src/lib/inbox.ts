@@ -205,3 +205,22 @@ export function sendLabel(m: Inquiry): string {
 export function isRead(m: Inquiry): boolean {
   return m.parsed !== null && m.processedAt !== null && !m.processingError;
 }
+
+/**
+ * A guest's conversations: those about one of their bookings, or from their email address.
+ * Latest message first.
+ */
+export function conversationsOf(
+  all: Inquiry[],
+  guest: Pick<Guest, 'email'>,
+  bookingIds: string[],
+): Inquiry[] {
+  const email = guest.email?.toLowerCase() ?? null;
+  return all
+    .filter(
+      (m) =>
+        (m.bookingId !== null && bookingIds.includes(m.bookingId)) ||
+        (email !== null && m.senderAddress?.toLowerCase() === email),
+    )
+    .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
+}

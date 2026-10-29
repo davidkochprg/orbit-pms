@@ -1,4 +1,4 @@
-import { CalendarX2, ChevronRight, Pencil, Plus } from 'lucide-react';
+import { CalendarX2, ChevronRight, Mail, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { BookingStatusBadge } from '@/components/booking-status-badge';
@@ -14,8 +14,15 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
-import { useBookings, useGuest, useRooms } from '@/lib/api';
-import { formatMoney, formatParty, formatRange, languageLabels } from '@/lib/format';
+import { useBookings, useGuest, useInbox, useRooms } from '@/lib/api';
+import {
+  formatDateTime,
+  formatMoney,
+  formatParty,
+  formatRange,
+  languageLabels,
+} from '@/lib/format';
+import { conversationsOf, preview } from '@/lib/inbox';
 
 export function GuestDetailPage() {
   const { id = '' } = useParams();
@@ -25,8 +32,24 @@ export function GuestDetailPage() {
   const { open } = useBookingDrawer();
   const { openNew } = useBookingEditor();
   const [editing, setEditing] = useState(false);
+  const inbox = useInbox();
   const roomName = (roomId: string) => rooms.data?.find((r) => r.id === roomId)?.name ?? roomId;
   const g = guest.data;
+  const all = bookings.data ?? [];
+  const messages = g
+    ? conversationsOf(
+        inbox.data ?? [],
+        g,
+        all.map((b) => b.id),
+      )
+    : [];
+  // Stays that happened or will: cancellations count for nothing.
+  const kept = all.filter((b) => b.status !== 'cancelled');
+  const stays = bookings.data && {
+    count: kept.length,
+    nights: kept.reduce((n, b) => n + (b.priceSnapshot?.nights ?? 0), 0),
+    spent: kept.reduce((n, b) => n + (b.priceSnapshot?.total ?? 0), 0),
+  };
 
   return (
     <>
@@ -65,11 +88,39 @@ export function GuestDetailPage() {
               <h2 className="text-xl font-semibold tracking-tight">{g.name}</h2>
             </div>
 
+            {stays && (
+              <dl className="grid grid-cols-3 gap-2 sm:max-w-lg">
+                {[
+                  { label: 'Stays', value: String(stays.count) },
+                  { label: 'Nights', value: String(stays.nights) },
+                  { label: 'Spent', value: formatMoney(stays.spent) },
+                ].map((f) => (
+                  <div
+                    key={f.label}
+                    className="flex flex-col gap-0.5 rounded-control bg-ink/4 px-3 py-2"
+                  >
+                    <dt className="text-xs text-muted-foreground">{f.label}</dt>
+                    <dd className="font-mono text-base tabular-nums">{f.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            )}
+
             <PropertyList>
               <Property label="Language">{languageLabels[g.language]}</Property>
               <Property label="Email">{g.email ?? '–'}</Property>
               <Property label="Phone">{g.phone ?? '–'}</Property>
-              {g.notes && <Property label="Notes">{g.notes}</Property>}
+              <Property label="Notes">
+                {g.notes ?? (
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="text-subtle-foreground hover:text-foreground"
+                  >
+                    Preferences, allergies…
+                  </button>
+                )}
+              </Property>
             </PropertyList>
 
             <Section title="Bookings" count={bookings.data?.length}>
@@ -100,6 +151,34 @@ export function GuestDetailPage() {
                 </ul>
               )}
             </Section>
+
+            {messages.length > 0 && (
+              <Section title="Messages" count={messages.length}>
+                <ul className="-mx-2 flex flex-col">
+                  {messages.map((m) => (
+                    <li key={m.id}>
+                      <Link
+                        to={`/inbox/${encodeURIComponent(m.id)}`}
+                        className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent"
+                      >
+                        <Mail className="size-4 shrink-0 text-muted-foreground" />
+                        <span className="flex min-w-0 flex-1 flex-col">
+                          <span className="truncate font-medium">
+                            {m.subject ?? '(no subject)'}
+                          </span>
+                          <span className="truncate text-xs text-muted-foreground">
+                            {preview(m)}
+                          </span>
+                        </span>
+                        <time className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                          {formatDateTime(m.lastMessageAt)}
+                        </time>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </Section>
+            )}
           </div>
         )}
       </PageBody>
