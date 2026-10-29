@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useComposeMessage, useCreateMessage, useReceiveMessage } from '@/lib/api';
+import { useCreateMessage, useReceiveMessage } from '@/lib/api';
 
 interface DialogProps {
   open: boolean;
@@ -62,78 +62,6 @@ function Shell({
         </form>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/** A new email from the hotel to a guest. */
-export function ComposeDialog({ open, onOpenChange }: DialogProps) {
-  const compose = useComposeMessage();
-  const navigate = useNavigate();
-  const [toName, setToName] = useState('');
-  const [toAddress, setToAddress] = useState('');
-  const [subject, setSubject] = useState('');
-  const [body, setBody] = useState('');
-
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    compose.mutate(
-      { toName: toName.trim() || null, toAddress: toAddress.trim(), subject, body },
-      {
-        onSuccess: (sent) => {
-          setToName('');
-          setToAddress('');
-          setSubject('');
-          setBody('');
-          onOpenChange(false);
-          void navigate(`/inbox/${sent.id}`);
-        },
-      },
-    );
-  }
-
-  return (
-    <Shell
-      open={open}
-      onOpenChange={onOpenChange}
-      title="New email"
-      description="Write to a guest. Their answer joins the same conversation."
-      onSubmit={onSubmit}
-      error={compose.error?.message}
-      submit="Send email"
-      disabled={!toAddress.trim() || !subject.trim() || !body.trim() || compose.isPending}
-    >
-      <div className="grid gap-3 sm:grid-cols-2">
-        <FormField label="To (name)" htmlFor="compose-name">
-          <Input id="compose-name" value={toName} onChange={(e) => setToName(e.target.value)} />
-        </FormField>
-        <FormField label="Email" htmlFor="compose-address">
-          <Input
-            id="compose-address"
-            type="email"
-            required
-            value={toAddress}
-            onChange={(e) => setToAddress(e.target.value)}
-          />
-        </FormField>
-      </div>
-      <FormField label="Subject" htmlFor="compose-subject">
-        <Input
-          id="compose-subject"
-          required
-          value={subject}
-          onChange={(e) => setSubject(e.target.value)}
-        />
-      </FormField>
-      <FormField label="Message" htmlFor="compose-body">
-        <Textarea
-          id="compose-body"
-          rows={8}
-          required
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-        />
-      </FormField>
-    </Shell>
   );
 }
 

@@ -20,9 +20,9 @@ Press <kbd>⌘K</kbd> and type what you need: "is a family room free from Friday
 
 ![The command bar over the tape chart: asked who still needs an ID today, the agent reads the daily brief and lists four arriving stays with their rooms](docs/images/agent.png)
 
-### An inbox that prepares the answer, in two languages
+### An inbox that drafts the answer, in two languages
 
-Email, web forms, phone notes and Booking.com messages land in one mail client: conversations with their history, folders, channel filters and search. Opening a message costs nothing. When staff click "Prepare a reply", Orbit reads the conversation, pulls out the dates, party, children's ages and wishes, finds free rooms, prices them with the real pricing rules, and drafts a reply in the guest's language, shown side by side with the receptionist's own language. Either side can be edited and translated into the other. A price guard checks every amount in the draft and its translation against the quote, so a wrong price never reaches a guest. One click puts a hold on the room.
+Email, web forms, phone notes and Booking.com messages land in one mail client: conversations with their history, folders, channel filters and search. Opening a message costs nothing. When staff click "Draft reply", Orbit reads the conversation, pulls out the dates, party, children's ages and wishes, finds free rooms, prices them with the real pricing rules, and drafts a reply in the guest's language. The reply box opens on the same text in the receptionist's own language, with a tab for the guest's; either can be edited and translated into the other, and only the guest's text is sent. A price guard checks every amount in the draft and its translation against the quote, so a wrong price never reaches a guest. One click puts a hold on the room.
 
 ![A web-form booking enquiry with a dog: Orbit pulls out the dates, party and wishes, prices a free cabin suite with a Hold button, and drafts the reply](docs/images/inbox.png)
 

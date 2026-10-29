@@ -76,7 +76,7 @@ The UI shows a confirm card. `POST /api/pending-actions/:id/confirm` runs the st
 
 ## Inbox pipeline
 
-A conversation is prepared only when staff click "Prepare a reply" ([ADR 0012](decisions/0012-inbox-conversations-and-ai-on-request.md)); opening one never calls a model (`packages/ai/src/inbox.ts`). The model reads the whole conversation, oldest message first, and answers the guest's latest message. The result is stored until the guest writes again, so asking again costs nothing.
+A conversation is prepared only when staff click "Draft reply" ([ADR 0012](decisions/0012-inbox-conversations-and-ai-on-request.md)); opening one never calls a model (`packages/ai/src/inbox.ts`). The model reads the whole conversation, oldest message first, and answers the guest's latest message. The result is stored until the guest writes again, so asking again costs nothing.
 
 ```mermaid
 flowchart LR
@@ -96,7 +96,7 @@ flowchart LR
 3. **Draft**: the model (Muse Spark Open when Baseten is configured, see [below](#muse-spark-open-on-baseten)) writes a reply in the guest's language, given the exact totals as text in the hotel's currency (e.g. `$1,156` or `12 500 CZK`). When taxes are added on the bill it says so, without working them out. It greets guests by the name they signed with, never a guessed title.
 4. **Price guard** (`price-guard.ts`): every money amount in the draft must be one of the quoted totals, line amounts or unit prices, or an amount the hotel profile states, and every option's total must appear. Czech, German, Polish and English number formats are recognised. A failing draft is regenerated once; if it fails again, no draft is shown, so a wrong price never reaches a guest.
 
-5. **Side by side** (`translate.ts`): when the staff member who asked reads another language than the guest writes, the draft is translated into theirs (`draftTranslation`). The UI shows both; staff edit either side and translate it into the other, and only the guest's side is sent.
+5. **In the staff's language** (`translate.ts`): when the staff member who asked reads another language than the guest writes, the draft is translated into theirs (`draftTranslation`). The reply box opens on that version with a tab for the guest's; staff edit either and translate it into the other, only the guest's text is sent, and sending waits until edits in the staff's language are translated.
 
 The pipeline checks the monthly budget before calling the model and records `inbox_extract`, `inbox_draft` and `translate` usage separately. Errors are stored on the conversation (`processingError`) and the next request retries.
 

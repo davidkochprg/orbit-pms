@@ -9,16 +9,15 @@ import {
   Archive,
   ArchiveRestore,
   ArrowLeft,
-  ArrowRight,
   Ban,
   CalendarPlus,
   Copy,
   Languages,
   Mail,
   MessageSquarePlus,
+  PenLine,
   RotateCw,
   Send,
-  Sparkles,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
@@ -26,6 +25,7 @@ import { ThinkingOrb } from 'thinking-orbs';
 import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { ReceiveDialog } from '@/components/inbox-dialogs';
+import { Panel } from '@/components/panel';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -95,13 +95,15 @@ export function Conversation({ id }: { id: string }) {
           />
         ))}
       </ol>
-      {m.status !== 'declined' && <Assist inquiry={m} aiOn={aiOn} myLanguage={myLanguage} />}
+      {m.suggestion && m.suggestion.options.length > 0 && (
+        <Options inquiry={m} options={m.suggestion.options} note={m.suggestion.note} />
+      )}
       {m.status !== 'declined' && (
         <ReplyEditor
           key={`${m.processedAt ?? 'none'}:${m.messages.length}`}
           inquiry={m}
           myLanguage={myLanguage}
-          canTranslate={aiOn}
+          aiOn={aiOn}
         />
       )}
     </article>
@@ -183,6 +185,26 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
           )}
         </span>
       </div>
+      {m.parsed && (
+        <div className="flex flex-col gap-2">
+          <ul aria-label="What the guest asks for" className="flex flex-wrap gap-1.5">
+            {analysisFacts(m.parsed).map((f) => (
+              <li
+                key={f}
+                className="rounded-full bg-ink/5 px-2.5 py-0.5 text-xs text-muted-foreground"
+              >
+                {f}
+              </li>
+            ))}
+          </ul>
+          {m.parsed.question && (
+            <p className="text-sm">
+              <span className="text-muted-foreground">Asks: </span>
+              {m.parsed.question}
+            </p>
+          )}
+        </div>
+      )}
       {m.status === 'declined' && (
         <p className="text-sm text-muted-foreground">Declined: no booking will be made.</p>
       )}
@@ -303,113 +325,21 @@ function Message({
   );
 }
 
-/**
- * What Orbit can do with the conversation: read the request, find free rooms with exact prices
- * and draft a reply. Nothing runs until staff ask, so opening a message costs nothing.
- */
-function Assist({
-  inquiry: m,
-  aiOn,
-  myLanguage,
+/** Free rooms for the request with their exact prices, each of which can be held. */
+function Options({
+  inquiry,
+  options,
+  note,
 }: {
   inquiry: Inquiry;
-  aiOn: boolean;
-  myLanguage: Language;
+  options: StayOption[];
+  note: string | null;
 }) {
-  const process = useProcessInquiry(m.id);
-  const prepare = (force: boolean) => process.mutate({ force, language: myLanguage });
-  const lastFromGuest = m.messages.at(-1)?.direction === 'in';
-
-  if (!aiOn) return null;
-  if (process.isPending) {
-    return (
-      <Panel>
-        <div className="flex items-center gap-3" role="status">
-          <ThinkingOrb state="searching" size={32} aria-label="Orbit is working" />
-          <span>
-            <span className="font-medium">Preparing a reply…</span>
-            <span className="block text-sm text-muted-foreground">
-              Reading the conversation, checking free rooms and prices, and drafting.
-            </span>
-          </span>
-        </div>
-      </Panel>
-    );
-  }
-  if (!m.processedAt) {
-    if (!lastFromGuest) return null;
-    return (
-      <Panel>
-        <div className="flex flex-wrap items-center gap-3">
-          <Sparkles className="size-4 shrink-0 text-primary-text" />
-          <p className="min-w-0 flex-1 text-sm text-muted-foreground">
-            Orbit can read this conversation, check free rooms and exact prices, and draft a reply
-            in the guest&apos;s language with a {languageLabels[myLanguage]} version alongside.
-          </p>
-          <Button size="sm" onClick={() => prepare(false)}>
-            <Sparkles /> Prepare a reply
-          </Button>
-        </div>
-        {process.error && <ErrorNotice message={process.error.message} />}
-      </Panel>
-    );
-  }
-  return (
-    <Panel>
-      <div className="flex items-center gap-2">
-        <Sparkles className="size-4 text-primary-text" />
-        <h3 className="font-medium">Prepared by Orbit</h3>
-        <Button
-          size="xs"
-          variant="ghost"
-          className="ml-auto text-muted-foreground"
-          onClick={() => prepare(true)}
-        >
-          <RotateCw /> Prepare again
-        </Button>
-      </div>
-      {m.processingError && <ErrorNotice message={m.processingError} />}
-      {process.error && <ErrorNotice message={process.error.message} />}
-      {m.parsed && (
-        <ul className="flex flex-wrap gap-1.5">
-          {analysisFacts(m.parsed).map((f) => (
-            <li
-              key={f}
-              className="rounded-full bg-ink/5 px-2.5 py-0.5 text-xs text-muted-foreground"
-            >
-              {f}
-            </li>
-          ))}
-        </ul>
-      )}
-      {m.parsed?.question && (
-        <p className="text-sm">
-          <span className="text-muted-foreground">Asks: </span>
-          {m.parsed.question}
-        </p>
-      )}
-      {m.suggestion?.note && <p className="text-sm text-muted-foreground">{m.suggestion.note}</p>}
-      {m.suggestion && m.suggestion.options.length > 0 && (
-        <Options inquiry={m} options={m.suggestion.options} />
-      )}
-    </Panel>
-  );
-}
-
-function Panel({ children }: { children: ReactNode }) {
-  return (
-    <section className="flex flex-col gap-3 rounded-card bg-surface-sunken p-4 ring-1 ring-ink/5 ring-inset">
-      {children}
-    </section>
-  );
-}
-
-function Options({ inquiry, options }: { inquiry: Inquiry; options: StayOption[] }) {
   const hold = useInboxHold(inquiry.id);
   return (
-    <div className="flex flex-col gap-1.5">
-      <h4 className="text-xs font-medium text-muted-foreground">Free rooms, priced</h4>
-      <ul className="flex flex-col overflow-hidden rounded-stage bg-background shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit">
+    <Panel title="Free rooms" count={options.length} contentClassName="p-0">
+      {note && <p className="border-b px-3 py-2 text-sm text-muted-foreground">{note}</p>}
+      <ul className="flex flex-col">
         {options.map((o) => (
           <li key={o.roomId} className="flex items-center gap-3 border-b px-3 py-2 last:border-b-0">
             <span className="rounded-[5px] border border-ink/7 px-1.5 py-px font-mono text-xs">
@@ -432,186 +362,241 @@ function Options({ inquiry, options }: { inquiry: Inquiry; options: StayOption[]
           </li>
         ))}
       </ul>
-      {hold.isError && <ErrorNotice message={hold.error.message} />}
-    </div>
+      {hold.isError && <ErrorNotice message={hold.error.message} className="m-2" />}
+    </Panel>
   );
 }
 
+type Side = 'theirs' | 'mine';
+
 /**
- * The reply. When the guest writes in another language than the staff member reads, it is two
- * texts side by side: what is sent, in the guest's language, and the same in the staff member's.
- * Either side can be translated into the other; only the guest's side is sent.
+ * The reply: one text in the guest's language, which is what is sent. When the staff member
+ * reads another language, a tab shows the same reply in theirs to read or write in; either side
+ * translates into the other, and sending waits until edits in the staff's language are in the
+ * guest's text. A draft is written only when asked for.
  */
 function ReplyEditor({
   inquiry: m,
   myLanguage,
-  canTranslate,
+  aiOn,
 }: {
   inquiry: Inquiry;
   myLanguage: Language;
-  canTranslate: boolean;
+  aiOn: boolean;
 }) {
   const suggestion = m.suggestion;
-  const known = guestLanguage(m);
-  const [theirLanguage, setTheirLanguage] = useState<Language>(known ?? myLanguage);
+  const process = useProcessInquiry(m.id);
+  const toTheirs = useTranslateText();
+  const toMine = useTranslateText();
+  const send = useSendReply(m.id);
+  const [theirLanguage, setTheirLanguage] = useState<Language>(guestLanguage(m) ?? myLanguage);
   const [theirs, setTheirs] = useState(suggestion?.draft ?? '');
   const [mine, setMine] = useState(
     suggestion?.draftTranslation?.language === myLanguage ? suggestion.draftTranslation.text : '',
   );
-  const toTheirs = useTranslateText();
-  const toMine = useTranslateText();
-  const send = useSendReply(m.id);
-  const sideBySide = theirLanguage !== myLanguage;
-  const drafted = Boolean(suggestion?.draft);
+  // The side changed since the two last matched; the other one is behind.
+  const [edited, setEdited] = useState<Side | null>(null);
+  const bilingual = aiOn && theirLanguage !== myLanguage;
+  // A draft opens in the staff member's language, so they can read it first.
+  const [view, setView] = useState<Side>(mine ? 'mine' : 'theirs');
+  const showing: Side = bilingual ? view : 'theirs';
+  const translating = toTheirs.isPending || toMine.isPending;
+  // Edits in the staff's language that the guest's text doesn't have yet.
+  const behind = bilingual && edited === 'mine';
+  const lastFromGuest = m.messages.at(-1)?.direction === 'in';
+  const theirName = languageLabels[theirLanguage];
+  const myName = languageLabels[myLanguage];
+
+  const translateToTheirs = () =>
+    toTheirs.mutate(
+      { text: mine, to: theirLanguage },
+      {
+        onSuccess: (r) => {
+          setTheirs(r.text);
+          setEdited(null);
+        },
+      },
+    );
+  const translateToMine = () =>
+    toMine.mutate(
+      { text: theirs, to: myLanguage },
+      {
+        onSuccess: (r) => {
+          setMine(r.text);
+          setEdited(null);
+        },
+      },
+    );
+  // Opening the staff's tab when it has nothing current translates the reply into it.
+  const openMine = () => {
+    setView('mine');
+    if (theirs.trim() && (!mine.trim() || edited === 'theirs') && !translating) translateToMine();
+  };
+
+  const error = process.error ?? toTheirs.error ?? toMine.error ?? send.error;
 
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <h3 className="font-medium">{drafted ? 'Reply drafted by Orbit' : 'Reply'}</h3>
-        <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-          Guest&apos;s language
-          <NativeSelect
-            value={theirLanguage}
-            onChange={(e) => setTheirLanguage(e.target.value as Language)}
-            className="h-7 w-32"
-          >
-            {languages.map((l) => (
-              <option key={l} value={l}>
-                {languageLabels[l]}
-              </option>
-            ))}
-          </NativeSelect>
-        </label>
-      </div>
-
-      <div className={cn('grid gap-3', sideBySide && 'md:grid-cols-2')}>
-        <Side
-          label={sideBySide ? `To the guest · ${languageLabels[theirLanguage]}` : 'To the guest'}
-          hint="This is what is sent."
-          value={theirs}
-          onChange={setTheirs}
-          action={
-            sideBySide &&
-            canTranslate && (
-              <TranslateButton
-                pending={toMine.isPending}
-                disabled={!theirs.trim()}
-                onClick={() =>
-                  toMine.mutate(
-                    { text: theirs, to: myLanguage },
-                    { onSuccess: (r) => setMine(r.text) },
-                  )
-                }
-              >
-                Update the {languageLabels[myLanguage]} version
-                <ArrowRight className="hidden md:block" />
-              </TranslateButton>
-            )
-          }
-        />
-        {sideBySide && (
-          <Side
-            label={`Your language · ${languageLabels[myLanguage]}`}
-            hint={`Read or write here, then translate it into ${languageLabels[theirLanguage]}.`}
-            value={mine}
-            onChange={setMine}
-            muted
-            action={
-              canTranslate && (
-                <TranslateButton
-                  pending={toTheirs.isPending}
-                  disabled={!mine.trim()}
-                  onClick={() =>
-                    toTheirs.mutate(
-                      { text: mine, to: theirLanguage },
-                      { onSuccess: (r) => setTheirs(r.text) },
-                    )
-                  }
-                >
-                  <ArrowLeft className="hidden md:block" />
-                  Translate into {languageLabels[theirLanguage]}
-                </TranslateButton>
-              )
-            }
-          />
+    <section
+      aria-label="Reply"
+      className="flex flex-col rounded-card bg-surface-sunken p-1 ring-1 ring-ink/5 ring-inset"
+    >
+      <div className="flex min-h-9 flex-wrap items-center gap-2 px-2 pt-0.5 pb-1">
+        {bilingual ? (
+          <div role="tablist" aria-label="Reply language" className="flex items-center gap-0.5">
+            <LanguageTab selected={showing === 'theirs'} onClick={() => setView('theirs')}>
+              {theirName}
+              <span className="text-subtle-foreground">· sent</span>
+            </LanguageTab>
+            <LanguageTab selected={showing === 'mine'} onClick={openMine}>
+              {myName}
+              {edited === 'theirs' && mine && (
+                <span aria-label="out of date" className="size-1.5 rounded-full bg-warning" />
+              )}
+            </LanguageTab>
+          </div>
+        ) : (
+          <h3 className="px-1 text-[0.8125rem] text-muted-foreground">Reply</h3>
+        )}
+        {aiOn && (
+          <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
+            Guest writes
+            <NativeSelect
+              value={theirLanguage}
+              onChange={(e) => setTheirLanguage(e.target.value as Language)}
+              className="h-7 w-32 text-xs"
+            >
+              {languages.map((l) => (
+                <option key={l} value={l}>
+                  {languageLabels[l]}
+                </option>
+              ))}
+            </NativeSelect>
+          </label>
         )}
       </div>
-      {(toTheirs.error ?? toMine.error) && (
-        <ErrorNotice message={(toTheirs.error ?? toMine.error)!.message} />
-      )}
-      {send.error && <ErrorNotice message={send.error.message} />}
-      <div className="flex items-center gap-2">
-        <Button disabled={!theirs.trim() || send.isPending} onClick={() => send.mutate(theirs)}>
-          <Send /> {sendLabel(m)}
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          disabled={!theirs.trim()}
-          onClick={() => void navigator.clipboard.writeText(theirs)}
-        >
-          <Copy /> Copy
-        </Button>
+
+      <div className="relative flex flex-col rounded-stage bg-background shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit">
+        <Textarea
+          aria-label={
+            showing === 'mine' ? `Reply in ${myName}` : `Reply to the guest in ${theirName}`
+          }
+          value={showing === 'mine' ? mine : theirs}
+          onChange={(e) => {
+            if (showing === 'mine') setMine(e.target.value);
+            else setTheirs(e.target.value);
+            setEdited(showing);
+          }}
+          placeholder={
+            process.isPending
+              ? undefined
+              : showing === 'mine'
+                ? `Write in ${myName}, then translate it into ${theirName}.`
+                : 'Write a reply…'
+          }
+          disabled={process.isPending || (showing === 'mine' && toMine.isPending)}
+          className="min-h-56 resize-none rounded-stage border-0 bg-transparent px-4 py-3 leading-relaxed shadow-none focus-visible:ring-0 disabled:bg-transparent"
+        />
+        {process.isPending && (
+          <div
+            role="status"
+            className="absolute inset-x-0 top-0 flex items-center gap-3 px-4 py-3 text-sm text-muted-foreground"
+          >
+            <ThinkingOrb state="searching" size={20} aria-hidden />
+            Reading the conversation, checking free rooms and prices…
+          </div>
+        )}
+
+        <div className="flex items-center gap-2 border-t px-2 py-2">
+          <Button
+            size="sm"
+            disabled={!theirs.trim() || send.isPending || behind || translating}
+            title={behind ? `Translate your ${myName} changes first` : undefined}
+            onClick={() => send.mutate(theirs)}
+          >
+            <Send /> {sendLabel(m)}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={!theirs.trim()}
+            onClick={() => void navigator.clipboard.writeText(theirs)}
+          >
+            <Copy /> Copy
+          </Button>
+          <span className="flex min-w-0 flex-1 items-center justify-end gap-2 text-xs text-muted-foreground">
+            {translating ? (
+              <>
+                <ThinkingOrb state="composing" size={20} className="size-4" aria-hidden />
+                Translating…
+              </>
+            ) : behind ? (
+              <>
+                <span className="truncate">Not in the {theirName} reply yet</span>
+                <Button
+                  variant="outline"
+                  size="xs"
+                  disabled={!mine.trim()}
+                  onClick={translateToTheirs}
+                >
+                  <Languages /> Translate into {theirName}
+                </Button>
+              </>
+            ) : showing === 'mine' && edited === 'theirs' && mine ? (
+              <>
+                <span className="truncate">The {theirName} reply changed</span>
+                <Button variant="ghost" size="xs" onClick={translateToMine}>
+                  <RotateCw /> Update
+                </Button>
+              </>
+            ) : (
+              showing === 'mine' && (
+                <span className="truncate">Only the {theirName} reply is sent</span>
+              )
+            )}
+            {aiOn && (lastFromGuest || m.processedAt) && (
+              <Button
+                variant="ghost"
+                size="xs"
+                disabled={process.isPending}
+                onClick={() =>
+                  process.mutate({ force: m.processedAt !== null, language: myLanguage })
+                }
+              >
+                {m.processedAt ? <RotateCw /> : <PenLine />}
+                {m.processedAt ? 'Redraft' : 'Draft reply'}
+              </Button>
+            )}
+          </span>
+        </div>
       </div>
+      {(m.processingError || error) && (
+        <ErrorNotice message={error?.message ?? m.processingError ?? ''} className="mt-1" />
+      )}
     </section>
   );
 }
 
-function Side({
-  label,
-  hint,
-  value,
-  onChange,
-  action,
-  muted = false,
-}: {
-  label: string;
-  hint: string;
-  value: string;
-  onChange: (value: string) => void;
-  action?: ReactNode;
-  muted?: boolean;
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <span className="text-xs font-medium text-muted-foreground">{label}</span>
-      <Textarea
-        aria-label={label}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={12}
-        className={cn('leading-relaxed', muted ? 'bg-surface-sunken' : 'bg-background')}
-      />
-      <div className="flex min-h-7 items-center justify-between gap-2">
-        <span className="text-xs text-subtle-foreground">{hint}</span>
-        {action}
-      </div>
-    </div>
-  );
-}
-
-function TranslateButton({
-  pending,
-  disabled,
+function LanguageTab({
+  selected,
   onClick,
   children,
 }: {
-  pending: boolean;
-  disabled: boolean;
+  selected: boolean;
   onClick: () => void;
   children: ReactNode;
 }) {
   return (
-    <Button
+    <button
       type="button"
-      variant="ghost"
-      size="xs"
-      disabled={disabled || pending}
+      role="tab"
+      aria-selected={selected}
       onClick={onClick}
-      className="shrink-0 text-primary-text"
+      className={cn(
+        'relative flex h-7 items-center gap-1.5 rounded-md px-2.5 text-[0.8125rem] text-muted-foreground outline-none transition-colors duration-150 ease-snap hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+        selected && 'fill-action text-foreground shadow-action stroke-lit',
+      )}
     >
-      {pending ? <ThinkingOrb state="composing" size={20} className="size-4" /> : <Languages />}
       {children}
-    </Button>
+    </button>
   );
 }

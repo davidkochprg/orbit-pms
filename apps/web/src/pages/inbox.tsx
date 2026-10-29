@@ -5,7 +5,8 @@ import { Link, useParams } from 'react-router';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
-import { ComposeDialog, IncomingDialog } from '@/components/inbox-dialogs';
+import { ComposeEmail } from '@/components/inbox-compose';
+import { IncomingDialog } from '@/components/inbox-dialogs';
 import { Conversation } from '@/components/inbox-conversation';
 import { PageHeader } from '@/components/page-header';
 import { Button } from '@/components/ui/button';
@@ -34,15 +35,16 @@ const folders: { id: InboxFolder; icon: ComponentType<{ className?: string }> }[
 
 /**
  * A basic mail client for every guest channel: direct email and OTA messaging in one list,
- * folders, search and filters, conversations with their full history, and replies.
+ * folders, search and filters, conversations with their full history, and replies. A new email
+ * is written in the reading pane (`/inbox/new`).
  */
 export function InboxPage() {
   const { id } = useParams();
+  const composing = id === 'new';
   const inbox = useInbox();
   const [folder, setFolder] = useState<InboxFolder>('inbox');
   const [channel, setChannel] = useState<string | null>(null);
   const [query, setQuery] = useState('');
-  const [composing, setComposing] = useState(false);
   const [adding, setAdding] = useState(false);
   const all = inbox.data ?? [];
   const counts = folderCounts(all);
@@ -59,8 +61,10 @@ export function InboxPage() {
             <Button variant="ghost" size="sm" onClick={() => setAdding(true)}>
               <Plus /> Add a guest message
             </Button>
-            <Button size="sm" onClick={() => setComposing(true)}>
-              <PenSquare /> New email
+            <Button size="sm" asChild>
+              <Link to="/inbox/new">
+                <PenSquare /> New email
+              </Link>
             </Button>
           </>
         }
@@ -169,19 +173,20 @@ export function InboxPage() {
         <section
           className={cn('scrollbar-thin min-w-0 flex-1 overflow-y-auto', !id && 'hidden md:block')}
         >
-          {id ? (
+          {composing ? (
+            <ComposeEmail />
+          ) : id ? (
             <Conversation key={id} id={id} />
           ) : (
             <EmptyState
               icon={Inbox}
               title="No conversation selected"
-              description="Pick one to read it. Orbit prepares a reply when you ask."
+              description="Pick one to read and answer it."
               className="h-full"
             />
           )}
         </section>
       </div>
-      <ComposeDialog open={composing} onOpenChange={setComposing} />
       <IncomingDialog open={adding} onOpenChange={setAdding} />
     </>
   );
