@@ -80,7 +80,7 @@ export function draftPrompt(params: {
       ? options
           .map(
             (o, i) =>
-              `${i + 1}. ${o.roomTypeName} (room ${o.roomName}), ${o.quote.nights} nights: total ${formatAmount(o.quote.total, o.quote.currency)}. Breakdown: ${o.quote.lines.map((l) => `${l.label} ${formatAmount(l.amount, o.quote.currency)}`).join('; ')}`,
+              `${i + 1}. ${o.roomTypeName} (${o.kind === 'apartment' ? 'apartment' : 'room'} ${o.roomName}), ${o.quote.nights} nights: total ${formatAmount(o.quote.total, o.quote.currency)}. Breakdown: ${o.quote.lines.map((l) => `${l.label} ${formatAmount(l.amount, o.quote.currency)}`).join('; ')}`,
           )
           .join('\n')
       : (note ?? 'No room offer: this message is not a booking request.');
