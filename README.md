@@ -4,6 +4,8 @@ An AI-native property management system for small hotels: anything you can click
 
 ![Orbit's Today page: tonight's house map floor by floor, occupancy, arrivals and departures, and what needs attention](docs/images/today.png)
 
+**Trying it out:** it runs on your machine in about two minutes with your own Meta API key. See [Run it locally](#run-it-locally).
+
 ## Why
 
 I'm the assistant manager at a small wellness guesthouse in the Jizera Mountains in Czechia. A day at the front desk of a place like ours means guest emails in Czech, German, Polish and English, Booking.com messages, per-person prices with child discounts and wellness add-ons, and housekeeping updates passed along by phone or in the corridor. Most hotel software leaves all of that to the person at the desk, and where AI shows up, it's usually a chat window on the side.
@@ -28,7 +30,7 @@ Email, web forms, phone notes and Booking.com messages land in one mail client: 
 
 ### Housekeeping by voice
 
-Housekeepers record a note on their phone, in their own language: "205 je hotový, v 204 nefunguje televize". Meta's speech-to-text transcribes it, the model reads it into room updates, and Orbit sets the room statuses and creates repair tasks. These are low-risk and easy to undo, so they apply straight away and the note shows exactly what changed. The board highlights rooms where a guest arrives today but the room isn't inspected yet, and cards can be dragged between columns.
+Housekeepers record a note on their phone, in their own language: "205 je hotový, v 204 nefunguje televize". Meta's speech-to-text transcribes it, the model reads it into room updates, and Orbit sets the room statuses and creates repair tasks. These are low-risk and easy to undo, so they apply straight away and the note shows exactly what changed. The board highlights rooms where a guest arrives today but the room isn't inspected yet, and cards can be dragged between columns. Within the same deadline it puts the heavier cleans first: children, dogs and long stays come from the booking, and Muse Spark reads the booking notes and guest messages for what only the text says ("we're bringing our labrador", "could you set up a cot"), shown as small cues on each card.
 
 ![The housekeeping board: dirty, clean, inspected and out-of-order columns, with rooms where a guest arrives today but the room isn't inspected yet flagged](docs/images/housekeeping.png)
 
@@ -37,6 +39,10 @@ Housekeepers record a note on their phone, in their own language: "205 je hotov�
 The booking panel keeps the guest book per person. "Scan ID" shows a QR code: a phone on the desk opens it, photographs the ID card or passport, and Meta's vision model reads it into the guest-book fields for staff to check before anything is saved. The photo is read in memory and never stored, and the link works for 15 minutes for that one guest. Check-in doesn't wait for the guest book: stays still missing an ID show up on Today and in the daily brief, and the agent can list them.
 
 ![A booking open on the tape chart with its guest book: the main guest read from a scanned ID, and the QR code that scans the second guest's document with a phone](docs/images/id-scan.png)
+
+### Rates that read the weeks ahead
+
+Rates opens on the next 60 nights: how full each night is against what's usual for that weekday, local events, and the weather forecast for the hotel (Open-Meteo). The domain suggests a change per night from small, labelled rules ("Busier than a usual Friday +10%, Ski area opening weekend +15%"), and a manager takes it, sets another percent, or applies them all, with Undo. Muse Spark summarises the outlook in a few sentences, checked so it states no number the outlook doesn't, and the agent can read it and propose changes ("raise next weekend by the suggested amount"). The same page lists this week's arrivals most likely not to come, from how they booked and the guest's own history, never from who the guest is.
 
 ### A tape chart that follows the day
 
@@ -54,23 +60,25 @@ All guests, bookings and messages in the demo and the screenshots are synthetic.
 
 Every AI feature runs on Meta's models through the Vercel AI SDK: Muse Spark on the Meta Model API, and its open-weight sibling Muse Spark Open on Baseten for reply drafts and translations. The models do language, the domain does the facts:
 
-| Feature            | Model                                               | What the model does                                                      | What it never does                                                           |
-| ------------------ | --------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
-| ⌘K agent           | `muse-spark-1.3`                                    | Plans multi-step tool use over 31 typed tools, writes the answer         | Computes a price or availability, or changes a booking without a click       |
-| Inbox extraction   | `muse-spark-1.3`                                    | Structured output: kind, language, dates, party, child ages, wishes      | Picks rooms or prices                                                        |
-| Reply drafts       | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Writes the reply in the guest's language around the exact quoted totals  | Runs before staff ask, or sends a reply; a wrong amount is redone or dropped |
-| Translation        | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Puts drafts and guest messages into the staff member's language and back | Changes an amount: such a translation is redone or refused                   |
-| Housekeeping notes | `muse-voice-transcribe-1.0` + `muse-spark-1.3`      | Transcribes the recording, reads it into room/status/issue updates       | Changes bookings; unknown rooms and forbidden changes are skipped            |
-| ID scans           | `muse-spark-1.3` (vision)                           | Reads a phone photo of an ID card or passport into guest-book fields     | Saves them: staff review every value; the photo is never stored              |
+| Feature            | Model                                               | What the model does                                                        | What it never does                                                           |
+| ------------------ | --------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| ⌘K agent           | `muse-spark-1.3`                                    | Plans multi-step tool use over 33 typed tools, writes the answer           | Computes a price or availability, or changes a booking without a click       |
+| Inbox extraction   | `muse-spark-1.3`                                    | Structured output: kind, language, dates, party, child ages, wishes        | Picks rooms or prices                                                        |
+| Reply drafts       | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Writes the reply in the guest's language around the exact quoted totals    | Runs before staff ask, or sends a reply; a wrong amount is redone or dropped |
+| Translation        | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Puts drafts and guest messages into the staff member's language and back   | Changes an amount: such a translation is redone or refused                   |
+| Housekeeping notes | `muse-voice-transcribe-1.0` + `muse-spark-1.3`      | Transcribes the recording, reads it into room/status/issue updates         | Changes bookings; unknown rooms and forbidden changes are skipped            |
+| ID scans           | `muse-spark-1.3` (vision)                           | Reads a phone photo of an ID card or passport into guest-book fields       | Saves them: staff review every value; the photo is never stored              |
+| Stay notes         | `muse-spark-1.3`                                    | Reads booking notes and guest messages for pets, mess and things to set up | Decides the cleaning order: the domain scores it                             |
+| Rate summary       | `muse-spark-1.3`                                    | Writes two or three sentences of advice on the coming nights               | Works out a rate: every percent must be one the domain computed              |
 
-Muse Spark always reasons before answering, so the reasoning effort is set per feature to the lowest level that keeps quality, measured with the evals and live runs: `minimal` for extraction, drafts, notes and ID scans, `low` for the agent, which plans multi-step tool use.
+Muse Spark always reasons before answering, so the reasoning effort is set per feature to the lowest level that keeps quality, measured with the evals and live runs: `minimal` for extraction, drafts, notes, the rate summary and ID scans, `low` for the agent, which plans multi-step tool use.
 
 **Guardrails**
 
 - The model calls `quote` and `checkAvailability` and repeats their results. Tool arguments and model output are validated with zod.
 - Booking changes are proposals that run only after a person confirms, with the stored arguments, never ones sent by the browser ([ADR 0004](docs/decisions/0004-human-approval-for-mutations.md)).
 - Every change, by staff or agent, is written to the audit log with its actor.
-- Every model call is metered in the database against a monthly budget, and the public demo has per-IP and daily limits ([ADR 0006](docs/decisions/0006-agent-autonomy-and-cost-budget.md)).
+- Every model call is metered in the database against a monthly budget, with per-IP and daily limits on top ([ADR 0006](docs/decisions/0006-agent-autonomy-and-cost-budget.md)).
 
 **Cost, measured with real calls:** an agent question costs about $0.019, a guest message about $0.004, a housekeeping note about $0.002. For a 30-room property that comes to roughly $30 a month.
 
@@ -80,15 +88,17 @@ More in [docs/ai.md](docs/ai.md).
 
 `pnpm eval` runs the real models against synthetic fixtures and prints a pass rate, cost and latency per item.
 
-| Suite              | Fixtures                                                                                         | Pass rate    |
-| ------------------ | ------------------------------------------------------------------------------------------------ | ------------ |
-| Inbox extraction   | 14 messages in Czech, German, English and Polish, including Booking.com questions about a stay   | 14/14 (100%) |
-| Housekeeping notes | 10 notes in four languages, including spelled-out room numbers, an unknown room and a vague note | 10/10 (100%) |
-| ID scans           | 3 synthetic specimen documents: a Czech-style ID card, a German-style passport and a receipt     | 3/3 (100%)   |
-| Agent tools        | 10 staff requests run through the real agent and tools, checked by their effect                  | 10/10 (100%) |
-| Translations       | 4 drafts and guest messages between Czech, German, English and Polish, amounts kept              | 4/4 (100%)   |
+| Suite              | Fixtures                                                                                             | Pass rate    |
+| ------------------ | ---------------------------------------------------------------------------------------------------- | ------------ |
+| Inbox extraction   | 14 messages in Czech, German, English and Polish, including Booking.com questions about a stay       | 14/14 (100%) |
+| Housekeeping notes | 10 notes in four languages, including spelled-out room numbers, an unknown room and a vague note     | 10/10 (100%) |
+| Stay notes         | 12 stays in five languages: dogs, a cot, an allergy, muddy bikes, and notes that aren't for cleaning | 12/12 (100%) |
+| ID scans           | 3 synthetic specimen documents: a Czech-style ID card, a German-style passport and a receipt         | 3/3 (100%)   |
+| Agent tools        | 12 staff requests run through the real agent and tools, checked by their effect                      | 12/12 (100%) |
+| Reply drafts       | 17 replies with real quotes, checked by the price guard                                              | 16/17, 17/17 |
+| Translations       | 4 drafts and guest messages between Czech, German, English and Polish, amounts kept                  | 4/4 (100%)   |
 
-Measured with `muse-spark-1.3` on 2026-10-28, at `minimal` reasoning effort except the agent (`low`). An inbox message takes about 2 s to read; a translation costs about $0.002.
+Measured on 2026-10-30 with `muse-spark-1.3`, and Muse Spark Open on Baseten for drafts and translations, at `minimal` reasoning effort except the agent (`low`). Drafts ran twice: the one miss was an empty answer from Baseten, which now goes to Muse Spark on the Meta API instead. An inbox message takes about 3 s to read; the whole suite costs about $0.70.
 
 ## Architecture
 
@@ -119,15 +129,55 @@ Docs: [architecture](docs/architecture.md) · [domain rules](docs/domain.md) · 
 
 ## Run it locally
 
-Needs Node 24+ and pnpm. No database to install: local dev uses an embedded Postgres ([PGlite](https://pglite.dev)).
+Everything runs on your machine: no database, Docker or cloud account to set up. The database is an embedded Postgres ([PGlite](https://pglite.dev)) in a folder of the repo, and the demo hotel is generated with dates around today.
+
+### What you need
+
+- **Node.js 22.12 or newer** (24 recommended; `node -v` to check).
+- **pnpm.** Any version from 9 on switches itself to the one this repo pins. Without pnpm: `corepack enable pnpm`, or `npm install -g pnpm`.
+- **A Meta Model API key** for the AI features. A Baseten key is optional (see below).
+
+### Start it
 
 ```bash
-pnpm i && pnpm db:migrate && pnpm db:seed && pnpm dev
+git clone https://github.com/davidkochprg/orbit-pms.git && cd orbit-pms
+cp .env.example .env     # then open .env and paste your key after META_API_KEY=
+pnpm install
+pnpm db:migrate          # creates the embedded database in .data/
+pnpm db:seed             # a fictional 50-room lodge, synthetic guests, dates around today
+pnpm dev                 # the API on :3001 and the web app on :5173
 ```
 
-Open http://localhost:5173. The seed fills in synthetic bookings, guest messages and room statuses with dates around today.
+Open **http://localhost:5173** and click **Enter demo**. The API's first log line says `ai: on` when the key was picked up; http://localhost:5173/health lists which AI features are configured.
 
-To turn on the AI features, copy `.env.example` to `.env` and set `META_API_KEY`. The key stays on the server and is never sent to the browser. More in [docs/development.md](docs/development.md).
+### A five-minute tour
+
+1. Press <kbd>⌘K</kbd> (<kbd>Ctrl</kbd>+<kbd>K</kbd> on Windows and Linux) and ask "Who arrives today?", then "Raise next Friday's rate by 10%": the change waits on a confirm card.
+2. **Inbox**: open a guest message, click **Draft reply**, then **Hold** on one of the rooms it found.
+3. **Housekeeping**: **Type a note** such as "205 is clean, the TV in 204 is broken", or record a **Voice note** with a microphone.
+4. **Rates**: click the ski-opening weekend to see why it's suggested higher, then **Summarize**.
+5. **Tape chart**: drag a booking to another room or other dates.
+6. Open a booking, **Scan ID**, then **Upload a photo instead** with one of the synthetic documents in `packages/ai/src/evals/id-documents/`.
+
+### Keys and what they turn on
+
+| Variable in `.env`           | Turns on                                                                                                    |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `META_API_KEY`               | Every AI feature. Without it Orbit runs with the AI off and ⌘K says "Agent not configured".                 |
+| `META_MODEL_VOICE` (preset)  | Voice notes on the housekeeping board. Typed notes work without it.                                         |
+| `META_MODEL_VISION` (preset) | Reading ID scans.                                                                                           |
+| `BASETEN_API_KEY` (optional) | Reply drafts and translations on Muse Spark Open, Meta's open-weight model. Without it they use Muse Spark. |
+
+The other values in `.env.example` work as they are. The API never sends the keys to the browser. AI spend is recorded and capped at $50 a month by default (`AI_MONTHLY_BUDGET_USD`).
+
+### If something goes wrong
+
+- **"Agent not configured" or `ai: off`**: `.env` must be at the repo root, next to `package.json`, with the key after `META_API_KEY=`. Restart `pnpm dev` after editing it.
+- **A port is in use**: set `PORT` in `.env` for the API (the web app follows it). If 5173 is taken, the web app picks the next free port and prints it.
+- **Start over with fresh data**: stop `pnpm dev`, then `pnpm db:reset`. The demo is dated around the day you seed it.
+- **Scanning with a real phone**: start with `pnpm dev:lan` and open Orbit by the network address it prints, so a phone on the same Wi-Fi can open the scan link.
+
+More in [docs/development.md](docs/development.md).
 
 ## How it was built
 
