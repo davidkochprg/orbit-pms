@@ -1,5 +1,5 @@
 import { Chat, useChat } from '@ai-sdk/react';
-import type { AgentContext } from '@orbit/shared';
+import { type AgentContext, hotelInfoCategoryLabels, withoutLinks } from '@orbit/shared';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { BorderBeam } from 'border-beam';
 import { Command as CommandPrimitive } from 'cmdk';
@@ -62,10 +62,12 @@ import {
   useDayOverview,
   useGuests,
   useHealth,
+  useHotelInfo,
   usePendingActions,
   useResolveAnyPendingAction,
 } from '@/lib/api';
 import { formatRecent } from '@/lib/format';
+import { folderIcons, noteHref } from '@/lib/knowledge';
 import { navItems } from '@/lib/nav';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -305,6 +307,7 @@ function SearchView({
   const { setTheme } = useTheme();
   const health = useHealth();
   const guests = useGuests();
+  const notes = useHotelInfo();
   const day = useDayOverview();
   const aiOn = health.data?.ai.configured ?? false;
   const query = text.trim();
@@ -335,7 +338,7 @@ function SearchView({
           autoFocus
           value={text}
           onValueChange={onTextChange}
-          placeholder={aiOn ? 'Ask Orbit or search…' : 'Search guests and pages…'}
+          placeholder={aiOn ? 'Ask Orbit or search…' : 'Search guests, notes and pages…'}
           className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-subtle-foreground"
         />
       </InputRow>
@@ -432,6 +435,28 @@ function SearchView({
                 {g.email && <span className="truncate text-muted-foreground">{g.email}</span>}
               </Item>
             ))}
+          </CommandPrimitive.Group>
+        )}
+
+        {query && notes.data && (
+          <CommandPrimitive.Group heading="Knowledge">
+            {notes.data.map((n) => {
+              const Icon = folderIcons[n.category];
+              const text = withoutLinks(n.details).replace(/\s+/g, ' ');
+              return (
+                <Item
+                  key={n.id}
+                  value={n.title}
+                  // A note is found by its folder, its tags and what it says, not only its title.
+                  keywords={[hotelInfoCategoryLabels[n.category], ...(n.tags ?? []), text]}
+                  onSelect={run(() => void navigate(noteHref(n.id)))}
+                >
+                  <Icon />
+                  <span className="max-w-1/2 shrink-0 truncate">{n.title}</span>
+                  <span className="min-w-0 truncate text-muted-foreground">{text}</span>
+                </Item>
+              );
+            })}
           </CommandPrimitive.Group>
         )}
 
@@ -703,12 +728,15 @@ function Footer({ children }: { children: ReactNode }) {
 
 function Item({
   value,
+  keywords,
   onSelect,
   hint,
   className,
   children,
 }: {
   value: string;
+  /** More words the row is found by, besides its value. */
+  keywords?: string[];
   onSelect: () => void;
   hint?: string;
   className?: string;
@@ -717,6 +745,7 @@ function Item({
   return (
     <CommandPrimitive.Item
       value={value}
+      {...(keywords && { keywords })}
       onSelect={onSelect}
       className={cn(
         'group flex h-10 cursor-default items-center gap-2.5 rounded-lg px-3 text-sm outline-none select-none',
