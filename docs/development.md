@@ -2,7 +2,7 @@
 
 ## Local setup
 
-Requirements: Node 24 or newer, pnpm 11 (`corepack enable` picks the version from `package.json`). No database install is needed.
+Requirements: Node 22.12 or newer (24 recommended, see `.nvmrc`) and pnpm. Any pnpm from 9 on switches itself to the version pinned in `package.json`; without pnpm, `corepack enable pnpm` (Node 22 and 24) or `npm install -g pnpm`. No database install is needed.
 
 ```bash
 pnpm i
@@ -11,7 +11,7 @@ pnpm db:seed
 pnpm dev
 ```
 
-- Web: http://localhost:5173 (Vite, proxies `/api` and `/health` to the API)
+- Web: http://localhost:5173 (Vite, proxies `/api` and `/health` to the API on `PORT`)
 - API: http://localhost:3001
 
 To use the AI features, copy `.env.example` to `.env` at the repo root and fill in the Meta variables. Without them the app runs with AI off, and the ⌘K command bar shows "Agent not configured".
@@ -34,7 +34,7 @@ Read from `.env` at the repo root by the API and the db scripts, and validated w
 | `AI_DAILY_TOKEN_BUDGET`  | `20000000`               | Daily token budget across all users (about 1,000 agent turns)       |
 | `AI_RATE_LIMIT_PER_HOUR` | `300`                    | AI calls per IP per hour                                            |
 | `AI_MONTHLY_BUDGET_USD`  | `50`                     | Monthly cap on real Meta spend                                      |
-| `PORT`                   | `3001`                   | API port                                                            |
+| `PORT`                   | `3001`                   | API port; the web dev server proxies `/api` to it                   |
 
 The hourly and daily limits are kept in memory; the monthly budget is computed from the `ai_usage` table. See [ai.md](ai.md#rate-limits).
 
