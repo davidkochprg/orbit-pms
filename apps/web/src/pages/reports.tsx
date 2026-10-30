@@ -12,7 +12,13 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useDayOverview, usePricing, useReport } from '@/lib/api';
-import { formatMoney, formatDate, formatRange, paymentMethodLabels } from '@/lib/format';
+import {
+  formatCount,
+  formatMoney,
+  formatDate,
+  formatRange,
+  paymentMethodLabels,
+} from '@/lib/format';
 import {
   type Change,
   comparisonRange,
@@ -123,7 +129,7 @@ function ReportView({
           <Kpi
             label="Occupancy"
             value={`${percent(report.occupancy)}%`}
-            detail={`${report.roomNightsSold} of ${report.roomNightsAvailable} room nights`}
+            detail={`${formatCount(report.roomNightsSold)} of ${formatCount(report.roomNightsAvailable)} room nights`}
             change={previous && pointChange(report.occupancy, previous.occupancy)}
             vs={vs}
           />
@@ -154,10 +160,10 @@ function ReportView({
           <Figure label="Add-ons" value={formatMoney(report.addonRevenue)} />
           <Figure label="Extras" value={formatMoney(report.extrasRevenue)} />
           {showCityTax && <Figure label={cityTaxLabel} value={formatMoney(report.cityTax)} />}
-          <Figure label="Guest nights" value={report.guestNights} />
-          <Figure label="Arrivals" value={report.arrivals} />
+          <Figure label="Guest nights" value={formatCount(report.guestNights)} />
+          <Figure label="Arrivals" value={formatCount(report.arrivals)} />
           <Figure label="Average stay" value={`${report.averageStay} nights`} />
-          <Figure label="Cancellations" value={report.cancellations} />
+          <Figure label="Cancellations" value={formatCount(report.cancellations)} />
         </dl>
       </Panel>
 
@@ -189,7 +195,7 @@ function ReportView({
                   key={s.source}
                   label={sourceLabels[s.source]}
                   share={s.roomNights / Math.max(report.roomNightsSold, 1)}
-                  value={`${s.roomNights} nights`}
+                  value={`${formatCount(s.roomNights)} nights`}
                   detail={formatMoney(s.roomRevenue)}
                 />
               ))}

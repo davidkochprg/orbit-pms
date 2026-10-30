@@ -94,6 +94,11 @@ export function formatRange(checkIn: string, checkOut: string): string {
   return `${formatDate(checkIn)} – ${formatDate(checkOut)}`;
 }
 
+/** A count with thousands grouped like the money: "1,458". */
+export function formatCount(count: number): string {
+  return new Intl.NumberFormat('en-US').format(count);
+}
+
 /** An amount in the hotel's currency: "$1,250", "-$150" or "12,500 CZK". */
 export function formatMoney(amount: number, currency: Currency = region.currency): string {
   const digits = new Intl.NumberFormat('en-US').format(Math.abs(amount));
@@ -101,7 +106,6 @@ export function formatMoney(amount: number, currency: Currency = region.currency
   return currency === 'USD' ? `${sign}$${digits}` : `${sign}${digits} ${currency}`;
 }
 
-/** The currency's symbol or code, e.g. for an input suffix: "$" or "CZK". */
 /**
  * A stay's price as a guest would be quoted it: "$159 + tax" where taxes are added on the bill,
  * the amount alone where they are included.
@@ -110,6 +114,7 @@ export function formatPrice(amount: number): string {
   return region.taxAdded ? `${formatMoney(amount)} + tax` : formatMoney(amount);
 }
 
+/** The currency's symbol or code, e.g. for an input suffix: "$" or "CZK". */
 export function currencyMark(currency: Currency = region.currency): string {
   return currency === 'USD' ? '$' : currency;
 }

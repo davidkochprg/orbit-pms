@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
+  formatCount,
   formatDateTime,
   formatRecent,
   formatMoney,
@@ -112,5 +113,12 @@ describe('formatPrice', () => {
     expect(formatPrice(159)).toBe('$159 + tax');
     setDisplayRegion(czech);
     expect(formatPrice(2000)).toBe(formatMoney(2000));
+  });
+});
+
+describe('formatCount', () => {
+  it('groups thousands', () => {
+    expect(formatCount(1458)).toBe('1,458');
+    expect(formatCount(12)).toBe('12');
   });
 });
