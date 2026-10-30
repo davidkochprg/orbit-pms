@@ -154,7 +154,7 @@ export const usHotelProfile: HotelProfile = {
   location: 'Sierra Nevada, California',
   description:
     'A family-run mountain lodge with 44 rooms and 6 cabin suites at the edge of the forest, popular with families, hikers and skiers.',
-  phone: null,
+  phone: '(530) 555-0100',
   email: 'frontdesk@example.com',
   website: 'https://example.com',
   checkInFrom: '15:00',
