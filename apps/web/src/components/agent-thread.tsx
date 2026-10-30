@@ -24,10 +24,12 @@ import { type ReactNode, useMemo, useState } from 'react';
 import { agentMessageMetadataSchema } from '@orbit/shared';
 import { ThinkingOrb } from 'thinking-orbs';
 import { AgentContextChip } from '@/components/agent-context-chip';
+import { GuestAvatar } from '@/components/guest-avatar';
 import { BookingRow, Mention, RoomRow } from '@/components/agent-mention';
 import { ResultCards } from '@/components/agent-result-cards';
 import { ConfirmAllButton, PendingActionCard } from '@/components/pending-action-card';
 import { AgentEntitiesContext } from '@/hooks/use-agent-entities';
+import { useSession } from '@/hooks/use-session';
 import {
   asProposal,
   asToolError,
@@ -144,14 +146,19 @@ export function AgentThread({
 }
 
 /** A staff member's question, with what it was about when there was something. */
+/** A question, on the right like in any chat, beside the signed-in staff member's avatar. */
 function Question({ message }: { message: UIMessage }) {
   const context = agentMessageMetadataSchema.safeParse(message.metadata).data?.context;
+  const { current } = useSession();
   return (
-    <div className="flex flex-col items-start gap-1.5">
-      {context && <AgentContextChip context={context} />}
-      <p className="text-base font-medium tracking-tight">
-        {message.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')}
-      </p>
+    <div className="flex items-end justify-end gap-2.5 pl-12">
+      <div className="flex min-w-0 flex-col items-end gap-1.5">
+        {context && <AgentContextChip context={context} />}
+        <p className="rounded-2xl rounded-br-md bg-ink/6 px-3.5 py-2 text-[0.9375rem] leading-snug whitespace-pre-wrap">
+          {message.parts.map((p) => (p.type === 'text' ? p.text : '')).join('')}
+        </p>
+      </div>
+      {current && <GuestAvatar name={current.name} className="mb-0.5" />}
     </div>
   );
 }
