@@ -480,7 +480,7 @@ export function InboxPage() {
                     className="py-12"
                   />
                 )}
-                <ul className="flex flex-col p-1.5">
+                <ul className="flex flex-col gap-0.5 p-1.5">
                   {shownDrafts.map((d) => (
                     <DraftRow key={d.id} draft={d} all={all} search={location.search} />
                   ))}
@@ -495,7 +495,7 @@ export function InboxPage() {
                     className="py-12"
                   />
                 )}
-                <ul className="flex flex-col p-1.5">
+                <ul className="flex flex-col gap-0.5 p-1.5">
                   {shown.map((m) => (
                     <ConversationRow
                       key={m.id}
