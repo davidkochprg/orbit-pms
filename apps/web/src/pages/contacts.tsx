@@ -59,7 +59,7 @@ export function ContactsPage() {
               placeholder="Filter by name or trade"
               value={query}
               onChange={setQuery}
-              className="w-56"
+              className="w-40 sm:w-56"
             />
             <Button size="sm" onClick={() => setCreating(true)}>
               <Plus /> <span className="hidden sm:inline">New contact</span>
@@ -83,7 +83,15 @@ export function ContactsPage() {
             <thead className="sticky top-0 z-10 bg-surface-sunken/90 backdrop-blur-md">
               <tr className="border-b">
                 {['Name', 'Does', 'Phone', 'Email'].map((h) => (
-                  <th key={h} className={cn(labelCaps, 'h-10 px-4 text-left first:pl-6')}>
+                  <th
+                    key={h}
+                    className={cn(
+                      labelCaps,
+                      'h-10 px-4 text-left first:pl-6',
+                      // Phones show who and how to call; the rest is in the contact.
+                      (h === 'Does' || h === 'Email') && 'max-md:hidden',
+                    )}
+                  >
                     {h}
                   </th>
                 ))}
@@ -100,13 +108,13 @@ export function ContactsPage() {
                     <span className="flex flex-col">
                       <span className="font-medium">{c.name}</span>
                       {(c.person || c.notes) && (
-                        <span className="max-w-md truncate text-xs text-muted-foreground">
+                        <span className="max-w-48 truncate text-xs text-muted-foreground sm:max-w-md">
                           {[c.person, c.notes].filter(Boolean).join(' · ')}
                         </span>
                       )}
                     </span>
                   </td>
-                  <td className="px-4 text-muted-foreground">
+                  <td className="px-4 text-muted-foreground max-md:hidden">
                     {c.trades.map((t: Trade) => tradeLabels[t]).join(', ')}
                   </td>
                   <td className="px-4 whitespace-nowrap">
@@ -122,7 +130,7 @@ export function ContactsPage() {
                       <span className="text-muted-foreground">–</span>
                     )}
                   </td>
-                  <td className="px-4">
+                  <td className="px-4 max-md:hidden">
                     {c.email ? (
                       <a
                         href={`mailto:${c.email}`}

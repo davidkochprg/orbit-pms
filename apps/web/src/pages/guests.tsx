@@ -56,6 +56,8 @@ const columns = helper.columns([
 ]);
 
 const searchable = new Set(['name', 'email']);
+/** Columns left out on phones, where the name and email fill the width. */
+const wideOnly = new Set(['language', 'phone']);
 const noGuests: Guest[] = [];
 
 export function GuestsPage() {
@@ -95,7 +97,7 @@ export function GuestsPage() {
               placeholder="Filter by name or email"
               value={String(table.state.globalFilter ?? '')}
               onChange={(v) => table.setGlobalFilter(v)}
-              className="w-56"
+              className="w-40 sm:w-56"
             />
             <Button size="sm" onClick={() => setCreating(true)}>
               <Plus /> <span className="hidden sm:inline">New guest</span>
@@ -120,7 +122,11 @@ export function GuestsPage() {
                     return (
                       <th
                         key={header.id}
-                        className={cn(labelCaps, 'h-10 px-4 text-left first:pl-6')}
+                        className={cn(
+                          labelCaps,
+                          'h-10 px-4 text-left first:pl-6',
+                          wideOnly.has(header.column.id) && 'max-md:hidden',
+                        )}
                       >
                         <button
                           type="button"
@@ -147,7 +153,10 @@ export function GuestsPage() {
                   {row.getAllCells().map((cell) => (
                     <td
                       key={cell.id}
-                      className="h-11 px-4 text-muted-foreground first:pl-6 first:text-foreground"
+                      className={cn(
+                        'h-11 px-4 text-muted-foreground first:pl-6 first:text-foreground',
+                        wideOnly.has(cell.column.id) && 'max-md:hidden',
+                      )}
                     >
                       <table.FlexRender cell={cell} />
                     </td>

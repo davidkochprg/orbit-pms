@@ -21,10 +21,12 @@ export function RateCalendar({
 }) {
   const weeks = calendarWeeks(nights);
   return (
+    // Phones get a narrower week, with the badge under the bar, rather than a sideways scroll
+    // that hides the weekend.
     <div className="scrollbar-thin overflow-x-auto">
-      <div className="grid min-w-[36rem] grid-cols-7 gap-1">
+      <div className="grid grid-cols-7 gap-1 sm:min-w-[36rem]">
         {weekdays.map((d) => (
-          <div key={d} className="px-2 pt-1 pb-0.5 text-[0.6875rem] text-subtle-foreground">
+          <div key={d} className="px-1 pt-1 pb-0.5 text-[0.6875rem] text-subtle-foreground sm:px-2">
             {d}
           </div>
         ))}
@@ -78,7 +80,7 @@ function NightCell({
       aria-pressed={selected}
       onClick={onSelect}
       className={cn(
-        'relative flex h-[5.25rem] min-w-0 flex-col gap-1 overflow-hidden rounded-[10px] bg-background p-2 text-left ring-1 ring-ink/6 transition-[box-shadow,background-color] duration-150 ease-snap ring-inset hover:bg-surface-raised',
+        'relative flex h-[5.25rem] min-w-0 flex-col gap-1 overflow-hidden rounded-[10px] bg-background p-1.5 text-left sm:p-2 ring-1 ring-ink/6 transition-[box-shadow,background-color] duration-150 ease-snap ring-inset hover:bg-surface-raised',
         selected && 'ring-2 ring-primary',
       )}
     >
@@ -98,11 +100,11 @@ function NightCell({
         )}
       </span>
       {night.events.length > 0 && (
-        <span className="truncate text-[0.6875rem] leading-tight text-muted-foreground">
+        <span className="truncate text-[0.6875rem] leading-tight text-muted-foreground max-sm:hidden">
           {night.events[0]}
         </span>
       )}
-      <span className="mt-auto flex items-end justify-between gap-1">
+      <span className="mt-auto flex justify-between gap-1 max-sm:flex-col-reverse sm:items-end">
         <span className="flex min-w-0 flex-1 flex-col gap-1">
           <span className="font-mono text-[0.6875rem] leading-none text-muted-foreground tabular-nums">
             {Math.round(share * 100)}%
@@ -118,11 +120,11 @@ function NightCell({
           </span>
         </span>
         {changes ? (
-          <span className="shrink-0 rounded-[5px] bg-primary-soft px-1 font-mono text-[0.6875rem] leading-4 font-medium text-primary-text">
+          <span className="shrink-0 self-start rounded-[5px] bg-primary-soft px-1 font-mono sm:self-auto text-[0.6875rem] leading-4 font-medium text-primary-text">
             {signed(night.suggestedPercent)}
           </span>
         ) : night.currentPercent !== 0 ? (
-          <span className="shrink-0 font-mono text-[0.6875rem] leading-4 text-muted-foreground">
+          <span className="shrink-0 self-start font-mono text-[0.6875rem] leading-4 text-muted-foreground sm:self-auto">
             {signed(night.currentPercent)}
           </span>
         ) : null}
