@@ -49,7 +49,7 @@ After an answer, up to three next steps sit above the input (`lib/agent-follow-u
 | `getBill`                                                  | The latest bill of each booking: charged, extras, paid and the balance, with a button to open the booking                                                                                                                                                                                        |
 | `setRoomStatus`, `createHousekeepingTask`, `setTaskStatus` | What the agent changed, one row per room: old → new status, or the new task. A status change has a button that sets it back, through the same endpoints as the board. A created task can't be undone from the card; it has a link to Housekeeping                                                |
 
-`runAgent` (`packages/ai/src/agent.ts`) calls the AI SDK's `streamText` with the tools, stopping after at most 8 model calls per user message. `POST /api/agent` validates the incoming UI messages, converts them for the model and streams the result back as an AI SDK UI message stream (server-sent events).
+`runAgent` (`packages/ai/src/agent.ts`) calls the AI SDK's `streamText` with the tools, stopping after at most 8 model calls per user message. `smoothStream` releases the text word by word (20 ms apart), however the provider batches it; the command bar shows result and confirm cards only once the reply has finished, below the text. `POST /api/agent` validates the incoming UI messages, converts them for the model and streams the result back as an AI SDK UI message stream (server-sent events).
 
 ## Tools
 

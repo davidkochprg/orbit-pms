@@ -229,25 +229,33 @@ function AssistantMessage({
       {live}
       {!live && tools.length > 0 && <StepSummary tools={tools} narration={narration} />}
       {blocks.length > 0 && <Answer blocks={blocks} />}
-      <ResultCards
-        listBookings={
-          proposals.length === 0 &&
-          !blocks.some(
-            (b) =>
-              b.type === 'list' && b.items.some((i) => i.lead && entityKind(i.lead) === 'booking'),
-          )
-        }
-        results={toolResults(message)}
-      />
-      {proposals.map((p) => (
-        <PendingActionCard
-          key={p.pendingActionId}
-          id={p.pendingActionId}
-          summary={p.summary}
-          targeted={p.pendingActionId === targetActionId}
-        />
-      ))}
-      {proposals.length > 1 && <ConfirmAllButton ids={proposals.map((p) => p.pendingActionId)} />}
+      {/* Cards wait for the reply to finish, so the text doesn't push them down as it streams. */}
+      {!working && (
+        <div className="flex flex-col gap-3 empty:hidden motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-1 motion-safe:animation-duration-300">
+          <ResultCards
+            listBookings={
+              proposals.length === 0 &&
+              !blocks.some(
+                (b) =>
+                  b.type === 'list' &&
+                  b.items.some((i) => i.lead && entityKind(i.lead) === 'booking'),
+              )
+            }
+            results={toolResults(message)}
+          />
+          {proposals.map((p) => (
+            <PendingActionCard
+              key={p.pendingActionId}
+              id={p.pendingActionId}
+              summary={p.summary}
+              targeted={p.pendingActionId === targetActionId}
+            />
+          ))}
+          {proposals.length > 1 && (
+            <ConfirmAllButton ids={proposals.map((p) => p.pendingActionId)} />
+          )}
+        </div>
+      )}
     </div>
   );
 }

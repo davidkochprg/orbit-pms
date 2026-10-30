@@ -1,4 +1,4 @@
-import { isStepCount, type LanguageModel, type ModelMessage, streamText } from 'ai';
+import { isStepCount, type LanguageModel, type ModelMessage, smoothStream, streamText } from 'ai';
 import { fromSdkUsage, type TokenUsage } from './cost';
 import { type ReasoningEffort, reasoningEffort } from './reasoning';
 import type { AgentTools } from './tools';
@@ -52,6 +52,8 @@ export function runAgent({
     tools,
     reasoning,
     stopWhen: isStepCount(maxSteps),
+    // The answer arrives word by word at a steady pace, however the provider batches it.
+    experimental_transform: smoothStream({ chunking: 'word', delayInMs: 20 }),
     ...(abortSignal && { abortSignal }),
     onFinish: async ({ totalUsage }) => {
       await onUsage?.(fromSdkUsage(totalUsage));

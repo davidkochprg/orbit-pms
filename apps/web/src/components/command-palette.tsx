@@ -500,8 +500,10 @@ function AgentView({
   const lastQuestion = chat.messages.findLast((m) => m.role === 'user')?.id;
   const proposals = useMemo(() => proposalIds(chat.messages), [chat.messages]);
   const statuses = usePendingActions(proposals);
-  // The shortcuts act on the newest change still waiting, the one just proposed.
-  const target = proposals.findLast((_, i) => statuses[i]?.data?.status === 'pending') ?? null;
+  // The shortcuts act on the newest change still waiting, the one just proposed, once its card shows.
+  const target = busy
+    ? null
+    : (proposals.findLast((_, i) => statuses[i]?.data?.status === 'pending') ?? null);
   const resolve = useResolveAnyPendingAction();
   const navigate = useNavigate();
   const { closePalette } = useCommandPalette();
