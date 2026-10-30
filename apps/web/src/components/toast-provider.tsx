@@ -42,7 +42,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           <div
             key={shown.id}
             role="status"
-            className="pointer-events-auto flex max-w-md items-center gap-3 rounded-control bg-popover py-2 pr-2 pl-4 text-sm shadow-floating stroke-lit animate-in fade-in slide-in-from-bottom-2"
+            className="pointer-events-auto flex max-w-md items-center gap-3 rounded-control bg-popover py-2 pr-2 pl-4 text-sm shadow-floating backdrop-blur-2xl stroke-lit animate-in fade-in slide-in-from-bottom-2"
           >
             <span className="min-w-0 flex-1 truncate">{shown.title}</span>
             {shown.action && (

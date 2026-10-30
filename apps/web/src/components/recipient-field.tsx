@@ -144,7 +144,7 @@ export function RecipientField({
         <ul
           id={`${id}-list`}
           role="listbox"
-          className="absolute top-full left-16 z-30 mt-1 w-[min(26rem,calc(100%-5rem))] overflow-hidden rounded-stage bg-popover p-1 text-sm shadow-floating stroke-lit"
+          className="absolute top-full left-16 z-30 mt-1 w-[min(26rem,calc(100%-5rem))] overflow-hidden rounded-stage bg-popover p-1 text-sm shadow-floating backdrop-blur-2xl stroke-lit"
         >
           {suggestions.map((s, i) => (
             <li

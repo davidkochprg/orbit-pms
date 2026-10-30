@@ -1,7 +1,7 @@
 import { type KnockOn, tradeLabels } from '@orbit/shared';
 import { BedDouble, CalendarCheck, Mail, Phone, Wrench, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useLocation, useNavigate } from 'react-router';
 import { RoomBadge } from '@/components/agent-mention';
 import { ErrorNotice } from '@/components/error-notice';
 import { RepairDialog } from '@/components/repair-panel';
@@ -31,8 +31,10 @@ function loadDismissed(): string[] {
 export function KnockOnStack() {
   const knockOns = useKnockOns();
   const [dismissed, setDismissed] = useState(loadDismissed);
+  const { pathname } = useLocation();
   const shown = (knockOns.data ?? []).filter((k) => !dismissed.includes(k.id)).slice(0, 2);
-  if (shown.length === 0) return null;
+  // The inbox's reply box and composer sit in that corner, and Send must stay reachable.
+  if (shown.length === 0 || pathname.startsWith('/inbox')) return null;
 
   const dismiss = (id: string) => {
     // Only what is still showing is worth remembering.
@@ -48,7 +50,7 @@ export function KnockOnStack() {
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed right-4 bottom-4 z-50 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
+      className="pointer-events-none fixed right-4 bottom-4 z-40 flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2"
     >
       {shown.map((k) =>
         k.kind === 'relocate' ? (
@@ -77,7 +79,7 @@ function Card({
   return (
     <section
       aria-label={title}
-      className="pointer-events-auto flex flex-col gap-3 rounded-stage bg-popover p-3.5 text-sm shadow-floating stroke-lit motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2"
+      className="pointer-events-auto flex flex-col gap-3 rounded-stage bg-popover p-3.5 text-sm shadow-floating backdrop-blur-2xl stroke-lit motion-safe:animate-in motion-safe:fade-in motion-safe:slide-in-from-bottom-2"
     >
       <header className="flex items-center gap-2">
         <span className="grid size-6 shrink-0 place-items-center rounded-full bg-warning/12 text-warning [&_svg]:size-3.5">
