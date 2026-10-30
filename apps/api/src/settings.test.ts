@@ -1,5 +1,6 @@
 import { applySeed, buildSeed, createDb, createRepositories, createUsageStore } from '@orbit/db';
 import type {
+  HotelInfoEntry,
   ActivityItem,
   ApiError,
   AuditLogEntry,
@@ -103,6 +104,61 @@ describe('hotel profile', () => {
       manager.id,
     );
     expect(lateCheckout).toMatchObject({ status: 400, body: { error: { code: 'invalid_input' } } });
+  });
+});
+
+describe('Knowledge', () => {
+  const draft = {
+    category: 'info',
+    title: 'Late arrival',
+    details: 'Key box by the door.',
+    until: null,
+  };
+
+  it('lets any active staff member add, edit and remove an entry', async () => {
+    const added = await call<HotelInfoEntry>('POST', '/api/hotel-info', draft, receptionist.id);
+    expect(added).toMatchObject({ status: 201, body: { title: 'Late arrival', source: 'staff' } });
+
+    const edited = await call<HotelInfoEntry>(
+      'PUT',
+      `/api/hotel-info/${added.body.id}`,
+      { ...draft, details: 'Key box left of the door.' },
+      receptionist.id,
+    );
+    expect(edited.body.details).toBe('Key box left of the door.');
+    expect((await call<HotelInfoEntry[]>('GET', '/api/hotel-info')).body).toContainEqual(
+      expect.objectContaining({ id: added.body.id, details: 'Key box left of the door.' }),
+    );
+
+    const res = await app.request(`/api/hotel-info/${added.body.id}`, {
+      method: 'DELETE',
+      headers: { 'x-staff-id': receptionist.id },
+    });
+    expect(res.status).toBe(204);
+    expect(
+      (await call<HotelInfoEntry[]>('GET', '/api/hotel-info')).body.some(
+        (e) => e.id === added.body.id,
+      ),
+    ).toBe(false);
+  });
+
+  it('refuses a duplicate title and anyone not signed in', async () => {
+    const taken = seed.hotelProfile.entries[0]!.title;
+    const dup = await call<ApiError>(
+      'POST',
+      '/api/hotel-info',
+      { ...draft, title: taken },
+      manager.id,
+    );
+    expect(dup).toMatchObject({ status: 409, body: { error: { code: 'conflict' } } });
+    expect((await call<ApiError>('POST', '/api/hotel-info', draft)).status).toBe(403);
+    expect((await call<ApiError>('POST', '/api/hotel-info', draft, former.id)).status).toBe(403);
+  });
+
+  it('keeps entries when Settings saves the profile', async () => {
+    await call('PUT', '/api/settings/profile', { ...seed.hotelProfile, entries: [] }, manager.id);
+    const entries = (await call<HotelInfoEntry[]>('GET', '/api/hotel-info')).body;
+    expect(entries).toHaveLength(seed.hotelProfile.entries.length);
   });
 });
 

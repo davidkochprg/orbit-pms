@@ -116,7 +116,13 @@ export function inboxRoutes({
           entries: await hotelEntries(),
           today: today(),
         });
-        return c.json(draft && (await actions.propose({ kind: 'save_hotel_info', input: draft })));
+        return c.json(
+          draft &&
+            (await actions.propose({
+              kind: 'save_hotel_info',
+              input: { ...draft, source: 'reply' },
+            })),
+        );
       })
       .post('/inbox/:id/receive', validate('json', messageBodySchema), async (c) =>
         c.json(await inbox.receive(c.req.param('id'), c.req.valid('json').body)),

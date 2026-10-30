@@ -1,7 +1,10 @@
 import type {
   AuditActor,
+  HotelInfoCategory,
   HotelInfoDraft,
   HotelInfoEntry,
+  HotelInfoProposal,
+  HotelInfoSource,
   HotelProfile,
   IsoDate,
   StaffMember,
@@ -62,14 +65,52 @@ export function currentEntries(profile: HotelProfile, today: IsoDate): HotelProf
   return { ...profile, entries: profile.entries.filter((e) => !e.until || e.until >= today) };
 }
 
+/** Who wrote an entry and when, kept on it for Knowledge to show. */
+export interface EntryStamp {
+  source: HotelInfoSource;
+  at: string;
+}
+
+function newEntryId(profile: HotelProfile, category: HotelInfoCategory): string {
+  const taken = new Set(profile.entries.map((e) => e.id));
+  let n = profile.entries.length + 1;
+  while (taken.has(`${category}-${n}`)) n++;
+  return `${category}-${n}`;
+}
+
+function assertRoom(profile: HotelProfile) {
+  if (profile.entries.length >= MAX_HOTEL_INFO_ENTRIES) {
+    throw new DomainError(
+      'invalid_input',
+      `The profile holds at most ${MAX_HOTEL_INFO_ENTRIES} entries; remove one first`,
+    );
+  }
+}
+
+const toEntry = (id: string, draft: HotelInfoDraft, stamp: EntryStamp): HotelInfoEntry => ({
+  id,
+  category: draft.category,
+  title: draft.title.trim(),
+  details: draft.details.trim(),
+  until: draft.until,
+  source: stamp.source,
+  updatedAt: stamp.at,
+});
+
+const replace = (profile: HotelProfile, entry: HotelInfoEntry): HotelProfile => ({
+  ...profile,
+  entries: profile.entries.map((e) => (e.id === entry.id ? entry : e)),
+});
+
 /**
- * The profile with the fact saved: it replaces the entry with the same title, in any category,
- * or is added as a new one.
+ * The profile with the fact the agent proposed: it replaces the entry with the same title, in any
+ * category, or is added as a new one.
  */
 export function withHotelInfo(
   profile: HotelProfile,
   draft: HotelInfoDraft,
   today: IsoDate,
+  stamp: EntryStamp,
 ): { profile: HotelProfile; entry: HotelInfoEntry; replaced: HotelInfoEntry | null } {
   if (draft.until && draft.until < today) {
     throw new DomainError('invalid_input', 'A notice has to last until today or later');
@@ -82,32 +123,50 @@ export function withHotelInfo(
       `"${replaced.title}" always applies; give the notice its own title, e.g. "${replaced.title} closed"`,
     );
   }
-  if (!replaced && profile.entries.length >= MAX_HOTEL_INFO_ENTRIES) {
-    throw new DomainError(
-      'invalid_input',
-      `The profile holds at most ${MAX_HOTEL_INFO_ENTRIES} entries; remove one first`,
-    );
-  }
-  const taken = new Set(profile.entries.map((e) => e.id));
-  let n = profile.entries.length + 1;
-  while (taken.has(`${draft.category}-${n}`)) n++;
-  const entry: HotelInfoEntry = {
-    id: replaced?.id ?? `${draft.category}-${n}`,
-    category: draft.category,
-    title: draft.title.trim(),
-    details: draft.details.trim(),
-    until: draft.until,
-  };
+  if (!replaced) assertRoom(profile);
+  const entry = toEntry(replaced?.id ?? newEntryId(profile, draft.category), draft, stamp);
   return {
-    profile: {
-      ...profile,
-      entries: replaced
-        ? profile.entries.map((e) => (e.id === replaced.id ? entry : e))
-        : [...profile.entries, entry],
-    },
+    profile: replaced
+      ? replace(profile, entry)
+      : { ...profile, entries: [...profile.entries, entry] },
     entry,
     replaced,
   };
+}
+
+/**
+ * The profile with an entry staff added (`id` null) or edited. Titles stay unique, so the agent's
+ * corrections find the one entry they mean; an end date may only be set to today or later.
+ */
+export function withEntry(
+  profile: HotelProfile,
+  id: string | null,
+  draft: HotelInfoDraft,
+  today: IsoDate,
+  stamp: EntryStamp,
+): { profile: HotelProfile; entry: HotelInfoEntry } {
+  const current = id === null ? null : profile.entries.find((e) => e.id === id);
+  if (current === undefined) throw new DomainError('not_found', `Entry ${id} not found`);
+  const clash = profile.entries.find((e) => e.id !== id && sameTitle(e.title, draft.title));
+  if (clash) {
+    throw new DomainError('conflict', `There is already an entry called "${clash.title}"`);
+  }
+  if (draft.until && draft.until < today && draft.until !== current?.until) {
+    throw new DomainError('invalid_input', 'A notice has to last until today or later');
+  }
+  if (!current) assertRoom(profile);
+  const entry = toEntry(current?.id ?? newEntryId(profile, draft.category), draft, stamp);
+  return {
+    profile: current
+      ? replace(profile, entry)
+      : { ...profile, entries: [...profile.entries, entry] },
+    entry,
+  };
+}
+
+/** Throws unless `by` is an active staff member: anyone on the team keeps Knowledge up to date. */
+function assertStaff(by: StaffMember | null): asserts by is StaffMember {
+  if (!by?.active) throw new DomainError('forbidden', 'Sign in as an active staff member');
 }
 
 export interface SettingsDeps {
@@ -125,18 +184,29 @@ export function createSettingsService({ repos, clock = () => new Date() }: Setti
     getProfile,
 
     /** What saving the fact would change, without saving it. */
-    async previewHotelInfo(draft: HotelInfoDraft) {
-      return withHotelInfo(await getProfile(), draft, hotelToday(clock()));
+    async previewHotelInfo({ source, ...draft }: HotelInfoProposal) {
+      const now = clock();
+      return withHotelInfo(await getProfile(), draft, hotelToday(now), {
+        source,
+        at: now.toISOString(),
+      });
     },
 
     /**
-     * Saves one fact, as staff confirm it from the agent or a reply. Unlike editing Settings this
-     * is open to all staff: it is one entry, confirmed by a person, and in the audit log.
+     * Saves one fact, as staff confirm it from the agent or a reply. Like Knowledge, this is open
+     * to all staff: one entry, confirmed by a person, and in the audit log.
      */
-    async saveHotelInfo(draft: HotelInfoDraft, actor: AuditActor): Promise<HotelInfoEntry> {
+    async saveHotelInfo(
+      { source, ...draft }: HotelInfoProposal,
+      actor: AuditActor,
+    ): Promise<HotelInfoEntry> {
       return repos.transaction(async (tx) => {
+        const now = clock();
         const before = (await tx.settings.getProfile()) ?? emptyHotelProfile;
-        const { profile, entry, replaced } = withHotelInfo(before, draft, hotelToday(clock()));
+        const { profile, entry, replaced } = withHotelInfo(before, draft, hotelToday(now), {
+          source,
+          at: now.toISOString(),
+        });
         assertValidProfile(profile);
         await tx.settings.saveProfile(profile);
         await tx.audit.append({
@@ -149,12 +219,68 @@ export function createSettingsService({ repos, clock = () => new Date() }: Setti
       });
     },
 
-    /** Replaces the profile; managers only. A save that changes nothing writes no audit entry. */
-    async updateProfile(profile: HotelProfile, by: StaffMember | null): Promise<HotelProfile> {
+    /** Adds an entry (`id` null) or edits one, from Knowledge; any active staff member. */
+    async saveEntry(
+      id: string | null,
+      draft: HotelInfoDraft,
+      by: StaffMember | null,
+    ): Promise<HotelInfoEntry> {
+      assertStaff(by);
+      return repos.transaction(async (tx) => {
+        const now = clock();
+        const before = (await tx.settings.getProfile()) ?? emptyHotelProfile;
+        const { profile, entry } = withEntry(before, id, draft, hotelToday(now), {
+          source: 'staff',
+          at: now.toISOString(),
+        });
+        assertValidProfile(profile);
+        await tx.settings.saveProfile(profile);
+        await tx.audit.append({
+          actor: 'user',
+          action: 'settings.entry',
+          subjectId: entry.id,
+          payload: {
+            by: by.id,
+            title: entry.title,
+            category: entry.category,
+            replaced: id !== null,
+          },
+        });
+        return entry;
+      });
+    },
+
+    /** Removes an entry; any active staff member. */
+    async removeEntry(id: string, by: StaffMember | null): Promise<void> {
+      assertStaff(by);
+      await repos.transaction(async (tx) => {
+        const before = (await tx.settings.getProfile()) ?? emptyHotelProfile;
+        const entry = before.entries.find((e) => e.id === id);
+        if (!entry) throw new DomainError('not_found', `Entry ${id} not found`);
+        await tx.settings.saveProfile({
+          ...before,
+          entries: before.entries.filter((e) => e.id !== id),
+        });
+        await tx.audit.append({
+          actor: 'user',
+          action: 'settings.entry_remove',
+          subjectId: id,
+          payload: { by: by.id, title: entry.title, category: entry.category },
+        });
+      });
+    },
+
+    /**
+     * Replaces the property details; managers only. The entries stay as stored: they are kept in
+     * Knowledge, so a Settings form opened earlier can't undo a fact saved since. A save that
+     * changes nothing writes no audit entry.
+     */
+    async updateProfile(next: HotelProfile, by: StaffMember | null): Promise<HotelProfile> {
       assertManager(by);
-      assertValidProfile(profile);
       return repos.transaction(async (tx) => {
         const before = (await tx.settings.getProfile()) ?? emptyHotelProfile;
+        const profile = { ...next, entries: before.entries };
+        assertValidProfile(profile);
         const changed = changedProfileFields(before, profile);
         if (changed.length === 0) return before;
         await tx.settings.saveProfile(profile);

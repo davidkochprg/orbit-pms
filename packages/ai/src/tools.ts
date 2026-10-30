@@ -371,7 +371,8 @@ export function createAgentTools({
       description:
         'Propose saving a fact about the hotel for answering guests later: a house rule ("policy"), a facility or service ("amenity"), or anything else guests ask ("info"). Use it when staff tell you to remember something, or tell you about a temporary notice such as "the sauna is closed until Friday" (until: its last day, YYYY-MM-DD; null if it always applies). A fact with the title of an existing entry replaces it: keep what that entry says and change only what is new. A temporary notice gets its own title, e.g. "Sauna closed", never the title of a lasting entry. Never for room prices, availability or one guest\'s booking. The user must confirm.',
       inputSchema: hotelInfoDraftSchema,
-      execute: (input) => propose({ kind: 'save_hotel_info', input }),
+      execute: (input) =>
+        propose({ kind: 'save_hotel_info', input: { ...input, source: 'agent' } }),
     }),
     getBill: tool({
       description:

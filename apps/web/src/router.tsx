@@ -13,6 +13,7 @@ import { ScanPage } from '@/pages/scan';
 import { RatesPage } from '@/pages/rates';
 import { RoomsPage } from '@/pages/rooms';
 import { NotFoundPage } from '@/pages/sections';
+import { KnowledgePage } from '@/pages/knowledge';
 import { SettingsPage } from '@/pages/settings';
 import { TapeChartPage } from '@/pages/tape-chart';
 import { WelcomePage } from '@/pages/welcome';
@@ -43,6 +44,7 @@ export const router = createBrowserRouter([
               { path: 'rates', element: <RatesPage /> },
               { path: 'reports', element: <ReportsPage /> },
               { path: 'activity', element: <ActivityPage /> },
+              { path: 'knowledge', element: <KnowledgePage /> },
               { path: 'settings/:section?', element: <SettingsPage /> },
               { path: '*', element: <NotFoundPage /> },
             ],

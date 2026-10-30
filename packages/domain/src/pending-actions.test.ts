@@ -539,6 +539,7 @@ describe('pending actions', () => {
         title: 'Sauna',
         details: 'Closed for repairs.',
         until: '2026-05-15',
+        source: 'agent',
       },
     });
     expect(proposed.summary).toBe(

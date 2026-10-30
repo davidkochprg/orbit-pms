@@ -94,7 +94,7 @@ const toolLabels: Record<string, [running: string, done: string]> = {
   setRoomStatus: ['Updating the room status', 'Updated the room status'],
   createHousekeepingTask: ['Creating the task', 'Created the task'],
   setTaskStatus: ['Updating the task', 'Updated the task'],
-  saveHotelInfo: ['Preparing the hotel info', 'Prepared the hotel info'],
+  saveHotelInfo: ['Preparing a Knowledge entry', 'Prepared a Knowledge entry'],
 };
 
 /** A plain-language line for a tool step, so staff see what the agent looked at. */

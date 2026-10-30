@@ -28,6 +28,8 @@ import {
   idScanPhoneViewSchema,
   idScanSchema,
   hotelProfileSchema,
+  hotelInfoEntrySchema,
+  type HotelInfoDraft,
   type HotelProfile,
   inquiryListSchema,
   inquirySchema,
@@ -703,6 +705,29 @@ export function useHousekeepingNote() {
     form.append('audio', note.audio, 'note.wav');
     return apiPostForm('/api/housekeeping/voice', form, housekeepingNoteResultSchema);
   });
+}
+
+/** Knowledge: what guests are told about the hotel, kept by the whole team. */
+export function useHotelInfo() {
+  return useQuery({
+    queryKey: ['hotel-info'],
+    queryFn: () => apiGet('/api/hotel-info', z.array(hotelInfoEntrySchema)),
+  });
+}
+
+/** Adds an entry (`id` null) or edits one. */
+export function useSaveEntry() {
+  return useRefreshingMutation(({ id, draft }: { id: string | null; draft: HotelInfoDraft }) =>
+    id
+      ? apiPost(`/api/hotel-info/${encodeURIComponent(id)}`, draft, hotelInfoEntrySchema, 'PUT')
+      : apiPost('/api/hotel-info', draft, hotelInfoEntrySchema),
+  );
+}
+
+export function useRemoveEntry() {
+  return useRefreshingMutation((id: string) =>
+    apiDelete(`/api/hotel-info/${encodeURIComponent(id)}`),
+  );
 }
 
 export function useHotelProfile() {

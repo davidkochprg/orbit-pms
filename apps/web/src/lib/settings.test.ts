@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   fromPercent,
   fromSurcharge,
+  isEntryCategory,
   isSettingsSection,
-  newEntry,
   newSeason,
   sameSettings,
   toPercent,
@@ -21,7 +21,8 @@ const entry = (id: string): HotelInfoEntry => ({
 describe('isSettingsSection', () => {
   it('accepts known sections only', () => {
     expect(isSettingsSection('team')).toBe(true);
-    expect(isSettingsSection('amenity')).toBe(true);
+    expect(isSettingsSection('property')).toBe(true);
+    expect(isSettingsSection('amenity')).toBe(false);
     expect(isSettingsSection('billing')).toBe(false);
     // Rooms and rates have their own pages.
     expect(isSettingsSection('rooms')).toBe(false);
@@ -30,15 +31,11 @@ describe('isSettingsSection', () => {
   });
 });
 
-describe('newEntry', () => {
-  it('makes a blank entry with an unused ID', () => {
-    expect(newEntry('amenity', [])).toEqual({
-      id: 'amenity-1',
-      category: 'amenity',
-      title: '',
-      details: '',
-    });
-    expect(newEntry('policy', [entry('policy-2'), entry('policy-3')]).id).toBe('policy-4');
+describe('isEntryCategory', () => {
+  it('knows the old Settings tabs that moved to Knowledge', () => {
+    expect(isEntryCategory('amenity')).toBe(true);
+    expect(isEntryCategory('team')).toBe(false);
+    expect(isEntryCategory(undefined)).toBe(false);
   });
 });
 

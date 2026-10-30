@@ -4,13 +4,12 @@ import { Navigate, NavLink, useParams } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { PageHeader } from '@/components/page-header';
 import { ReadOnlyNotice, SaveBar } from '@/components/save-bar';
-import { EntrySettings } from '@/components/settings-entries';
 import { PropertySettings } from '@/components/settings-property';
 import { TeamSettings } from '@/components/settings-team';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/hooks/use-session';
 import { useHotelProfile, useSaveHotelProfile } from '@/lib/api';
-import { isSettingsSection, sameSettings, settingsSections } from '@/lib/settings';
+import { isEntryCategory, isSettingsSection, sameSettings, settingsSections } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 
 export function SettingsPage() {
@@ -23,6 +22,7 @@ export function SettingsPage() {
 
   // Rooms and rates have their own pages now; old links still land there.
   if (section === 'rooms' || section === 'rates') return <Navigate to={`/${section}`} replace />;
+  if (isEntryCategory(section)) return <Navigate to={`/knowledge?kind=${section}`} replace />;
   if (!isSettingsSection(section)) return <Navigate to="/settings/property" replace />;
 
   const readOnly = !session.canManage;
@@ -74,16 +74,7 @@ export function SettingsPage() {
                 <Skeleton className="h-80" />
               ) : (
                 <fieldset disabled={readOnly} className="min-w-0">
-                  {section === 'property' ? (
-                    <PropertySettings profile={current} onChange={edit} />
-                  ) : (
-                    <EntrySettings
-                      category={section}
-                      profile={current}
-                      onChange={edit}
-                      readOnly={readOnly}
-                    />
-                  )}
+                  <PropertySettings profile={current} onChange={edit} />
                 </fieldset>
               )}
             </div>

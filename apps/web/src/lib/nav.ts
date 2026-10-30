@@ -1,5 +1,6 @@
 import {
   BedDouble,
+  BookOpenText,
   ChartColumn,
   History,
   CalendarRange,
@@ -30,6 +31,7 @@ export const navItems: NavItem[] = [
   { group: 'desk', label: 'Guests', path: '/guests', icon: Users },
   { group: 'office', label: 'Rooms', path: '/rooms', icon: DoorOpen },
   { group: 'office', label: 'Rates', path: '/rates', icon: Tags },
+  { group: 'office', label: 'Knowledge', path: '/knowledge', icon: BookOpenText },
   { group: 'office', label: 'Reports', path: '/reports', icon: ChartColumn },
   { group: 'office', label: 'Activity', path: '/activity', icon: History },
   { group: 'office', label: 'Settings', path: '/settings', icon: Settings },

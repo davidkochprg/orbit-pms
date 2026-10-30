@@ -223,7 +223,11 @@ Requests are signed in with the `x-staff-id` header: the ID of an active staff m
 
 ### `GET /api/settings/profile`, `PUT /api/settings/profile`
 
-`HotelProfile`: `name`, `location`, `description`, `phone`, `email`, `website`, `checkInFrom` and `checkOutBy` (`HH:MM`), `country` (ISO alpha-2; sets the guest-book rules), `language` (the working language new staff and guests start with), `coordinates` (`{ latitude, longitude }` or null; where the weather forecast is for), and `entries` (`{ id, category: 'policy' | 'amenity' | 'info', title, details }`, at most 100). `PUT` replaces the whole profile and returns it; empty strings become `null`. Check-out must be earlier than check-in (`400 invalid_input`). See [domain.md](domain.md#hotel-profile).
+`HotelProfile`: `name`, `location`, `description`, `phone`, `email`, `website`, `checkInFrom` and `checkOutBy` (`HH:MM`), `country` (ISO alpha-2; sets the guest-book rules), `language` (the working language new staff and guests start with), `coordinates` (`{ latitude, longitude }` or null; where the weather forecast is for), and `entries` (`{ id, category: 'policy' | 'amenity' | 'info', title, details, until?, source?, updatedAt? }`, at most 100). `PUT` replaces the profile except its entries, which stay as stored (they change through `/api/hotel-info`), and returns it; empty strings become `null`. Check-out must be earlier than check-in (`400 invalid_input`). See [domain.md](domain.md#hotel-profile).
+
+### `GET /api/hotel-info`, `POST /api/hotel-info`, `PUT /api/hotel-info/:id`, `DELETE /api/hotel-info/:id`
+
+Knowledge: the profile's entries. `GET` returns them; `POST` (201) and `PUT` take `{ category, title, details, until }` (`until` a date or null) and return the entry with `source: "staff"` and `updatedAt`; `DELETE` returns 204. Any active staff member (`x-staff-id`), otherwise 403 `forbidden`. 409 `conflict` for a title another entry has, 400 `invalid_input` for a new end date in the past or a 101st entry, 404 for an unknown ID.
 
 ### `GET /api/settings/pricing`, `PUT /api/settings/pricing`
 

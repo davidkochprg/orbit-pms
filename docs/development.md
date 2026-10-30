@@ -87,7 +87,7 @@ A PGlite directory can only be open in one process at a time; two processes writ
 - Housekeeping tasks: turnovers for today's departures, stayovers for in-house guests, one maintenance task.
 - Two departures today that clean very differently: a one-guest work trip in 102, and a family with a dog and muddy boots in A4. Today's family arrival in A2 asks for a cot. The board reads these notes on first open, so seeded stays have no stored readings.
 - A day and a half of activity (`packages/db/src/seed/activity.ts`): yesterday's check-ins, check-outs, payments and cleaning by staff, and a hold, a maintenance task and this morning's inspections by Orbit.
-- The hotel profile of the fictional "Orbit Demo Lodge" or "Orbit Demo Penzion" (`packages/db/src/seed/hotel.ts`): policies, amenities and guest information, without prices. Seeding replaces any profile edited in Settings.
+- The hotel profile of the fictional "Orbit Demo Lodge" or "Orbit Demo Penzion" (`packages/db/src/seed/hotel.ts`): policies, amenities and guest information, without prices. Seeding replaces any profile edited in Settings or Knowledge.
 - The rates from `packages/domain/src/pricing/config.ts`: `usDemoPricing` (illustrative) or the Czech placeholders. Seeding replaces any rates, room types and rooms edited on the Rates and Rooms pages.
 
 The generator is deterministic (fixed PRNG seed), and its invariants are tested in `packages/db/src/seed/build.test.ts`.

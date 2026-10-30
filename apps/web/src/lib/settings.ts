@@ -1,21 +1,23 @@
-import type { HotelInfoCategory, HotelInfoEntry, Season } from '@orbit/shared';
+import { type HotelInfoCategory, hotelInfoCategories, type Season } from '@orbit/shared';
 
-/** The hotel profile (property, policies, amenities, guest info), saved together, and the team. */
-export type SettingsSection = 'property' | HotelInfoCategory | 'team';
+/** The property details and the team. Policies, amenities and guest info are in Knowledge. */
+export type SettingsSection = 'property' | 'team';
 
 export const settingsSections: { id: SettingsSection; label: string }[] = [
   { id: 'property', label: 'Property' },
-  { id: 'policy', label: 'Policies' },
-  { id: 'amenity', label: 'Amenities' },
-  { id: 'info', label: 'Guest info' },
   { id: 'team', label: 'Team' },
 ];
+
+/** The Settings tabs entries used to have, for links that still point there. */
+export function isEntryCategory(value: string | undefined): value is HotelInfoCategory {
+  return hotelInfoCategories.some((c) => c === value);
+}
 
 export function isSettingsSection(value: string | undefined): value is SettingsSection {
   return settingsSections.some((s) => s.id === value);
 }
 
-/** The heading and title placeholder for each kind of entry. */
+/** The name and title placeholder for each kind of entry. */
 export const entryHints: Record<HotelInfoCategory, { title: string; example: string }> = {
   policy: {
     title: 'Policies',
@@ -30,14 +32,6 @@ export const entryHints: Record<HotelInfoCategory, { title: string; example: str
     example: 'e.g. Getting here',
   },
 };
-
-/** A blank entry with an ID unique within the profile. */
-export function newEntry(category: HotelInfoCategory, existing: HotelInfoEntry[]): HotelInfoEntry {
-  const taken = new Set(existing.map((e) => e.id));
-  let n = existing.length + 1;
-  while (taken.has(`${category}-${n}`)) n++;
-  return { id: `${category}-${n}`, category, title: '', details: '' };
-}
 
 /** Deep equality for plain JSON settings, e.g. a draft profile or rates against the saved ones. */
 export function sameSettings<T>(a: T, b: T): boolean {

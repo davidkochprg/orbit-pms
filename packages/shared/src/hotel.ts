@@ -12,6 +12,11 @@ export const timeOfDaySchema = z
   .string()
   .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use a 24-hour time like 15:00');
 
+/** Who last wrote an entry: staff in Knowledge, the agent when asked, or a reply staff sent. */
+export const hotelInfoSources = ['staff', 'agent', 'reply'] as const;
+export const hotelInfoSourceSchema = z.enum(hotelInfoSources);
+export type HotelInfoSource = z.infer<typeof hotelInfoSourceSchema>;
+
 /** One fact staff and the agent may tell guests, e.g. "Parking: free, behind the house". */
 export const hotelInfoEntrySchema = z.object({
   id: z.string().min(1).max(40),
@@ -20,6 +25,9 @@ export const hotelInfoEntrySchema = z.object({
   details: z.string().trim().min(1).max(600),
   /** The last day a temporary notice applies, e.g. "Sauna closed"; absent or null if it always does. */
   until: isoDateSchema.nullable().optional(),
+  /** Absent for entries from before this was recorded, such as the seeded ones. */
+  source: hotelInfoSourceSchema.optional(),
+  updatedAt: z.iso.datetime().optional(),
 });
 export type HotelInfoEntry = z.infer<typeof hotelInfoEntrySchema>;
 
@@ -34,6 +42,12 @@ export const hotelInfoDraftSchema = z.object({
   until: isoDateSchema.nullable(),
 });
 export type HotelInfoDraft = z.infer<typeof hotelInfoDraftSchema>;
+
+/** A fact the agent proposes, from staff asking it or from a reply they sent. */
+export const hotelInfoProposalSchema = hotelInfoDraftSchema.extend({
+  source: z.enum(['agent', 'reply']).default('agent'),
+});
+export type HotelInfoProposal = z.infer<typeof hotelInfoProposalSchema>;
 
 const optionalText = (max: number) =>
   z

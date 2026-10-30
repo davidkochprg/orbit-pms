@@ -1,5 +1,6 @@
 import type { RatesService, SettingsService, StaffService } from '@orbit/domain';
 import {
+  hotelInfoDraftSchema,
   hotelProfileSchema,
   newStaffBodySchema,
   pricingConfigSchema,
@@ -24,32 +25,48 @@ export interface SettingsRouteDeps {
 export function settingsRoutes({ settings, staff, rates }: SettingsRouteDeps) {
   const signedIn = (c: Context) => staff.identify(c.req.header(STAFF_HEADER));
 
-  return new Hono()
-    .get('/settings/profile', async (c) => c.json(await settings.getProfile()))
-    .put('/settings/profile', validate('json', hotelProfileSchema), async (c) =>
-      c.json(await settings.updateProfile(c.req.valid('json'), await signedIn(c))),
-    )
-    .get('/settings/pricing', async (c) => c.json(await rates.getPricing()))
-    .put('/settings/pricing', validate('json', pricingConfigSchema), async (c) =>
-      c.json(await rates.updatePricing(c.req.valid('json'), await signedIn(c))),
-    )
-    .post('/room-types', validate('json', roomTypeBodySchema), async (c) =>
-      c.json(await rates.createRoomType(c.req.valid('json'), await signedIn(c)), 201),
-    )
-    .put('/room-types/:id', validate('json', roomTypeBodySchema), async (c) =>
-      c.json(await rates.updateRoomType(c.req.param('id'), c.req.valid('json'), await signedIn(c))),
-    )
-    .post('/rooms', validate('json', roomBodySchema), async (c) =>
-      c.json(await rates.createRoom(c.req.valid('json'), await signedIn(c)), 201),
-    )
-    .put('/rooms/:id', validate('json', roomBodySchema), async (c) =>
-      c.json(await rates.updateRoom(c.req.param('id'), c.req.valid('json'), await signedIn(c))),
-    )
-    .get('/staff', async (c) => c.json(await staff.list()))
-    .post('/staff', validate('json', newStaffBodySchema), async (c) =>
-      c.json(await staff.create(c.req.valid('json'), await signedIn(c)), 201),
-    )
-    .patch('/staff/:id', validate('json', updateStaffBodySchema), async (c) =>
-      c.json(await staff.update(c.req.param('id'), c.req.valid('json'), await signedIn(c))),
-    );
+  return (
+    new Hono()
+      .get('/settings/profile', async (c) => c.json(await settings.getProfile()))
+      .put('/settings/profile', validate('json', hotelProfileSchema), async (c) =>
+        c.json(await settings.updateProfile(c.req.valid('json'), await signedIn(c))),
+      )
+      // Knowledge: the entries guests are told about, kept by any staff member.
+      .get('/hotel-info', async (c) => c.json((await settings.getProfile()).entries))
+      .post('/hotel-info', validate('json', hotelInfoDraftSchema), async (c) =>
+        c.json(await settings.saveEntry(null, c.req.valid('json'), await signedIn(c)), 201),
+      )
+      .put('/hotel-info/:id', validate('json', hotelInfoDraftSchema), async (c) =>
+        c.json(await settings.saveEntry(c.req.param('id'), c.req.valid('json'), await signedIn(c))),
+      )
+      .delete('/hotel-info/:id', async (c) => {
+        await settings.removeEntry(c.req.param('id'), await signedIn(c));
+        return c.body(null, 204);
+      })
+      .get('/settings/pricing', async (c) => c.json(await rates.getPricing()))
+      .put('/settings/pricing', validate('json', pricingConfigSchema), async (c) =>
+        c.json(await rates.updatePricing(c.req.valid('json'), await signedIn(c))),
+      )
+      .post('/room-types', validate('json', roomTypeBodySchema), async (c) =>
+        c.json(await rates.createRoomType(c.req.valid('json'), await signedIn(c)), 201),
+      )
+      .put('/room-types/:id', validate('json', roomTypeBodySchema), async (c) =>
+        c.json(
+          await rates.updateRoomType(c.req.param('id'), c.req.valid('json'), await signedIn(c)),
+        ),
+      )
+      .post('/rooms', validate('json', roomBodySchema), async (c) =>
+        c.json(await rates.createRoom(c.req.valid('json'), await signedIn(c)), 201),
+      )
+      .put('/rooms/:id', validate('json', roomBodySchema), async (c) =>
+        c.json(await rates.updateRoom(c.req.param('id'), c.req.valid('json'), await signedIn(c))),
+      )
+      .get('/staff', async (c) => c.json(await staff.list()))
+      .post('/staff', validate('json', newStaffBodySchema), async (c) =>
+        c.json(await staff.create(c.req.valid('json'), await signedIn(c)), 201),
+      )
+      .patch('/staff/:id', validate('json', updateStaffBodySchema), async (c) =>
+        c.json(await staff.update(c.req.param('id'), c.req.valid('json'), await signedIn(c))),
+      )
+  );
 }
