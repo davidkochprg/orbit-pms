@@ -4,7 +4,6 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorNotice } from '@/components/error-notice';
 import { Button } from '@/components/ui/button';
 import { useSession } from '@/hooks/use-session';
-import { staffRoleLabels } from '@/lib/session';
 
 interface SaveState {
   isPending: boolean;
@@ -97,8 +96,7 @@ export function ReadOnlyNotice({ what }: { what: string }) {
   return (
     <p className="flex items-center gap-2 rounded-control bg-surface-sunken px-3 py-2.5 text-sm text-muted-foreground">
       <Lock className="size-4 shrink-0" />
-      Only managers can change {what}. You are signed in as {current.name} (
-      {staffRoleLabels[current.role]}).
+      Only managers can change {what}.
     </p>
   );
 }

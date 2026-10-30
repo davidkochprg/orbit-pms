@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -29,7 +28,7 @@ interface GuestEditorProps {
 export function GuestEditorDialog({ open, onOpenChange, guest }: GuestEditorProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="shadow-floating sm:max-w-lg">
+      <DialogContent aria-describedby={undefined} className="shadow-floating sm:max-w-lg">
         {open && <GuestForm guest={guest} onDone={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
@@ -70,9 +69,6 @@ function GuestForm({ guest, onDone }: { guest: Guest | undefined; onDone: () => 
     <form onSubmit={submit} className="flex flex-col gap-4">
       <DialogHeader>
         <DialogTitle>{guest ? `Edit ${guest.name}` : 'New guest'}</DialogTitle>
-        <DialogDescription>
-          The guest's language is used for replies the agent drafts.
-        </DialogDescription>
       </DialogHeader>
       <div className="grid gap-3 sm:grid-cols-2">
         <FormField label="Name" htmlFor="ge-name">

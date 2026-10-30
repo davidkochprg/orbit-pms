@@ -54,9 +54,7 @@ export function ScanPage() {
         {view.isError ? (
           <div className="flex flex-col gap-2">
             <h1 className="text-xl font-semibold tracking-tight">This link has expired</h1>
-            <p className="text-muted-foreground">
-              Scan links work for 15 minutes. Ask at the desk for a new code.
-            </p>
+            <p className="text-muted-foreground">Ask at the desk for a new code.</p>
           </div>
         ) : !view.data ? (
           <LoaderCircle className="mx-auto size-6 animate-spin text-muted-foreground" />
@@ -64,10 +62,7 @@ export function ScanPage() {
           <div className="flex flex-col items-center gap-3 text-center">
             <CircleCheck className="size-12 text-success" />
             <h1 className="text-xl font-semibold tracking-tight">Sent to the desk</h1>
-            <p className="text-muted-foreground">
-              The details are checked on the reception screen. The photo isn&apos;t kept. You can
-              close this page.
-            </p>
+            <p className="text-muted-foreground">You can close this page.</p>
             {unreadable && problem && <ErrorNotice message={problem} />}
             <Button
               variant="ghost"
@@ -82,15 +77,13 @@ export function ScanPage() {
           <div className="flex flex-col items-center gap-3 text-center">
             <LoaderCircle className="size-10 animate-spin text-primary-text" />
             <h1 className="text-xl font-semibold tracking-tight">Reading the document…</h1>
-            <p className="text-muted-foreground">This takes a few seconds.</p>
           </div>
         ) : (
           <>
             <div className="flex flex-col gap-2">
               <h1 className="text-2xl font-semibold tracking-tight">Photograph {who} ID</h1>
               <p className="text-muted-foreground">
-                Room {view.data.roomName}. Lay the ID card or passport photo page flat, fill the
-                frame and avoid glare.
+                Room {view.data.roomName}. Lay it flat and avoid glare.
               </p>
             </div>
             {problem && <ErrorNotice message={problem} />}
@@ -124,7 +117,7 @@ export function ScanPage() {
         onChange={(e) => void send(e.currentTarget)}
       />
       <footer className="text-center text-xs text-subtle-foreground">
-        The photo is read once to fill in the guest book and then discarded.
+        The photo is discarded once it&apos;s read.
       </footer>
     </main>
   );

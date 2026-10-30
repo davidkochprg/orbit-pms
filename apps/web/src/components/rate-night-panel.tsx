@@ -60,9 +60,7 @@ export function RateNightPanel({
       <section className="flex flex-col gap-1.5">
         <h4 className="text-xs text-subtle-foreground">Why</h4>
         {night.factors.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
-            Nothing stands out: demand is as usual, with no event or notable weather.
-          </p>
+          <p className="text-xs text-muted-foreground">Nothing unusual</p>
         ) : (
           <ul className="flex flex-col gap-1">
             {night.factors.map((f) => {

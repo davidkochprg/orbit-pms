@@ -41,9 +41,6 @@ export function ComposeEmail() {
           </Link>
         </Button>
       </header>
-      <p className="-mt-2 text-sm text-muted-foreground">
-        Write to a guest. Their answer joins the same conversation.
-      </p>
 
       <form
         onSubmit={onSubmit}

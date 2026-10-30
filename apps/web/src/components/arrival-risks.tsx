@@ -12,7 +12,7 @@ export function ArrivalRisks({ risks }: { risks: ArrivalRisk[] }) {
   if (risks.length === 0) {
     return (
       <p className="px-3 py-6 text-center text-xs text-subtle-foreground">
-        Every arrival this week looks likely to come
+        No no-show risks this week
       </p>
     );
   }

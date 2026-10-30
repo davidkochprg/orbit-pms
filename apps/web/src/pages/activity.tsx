@@ -71,11 +71,7 @@ export function ActivityPage() {
           ) : !activity.data ? (
             <Skeleton className="h-96" />
           ) : activity.data.length === 0 ? (
-            <EmptyState
-              icon={History}
-              title="Nothing yet"
-              description="Changes by staff and by Orbit show up here, with who made them."
-            />
+            <EmptyState icon={History} title="Nothing yet" />
           ) : (
             [...groups].map(([date, items]) => (
               <Section key={date} title={formatLongDate(date)} count={items.length}>

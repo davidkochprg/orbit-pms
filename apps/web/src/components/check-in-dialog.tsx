@@ -114,16 +114,6 @@ function Flow({ detail, onDone }: { detail: BookingDetail; onDone: () => void })
       <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto bg-surface-sunken p-5">
         {step === 'Guests & IDs' && (
           <div className="flex flex-col gap-3">
-            <p className="text-sm text-muted-foreground">
-              Scan each guest&apos;s ID card or passport with a phone, or type the details.
-              {book.data && book.data.missing > 0 && (
-                <>
-                  {' '}
-                  You can continue without {book.data.missing === 1 ? 'it' : 'them'} and scan{' '}
-                  {book.data.missing === 1 ? 'it' : 'them'} later from the booking.
-                </>
-              )}
-            </p>
             <BookingGuests bookingId={booking.id} editable compact />
           </div>
         )}
@@ -140,7 +130,7 @@ function Flow({ detail, onDone }: { detail: BookingDetail; onDone: () => void })
                       ? `${formatMoney(-folio.data.balance)} owed to the guest`
                       : 'Paid in full'
                 }
-                detail={`${formatMoney(folio.data.charged)} charged, ${formatMoney(folio.data.paid)} paid so far. Many guests settle at check-out.`}
+                detail={`${formatMoney(folio.data.charged)} charged, ${formatMoney(folio.data.paid)} paid`}
               />
               {folio.data.balance > 0 && (
                 <Button variant="outline" className="self-start" onClick={() => setPaying(true)}>
@@ -157,22 +147,13 @@ function Flow({ detail, onDone }: { detail: BookingDetail; onDone: () => void })
             <SummaryRow
               ok={room.status === 'clean' || room.status === 'inspected'}
               title={`Room ${room.name}: ${roomStatusText[room.status].toLowerCase()}`}
-              detail={
-                room.status === 'clean' || room.status === 'inspected'
-                  ? 'Ready for the guest.'
-                  : 'Check with housekeeping before handing over the key.'
-              }
             />
             {book.data && (
               <SummaryRow
                 ok={book.data.missing === 0 && book.data.extra === 0}
                 title={guestBookProgress(book.data)}
                 detail={
-                  book.data.extra > 0
-                    ? 'More people are listed than the booking is for. Fix the party or the list.'
-                    : book.data.missing === 0
-                      ? 'Everyone is registered.'
-                      : `${book.data.missing} still ${book.data.missing === 1 ? 'needs' : 'need'} an ID. Scan it later from the booking's Guests tab.`
+                  book.data.extra > 0 ? 'More people listed than the booking is for' : undefined
                 }
                 action={
                   (book.data.missing > 0 || book.data.extra > 0) && (
@@ -189,7 +170,6 @@ function Flow({ detail, onDone }: { detail: BookingDetail; onDone: () => void })
                 title={
                   folio.data.balance > 0 ? `${formatMoney(folio.data.balance)} due` : 'Bill settled'
                 }
-                detail={folio.data.balance > 0 ? 'Collected at check-out.' : 'Nothing to collect.'}
               />
             )}
           </div>
@@ -234,7 +214,7 @@ function SummaryRow({
 }: {
   ok: boolean;
   title: string;
-  detail: string;
+  detail?: string;
   action?: ReactNode;
 }) {
   const Icon = ok ? CircleCheck : title.startsWith('Room') ? AlertTriangle : CircleDashed;
@@ -243,7 +223,7 @@ function SummaryRow({
       <Icon className={cn('mt-0.5 size-4 shrink-0', ok ? 'text-success' : 'text-warning')} />
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="font-medium">{title}</span>
-        <span className="text-sm text-muted-foreground">{detail}</span>
+        {detail && <span className="text-sm text-muted-foreground">{detail}</span>}
       </div>
       {action}
     </div>

@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -33,7 +32,7 @@ const taskTypes: { value: HousekeepingTaskType; label: string }[] = [
 export function TaskDialog({ open, onOpenChange, roomId }: TaskDialogProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="shadow-floating sm:max-w-md">
+      <DialogContent aria-describedby={undefined} className="shadow-floating sm:max-w-md">
         {open && <TaskForm roomId={roomId} onDone={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
@@ -57,9 +56,6 @@ function TaskForm({ roomId, onDone }: { roomId: string | undefined; onDone: () =
     <form onSubmit={submit} className="flex flex-col gap-4">
       <DialogHeader>
         <DialogTitle>New task</DialogTitle>
-        <DialogDescription>
-          It shows on the room's card until someone marks it done.
-        </DialogDescription>
       </DialogHeader>
       <FormField label="Room" htmlFor="task-room">
         <NativeSelect

@@ -1,7 +1,6 @@
 import type { Room, RoomKind, RoomType } from '@orbit/shared';
 import { Pencil, Plus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
-import { Link } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { FormField } from '@/components/form-field';
 import { Panel } from '@/components/panel';
@@ -12,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -149,13 +147,6 @@ export function RoomsEditor({ readOnly }: Props) {
             );
           })}
         </ul>
-        <p className="border-t border-ink/5 px-3 py-2 text-xs text-muted-foreground">
-          The base price is before season and per-night changes, which are on the{' '}
-          <Link to="/rates" className="underline underline-offset-2">
-            Rates
-          </Link>{' '}
-          page. New quotes use it as soon as you save.
-        </p>
       </Panel>
 
       <Panel
@@ -210,25 +201,17 @@ export function RoomsEditor({ readOnly }: Props) {
             </section>
           ))}
         </div>
-        <p className="border-t border-ink/5 px-3 py-2 text-xs text-muted-foreground">
-          The dot is the housekeeping status. To take a room out of service, mark it out of order on
-          the{' '}
-          <Link to="/housekeeping" className="underline underline-offset-2">
-            housekeeping board
-          </Link>
-          .
-        </p>
       </Panel>
 
       <Dialog open={editingType !== null} onOpenChange={(open) => !open && setEditingType(null)}>
-        <DialogContent className="shadow-floating sm:max-w-md">
+        <DialogContent aria-describedby={undefined} className="shadow-floating sm:max-w-md">
           {editingType && (
             <RoomTypeForm roomType={editingType.item} onDone={() => setEditingType(null)} />
           )}
         </DialogContent>
       </Dialog>
       <Dialog open={editingRoom !== null} onOpenChange={(open) => !open && setEditingRoom(null)}>
-        <DialogContent className="shadow-floating sm:max-w-md">
+        <DialogContent aria-describedby={undefined} className="shadow-floating sm:max-w-md">
           {editingRoom && (
             <RoomForm room={editingRoom.item} types={types} onDone={() => setEditingRoom(null)} />
           )}
@@ -260,9 +243,6 @@ function RoomTypeForm({ roomType, onDone }: { roomType: RoomType | null; onDone:
     <form onSubmit={submit} className="flex flex-col gap-4">
       <DialogHeader>
         <DialogTitle>{roomType ? `Edit ${roomType.name}` : 'New room type'}</DialogTitle>
-        <DialogDescription>
-          Existing bookings keep their price; new quotes use these details.
-        </DialogDescription>
       </DialogHeader>
       <FormField label="Name" htmlFor="type-name">
         <Input id="type-name" required value={name} onChange={(e) => setName(e.target.value)} />
@@ -284,9 +264,8 @@ function RoomTypeForm({ roomType, onDone }: { roomType: RoomType | null; onDone:
         </div>
       </div>
       <FormField
-        label="Base price"
+        label={`Base price, ${basisText()} per night (${displayRegion().currency})`}
         htmlFor="type-price"
-        hint={`The rate ${basisText()} per night, whole ${displayRegion().currency}.`}
       >
         <Input
           id="type-price"
@@ -350,11 +329,6 @@ function RoomForm({
     <form onSubmit={submit} className="flex flex-col gap-4">
       <DialogHeader>
         <DialogTitle>{room ? `Edit room ${room.name}` : 'New room'}</DialogTitle>
-        <DialogDescription>
-          {room
-            ? 'Its bookings stay in this room. A smaller room type only limits new bookings.'
-            : 'A new room starts clean and can be booked right away.'}
-        </DialogDescription>
       </DialogHeader>
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Name" htmlFor="room-name">

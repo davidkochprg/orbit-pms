@@ -43,7 +43,10 @@ interface Props {
 export function IdScanDialog({ open, onOpenChange, ...props }: Props) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="grid-cols-[minmax(0,1fr)] shadow-floating sm:max-w-md">
+      <DialogContent
+        aria-describedby={undefined}
+        className="grid-cols-[minmax(0,1fr)] shadow-floating sm:max-w-md"
+      >
         {open && <ScanFlow {...props} onDone={() => onOpenChange(false)} />}
       </DialogContent>
     </Dialog>
@@ -108,10 +111,6 @@ function ScanFlow({
     <>
       <DialogHeader>
         <DialogTitle>Scan ID for {who}</DialogTitle>
-        <DialogDescription>
-          Scan the code with a phone and photograph the ID card or passport. The photo is read and
-          then discarded; you check the details here before anything is saved.
-        </DialogDescription>
       </DialogHeader>
       {start.error ? (
         <ErrorNotice message={start.error.message} />
@@ -188,9 +187,7 @@ function WaitForPhone({
               </>
             )}
           </p>
-          <p className="text-muted-foreground">
-            The link works for 15 minutes and only for this guest.
-          </p>
+          <p className="text-muted-foreground">Expires in 15 minutes</p>
           {url && (
             <a
               href={url}
@@ -298,9 +295,6 @@ function ReviewForm({
     <form onSubmit={submit} className="flex flex-col gap-4">
       <DialogHeader>
         <DialogTitle>Check the scanned details</DialogTitle>
-        <DialogDescription>
-          Compare them with the document, fix anything misread, then save.
-        </DialogDescription>
       </DialogHeader>
       {(result.warnings.length > 0 || nameDiffers) && (
         <ul className="flex flex-col gap-1 rounded-control bg-warning/10 px-3 py-2 text-sm">
@@ -374,7 +368,7 @@ function ReviewForm({
       <FormField
         label={abroad ? 'Home address' : 'Home address (optional)'}
         htmlFor="scan-address"
-        hint={abroad ? 'Needed for guests from abroad; passports don’t print it.' : undefined}
+        hint={abroad ? 'Required for guests from abroad' : undefined}
       >
         <Input id="scan-address" value={address} onChange={(e) => setAddress(e.target.value)} />
       </FormField>

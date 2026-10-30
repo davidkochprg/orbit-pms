@@ -388,9 +388,7 @@ function UnpaidDepartures({ report }: { report: Report }) {
   return (
     <Panel title="Left without paying" count={report.unpaidDepartures.length}>
       {report.unpaidDepartures.length === 0 ? (
-        <p className="p-3.5 text-sm text-muted-foreground">
-          Every guest who left in this period has settled their bill.
-        </p>
+        <p className="p-3.5 text-sm text-muted-foreground">No unpaid departures</p>
       ) : (
         <ul className="flex flex-col">
           {report.unpaidDepartures.map((u) => (

@@ -32,23 +32,14 @@ export function PropertySettings({ profile, onChange }: Props) {
           <FormField label="Name" htmlFor="name">
             <Input id="name" value={profile.name} onChange={(e) => set('name', e.target.value)} />
           </FormField>
-          <FormField
-            label="Location"
-            htmlFor="location"
-            hint="Address or region, as guests read it."
-          >
+          <FormField label="Location" htmlFor="location">
             <Input
               id="location"
               value={profile.location}
               onChange={(e) => set('location', e.target.value)}
             />
           </FormField>
-          <FormField
-            label="Description"
-            htmlFor="description"
-            hint="A few sentences the agent can use to describe the property."
-            className="sm:col-span-2"
-          >
+          <FormField label="Description" htmlFor="description" className="sm:col-span-2">
             <Textarea
               id="description"
               rows={3}
@@ -60,13 +51,11 @@ export function PropertySettings({ profile, onChange }: Props) {
       </Section>
 
       <Section title="Weather">
-        <p className="text-xs text-muted-foreground">
-          Where the forecast behind suggested rates is for. Leave empty for no forecast.
-        </p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField label="Latitude" htmlFor="latitude" hint="e.g. 37.65">
+          <FormField label="Latitude" htmlFor="latitude">
             <Input
               id="latitude"
+              placeholder="37.65"
               type="number"
               step="0.01"
               min={-90}
@@ -75,9 +64,10 @@ export function PropertySettings({ profile, onChange }: Props) {
               onChange={(e) => setCoordinate('latitude', e.target.value)}
             />
           </FormField>
-          <FormField label="Longitude" htmlFor="longitude" hint="e.g. -118.97">
+          <FormField label="Longitude" htmlFor="longitude">
             <Input
               id="longitude"
+              placeholder="-118.97"
               type="number"
               step="0.01"
               min={-180}
@@ -91,11 +81,7 @@ export function PropertySettings({ profile, onChange }: Props) {
 
       <Section title="Country and language">
         <div className="grid gap-4 sm:grid-cols-2">
-          <FormField
-            label="Country"
-            htmlFor="country"
-            hint="Sets the guest-book rules: in the US the guest who booked shows an ID; elsewhere everyone in the room is recorded."
-          >
+          <FormField label="Country" htmlFor="country">
             <NativeSelect
               id="country"
               value={profile.country}
@@ -108,11 +94,7 @@ export function PropertySettings({ profile, onChange }: Props) {
               ))}
             </NativeSelect>
           </FormField>
-          <FormField
-            label="Working language"
-            htmlFor="language"
-            hint="New staff and guests start with it."
-          >
+          <FormField label="Working language" htmlFor="language">
             <NativeSelect
               id="language"
               value={profile.language}

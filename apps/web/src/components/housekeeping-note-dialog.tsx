@@ -4,13 +4,7 @@ import { type FormEvent, useState } from 'react';
 import { ErrorNotice } from '@/components/error-notice';
 import { StatusDot } from '@/components/status-dot';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
 import { useHousekeepingNote } from '@/lib/api';
@@ -48,13 +42,9 @@ export function HousekeepingNoteDialog({
         if (!next) reset();
       }}
     >
-      <DialogContent className="gap-5 shadow-floating sm:max-w-md">
+      <DialogContent aria-describedby={undefined} className="gap-5 shadow-floating sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Housekeeping note</DialogTitle>
-          <DialogDescription>
-            Say or type what you did, e.g. “104 is done, the bedside lamp is broken.” Orbit updates
-            the rooms and creates tasks.
-          </DialogDescription>
         </DialogHeader>
 
         {note.data ? (

@@ -41,7 +41,7 @@ export function UserCard() {
       <DropdownMenuContent side="top" align="start" className="w-64">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-            Sign in as (demo, no password)
+            Switch user
           </DropdownMenuLabel>
           {others.map((member) => (
             <DropdownMenuItem key={member.id} onSelect={() => signInAs(member.id)}>

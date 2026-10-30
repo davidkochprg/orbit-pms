@@ -80,7 +80,10 @@ export function BookingEditorProvider({ children }: { children: ReactNode }) {
     <BookingEditorContext.Provider value={value}>
       {children}
       <Dialog open={state !== null} onOpenChange={(open) => !open && close()}>
-        <DialogContent className="flex max-h-[calc(100svh-2rem)] flex-col gap-0 p-0 shadow-floating sm:max-w-2xl">
+        <DialogContent
+          {...(state?.mode === 'new' && { 'aria-describedby': undefined })}
+          className="flex max-h-[calc(100svh-2rem)] flex-col gap-0 p-0 shadow-floating sm:max-w-2xl"
+        >
           {state?.mode === 'new' && (
             <NewBooking key={session} prefill={state.prefill} onDone={close} />
           )}
@@ -134,7 +137,6 @@ function NewBookingForm({ initial, onDone }: { initial: BookingForm; onDone: () 
   return (
     <EditorShell
       title="New booking"
-      description="Pick the stay and a free room. Holds lapse unless confirmed; phone and walk-in bookings can be confirmed right away."
       onSubmit={submit}
       footer={
         <>
@@ -275,7 +277,7 @@ function EditorShell({
   children,
 }: {
   title: string;
-  description: string;
+  description?: string;
   onSubmit: (e: FormEvent) => void;
   footer: ReactNode;
   error: string | undefined;
@@ -285,7 +287,7 @@ function EditorShell({
     <form onSubmit={onSubmit} className="flex min-h-0 flex-col">
       <DialogHeader className="border-b p-5">
         <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
+        {description && <DialogDescription>{description}</DialogDescription>}
       </DialogHeader>
       <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5">
         {children}
@@ -483,9 +485,7 @@ function RoomPicker({
           {loading ? 'Finding free rooms…' : 'Enter the stay to see free rooms.'}
         </p>
       ) : options.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No room is free for this stay and party. Try other dates or fewer guests.
-        </p>
+        <p className="text-sm text-muted-foreground">No free rooms for this stay.</p>
       ) : (
         <div
           role="radiogroup"
@@ -637,7 +637,7 @@ function GuestFields({
               onChange={(e) => onChange({ ...guest, name: e.target.value })}
             />
           </FormField>
-          <FormField label="Language" htmlFor="be-guest-language" hint="Replies are drafted in it.">
+          <FormField label="Language" htmlFor="be-guest-language">
             <NativeSelect
               id="be-guest-language"
               value={guest.language}

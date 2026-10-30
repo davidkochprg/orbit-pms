@@ -179,12 +179,7 @@ export function InboxPage() {
           ) : id ? (
             <Conversation key={id} id={id} />
           ) : (
-            <EmptyState
-              icon={Inbox}
-              title="No conversation selected"
-              description="Pick one to read and answer it."
-              className="h-full"
-            />
+            <EmptyState icon={Inbox} title="No conversation selected" className="h-full" />
           )}
         </section>
       </div>

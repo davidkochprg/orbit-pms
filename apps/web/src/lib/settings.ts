@@ -15,24 +15,18 @@ export function isSettingsSection(value: string | undefined): value is SettingsS
   return settingsSections.some((s) => s.id === value);
 }
 
-/** What each kind of entry is for, shown above its list. */
-export const entryHints: Record<
-  HotelInfoCategory,
-  { title: string; hint: string; example: string }
-> = {
+/** The heading and title placeholder for each kind of entry. */
+export const entryHints: Record<HotelInfoCategory, { title: string; example: string }> = {
   policy: {
     title: 'Policies',
-    hint: 'House rules guests should know before they book: pets, children, cancellation, payment, quiet hours.',
     example: 'e.g. Quiet hours',
   },
   amenity: {
     title: 'Amenities',
-    hint: 'Facilities and services, with opening hours and how to book them.',
     example: 'e.g. Sauna',
   },
   info: {
     title: 'Guest info',
-    hint: 'Everything else guests ask about: directions, reception hours, what is nearby.',
     example: 'e.g. Getting here',
   },
 };

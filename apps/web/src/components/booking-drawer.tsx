@@ -22,7 +22,6 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -401,12 +400,9 @@ function GuestsTab({ detail }: { detail: BookingDetail }) {
   const editable = booking.status !== 'cancelled';
   return (
     <>
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-sm text-muted-foreground">
-          {book.data ? guestBookProgress(book.data) : 'Loading the guest book…'}
-        </p>
-        <p className="text-xs text-subtle-foreground">Click a value to edit it.</p>
-      </div>
+      <p className="text-sm text-muted-foreground">
+        {book.data ? guestBookProgress(book.data) : 'Loading the guest book…'}
+      </p>
       <BookingGuests bookingId={booking.id} editable={editable} />
     </>
   );
@@ -505,7 +501,11 @@ function CheckOutDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="shadow-floating sm:max-w-sm" showCloseButton={paying}>
+      <DialogContent
+        {...(!paying && { 'aria-describedby': undefined })}
+        className="shadow-floating sm:max-w-sm"
+        showCloseButton={paying}
+      >
         {paying ? (
           <PaymentForm
             bookingId={bookingId}
@@ -517,10 +517,6 @@ function CheckOutDialog({
           <>
             <DialogHeader>
               <DialogTitle>{formatMoney(balance)} is still due</DialogTitle>
-              <DialogDescription>
-                Take the payment and check the guest out, or check out now and settle the bill
-                later.
-              </DialogDescription>
             </DialogHeader>
             <DialogFooter>
               <Button variant="ghost" onClick={onCheckOut}>

@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -26,7 +25,6 @@ function Shell({
   open,
   onOpenChange,
   title,
-  description,
   onSubmit,
   error,
   submit,
@@ -34,7 +32,6 @@ function Shell({
   children,
 }: DialogProps & {
   title: string;
-  description: string;
   onSubmit: (e: FormEvent) => void;
   error: string | undefined;
   submit: string;
@@ -43,11 +40,10 @@ function Shell({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="shadow-floating sm:max-w-lg">
+      <DialogContent aria-describedby={undefined} className="shadow-floating sm:max-w-lg">
         <form onSubmit={onSubmit} className="flex flex-col gap-4">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
-            <DialogDescription>{description}</DialogDescription>
           </DialogHeader>
           {children}
           {error && <ErrorNotice message={error} />}
@@ -118,7 +114,6 @@ export function IncomingDialog({ open, onOpenChange }: DialogProps) {
       open={open}
       onOpenChange={onOpenChange}
       title="Add a guest message"
-      description="Paste a guest's email, or a message as an OTA would pass it on."
       onSubmit={onSubmit}
       error={create.error?.message}
       submit="Add to inbox"
@@ -168,7 +163,6 @@ export function ReceiveDialog({ id, open, onOpenChange }: DialogProps & { id: st
       open={open}
       onOpenChange={onOpenChange}
       title="Add the guest's reply"
-      description="Their next message joins this conversation and marks it unread."
       onSubmit={(e) => {
         e.preventDefault();
         receive.mutate(body, {

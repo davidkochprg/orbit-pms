@@ -510,12 +510,6 @@ function AgentView({
             The agent is not configured on this server. Set the Meta API variables to use it.
           </p>
         )}
-        {aiOn && chat.messages.length === 0 && (
-          <p className="text-muted-foreground">
-            Ask about arrivals, availability or prices, or tell Orbit what to change. Changes wait
-            for your confirmation.
-          </p>
-        )}
         <AgentThread
           messages={chat.messages}
           status={chat.status}

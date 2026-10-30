@@ -8,7 +8,6 @@ import {
 } from '@orbit/shared';
 import { Plus, Trash2 } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
-import { Link } from 'react-router';
 import { FormField } from '@/components/form-field';
 import { Section } from '@/components/section';
 import { Segmented } from '@/components/segmented';
@@ -35,21 +34,7 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
 
   return (
     <div className="flex flex-col gap-8">
-      <p className="max-w-prose text-sm text-muted-foreground">
-        Every quote, in the app and from the agent, is computed from these rates. New quotes use
-        them as soon as you save; existing bookings keep their price. Base prices per room type are
-        under{' '}
-        <Link to="/rooms" className="text-foreground underline underline-offset-2">
-          Rooms
-        </Link>
-        .
-      </p>
-
       <Section title="Currency and taxes">
-        <Hint>
-          How prices are stated. In the US, rates are per room and taxes go on top of them; in
-          Europe, prices usually include VAT. Changing the currency doesn&apos;t convert any amount.
-        </Hint>
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Currency" htmlFor="currency">
             <NativeSelect
@@ -93,19 +78,15 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
           </div>
           {(
             [
-              [
-                'reduced',
-                'Lodging tax',
-                'Accommodation and extra beds, e.g. an occupancy tax or reduced VAT.',
-              ],
-              ['standard', 'Other tax', 'Most extras, e.g. a sales tax or standard VAT.'],
-            ] as [Exclude<VatBracket, 'none'>, string, string][]
-          ).map(([bracket, title, hint]) => (
-            <FormField key={bracket} label={title} htmlFor={`tax-${bracket}`} hint={hint}>
+              ['reduced', 'Tax on rooms and extra beds'],
+              ['standard', 'Tax on other extras'],
+            ] as [Exclude<VatBracket, 'none'>, string][]
+          ).map(([bracket, title]) => (
+            <FormField key={bracket} label={title} htmlFor={`tax-${bracket}`}>
               <div className="grid grid-cols-[1fr_7.5rem] gap-2">
                 <Input
                   id={`tax-${bracket}`}
-                  aria-label={`${title} name`}
+                  aria-label={`${title}, name`}
                   value={pricing.tax[bracket].label}
                   disabled={readOnly}
                   onChange={(e) =>
@@ -116,7 +97,7 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
                   }
                 />
                 <NumberInput
-                  aria-label={`${title} rate`}
+                  aria-label={`${title}, rate`}
                   min={0}
                   max={50}
                   step={0.01}
@@ -151,15 +132,11 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
           )
         }
       >
-        <Hint>
-          A surcharge on the base price for nights from the first to the last day, both included. A
-          season may wrap the new year (12-20 to 03-15). The first matching season wins.
-        </Hint>
         <Rows
           header={['Name', 'First night', 'Last night', 'Surcharge %']}
           columns="sm:grid-cols-[1fr_7rem_7rem_7rem_2rem]"
           headerOnMobile={false}
-          empty="No seasons: every night is at the base price."
+          empty="No seasons"
         >
           {pricing.seasons.map((season, i) => (
             <Row
@@ -232,14 +209,10 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
             )
           }
         >
-          <Hint>
-            Off the adult rate, for each child up to and including the age. List the youngest tier
-            first; older children pay the adult rate.
-          </Hint>
           <Rows
             header={['Up to age', 'Discount %']}
             columns="grid-cols-[1fr_1fr_2rem] sm:grid-cols-[7rem_7rem_2rem]"
-            empty="No child discounts: children pay the adult rate."
+            empty="No child discounts"
           >
             {pricing.childDiscounts.map((tier, i) => (
               <Row
@@ -300,14 +273,10 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
           )
         }
       >
-        <Hint>
-          Off accommodation, after child discounts. A stay gets the tier with the most nights it
-          reaches. Add-ons are not discounted.
-        </Hint>
         <Rows
           header={['From nights', 'Discount %']}
           columns="grid-cols-[1fr_1fr_2rem] sm:grid-cols-[7rem_7rem_2rem]"
-          empty="No long-stay discounts."
+          empty="No long-stay discounts"
         >
           {pricing.longStay.map((tier, i) => (
             <Row
@@ -345,7 +314,6 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
       </Section>
 
       <Section title="Add-ons">
-        <Hint>Whole {pricing.currency}, per night of the stay.</Hint>
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Wellness, per guest per night" htmlFor="wellness-price">
             <NumberInput
@@ -358,11 +326,7 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
               }
             />
           </FormField>
-          <FormField
-            label="Wellness from age"
-            htmlFor="wellness-age"
-            hint="Younger children use it for free."
-          >
+          <FormField label="Wellness from age" htmlFor="wellness-age">
             <NumberInput
               id="wellness-age"
               min={0}
@@ -393,10 +357,6 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
       </Section>
 
       <Section title={pricing.cityTax.label}>
-        <Hint>
-          A local tax or fee per paying guest per night, added to each bill rather than to the
-          quoted price. Adults always pay it. Set it to 0 if there is none.
-        </Hint>
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Name on the bill" htmlFor="city-tax-label" className="sm:col-span-2">
             <Input
@@ -417,11 +377,7 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
               }
             />
           </FormField>
-          <FormField
-            label="Children pay from age"
-            htmlFor="city-tax-age"
-            hint="18 means children don't pay."
-          >
+          <FormField label="Children pay from age" htmlFor="city-tax-age">
             <NumberInput
               id="city-tax-age"
               min={0}
@@ -434,10 +390,6 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
       </Section>
     </div>
   );
-}
-
-function Hint({ children }: { children: ReactNode }) {
-  return <p className="-mt-1 max-w-prose text-sm text-muted-foreground">{children}</p>;
 }
 
 /** A list of editable rows with column headers on wider screens. */

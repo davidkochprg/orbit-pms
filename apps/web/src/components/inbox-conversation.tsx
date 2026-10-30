@@ -136,7 +136,6 @@ export function Conversation({ id }: { id: string }) {
       {offerPrepare && (
         <Prepare
           reading={reading.isPending}
-          forBooking={m.bookingId !== null}
           onPrepare={prepare}
           onWrite={writing ? undefined : () => setWriting(true)}
         />
@@ -180,25 +179,19 @@ function useHeldRoomName(bookingId: string | null): string | null {
   return held?.booking.status === 'hold' ? held.room.name : null;
 }
 
-/** Before Orbit has read the latest message: what preparing does, and the button. */
+/** Before Orbit has read the latest message: the buttons to draft a reply or write one. */
 function Prepare({
   reading,
-  forBooking,
   onPrepare,
   onWrite,
 }: {
   reading: boolean;
-  /** The conversation is about a booking the guest already has. */
-  forBooking: boolean;
   onPrepare: () => void;
   /** Opens the reply box without Orbit; absent once it is open. */
   onWrite?: () => void;
 }) {
   return (
-    <section
-      aria-label="Prepare a reply"
-      className="flex flex-wrap items-center gap-3 rounded-stage bg-background p-4 shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit"
-    >
+    <section aria-label="Prepare a reply" className="flex min-h-8 items-center justify-end gap-1.5">
       {reading ? (
         <p role="status" className="flex items-center gap-3 text-sm text-muted-foreground">
           <ThinkingOrb state="searching" size={20} aria-hidden />
@@ -206,22 +199,14 @@ function Prepare({
         </p>
       ) : (
         <>
-          {/* Wide enough to read; narrower, the buttons go below it. */}
-          <p className="min-w-56 flex-1 text-sm text-muted-foreground">
-            {forBooking
-              ? 'Orbit reads the message and drafts the reply, with the booking in mind.'
-              : 'Orbit reads the message and drafts the reply. If the guest asks for a stay, you see the free rooms with their prices first; hold one and the reply says so.'}
-          </p>
-          <span className="flex shrink-0 items-center gap-1.5">
-            {onWrite && (
-              <Button variant="ghost" size="sm" onClick={onWrite}>
-                Write it yourself
-              </Button>
-            )}
-            <Button size="sm" onClick={onPrepare}>
-              <PenLine /> Prepare reply
+          {onWrite && (
+            <Button variant="ghost" size="sm" onClick={onWrite}>
+              Write it yourself
             </Button>
-          </span>
+          )}
+          <Button size="sm" onClick={onPrepare}>
+            <PenLine /> Prepare reply
+          </Button>
         </>
       )}
     </section>
@@ -491,18 +476,7 @@ function Options({
   const rows = heldFirst(options, held.data);
 
   return (
-    <Panel
-      title="Rooms for this stay"
-      count={rows.length}
-      actions={
-        canHold && (
-          <span className="text-xs text-muted-foreground">
-            {booking ? 'The reply tells the guest about the held room' : 'Hold one to offer it'}
-          </span>
-        )
-      }
-      contentClassName="p-0"
-    >
+    <Panel title="Rooms for this stay" count={rows.length} contentClassName="p-0">
       {note && <p className="border-b px-3 py-2 text-sm text-muted-foreground">{note}</p>}
       <ul className="flex flex-col">
         {rows.map((o) => {

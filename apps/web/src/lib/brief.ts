@@ -10,7 +10,7 @@ export interface AttentionItem {
   id: string;
   kind: AttentionKind;
   title: string;
-  detail: string;
+  detail?: string;
   /**
    * `?booking=` opens the booking inspector on the current page; `items` opens into the rows it
    * stands for, when several of one kind would crowd the list.
@@ -117,7 +117,6 @@ export function attentionItems(brief: DailyBrief): AttentionItem[] {
       id: 'messages',
       kind: 'messages',
       title: `${plural(brief.unansweredMessages, 'message')} waiting for a reply`,
-      detail: 'Orbit drafts a reply when you ask, in the guest’s language',
       target: { path: '/inbox' },
     });
   }
@@ -126,7 +125,6 @@ export function attentionItems(brief: DailyBrief): AttentionItem[] {
       id: `ooo:${r.roomId}`,
       kind: 'out_of_order',
       title: `Room ${r.roomName} is out of order`,
-      detail: 'Not offered to guests until repaired and cleaned',
       target: { path: '/housekeeping' },
     });
   }

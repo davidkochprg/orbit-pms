@@ -86,6 +86,7 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
       {aiOn && (
         <Panel
           title="Summary"
+          bare={!brief.data && !brief.isError}
           actions={
             <Button
               variant="ghost"
@@ -103,11 +104,7 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
             <p className="max-w-3xl px-3 py-2.5 text-[0.8125rem] leading-relaxed">
               {brief.data.text}
             </p>
-          ) : (
-            <p className="px-3 py-2.5 text-xs text-muted-foreground">
-              A few sentences on the coming nights: where to raise or lower rates, and why.
-            </p>
-          )}
+          ) : null}
         </Panel>
       )}
 

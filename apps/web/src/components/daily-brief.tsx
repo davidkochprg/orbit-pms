@@ -130,7 +130,9 @@ function AttentionRow({
       </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate">{item.title}</span>
-        <span className="truncate text-xs text-muted-foreground">{item.detail}</span>
+        {item.detail && (
+          <span className="truncate text-xs text-muted-foreground">{item.detail}</span>
+        )}
       </span>
       <ChevronRight className="size-4 shrink-0 text-subtle-foreground opacity-0 transition-[opacity,transform] duration-150 ease-snap group-hover:translate-x-0.5 group-hover:opacity-100 group-focus-visible:opacity-100" />
     </>

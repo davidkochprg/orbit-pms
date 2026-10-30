@@ -34,7 +34,6 @@ function ErrorBody() {
       <EmptyState
         icon={CircleAlert}
         title="This page hit an error"
-        description="Try reloading. If it keeps happening, go back to Today and try again from there."
         action={
           <div className="flex gap-2">
             <Button size="sm" onClick={() => window.location.reload()}>

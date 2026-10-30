@@ -16,7 +16,7 @@ interface Props {
 
 /** The policies, amenities or guest info entries, each a title and a few sentences. */
 export function EntrySettings({ category, profile, onChange, readOnly }: Props) {
-  const { title, hint, example } = entryHints[category];
+  const { title, example } = entryHints[category];
   const entries = profile.entries.filter((e) => e.category === category);
 
   const update = (id: string, patch: Partial<HotelInfoEntry>) =>
@@ -41,17 +41,8 @@ export function EntrySettings({ category, profile, onChange, readOnly }: Props) 
         )
       }
     >
-      <p className="-mt-1 max-w-prose text-sm text-muted-foreground">
-        {hint} The agent answers guests and drafts replies from these. Room prices come from the
-        pricing rules, not from here.
-      </p>
       {entries.length === 0 ? (
-        <EmptyState
-          icon={BookOpenText}
-          title={`No ${title.toLowerCase()} yet`}
-          description="Until you add some, the agent will say it does not know."
-          className="py-8"
-        />
+        <EmptyState icon={BookOpenText} title={`No ${title.toLowerCase()} yet`} className="py-8" />
       ) : (
         <ul className="mt-2 flex flex-col gap-3">
           {entries.map((entry) => (
