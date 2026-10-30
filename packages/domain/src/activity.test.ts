@@ -110,4 +110,24 @@ describe('createActivityService', () => {
       'folio.charge',
     ]);
   });
+
+  it('lists the changes to one booking, guest, room or conversation', async () => {
+    const repos = createMemoryRepositories({ ...lookup, staff: [manager] });
+    await repos.audit.append({
+      actor: 'user',
+      action: 'booking.confirm',
+      subjectId: 'bk_1',
+      payload: null,
+    });
+    await repos.audit.append({
+      actor: 'user',
+      action: 'room.status',
+      subjectId: 'rm_1',
+      payload: null,
+    });
+    const service = createActivityService({ repos });
+    expect((await service.list({ subjectId: 'rm_1', limit: 10 })).map((i) => i.action)).toEqual([
+      'room.status',
+    ]);
+  });
 });

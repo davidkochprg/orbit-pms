@@ -2,6 +2,7 @@ import type {
   AuditActor,
   Booking,
   ComposeBody,
+  BookingPatch,
   CreateHoldInput,
   InboxMessage,
   Inquiry,
@@ -91,6 +92,59 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
     };
     await r.inquiries.updateInquiry(updated);
     return updated;
+  }
+
+  /**
+   * How a processed booking request becomes a hold in the chosen room. Reuses a guest with the
+   * same email address, otherwise creates one from the sender. If the message already has a hold,
+   * it moves to the chosen room and is quoted there (`switchHold`).
+   */
+  async function holdPlan(
+    id: string,
+    roomId: string,
+  ): Promise<{ switch: string; patch: BookingPatch } | { input: CreateHoldInput }> {
+    const inquiry = await load(repos, id);
+    const analysis = inquiry.parsed;
+    const stay = analysis && stayRequest(analysis);
+    if (!analysis || !stay) {
+      throw new DomainError('invalid_transition', 'This message has no complete stay request');
+    }
+    // Holding another offered room moves the message's hold there, while it is still a hold.
+    if (inquiry.bookingId) {
+      const held = await repos.bookings.getBooking(inquiry.bookingId);
+      if (held?.status !== 'hold') {
+        throw new DomainError(
+          'conflict',
+          `This message already led to a booking (${inquiry.bookingId})`,
+        );
+      }
+      return {
+        switch: held.id,
+        patch: { roomId, ...stay, addons: addonsForWishes(analysis.wishes) },
+      };
+    }
+    const email = inquiry.senderAddress && normalizeText(inquiry.senderAddress);
+    const existing = email
+      ? (await repos.guests.listGuests()).find((g) => g.email && normalizeText(g.email) === email)
+      : undefined;
+    return {
+      input: {
+        guest: existing
+          ? { guestId: existing.id }
+          : {
+              name: inquiry.senderName ?? analysis.guestName ?? 'Guest',
+              email: inquiry.senderAddress,
+              phone: null,
+              language: analysis.language,
+            },
+        roomId,
+        ...stay,
+        addons: addonsForWishes(analysis.wishes),
+        source: bookingSourceFor(inquiry),
+        notes: analysis.question,
+        inquiryId: inquiry.id,
+      },
+    };
   }
 
   return {
@@ -282,54 +336,24 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
       return updated;
     },
 
-    /**
-     * Turns a processed booking request into a hold in the chosen room. Reuses a guest with the
-     * same email address, otherwise creates one from the sender. If the message already has a
-     * hold, it moves to the chosen room and is quoted there (`switchHold`).
-     */
+    /** Turns a processed booking request into a hold in the chosen room (`holdPlan`). */
     async createHold(id: string, roomId: string, actor: AuditActor): Promise<Booking> {
-      const inquiry = await load(repos, id);
-      const analysis = inquiry.parsed;
-      const stay = analysis && stayRequest(analysis);
-      if (!analysis || !stay) {
-        throw new DomainError('invalid_transition', 'This message has no complete stay request');
-      }
-      // Holding another offered room moves the message's hold there, while it is still a hold.
-      if (inquiry.bookingId) {
-        const held = await repos.bookings.getBooking(inquiry.bookingId);
-        if (held?.status !== 'hold') {
-          throw new DomainError(
-            'conflict',
-            `This message already led to a booking (${inquiry.bookingId})`,
-          );
-        }
-        return hotel.switchHold(
-          held.id,
-          { roomId, ...stay, addons: addonsForWishes(analysis.wishes) },
-          actor,
-        );
-      }
-      const email = inquiry.senderAddress && normalizeText(inquiry.senderAddress);
-      const existing = email
-        ? (await repos.guests.listGuests()).find((g) => g.email && normalizeText(g.email) === email)
-        : undefined;
-      const input: CreateHoldInput = {
-        guest: existing
-          ? { guestId: existing.id }
-          : {
-              name: inquiry.senderName ?? analysis.guestName ?? 'Guest',
-              email: inquiry.senderAddress,
-              phone: null,
-              language: analysis.language,
-            },
-        roomId,
-        ...stay,
-        addons: addonsForWishes(analysis.wishes),
-        source: bookingSourceFor(inquiry),
-        notes: analysis.question,
-        inquiryId: inquiry.id,
-      };
-      return hotel.createHold(input, actor);
+      const plan = await holdPlan(id, roomId);
+      return 'switch' in plan
+        ? hotel.switchHold(plan.switch, plan.patch, actor)
+        : hotel.createHold(plan.input, actor);
+    },
+
+    /** The hold `createHold` would make or move, with its room and the guest it is for. */
+    async previewHold(id: string, roomId: string) {
+      const plan = await holdPlan(id, roomId);
+      const { booking, room, newGuest } =
+        'switch' in plan
+          ? await hotel.previewSwitchHold(plan.switch, plan.patch)
+          : await hotel.previewHold(plan.input);
+      const guestName =
+        newGuest?.name ?? (await repos.guests.getGuest(booking.guestId))?.name ?? 'Guest';
+      return { booking, room, guestName, moved: 'switch' in plan };
     },
 
     /** Marks a message as not leading to a booking, e.g. spam or a request that can't be met. */

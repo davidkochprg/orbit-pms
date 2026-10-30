@@ -62,7 +62,7 @@ Pure functions in `packages/domain/src/bookings.ts`, wrapped by `createHotelServ
 
 `createHold(input, actor)` creates a `hold` for an existing guest (`guestId`) or a new guest record, priced with `quote()` and stored add-ons. Rules: valid dates, check-in not in the past, room not out of order, party fits, room free. The hold expires after `hotelPolicy.holdHours` (placeholder: 48).
 
-Every mutation also has a `preview*` variant that runs the same rules against current data without saving. `createPendingActionService` uses these to validate agent proposals, store them as pending actions, and execute them only on confirmation. See [ai.md](ai.md#approval-pattern).
+Every mutation also has a `preview*` variant that runs the same rules against current data without saving. `createPendingActionService` uses these to validate agent proposals, store them as pending actions, and execute them only on confirmation, as the staff member who confirmed (`confirm(id, by)`): a reply sent from a conversation is signed with their name, and manager-only changes (local events, rooms) check that they are a manager. Proposals also cover the inbox (send a reply, hold a room for a request through `inbox.previewHold`, decline), deleting a Knowledge note by title, local events and room details. See [ai.md](ai.md#approval-pattern).
 
 `searchBookings` matches guest names ignoring case and accents (`novak` finds `Novák`).
 

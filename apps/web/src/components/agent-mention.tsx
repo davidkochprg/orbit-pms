@@ -1,4 +1,4 @@
-import { BrushCleaning, CalendarPlus, CalendarRange } from 'lucide-react';
+import { BrushCleaning, CalendarPlus, CalendarRange, Mail } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
 import { BookingContextMenu } from '@/components/booking-menu';
@@ -17,11 +17,13 @@ import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import {
   type BookingEntity,
+  type ConversationEntity,
   entityKind,
   type GuestEntity,
   type RoomEntity,
 } from '@/lib/agent-answer';
-import { useBookingDetail, useRooms, useRoomTypes } from '@/lib/api';
+import { useBookingDetail, useInquiry, useRooms, useRoomTypes } from '@/lib/api';
+import { senderLabel } from '@/lib/inbox';
 import { formatParty, formatRange, statusLabels } from '@/lib/format';
 import { bookingStatusColor, roomStatusColor, roomStatusLabels } from '@/lib/status';
 import { cn } from '@/lib/utils';
@@ -167,7 +169,29 @@ function GuestChip({ id }: { id: string }) {
   );
 }
 
-/** A booking, room or guest the agent mentioned, as a chip that opens it. */
+function ConversationChip({ id }: { id: string }) {
+  const known = useAgentEntity(id) as ConversationEntity | undefined;
+  // Mentioned from the page's context rather than a tool result: read who it is with.
+  const fetched = useInquiry(known?.name ? undefined : id).data;
+  const name = known?.name ?? (fetched && senderLabel(fetched));
+  const navigate = useNavigate();
+  const { closePalette } = useCommandPalette();
+  return (
+    <button
+      type="button"
+      onClick={() => {
+        closePalette();
+        void navigate(`/inbox/${encodeURIComponent(id)}`);
+      }}
+      className={cn(chip, 'pl-1.5')}
+    >
+      <Mail className="size-3.5 text-muted-foreground" />
+      <span className="truncate">{name ?? 'Conversation'}</span>
+    </button>
+  );
+}
+
+/** A booking, room, guest or conversation the agent mentioned, as a chip that opens it. */
 export function Mention({ id }: { id: string }) {
   switch (entityKind(id)) {
     case 'booking':
@@ -176,6 +200,8 @@ export function Mention({ id }: { id: string }) {
       return <RoomChip id={id} />;
     case 'guest':
       return <GuestChip id={id} />;
+    case 'conversation':
+      return <ConversationChip id={id} />;
     default:
       return <span className="font-mono text-xs">{id}</span>;
   }

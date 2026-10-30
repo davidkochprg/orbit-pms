@@ -255,7 +255,13 @@ export function createRatesService({ repos, defaults, newId }: RatesDeps) {
       });
     },
 
-    async updateRoom(id: string, body: RoomBody, by: StaffMember | null): Promise<Room> {
+    /** Renames a room or changes its type, kind or floor; managers only. */
+    async updateRoom(
+      id: string,
+      body: RoomBody,
+      by: StaffMember | null,
+      actor: AuditActor = 'user',
+    ): Promise<Room> {
       assertManager(by);
       return repos.transaction(async (tx) => {
         const current = await tx.rooms.getRoom(id);
@@ -269,7 +275,7 @@ export function createRatesService({ repos, defaults, newId }: RatesDeps) {
         if (changed.length === 0) return current;
         await tx.rooms.updateRoom(updated);
         await tx.audit.append({
-          actor: 'user',
+          actor,
           action: 'room.update',
           subjectId: id,
           payload: { by: by.id, changed },

@@ -64,6 +64,11 @@ export function currentEntries(profile: HotelProfile, today: IsoDate): HotelProf
   return { ...profile, entries: profile.entries.filter((e) => !e.until || e.until >= today) };
 }
 
+/** Notices whose last day has passed: no longer told to guests, but still in Knowledge. */
+export function endedEntries(profile: HotelProfile, today: IsoDate): HotelInfoEntry[] {
+  return profile.entries.filter((e) => e.until && e.until < today);
+}
+
 /** Who wrote an entry and when, kept on it for Knowledge to show. */
 export interface EntryStamp {
   source: HotelInfoSource;
@@ -272,6 +277,32 @@ export function createSettingsService({ repos, clock = () => new Date() }: Setti
           },
         });
         return entry;
+      });
+    },
+
+    /** The note called `title`, which `removeHotelInfo` would delete. */
+    async previewRemoveHotelInfo(title: string): Promise<HotelInfoEntry> {
+      const entry = (await getProfile()).entries.find((e) => sameNoteTitle(e.title, title));
+      if (!entry) throw new DomainError('not_found', `There is no note called "${title}"`);
+      return entry;
+    },
+
+    /** Deletes the note called `title`, as staff confirm it from the agent. */
+    async removeHotelInfo(title: string, actor: AuditActor): Promise<void> {
+      await repos.transaction(async (tx) => {
+        const before = (await tx.settings.getProfile()) ?? emptyHotelProfile;
+        const entry = before.entries.find((e) => sameNoteTitle(e.title, title));
+        if (!entry) throw new DomainError('not_found', `There is no note called "${title}"`);
+        await tx.settings.saveProfile({
+          ...before,
+          entries: before.entries.filter((e) => e.id !== entry.id),
+        });
+        await tx.audit.append({
+          actor,
+          action: 'settings.entry_remove',
+          subjectId: entry.id,
+          payload: { title: entry.title, category: entry.category },
+        });
       });
     },
 

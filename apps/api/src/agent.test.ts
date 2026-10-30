@@ -158,6 +158,51 @@ describe('POST /api/agent', () => {
     expect((await post(app, `/api/pending-actions/${actionId}/confirm`)).status).toBe(409);
   });
 
+  it('runs a manager-only change only when a manager confirms it', async () => {
+    /** Asks a fresh agent to add a fair, and returns the proposal's ID. */
+    const propose = async () => {
+      const app = appWith(
+        scriptedModel([
+          {
+            tool: 'addLocalEvent',
+            input: {
+              name: 'Test Fair',
+              firstNight: '2026-11-10',
+              lastNight: '2026-11-11',
+              impact: 'high',
+            },
+          },
+          { text: 'Prepared; a manager has to confirm it.' },
+        ]),
+      );
+      const body = await (
+        await post(app, '/api/agent', { messages: [userMessage('Add the fair')] })
+      ).text();
+      return { app, id: /"pendingActionId":"(act_[^"]+)"/.exec(body)?.[1] };
+    };
+    const confirmAs = (
+      app: ReturnType<typeof createApp>,
+      id: string | undefined,
+      staffId: string,
+    ) =>
+      app.request(`/api/pending-actions/${id}/confirm`, {
+        method: 'POST',
+        headers: { 'x-staff-id': staffId },
+      });
+
+    const receptionist = seed.staff.find((s) => s.active && s.role === 'receptionist')!;
+    const first = await propose();
+    const refused = await confirmAs(first.app, first.id, receptionist.id);
+    expect(refused.status).toBe(409);
+    expect(((await refused.json()) as PendingAction).error).toMatch(/manager/i);
+
+    const manager = seed.staff.find((s) => s.active && s.role === 'manager')!;
+    const second = await propose();
+    expect((await confirmAs(second.app, second.id, manager.id)).status).toBe(200);
+    const events = (await (await second.app.request('/api/events')).json()) as { name: string }[];
+    expect(events.map((e) => e.name)).toContain('Test Fair');
+  });
+
   it('tells the agent about the hotel as saved in Settings', async () => {
     await repos.settings.saveProfile({
       ...seed.hotelProfile,

@@ -93,8 +93,12 @@ export function describeActivity(entries: AuditLogEntry[], lookup: ActivityLooku
 /** The hotel-wide activity feed: every change by staff or the agent, newest first. */
 export function createActivityService({ repos }: { repos: Repositories }) {
   return {
-    async list({ actor, limit }: ActivityQuery): Promise<ActivityItem[]> {
-      const entries = await repos.audit.list({ limit, ...(actor && { actor }) });
+    async list({ actor, subjectId, limit }: ActivityQuery): Promise<ActivityItem[]> {
+      const entries = await repos.audit.list({
+        limit,
+        ...(actor && { actor }),
+        ...(subjectId && { subjectId }),
+      });
       const bookingIds = new Set<string>();
       for (const e of entries) {
         if (e.subjectId && subjectKindOf(e.action) === 'booking') bookingIds.add(e.subjectId);

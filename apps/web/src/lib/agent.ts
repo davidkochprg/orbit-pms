@@ -95,6 +95,21 @@ const toolLabels: Record<string, [running: string, done: string]> = {
   createHousekeepingTask: ['Creating the task', 'Created the task'],
   setTaskStatus: ['Updating the task', 'Updated the task'],
   saveHotelInfo: ['Preparing a Knowledge entry', 'Prepared a Knowledge entry'],
+  removeHotelInfo: ['Preparing to delete the note', 'Prepared to delete the note'],
+  getRateOutlook: ['Reading the rate outlook', 'Read the rate outlook'],
+  adjustRates: ['Preparing the rate change', 'Prepared the rate change'],
+  listConversations: ['Checking the inbox', 'Checked the inbox'],
+  getConversation: ['Reading the conversation', 'Read the conversation'],
+  draftReply: ['Drafting the reply', 'Drafted the reply'],
+  sendReply: ['Preparing the reply', 'Prepared the reply'],
+  holdFromConversation: ['Preparing a hold for the request', 'Prepared a hold for the request'],
+  declineConversation: ['Preparing to decline the request', 'Prepared to decline the request'],
+  getActivity: ['Checking the activity log', 'Checked the activity log'],
+  getGuest: ['Opening the guest profile', 'Opened the guest profile'],
+  getLocalEvents: ['Checking local events', 'Checked local events'],
+  addLocalEvent: ['Preparing the local event', 'Prepared the local event'],
+  removeLocalEvent: ['Preparing to remove the event', 'Prepared to remove the event'],
+  updateRoom: ['Preparing the room change', 'Prepared the room change'],
 };
 
 /** A plain-language line for a tool step, so staff see what the agent looked at. */
@@ -111,6 +126,7 @@ const orbStates: Record<string, AgentOrbState> = {
   quote: 'solving',
   getReport: 'solving',
   getBill: 'solving',
+  draftReply: 'composing',
   setRoomStatus: 'weaving',
   createHousekeepingTask: 'weaving',
   setTaskStatus: 'weaving',
@@ -142,6 +158,9 @@ export function toolResultSummary(toolName: string, output: unknown): string | n
       searchBookings: ['booking', 'bookings'],
       checkAvailability: ['room free', 'rooms free'],
       listRooms: ['room', 'rooms'],
+      listConversations: ['conversation', 'conversations'],
+      getActivity: ['change', 'changes'],
+      getLocalEvents: ['event', 'events'],
     };
     const [one, many] = noun[toolName] ?? ['result', 'results'];
     return output.length === 0 ? `No ${many}` : count(output.length, one, many);
@@ -179,6 +198,12 @@ export function toolResultSummary(toolName: string, output: unknown): string | n
       const occupancy = output.occupancy;
       return typeof occupancy === 'number' ? `${Math.round(occupancy * 100)}% occupancy` : null;
     }
+    case 'getGuest':
+      return Array.isArray(output.stays) ? count(output.stays.length, 'stay') : null;
+    case 'getConversation':
+      return Array.isArray(output.messages) ? count(output.messages.length, 'message') : null;
+    case 'draftReply':
+      return typeof output.draft === 'string' ? 'Draft ready' : null;
     case 'getHousekeeping':
       return Array.isArray(output.rooms) ? count(output.rooms.length, 'room') : null;
     case 'setRoomStatus':

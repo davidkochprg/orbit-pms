@@ -157,9 +157,9 @@ Takes `{ kind?: 'payment' | 'refund', method: 'cash' | 'card' | 'bank_transfer',
 
 `DailyBrief` for `date` (default: today): `occupancy` (`occupied`, `sellable`, `total` rooms tonight), `guestsTonight`, `arrivals` and `departures` counts, `turnovers`, `roomsToPrepare`, `holds` (`{ summary, expired }`), `outOfOrder`, `maintenance`, `unansweredMessages` and `gaps` (`{ roomId, roomName, from, to, nights }`). See [domain.md](domain.md#daily-brief).
 
-### `GET /api/activity?actor=&limit=`
+### `GET /api/activity?actor=&subjectId=&limit=`
 
-The hotel-wide audit log, newest first: `ActivityItem[]`, each an audit entry plus `subject` (`{ kind, id, label }` or `null`) and `byName` (the staff member who made the change, when recorded). `actor` is `user` or `agent`; `limit` 1–200, default 100. See [domain.md](domain.md#activity).
+The hotel-wide audit log, newest first: `ActivityItem[]`, each an audit entry plus `subject` (`{ kind, id, label }` or `null`) and `byName` (the staff member who made the change, when recorded). `actor` is `user` or `agent`; `subjectId` keeps only changes to one booking, guest, room or conversation; `limit` 1–200, default 100. See [domain.md](domain.md#activity).
 
 ### `GET /api/reports?from=&to=`
 
@@ -283,11 +283,11 @@ Body: `{ "messages": UIMessage[] }`, the chat so far in AI SDK UI message format
 
 ### `GET /api/pending-actions/:id`
 
-`PendingAction`: `id`, `kind` (`create_hold`, `confirm_booking`, `cancel_booking`, `check_in`, `check_out`, `move_booking`, `change_dates`, `update_booking`, `add_charge`, `record_payment`, `update_charge`, `remove_charge`, `add_stay_guest`, `update_stay_guest`, `remove_stay_guest`, `update_guest`), `input` (the stored arguments), `summary`, `details` (`changes`: `{ label, before, after }` where each side is `{ text }`, `{ checkIn, checkOut }` or null; `amount`: `{ label, before, after }` or null; `note`; null for actions proposed before details were recorded), `status` (`pending`, `confirmed`, `rejected`, `failed`), `bookingId`, `error`, `createdAt`, `resolvedAt`.
+`PendingAction`: `id`, `kind` (`create_hold`, `confirm_booking`, `cancel_booking`, `check_in`, `check_out`, `move_booking`, `change_dates`, `update_booking`, `add_charge`, `record_payment`, `update_charge`, `remove_charge`, `add_stay_guest`, `update_stay_guest`, `remove_stay_guest`, `update_guest`, `adjust_rates`, `save_hotel_info`, `remove_hotel_info`, `send_reply`, `hold_inquiry`, `decline_inquiry`, `add_local_event`, `remove_local_event`, `update_room`), `input` (the stored arguments), `summary`, `details` (`changes`: `{ label, before, after }` where each side is `{ text }`, `{ checkIn, checkOut }` or null; `amount`: `{ label, before, after }` or null; `note`; null for actions proposed before details were recorded), `status` (`pending`, `confirmed`, `rejected`, `failed`), `bookingId`, `error`, `createdAt`, `resolvedAt`.
 
 ### `POST /api/pending-actions/:id/confirm`
 
-Runs the stored action through the domain service as the `agent` actor and returns the resolved `PendingAction` (`bookingId` set to the booking created or changed). If the action is no longer valid, it comes back with `status: "failed"`, an `error`, and HTTP 409. Resolving an action twice returns 409 `invalid_transition`.
+Runs the stored action through the domain service as the `agent` actor, confirmed by the signed-in staff member (`x-staff-id`), and returns the resolved `PendingAction`. A reply is signed with their name; adding or removing a local event and changing a room fail (409, `failed`) unless they are an active manager. It returns `bookingId` set to the booking created or changed. If the action is no longer valid, it comes back with `status: "failed"`, an `error`, and HTTP 409. Resolving an action twice returns 409 `invalid_transition`.
 
 ### `POST /api/pending-actions/:id/reject`
 

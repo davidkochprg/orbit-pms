@@ -95,4 +95,25 @@ describe('buildSystemPrompt', () => {
     expect(b.startsWith(shared)).toBe(true);
     expect(a.endsWith('Today is 2026-10-27 (Europe/Prague).')).toBe(true);
   });
+
+  it('lists ended notices for staff only, with links as plain words', () => {
+    const withEnded = buildSystemPrompt({
+      hotel,
+      today: '2026-10-27',
+      timezone: 'Europe/Prague',
+      endedNotices: [
+        {
+          id: 'pool',
+          category: 'wellness',
+          title: 'Pool closed',
+          details: 'Repairs, use the [[Sauna]].',
+          until: '2026-10-20',
+        },
+      ],
+    });
+    expect(withEnded).toContain(
+      'Ended notices in Knowledge (never tell guests; staff may ask about them or to delete them):\n- Pool closed: Repairs, use the Sauna. (ended 2026-10-20)',
+    );
+    expect(a).not.toContain('Ended notices');
+  });
 });

@@ -1,11 +1,13 @@
 import { z } from 'zod';
 import { chargePatchSchema, newChargeBodySchema, newPaymentBodySchema } from './billing';
+import { replyProposalSchema } from './api';
 import { isoDateSchema } from './dates';
 import { hotelInfoProposalSchema } from './hotel';
 import { bookingPatchSchema, createHoldInputSchema, guestPatchSchema } from './operations';
 import { moneySchema } from './quote';
 import { newStayGuestBodySchema, stayGuestPatchSchema } from './registration';
-import { adjustRatesBodySchema } from './revenue';
+import { roomBodySchema } from './rates';
+import { adjustRatesBodySchema, localEventBodySchema } from './revenue';
 
 const stayGuestRef = z.object({ bookingId: z.string(), stayGuestId: z.string() });
 const chargeRef = z.object({ bookingId: z.string(), chargeId: z.string() });
@@ -57,6 +59,19 @@ export const pendingActionInputSchema = z.discriminatedUnion('kind', [
   }),
   z.object({ kind: z.literal('adjust_rates'), input: adjustRatesBodySchema }),
   z.object({ kind: z.literal('save_hotel_info'), input: hotelInfoProposalSchema }),
+  z.object({ kind: z.literal('remove_hotel_info'), input: z.object({ title: z.string() }) }),
+  z.object({ kind: z.literal('send_reply'), input: replyProposalSchema }),
+  z.object({
+    kind: z.literal('hold_inquiry'),
+    input: z.object({ inquiryId: z.string(), roomId: z.string() }),
+  }),
+  z.object({ kind: z.literal('decline_inquiry'), input: z.object({ inquiryId: z.string() }) }),
+  z.object({ kind: z.literal('add_local_event'), input: localEventBodySchema }),
+  z.object({ kind: z.literal('remove_local_event'), input: z.object({ eventId: z.string() }) }),
+  z.object({
+    kind: z.literal('update_room'),
+    input: roomBodySchema.partial().extend({ roomId: z.string() }),
+  }),
 ]);
 export type PendingActionInput = z.infer<typeof pendingActionInputSchema>;
 export type PendingActionKind = PendingActionInput['kind'];

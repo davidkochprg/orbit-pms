@@ -1,8 +1,10 @@
 import {
+  type ActivityService,
   type BillingService,
   DomainError,
   type HotelService,
   type HousekeepingService,
+  type InboxService,
   type PendingActionService,
   type RegistrationService,
   type ReportService,
@@ -12,17 +14,23 @@ import {
   type AgentRoomStatusResult,
   type AgentTaskCreatedResult,
   type AgentTaskStatusResult,
+  auditActorSchema,
+  type Booking,
   type BookingSummary,
   bookingPatchSchema,
   bookingSearchSchema,
   chargePatchSchema,
   createHoldInputSchema,
   currencySchema,
+  type Guest,
   type GuestBook,
   guestPatchSchema,
   type HousekeepingBoard,
   housekeepingTaskStatusSchema,
+  type Inquiry,
   isoDateSchema,
+  type LocalEvent,
+  localEventBodySchema,
   newChargeBodySchema,
   newPaymentBodySchema,
   newStayGuestBodySchema,
@@ -37,12 +45,15 @@ import {
   roomOptionSchema,
   roomOptionsQuerySchema,
   reportQuerySchema,
+  replyProposalSchema,
   reportSchema,
+  roomBodySchema,
   roomStatusSchema,
   stayGuestPatchSchema,
 } from '@orbit/shared';
 import { type JSONValue, tool } from 'ai';
 import { compactOutlook } from './outlook';
+import { amountsInText, checkDraftPrices } from './price-guard';
 import { z } from 'zod';
 
 export interface ToolDeps {
@@ -62,6 +73,20 @@ export interface ToolDeps {
   rateOutlook: (days: number) => Promise<RevenueOutlook>;
   /** Stays booked into a room that is out of order, with a free room for each. */
   relocations?: (roomId: string) => Promise<Relocation[]>;
+  /** Guest conversations by email and through OTAs. */
+  inbox: Pick<InboxService, 'list' | 'get'>;
+  /**
+   * Writes a conversation's reply draft with the hotel's rooms and exact prices, checked against
+   * the quotes; null when drafting is not configured.
+   */
+  draftReply: ((inquiryId: string) => Promise<Inquiry>) | null;
+  activity: Pick<ActivityService, 'list'>;
+  getGuest: (guestId: string) => Promise<Guest | null>;
+  /** Every booking of one guest. */
+  guestBookings: (guestId: string) => Promise<Booking[]>;
+  listEvents: () => Promise<LocalEvent[]>;
+  /** Amounts the hotel facts state, e.g. a fee, which a reply may repeat. */
+  statedAmounts: () => Promise<number[]>;
 }
 
 export interface ToolError {
@@ -145,6 +170,54 @@ function compactGuestBook(book: GuestBook) {
   };
 }
 
+/** How many characters of a message the model sees in a conversation list. */
+const PREVIEW = 160;
+
+/** A conversation as a list row: who, what they asked for, and where it stands. */
+function compactConversation(i: Inquiry) {
+  const last = i.messages.at(-1);
+  const r = i.parsed;
+  return {
+    inquiryId: i.id,
+    senderName: i.senderName ?? i.senderAddress ?? 'Guest',
+    subject: i.subject,
+    channel: i.partner ?? i.channel,
+    status: i.status,
+    unread: i.unread,
+    lastMessageAt: i.lastMessageAt,
+    lastFrom: last?.direction === 'out' ? 'hotel' : 'guest',
+    preview: last ? last.body.replace(/\s+/g, ' ').slice(0, PREVIEW) : null,
+    request:
+      r && r.checkIn && r.checkOut
+        ? { checkIn: r.checkIn, checkOut: r.checkOut, adults: r.adults, childAges: r.childAges }
+        : null,
+    bookingId: i.bookingId,
+  };
+}
+
+/** A whole conversation: messages, the request as read, the rooms on offer and the draft. */
+function conversationDetail(i: Inquiry) {
+  return {
+    ...compactConversation(i),
+    senderAddress: i.senderAddress,
+    request: i.parsed,
+    messages: i.messages.map((m) => ({
+      from: m.direction === 'out' ? (m.author ?? 'hotel') : 'guest',
+      sentAt: m.sentAt,
+      body: m.body,
+    })),
+    roomOptions: (i.suggestion?.options ?? []).map((o) => ({
+      roomId: o.roomId,
+      roomName: o.roomName,
+      roomTypeName: o.roomTypeName,
+      total: o.quote.total,
+      currency: o.quote.currency,
+    })),
+    draft: i.suggestion?.draft ?? null,
+    note: i.suggestion?.note ?? i.processingError ?? null,
+  };
+}
+
 function compactBoard(board: HousekeepingBoard) {
   return {
     date: board.date,
@@ -185,6 +258,9 @@ const chargeRefSchema = bookingIdSchema.extend({
 const stayGuestRefSchema = bookingIdSchema.extend({
   stayGuestId: z.string().describe('The stayGuestId of a person, from getGuestBook.'),
 });
+const inquiryIdSchema = z.object({
+  inquiryId: z.string().describe('Conversation ID, e.g. "inq_4".'),
+});
 const dateInputSchema = z.object({
   date: isoDateSchema.optional().describe('Defaults to today.'),
 });
@@ -209,6 +285,13 @@ export const proposalToolNames = [
   'updateGuestProfile',
   'adjustRates',
   'saveHotelInfo',
+  'removeHotelInfo',
+  'sendReply',
+  'holdFromConversation',
+  'declineConversation',
+  'addLocalEvent',
+  'removeLocalEvent',
+  'updateRoom',
 ] as const;
 
 /** Tools that change data straight away: housekeeping is low-risk and reversible (ADR 0006). */
@@ -234,6 +317,13 @@ export function createAgentTools({
   listRoomTypes,
   rateOutlook,
   relocations,
+  inbox,
+  draftReply,
+  activity,
+  getGuest,
+  guestBookings,
+  listEvents,
+  statedAmounts,
 }: ToolDeps) {
   const propose = (input: PendingActionInput) =>
     safely(async () => toProposal(await actions.propose(input)));
@@ -373,6 +463,164 @@ export function createAgentTools({
       inputSchema: hotelInfoDraftSchema,
       execute: (input) =>
         propose({ kind: 'save_hotel_info', input: { ...input, source: 'agent' } }),
+    }),
+    removeHotelInfo: tool({
+      description:
+        'Propose deleting a note from Knowledge by its exact title, e.g. a notice that no longer applies. The user must confirm.',
+      inputSchema: z.object({ title: z.string().describe('The exact title of the note.') }),
+      execute: (input) => propose({ kind: 'remove_hotel_info', input }),
+    }),
+    listConversations: tool({
+      description:
+        'Guest conversations in the inbox (email and OTAs), latest first, without archived ones: who wrote, what they ask for, where it stands (new, quoted, replied, converted, declined) and the start of the last message.',
+      inputSchema: z.object({
+        unreadOnly: z.boolean().default(false),
+        query: z
+          .string()
+          .optional()
+          .describe('Part of the sender, subject or a message, e.g. a guest name.'),
+      }),
+      execute: ({ unreadOnly, query }) =>
+        safely(async () => {
+          const q = query?.trim().toLowerCase();
+          return (await inbox.list())
+            .filter((i) => !i.archivedAt && (!unreadOnly || i.unread))
+            .filter(
+              (i) =>
+                !q ||
+                [i.senderName, i.senderAddress, i.subject, ...i.messages.map((m) => m.body)].some(
+                  (t) => t?.toLowerCase().includes(q),
+                ),
+            )
+            .slice(0, 30)
+            .map(compactConversation);
+        }),
+    }),
+    getConversation: tool({
+      description:
+        'One conversation in full: every message, the request as read (dates, party, wishes), the rooms on offer with their exact totals, and the current reply draft.',
+      inputSchema: inquiryIdSchema,
+      execute: ({ inquiryId }) =>
+        safely(async () => conversationDetail(await inbox.get(inquiryId))),
+    }),
+    draftReply: tool({
+      description:
+        "Write the reply draft for a conversation, in the guest's language, with the rooms free now and their exact prices; staff also see it in the inbox. Use it before sendReply when a guest asks for a stay or prices, and send its text (edited only as staff ask).",
+      inputSchema: inquiryIdSchema,
+      execute: ({ inquiryId }) =>
+        safely(async () => {
+          if (!draftReply) {
+            return { error: { code: 'not_configured', message: 'Reply drafts are not set up.' } };
+          }
+          const { draft, roomOptions, note } = conversationDetail(await draftReply(inquiryId));
+          return { inquiryId, draft, roomOptions, note };
+        }),
+    }),
+    sendReply: tool({
+      description:
+        "Propose sending a reply in a conversation, in the guest's language. Any price in it must be a total from the conversation's room options (getConversation or draftReply). Signed by the staff member who confirms. The user must confirm.",
+      inputSchema: replyProposalSchema,
+      execute: (input) =>
+        safely(async () => {
+          const conversation = await inbox.get(input.inquiryId);
+          const { unexpected } = checkDraftPrices(
+            input.body,
+            conversation.suggestion?.options ?? [],
+            [...(await statedAmounts()), ...amountsInText(conversation.suggestion?.draft ?? '')],
+          );
+          if (unexpected.length > 0) {
+            return {
+              error: {
+                code: 'unquoted_price',
+                message: `The reply states amounts no quote for this conversation produced (${unexpected.join(', ')}). Use draftReply, or the totals from its room options.`,
+              },
+            };
+          }
+          return propose({ kind: 'send_reply', input });
+        }),
+    }),
+    holdFromConversation: tool({
+      description:
+        "Propose holding a room for a conversation's booking request, for the dates and party it asks for; the hold is linked to the conversation. Use a roomId from its room options. If it already has a hold, that hold moves to this room. The user must confirm.",
+      inputSchema: inquiryIdSchema.extend({
+        roomId: z.string().describe('Room ID from the room options, e.g. "rm_201".'),
+      }),
+      execute: (input) => propose({ kind: 'hold_inquiry', input }),
+    }),
+    declineConversation: tool({
+      description:
+        "Propose marking a conversation's request as declined, e.g. spam or a stay the hotel can't offer. It sends nothing to the guest. The user must confirm.",
+      inputSchema: inquiryIdSchema,
+      execute: (input) => propose({ kind: 'decline_inquiry', input }),
+    }),
+    getActivity: tool({
+      description:
+        'Who changed what and when, newest first: every change by staff or Orbit. Pass subjectId for one booking, guest, room or conversation (e.g. "who cancelled bk_12?"), or actor "agent" for what Orbit did.',
+      inputSchema: z.object({
+        subjectId: z.string().optional().describe('A booking, guest, room or conversation ID.'),
+        actor: auditActorSchema.optional(),
+        limit: z.number().int().min(1).max(50).default(20),
+      }),
+      execute: (query) =>
+        safely(async () =>
+          (await activity.list(query)).map((item) => ({
+            at: item.createdAt,
+            by: item.actor === 'agent' ? 'Orbit' : (item.byName ?? 'staff'),
+            action: item.action,
+            subject: item.subject?.label ?? item.subjectId,
+            subjectId: item.subjectId,
+            details: item.payload,
+          })),
+        ),
+    }),
+    getGuest: tool({
+      description:
+        "A guest's profile (email, phone, language, notes) and every stay they booked, newest first.",
+      inputSchema: z.object({ guestId: z.string().describe('Guest ID, e.g. "gst_12".') }),
+      execute: ({ guestId }) =>
+        safely(async () => {
+          const guest = await getGuest(guestId);
+          if (!guest) throw new DomainError('not_found', `Guest ${guestId} not found`);
+          const rooms = new Map((await listRooms()).map((r) => [r.id, r.name]));
+          const stays = (await guestBookings(guestId))
+            .sort((a, b) => b.checkIn.localeCompare(a.checkIn))
+            .map((b) => ({
+              bookingId: b.id,
+              guestId: guest.id,
+              guestName: guest.name,
+              roomId: b.roomId,
+              roomName: rooms.get(b.roomId) ?? b.roomId,
+              checkIn: b.checkIn,
+              checkOut: b.checkOut,
+              status: b.status,
+              total: b.priceSnapshot?.total ?? null,
+            }));
+          return { ...guest, guestId: guest.id, guestName: guest.name, stays };
+        }),
+    }),
+    getLocalEvents: tool({
+      description:
+        'Local events that raise or lower demand on the rate outlook, with their IDs, nights and impact.',
+      inputSchema: z.object({}),
+      execute: () => safely(listEvents),
+    }),
+    addLocalEvent: tool({
+      description:
+        'Propose adding a local event (a festival, a race, a trade fair) so the rate outlook weighs it: its first and last night, both included, and its impact on demand. A manager must confirm.',
+      inputSchema: localEventBodySchema,
+      execute: (input) => propose({ kind: 'add_local_event', input }),
+    }),
+    removeLocalEvent: tool({
+      description:
+        'Propose removing a local event by its ID from getLocalEvents. A manager must confirm.',
+      inputSchema: z.object({ eventId: z.string() }),
+      execute: (input) => propose({ kind: 'remove_local_event', input }),
+    }),
+    updateRoom: tool({
+      description:
+        'Propose renaming a room or changing its room type, kind or floor. Send only the fields that change; room types come from listRooms. A manager must confirm.',
+      inputSchema: roomBodySchema.partial().extend({ roomId: z.string() }),
+      execute: (input) => propose({ kind: 'update_room', input }),
     }),
     getBill: tool({
       description:

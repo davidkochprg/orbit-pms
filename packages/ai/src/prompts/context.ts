@@ -14,6 +14,7 @@ export type ContextSubject =
   | { kind: 'guest'; guestId: string; name: string; email: string | null; language: Language }
   | {
       kind: 'inquiry';
+      inquiryId: string;
       senderName: string | null;
       senderAddress: string | null;
       request: InquiryExtraction | null;
@@ -59,7 +60,7 @@ export function contextNote(subject: ContextSubject): string {
         : [];
       const message = subject.lastMessage?.trim();
       return [
-        `The staff member is looking at an inbox conversation with ${who || 'a guest'}, not yet a guest record.`,
+        `The staff member is looking at the inbox conversation [[${subject.inquiryId}]] with ${who || 'a guest'}, not yet a guest record.`,
         asks.length > 0 && `They ask for ${asks.join(', ')}.`,
         r?.language && `They write in ${r.language}.`,
         message &&

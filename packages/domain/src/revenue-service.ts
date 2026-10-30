@@ -1,4 +1,5 @@
 import type {
+  AuditActor,
   LocalEvent,
   LocalEventBody,
   PricingConfig,
@@ -61,13 +62,17 @@ export function createRevenueService({ repos, defaults, clock, newId }: RevenueD
 
     listEvents: () => repos.events.list(),
 
-    async createEvent(body: LocalEventBody, by: StaffMember | null): Promise<LocalEvent> {
+    async createEvent(
+      body: LocalEventBody,
+      by: StaffMember | null,
+      actor: AuditActor = 'user',
+    ): Promise<LocalEvent> {
       assertManager(by);
       const event: LocalEvent = { id: newId('evt'), ...body, name: body.name.trim() };
       return repos.transaction(async (tx) => {
         await tx.events.create(event);
         await tx.audit.append({
-          actor: 'user',
+          actor,
           action: 'event.create',
           subjectId: event.id,
           payload: { by: by.id, ...body },
@@ -76,14 +81,18 @@ export function createRevenueService({ repos, defaults, clock, newId }: RevenueD
       });
     },
 
-    async deleteEvent(id: string, by: StaffMember | null): Promise<void> {
+    async deleteEvent(
+      id: string,
+      by: StaffMember | null,
+      actor: AuditActor = 'user',
+    ): Promise<void> {
       assertManager(by);
       await repos.transaction(async (tx) => {
         const event = (await tx.events.list()).find((e) => e.id === id);
         if (!event) throw new DomainError('not_found', `Event ${id} not found`);
         await tx.events.delete(id);
         await tx.audit.append({
-          actor: 'user',
+          actor,
           action: 'event.delete',
           subjectId: id,
           payload: { by: by.id, name: event.name },

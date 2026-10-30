@@ -15,6 +15,8 @@ export type ActivitySubjectKind = z.infer<typeof activitySubjectKindSchema>;
 
 export const activityQuerySchema = z.object({
   actor: auditActorSchema.optional(),
+  /** Only changes to this booking, guest, room or conversation. */
+  subjectId: z.string().optional(),
   limit: z.coerce.number().int().min(1).max(200).default(100),
 });
 export type ActivityQuery = z.infer<typeof activityQuerySchema>;

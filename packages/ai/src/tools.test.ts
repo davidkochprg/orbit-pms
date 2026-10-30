@@ -1,6 +1,54 @@
-import { currencySchema, reportSchema } from '@orbit/shared';
+import { conversation } from '@orbit/domain/testing';
+import { currencySchema, type Inquiry, reportSchema } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { callOptions, setup } from './test-setup';
+
+/** The test hotel with a request from Ruth Example for 20 to 22 May, read, with room 201 on offer. */
+async function withConversation(options: Parameters<typeof setup>[0] = {}) {
+  const hotel = setup(options);
+  const [option] = await hotel.hotel.roomOptions({
+    checkIn: '2026-05-20',
+    checkOut: '2026-05-22',
+    adults: 2,
+    childAges: [],
+    addons: { wellness: false, dogs: 0, extraBeds: 0 },
+  });
+  const inquiry: Inquiry = conversation({
+    id: 'inq_1',
+    senderName: 'Ruth Example',
+    senderAddress: 'ruth@example.com',
+    body: 'Do you have a room for two, 20 to 22 May?',
+    parsed: {
+      kind: 'booking_request',
+      language: 'en',
+      guestName: 'Ruth Example',
+      checkIn: '2026-05-20',
+      checkOut: '2026-05-22',
+      adults: 2,
+      childAges: [],
+      wishes: { wellness: false, dog: false, apartment: false },
+      question: null,
+    },
+    status: 'quoted',
+    suggestion: {
+      options: [
+        {
+          roomId: option!.roomId,
+          roomName: option!.roomName,
+          roomTypeName: option!.roomType.name,
+          kind: option!.kind,
+          quote: option!.quote,
+        },
+      ],
+      note: null,
+      draft: null,
+      draftLanguage: null,
+      draftTranslation: null,
+    },
+  });
+  hotel.repos.state.inquiries.push(inquiry);
+  return { ...hotel, inquiry, total: option!.quote.total, roomId: option!.roomId };
+}
 
 describe('agent tools', () => {
   it('lists rooms with their type names, so a type the guest names can be found', async () => {
@@ -347,5 +395,100 @@ describe('agent tools', () => {
     );
     expect(result).toMatchObject({ status: 'awaiting_confirmation' });
     expect(repos.state.profile?.entries ?? []).toEqual([]);
+  });
+
+  it('lists conversations and reads one with its rooms on offer', async () => {
+    const { tools, total, roomId } = await withConversation();
+    expect(
+      await tools.listConversations.execute({ unreadOnly: false, query: 'ruth' }, callOptions),
+    ).toEqual([
+      expect.objectContaining({
+        inquiryId: 'inq_1',
+        senderName: 'Ruth Example',
+        status: 'quoted',
+        lastFrom: 'guest',
+        request: { checkIn: '2026-05-20', checkOut: '2026-05-22', adults: 2, childAges: [] },
+      }),
+    ]);
+    expect(
+      await tools.listConversations.execute({ unreadOnly: false, query: 'nobody' }, callOptions),
+    ).toEqual([]);
+    expect(await tools.getConversation.execute({ inquiryId: 'inq_1' }, callOptions)).toMatchObject({
+      messages: [{ from: 'guest', body: 'Do you have a room for two, 20 to 22 May?' }],
+      roomOptions: [{ roomId, total }],
+    });
+  });
+
+  it('proposes a reply only when every price in it was quoted', async () => {
+    const { tools, repos, total } = await withConversation();
+    const wrong = await tools.sendReply.execute(
+      { inquiryId: 'inq_1', body: 'Room 201 is free for 999 CZK.' },
+      callOptions,
+    );
+    expect(wrong).toMatchObject({ error: { code: 'unquoted_price' } });
+    expect(repos.state.pendingActions).toEqual([]);
+    const right = await tools.sendReply.execute(
+      { inquiryId: 'inq_1', body: `Room 201 is free, ${total} CZK for both nights.` },
+      callOptions,
+    );
+    expect(right).toMatchObject({ status: 'awaiting_confirmation' });
+  });
+
+  it('drafts a reply through the inbox pipeline, when there is one', async () => {
+    const drafted = (i: Inquiry): Inquiry => ({
+      ...i,
+      suggestion: { ...i.suggestion!, draft: 'Dear Ruth, …', draftLanguage: 'en' },
+    });
+    const { tools, inquiry } = await withConversation({
+      draftReply: () => Promise.resolve(drafted(inquiry)),
+    });
+    expect(await tools.draftReply.execute({ inquiryId: 'inq_1' }, callOptions)).toMatchObject({
+      draft: 'Dear Ruth, …',
+    });
+    const { tools: off } = setup();
+    expect(await off.draftReply.execute({ inquiryId: 'inq_1' }, callOptions)).toMatchObject({
+      error: { code: 'not_configured' },
+    });
+  });
+
+  it('proposes holding a room for a conversation and declining one', async () => {
+    const { tools, repos, roomId } = await withConversation();
+    await tools.holdFromConversation.execute({ inquiryId: 'inq_1', roomId }, callOptions);
+    await tools.declineConversation.execute({ inquiryId: 'inq_1' }, callOptions);
+    expect(repos.state.pendingActions.map((a) => a.kind)).toEqual([
+      'hold_inquiry',
+      'decline_inquiry',
+    ]);
+    expect(repos.state.bookings).toHaveLength(1);
+  });
+
+  it("reads who changed what, and a guest's stays", async () => {
+    const { tools, hotel } = setup();
+    await hotel.applyBookingAction('bk_1', 'cancel', 'user');
+    expect(await tools.getActivity.execute({ subjectId: 'bk_1', limit: 20 }, callOptions)).toEqual([
+      expect.objectContaining({ action: 'booking.cancel', subjectId: 'bk_1', by: 'staff' }),
+    ]);
+    expect(await tools.getGuest.execute({ guestId: 'gst_1' }, callOptions)).toMatchObject({
+      name: 'Tomáš Novák',
+      stays: [{ bookingId: 'bk_1', roomName: '104', status: 'cancelled' }],
+    });
+    expect(await tools.getGuest.execute({ guestId: 'gst_x' }, callOptions)).toMatchObject({
+      error: { code: 'not_found' },
+    });
+  });
+
+  it('proposes manager changes: local events and rooms', async () => {
+    const { tools, repos } = setup();
+    await tools.addLocalEvent.execute(
+      { name: 'Marathon', firstNight: '2026-06-01', lastNight: '2026-06-01', impact: 'high' },
+      callOptions,
+    );
+    await tools.updateRoom.execute({ roomId: 'rm_201', name: '201A' }, callOptions);
+    expect(repos.state.pendingActions.map((a) => a.kind)).toEqual([
+      'add_local_event',
+      'update_room',
+    ]);
+    expect(repos.state.events).toEqual([]);
+    expect(await tools.getLocalEvents.execute({}, callOptions)).toEqual([]);
   });
 });

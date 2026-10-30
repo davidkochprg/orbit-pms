@@ -510,6 +510,8 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     previewDates: (id: string, range: DateRange) => preview(planDates(id, range)),
     previewHold: (input: CreateHoldInput) => preview(planHold(input)),
     previewUpdate: (id: string, patch: BookingPatch) => preview(planUpdate(id, patch)),
+    previewSwitchHold: (id: string, patch: BookingPatch) =>
+      preview(planUpdate(id, patch, switchHold)),
   };
 }
 

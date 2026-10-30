@@ -6,7 +6,18 @@ describe('entityKind', () => {
     expect(entityKind('bk_147')).toBe('booking');
     expect(entityKind('rm_a1')).toBe('room');
     expect(entityKind('gst_12')).toBe('guest');
+    expect(entityKind('inq_seed_ota')).toBe('conversation');
     expect(entityKind('chg_1')).toBe(null);
+  });
+});
+
+describe('conversations', () => {
+  it('names a conversation from the inbox tools, and picks out its mention', () => {
+    const map = collectEntities([
+      [{ inquiryId: 'inq_4', senderName: 'Ruth Example', status: 'quoted' }],
+    ]);
+    expect(map.get('inq_4')).toEqual({ kind: 'conversation', id: 'inq_4', name: 'Ruth Example' });
+    expect(parseInline('Answered [[inq_4]].')).toContainEqual({ type: 'mention', id: 'inq_4' });
   });
 });
 

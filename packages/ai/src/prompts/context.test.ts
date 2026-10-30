@@ -21,6 +21,7 @@ describe('contextNote', () => {
   it('describes an inbox conversation by what the guest asks for, with a short message', () => {
     const note = contextNote({
       kind: 'inquiry',
+      inquiryId: 'inq_4',
       senderName: 'Demo Sender',
       senderAddress: 'demo@example.com',
       request: {
@@ -36,7 +37,7 @@ describe('contextNote', () => {
       },
       lastMessage: 'x'.repeat(500),
     });
-    expect(note).toContain('Demo Sender <demo@example.com>');
+    expect(note).toContain('the inbox conversation [[inq_4]] with Demo Sender <demo@example.com>');
     expect(note).toContain(
       'They ask for 2026-11-06 to 2026-11-08, 2 adults, children aged 7, a dog.',
     );
@@ -48,13 +49,14 @@ describe('contextNote', () => {
     expect(
       contextNote({
         kind: 'inquiry',
+        inquiryId: 'inq_9',
         senderName: null,
         senderAddress: null,
         request: null,
         lastMessage: null,
       }),
     ).toBe(
-      'The staff member is looking at an inbox conversation with a guest, not yet a guest record.',
+      'The staff member is looking at the inbox conversation [[inq_9]] with a guest, not yet a guest record.',
     );
   });
 });

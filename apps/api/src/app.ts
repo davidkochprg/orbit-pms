@@ -28,6 +28,7 @@ import {
   createSettingsService,
   createKnockOnService,
   currentEntries,
+  endedEntries,
   createStaffService,
   getHotelTimeZone,
   hotelPolicy,
@@ -107,6 +108,9 @@ export function createApp({
   const housekeeping = createHousekeepingService({ repos, clock, newId });
   const rates = createRatesService({ repos, defaults: pricingConfig, newId });
   const settings = createSettingsService({ repos, clock });
+  const inbox = createInboxService({ repos, hotel, clock, newId });
+  const revenue = createRevenueService({ repos, defaults: pricingConfig, clock, newId });
+  const activity = createActivityService({ repos });
   const actions = createPendingActionService({
     repos,
     rates,
@@ -115,12 +119,13 @@ export function createApp({
     registrations,
     guests,
     settings,
+    inbox,
+    events: revenue,
     clock,
     newId,
   });
   const knockOns = createKnockOnService({ repos, hotel, policy: hotelPolicy, clock });
   const staff = createStaffService({ repos, newId });
-  const revenue = createRevenueService({ repos, defaults: pricingConfig, clock, newId });
   /** The outlook with the forecast at the hotel, when it has coordinates and one loads. */
   const rateOutlook = async (days: number) => {
     const { coordinates } = await settings.getProfile();
@@ -134,7 +139,6 @@ export function createApp({
     policy: hotelPolicy,
     pricing: await rates.getPricing(),
   });
-  const inbox = createInboxService({ repos, hotel, clock, newId });
   const limiter = createAiLimiter(limits, clock);
   const monthlyBudgetMicroUsd = Math.round(monthlyBudgetUsd * 1_000_000);
   const { gate, withinBudget } = createAiGate({ limiter, usage, monthlyBudgetMicroUsd, clock });
@@ -207,10 +211,13 @@ export function createApp({
       gate,
     }),
   );
-  app.route('/api', activityRoutes(createActivityService({ repos })));
+  app.route('/api', activityRoutes(activity));
   app.route('/api', guestRoutes(repos, guests));
   app.route('/api', overviewRoutes(repos, hotel));
-  app.route('/api', pendingActionRoutes(actions));
+  app.route(
+    '/api',
+    pendingActionRoutes(actions, (id) => staff.identify(id)),
+  );
   app.route('/api', knockOnRoutes(knockOns));
   app.route(
     '/api',
@@ -242,6 +249,11 @@ export function createApp({
       rateOutlook,
       relocations: (roomId) => knockOns.relocationsFor(roomId),
       hotelContext,
+      endedNotices: async () => endedEntries(await settings.getProfile(), hotelToday(clock())),
+      inbox,
+      draftReply: pipeline ? (id) => pipeline.draft(id) : null,
+      activity,
+      events: revenue,
       limiter,
       gate,
       clock,

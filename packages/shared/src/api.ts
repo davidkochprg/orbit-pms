@@ -138,6 +138,12 @@ export type ComposeBody = z.infer<typeof composeBodySchema>;
 /** `POST /api/inbox/:id/send` (the hotel's reply) and `/receive` (the guest writing again). */
 export const messageBodySchema = z.object({ body: messageText });
 
+/** A reply the agent proposes to send in a conversation, once staff confirm it. */
+export const replyProposalSchema = z.object({
+  inquiryId: z.string().describe('Conversation ID, e.g. "inq_4".'),
+  body: messageText.describe("The whole reply, in the guest's language, signed as the hotel."),
+});
+
 export const unreadBodySchema = z.object({ unread: z.boolean() });
 export const archiveBodySchema = z.object({ archived: z.boolean() });
 

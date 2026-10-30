@@ -6,12 +6,16 @@ import type {
   Charge,
   Currency,
   GuestPatch,
+  Inquiry,
+  InquiryStatus,
   PendingAction,
   PendingActionDetails,
   PendingActionInput,
   PendingValue,
   PricingConfig,
   QuoteAddons,
+  RoomBody,
+  StaffMember,
   StayGuestPatch,
 } from '@orbit/shared';
 import { formatMoney, hotelInfoCategoryLabels } from '@orbit/shared';
@@ -20,9 +24,11 @@ import { changedBookingFields } from './bookings';
 import { hotelToday, nightsBetween } from './dates';
 import { DomainError } from './errors';
 import type { GuestService } from './guests';
+import type { InboxService } from './inbox-service';
 import { adjustmentChanges, applyAdjustments, type RatesService } from './rates';
 import type { RegistrationService } from './registration';
 import type { Repositories } from './repositories';
+import type { RevenueService } from './revenue-service';
 import type { HotelService } from './service';
 import type { SettingsService } from './settings';
 
@@ -32,8 +38,13 @@ export interface PendingActionDeps {
   billing: BillingService;
   registrations: RegistrationService;
   guests: GuestService;
-  rates: Pick<RatesService, 'getPricing' | 'adjustRates'>;
-  settings: Pick<SettingsService, 'previewHotelInfo' | 'saveHotelInfo'>;
+  rates: Pick<RatesService, 'getPricing' | 'adjustRates' | 'updateRoom'>;
+  settings: Pick<
+    SettingsService,
+    'previewHotelInfo' | 'saveHotelInfo' | 'previewRemoveHotelInfo' | 'removeHotelInfo'
+  >;
+  inbox: Pick<InboxService, 'get' | 'previewHold' | 'createHold' | 'send' | 'decline'>;
+  events: Pick<RevenueService, 'listEvents' | 'createEvent' | 'deleteEvent'>;
   clock: () => Date;
   newId: (prefix: string) => string;
 }
@@ -175,6 +186,32 @@ const bookingStatusLabels: Record<BookingStatus, string> = {
   cancelled: 'Cancelled',
 };
 
+const inquiryStatusLabels: Record<InquiryStatus, string> = {
+  new: 'New',
+  quoted: 'Quoted',
+  replied: 'Replied',
+  converted: 'Booked',
+  declined: 'Declined',
+};
+
+/** Who a conversation is with, as a confirm card names them. */
+const sender = (i: Inquiry) => i.senderName ?? i.senderAddress ?? 'the guest';
+
+/** The first words of a reply, for a one-line summary. */
+const excerpt = (body: string) => {
+  const line = body.trim().replace(/\s+/g, ' ');
+  return line.length > 80 ? `${line.slice(0, 80)}…` : line;
+};
+
+const roomFieldLabels: Record<keyof RoomBody, string> = {
+  name: 'Name',
+  roomTypeId: 'Room type',
+  kind: 'Kind',
+  floor: 'Floor',
+};
+
+const managersOnly = 'A manager has to confirm this.';
+
 const statusChange = (from: BookingStatus, to: BookingStatus) =>
   changed('Status', text(bookingStatusLabels[from]), text(bookingStatusLabels[to]));
 
@@ -259,11 +296,43 @@ export function createPendingActionService({
   guests,
   rates,
   settings,
+  inbox,
+  events,
   clock,
   newId,
 }: PendingActionDeps) {
   async function guestName(guestId: string): Promise<string> {
     return (await repos.guests.getGuest(guestId))?.name ?? 'Unknown guest';
+  }
+
+  /** The room as an update would leave it, with the fields that change. */
+  async function roomUpdate({ roomId, ...patch }: Partial<RoomBody> & { roomId: string }) {
+    const room = await repos.rooms.getRoom(roomId);
+    if (!room) throw new DomainError('not_found', `Room ${roomId} not found`);
+    const before: RoomBody = {
+      name: room.name,
+      roomTypeId: room.roomTypeId,
+      kind: room.kind,
+      floor: room.floor,
+    };
+    const after: RoomBody = { ...before, ...patch, name: (patch.name ?? room.name).trim() };
+    const fields = (Object.keys(before) as (keyof RoomBody)[]).filter(
+      (k) => before[k] !== after[k],
+    );
+    if (fields.length === 0)
+      throw new DomainError('invalid_input', 'Nothing about the room changes');
+    const types = await repos.rooms.listRoomTypes();
+    if (!types.some((t) => t.id === after.roomTypeId)) {
+      throw new DomainError('not_found', `Room type ${after.roomTypeId} not found`);
+    }
+    const taken = (await repos.rooms.listRooms()).find(
+      (r) => r.id !== roomId && r.name.toLowerCase() === after.name.toLowerCase(),
+    );
+    if (taken) throw new DomainError('conflict', `There is already a room ${taken.name}`);
+    const typeName = (id: string) => types.find((t) => t.id === id)?.name ?? id;
+    const show = (body: RoomBody, k: keyof RoomBody) =>
+      k === 'roomTypeId' ? typeName(body.roomTypeId) : String(body[k]);
+    return { room, before, after, fields, show };
   }
 
   /** The one-line summary the model repeats, and the details the confirm card shows. */
@@ -520,6 +589,100 @@ export function createPendingActionService({
           ]),
         };
       }
+      case 'remove_hotel_info': {
+        const entry = await settings.previewRemoveHotelInfo(action.input.title);
+        const where = hotelInfoCategoryLabels[entry.category];
+        return {
+          summary: `Delete from ${where}: ${entry.title}`,
+          details: details([removed(where, text(`${entry.title}: ${entry.details}`))]),
+        };
+      }
+      case 'send_reply': {
+        const inquiry = await inbox.get(action.input.inquiryId);
+        return {
+          summary: `Reply to ${sender(inquiry)}: "${excerpt(action.input.body)}"`,
+          details: details([added('Reply', text(action.input.body.trim()))]),
+        };
+      }
+      case 'hold_inquiry': {
+        const { booking, room, guestName, moved } = await inbox.previewHold(
+          action.input.inquiryId,
+          action.input.roomId,
+        );
+        const total = booking.priceSnapshot?.total;
+        return {
+          summary: `${moved ? 'Move the hold to' : 'Hold'} room ${room.name} for ${guestName}, ${stay(booking)}, ${party(booking)}, total ${money(total)}`,
+          details: details(
+            [
+              added('Guest', text(guestName)),
+              added('Room', text(room.name)),
+              added('Stay', dates(booking)),
+              added('Party', text(party(booking))),
+              ...(hasAddons(booking.addons)
+                ? [added('Add-ons', text(addonsText(booking.addons)))]
+                : []),
+            ],
+            total === undefined ? null : { label: 'Total', before: null, after: total },
+          ),
+        };
+      }
+      case 'decline_inquiry': {
+        const inquiry = await inbox.get(action.input.inquiryId);
+        if (inquiry.status === 'converted' || inquiry.bookingId) {
+          throw new DomainError('invalid_transition', 'This message already led to a booking');
+        }
+        return {
+          summary: `Decline the request from ${sender(inquiry)}`,
+          details: details([
+            changed(
+              'Status',
+              text(inquiryStatusLabels[inquiry.status]),
+              text(inquiryStatusLabels.declined),
+            ),
+          ]),
+        };
+      }
+      case 'add_local_event': {
+        const { name, firstNight, lastNight, impact } = action.input;
+        if (lastNight < hotelToday(clock())) {
+          throw new DomainError('invalid_input', 'The event is already over');
+        }
+        return {
+          summary: `Add the local event ${name.trim()}, ${firstNight} to ${lastNight}, ${impact} impact`,
+          details: details(
+            [
+              added('Event', text(name.trim())),
+              added('Nights', text(`${firstNight} to ${lastNight}`)),
+              added('Impact', text(impact)),
+            ],
+            null,
+            managersOnly,
+          ),
+        };
+      }
+      case 'remove_local_event': {
+        const event = (await events.listEvents()).find((e) => e.id === action.input.eventId);
+        if (!event) throw new DomainError('not_found', `Event ${action.input.eventId} not found`);
+        return {
+          summary: `Remove the local event ${event.name}, ${event.firstNight} to ${event.lastNight}`,
+          details: details([removed('Event', text(event.name))], null, managersOnly),
+        };
+      }
+      case 'update_room': {
+        const { room, before, after, fields, show } = await roomUpdate(action.input);
+        return {
+          summary: `Change room ${room.name}: ${fields
+            .map((k) => `${roomFieldLabels[k].toLowerCase()} ${show(after, k)}`)
+            .join(', ')}`,
+          details: details(
+            fields.map((k) =>
+              changed(roomFieldLabels[k], text(show(before, k)), text(show(after, k))),
+            ),
+            null,
+            managersOnly,
+          ),
+        };
+      }
       case 'update_guest': {
         const { guestId, ...patch } = action.input;
         const { guest } = await guests.previewUpdate(guestId, patch);
@@ -541,8 +704,14 @@ export function createPendingActionService({
     }
   }
 
-  /** Runs the action and returns the ID of the booking it created or changed, if any. */
-  async function execute(action: PendingActionInput): Promise<string | null> {
+  /**
+   * Runs the action as confirmed by `by`, and returns the ID of the booking it created or
+   * changed, if any.
+   */
+  async function execute(
+    action: PendingActionInput,
+    by: StaffMember | null,
+  ): Promise<string | null> {
     const id = (b: Booking) => b.id;
     switch (action.kind) {
       case 'create_hold':
@@ -605,6 +774,29 @@ export function createPendingActionService({
       case 'save_hotel_info':
         await settings.saveHotelInfo(action.input, 'agent');
         return null;
+      case 'remove_hotel_info':
+        await settings.removeHotelInfo(action.input.title, 'agent');
+        return null;
+      case 'send_reply': {
+        const { inquiryId, body } = action.input;
+        return (await inbox.send(inquiryId, body, by?.name ?? null, 'agent')).bookingId;
+      }
+      case 'hold_inquiry':
+        return id(await inbox.createHold(action.input.inquiryId, action.input.roomId, 'agent'));
+      case 'decline_inquiry':
+        await inbox.decline(action.input.inquiryId, 'agent');
+        return null;
+      case 'add_local_event':
+        await events.createEvent(action.input, by, 'agent');
+        return null;
+      case 'remove_local_event':
+        await events.deleteEvent(action.input.eventId, by, 'agent');
+        return null;
+      case 'update_room': {
+        const { after } = await roomUpdate(action.input);
+        await rates.updateRoom(action.input.roomId, after, by, 'agent');
+        return null;
+      }
     }
   }
 
@@ -650,12 +842,16 @@ export function createPendingActionService({
       return action;
     },
 
-    /** Runs the stored action. If it is no longer valid, the action is marked failed. */
-    async confirm(id: string): Promise<PendingAction> {
+    /**
+     * Runs the stored action as the staff member `by` who confirmed it: a reply is signed with
+     * their name, and changes only managers may make check that they are one. If it is no longer
+     * valid, the action is marked failed.
+     */
+    async confirm(id: string, by: StaffMember | null = null): Promise<PendingAction> {
       const claimed = await claim(id, 'confirmed');
       let resolved: PendingAction;
       try {
-        resolved = { ...claimed, bookingId: await execute(claimed) };
+        resolved = { ...claimed, bookingId: await execute(claimed, by) };
       } catch (err) {
         if (!(err instanceof DomainError)) {
           // Not the change's fault: put it back so it can be confirmed again.

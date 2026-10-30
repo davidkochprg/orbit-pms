@@ -1,4 +1,6 @@
 import {
+  createActivityService,
+  createInboxService,
   createHotelService,
   emptyHotelProfile,
   createBillingService,
@@ -15,7 +17,7 @@ import {
   pricingConfig,
 } from '@orbit/domain';
 import { createMemoryRepositories } from '@orbit/domain/testing';
-import type { Booking, RoomType } from '@orbit/shared';
+import type { Booking, Inquiry, RoomType } from '@orbit/shared';
 import { createAgentTools } from './tools';
 
 export const now = new Date('2026-05-10T08:00:00Z');
@@ -41,8 +43,13 @@ const base: Omit<Booking, 'id' | 'roomId' | 'checkIn' | 'checkOut'> = {
   notes: null,
 };
 
-/** A two-room hotel with Tomáš Novák in room 104 from today for two nights. */
-export function setup() {
+/**
+ * A two-room hotel with Tomáš Novák in room 104 from today for two nights. `draftReply` stands in
+ * for the inbox pipeline's drafts.
+ */
+export function setup({
+  draftReply = null,
+}: { draftReply?: ((inquiryId: string) => Promise<Inquiry>) | null } = {}) {
   const repos = createMemoryRepositories(
     {
       // A Czech hotel: the guest book records everyone in the room.
@@ -88,6 +95,8 @@ export function setup() {
   const billing = createBillingService({ repos, pricing: pricingConfig, clock, newId });
   const registrations = createRegistrationService({ repos, clock, newId });
   const guests = createGuestService({ repos, newId });
+  const inbox = createInboxService({ repos, hotel, clock, newId });
+  const revenue = createRevenueService({ repos, defaults: pricingConfig, clock, newId });
   const actions = createPendingActionService({
     repos,
     rates: createRatesService({ repos, defaults: pricingConfig, newId }),
@@ -96,6 +105,8 @@ export function setup() {
     registrations,
     guests,
     settings: createSettingsService({ repos, clock }),
+    inbox,
+    events: revenue,
     clock,
     newId,
   });
@@ -110,10 +121,16 @@ export function setup() {
     registrations,
     listRooms: () => repos.rooms.listRooms(),
     listRoomTypes: () => repos.rooms.listRoomTypes(),
-    rateOutlook: (days) =>
-      createRevenueService({ repos, defaults: pricingConfig, clock, newId }).outlook(days, null),
+    rateOutlook: (days) => revenue.outlook(days, null),
     relocations: (roomId) =>
       createKnockOnService({ repos, hotel, policy: hotelPolicy, clock }).relocationsFor(roomId),
+    inbox,
+    draftReply,
+    activity: createActivityService({ repos }),
+    getGuest: (id) => repos.guests.getGuest(id),
+    guestBookings: (guestId) => repos.bookings.listBookings({ guestId }),
+    listEvents: () => revenue.listEvents(),
+    statedAmounts: () => Promise.resolve([]),
   });
   return { repos, hotel, billing, actions, tools };
 }

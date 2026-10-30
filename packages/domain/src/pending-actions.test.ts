@@ -1,17 +1,35 @@
+import type { StaffMember } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { createBillingService } from './billing';
 import { createGuestService } from './guests';
+import { createInboxService } from './inbox-service';
 import { createPendingActionService } from './pending-actions';
 import { hotelPolicy } from './policy';
 import { pricingConfig } from './pricing';
 import { createRatesService } from './rates';
 import { createSettingsService } from './settings';
 import { createRegistrationService } from './registration';
+import { createRevenueService } from './revenue-service';
 import { createHotelService } from './service';
 import { booking, czechProfile, double, room } from './test-fixtures';
-import { createMemoryRepositories } from './testing';
+import { conversation, createMemoryRepositories } from './testing';
 
 const now = new Date('2026-05-10T08:00:00Z');
+
+const manager: StaffMember = {
+  id: 'stf_m',
+  name: 'Test Manager',
+  email: null,
+  role: 'manager',
+  language: 'en',
+  active: true,
+};
+const receptionist: StaffMember = {
+  ...manager,
+  id: 'stf_r',
+  name: 'Test Desk',
+  role: 'receptionist',
+};
 
 function setup() {
   const repos = createMemoryRepositories(
@@ -58,6 +76,36 @@ function setup() {
     },
     () => now,
   );
+  repos.state.profile = {
+    ...czechProfile,
+    entries: [{ id: 'spa', category: 'wellness', title: 'Spa', details: 'Open 16:00 to 21:00.' }],
+  };
+  repos.state.inquiries.push(
+    conversation({
+      id: 'inq_1',
+      senderName: 'Ruth Example',
+      senderAddress: 'ruth@example.com',
+      body: 'A room for 2 adults, 25 to 27 May?',
+      parsed: {
+        kind: 'booking_request',
+        language: 'en',
+        guestName: 'Ruth Example',
+        checkIn: '2026-05-25',
+        checkOut: '2026-05-27',
+        adults: 2,
+        childAges: [],
+        wishes: { wellness: false, dog: false, apartment: false },
+        question: null,
+      },
+    }),
+  );
+  repos.state.events.push({
+    id: 'evt_1',
+    name: 'Jazz festival',
+    firstNight: '2026-05-15',
+    lastNight: '2026-05-16',
+    impact: 'high',
+  });
   let n = 0;
   const newId = (prefix: string) => `${prefix}_${++n}`;
   const hotel = createHotelService({
@@ -86,6 +134,8 @@ function setup() {
       registrations,
       guests,
       settings: createSettingsService({ repos, clock: () => now }),
+      inbox: createInboxService({ repos, hotel, clock: () => now, newId }),
+      events: createRevenueService({ repos, defaults: pricingConfig, clock: () => now, newId }),
       clock: () => now,
       newId,
     }),
@@ -551,11 +601,130 @@ describe('pending actions', () => {
       { label: 'Until', before: null, after: { text: '2026-05-15' } },
     ]);
     expect(proposed.bookingId).toBeNull();
-    expect(repos.state.profile?.entries).toEqual([]);
+    expect(repos.state.profile?.entries).toHaveLength(1);
 
     await actions.confirm(proposed.id);
-    expect(repos.state.profile?.entries).toEqual([
+    expect(repos.state.profile?.entries).toContainEqual(
       expect.objectContaining({ title: 'Sauna', tags: ['sauna'], until: '2026-05-15' }),
+    );
+  });
+
+  it('proposes a reply to a conversation and sends it signed by whoever confirms', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'send_reply',
+      input: { inquiryId: 'inq_1', body: 'Dear Ruth, room 1 is free for you.' },
+    });
+    expect(proposed.summary).toBe('Reply to Ruth Example: "Dear Ruth, room 1 is free for you."');
+    expect(repos.state.inquiries[0]?.messages).toHaveLength(1);
+    await actions.confirm(proposed.id, receptionist);
+    expect(repos.state.inquiries[0]?.messages.at(-1)).toMatchObject({
+      direction: 'out',
+      author: 'Test Desk',
+      body: 'Dear Ruth, room 1 is free for you.',
+    });
+    expect(repos.state.audit.at(-1)).toMatchObject({ actor: 'agent', action: 'inquiry.replied' });
+  });
+
+  it('proposes a hold from a conversation, linked to it once confirmed', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'hold_inquiry',
+      input: { inquiryId: 'inq_1', roomId: 'rm_2' },
+    });
+    expect(proposed.summary).toMatch(/^Hold room 2 for Ruth Example, 2026-05-25 to 2026-05-27/);
+    const confirmed = await actions.confirm(proposed.id);
+    expect(confirmed.bookingId).toBeTruthy();
+    expect(repos.state.inquiries[0]?.bookingId).toBe(confirmed.bookingId);
+  });
+
+  it('proposes declining a conversation, unless it led to a booking', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'decline_inquiry',
+      input: { inquiryId: 'inq_1' },
+    });
+    expect(proposed.details?.changes).toEqual([
+      { label: 'Status', before: { text: 'New' }, after: { text: 'Declined' } },
     ]);
+    await actions.confirm(proposed.id);
+    expect(repos.state.inquiries[0]?.status).toBe('declined');
+    repos.state.inquiries[0] = {
+      ...repos.state.inquiries[0]!,
+      bookingId: 'bk_a',
+      status: 'converted',
+    };
+    await expect(
+      actions.propose({ kind: 'decline_inquiry', input: { inquiryId: 'inq_1' } }),
+    ).rejects.toMatchObject({ code: 'invalid_transition' });
+  });
+
+  it('proposes deleting a note by title', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'remove_hotel_info',
+      input: { title: 'spa' },
+    });
+    expect(proposed.summary).toBe('Delete from Wellness: Spa');
+    await actions.confirm(proposed.id);
+    expect(repos.state.profile?.entries).toEqual([]);
+    await expect(
+      actions.propose({ kind: 'remove_hotel_info', input: { title: 'Pool' } }),
+    ).rejects.toMatchObject({ code: 'not_found' });
+  });
+
+  it('adds and removes local events only when a manager confirms', async () => {
+    const { repos, actions } = setup();
+    const add = await actions.propose({
+      kind: 'add_local_event',
+      input: {
+        name: 'Marathon',
+        firstNight: '2026-06-01',
+        lastNight: '2026-06-02',
+        impact: 'medium',
+      },
+    });
+    expect(add.details?.note).toBe('A manager has to confirm this.');
+    expect(await actions.confirm(add.id, receptionist)).toMatchObject({ status: 'failed' });
+    const again = await actions.propose({
+      kind: 'add_local_event',
+      input: {
+        name: 'Marathon',
+        firstNight: '2026-06-01',
+        lastNight: '2026-06-02',
+        impact: 'medium',
+      },
+    });
+    await actions.confirm(again.id, manager);
+    expect(repos.state.events.map((e) => e.name)).toEqual(['Jazz festival', 'Marathon']);
+    expect(repos.state.audit.at(-1)).toMatchObject({ actor: 'agent', action: 'event.create' });
+
+    const remove = await actions.propose({
+      kind: 'remove_local_event',
+      input: { eventId: 'evt_1' },
+    });
+    expect(remove.summary).toBe('Remove the local event Jazz festival, 2026-05-15 to 2026-05-16');
+    await actions.confirm(remove.id, manager);
+    expect(repos.state.events.map((e) => e.name)).toEqual(['Marathon']);
+  });
+
+  it('proposes changing a room, showing only what changes, and checks the new name', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'update_room',
+      input: { roomId: 'rm_2', name: '2B', floor: 2 },
+    });
+    expect(proposed.details?.changes).toEqual([
+      { label: 'Name', before: { text: '2' }, after: { text: '2B' } },
+      { label: 'Floor', before: { text: '1' }, after: { text: '2' } },
+    ]);
+    await actions.confirm(proposed.id, manager);
+    expect(repos.state.rooms.find((r) => r.id === 'rm_2')).toMatchObject({ name: '2B', floor: 2 });
+    await expect(
+      actions.propose({ kind: 'update_room', input: { roomId: 'rm_2', name: '1' } }),
+    ).rejects.toMatchObject({ code: 'conflict' });
+    await expect(
+      actions.propose({ kind: 'update_room', input: { roomId: 'rm_2', name: '2B' } }),
+    ).rejects.toMatchObject({ code: 'invalid_input' });
   });
 });

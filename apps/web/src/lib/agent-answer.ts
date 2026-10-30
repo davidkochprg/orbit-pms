@@ -1,11 +1,11 @@
 import type { BookingStatus } from '@orbit/shared';
 
 /**
- * The agent mentions bookings, rooms and guests by ID in double brackets, e.g. `[[bk_147]]`
+ * The agent mentions bookings, rooms, guests and conversations by ID in double brackets, e.g. `[[bk_147]]`
  * (see the system prompt). The thread turns those into chips that open the booking, and what
  * the agent's tools returned supplies the names, rooms and dates the chips show.
  */
-export type EntityKind = 'booking' | 'room' | 'guest';
+export type EntityKind = 'booking' | 'room' | 'guest' | 'conversation';
 
 export interface BookingEntity {
   kind: 'booking';
@@ -31,9 +31,21 @@ export interface GuestEntity {
   name?: string;
 }
 
-export type Entity = BookingEntity | RoomEntity | GuestEntity;
+/** An inbox conversation, named by who it is with. */
+export interface ConversationEntity {
+  kind: 'conversation';
+  id: string;
+  name?: string;
+}
 
-const prefixes: Record<string, EntityKind> = { bk: 'booking', rm: 'room', gst: 'guest' };
+export type Entity = BookingEntity | RoomEntity | GuestEntity | ConversationEntity;
+
+const prefixes: Record<string, EntityKind> = {
+  bk: 'booking',
+  rm: 'room',
+  gst: 'guest',
+  inq: 'conversation',
+};
 
 export function entityKind(id: string): EntityKind | null {
   return prefixes[id.slice(0, id.indexOf('_'))] ?? null;
@@ -94,6 +106,11 @@ function collect(value: unknown, map: Map<string, Entity>) {
   const guestId = str(value.guestId);
   const guestName = str(value.guestName);
   if (guestId && guestName) merge(map, { kind: 'guest', id: guestId, name: guestName });
+  const inquiryId = str(value.inquiryId);
+  const senderName = str(value.senderName);
+  if (inquiryId && senderName && entityKind(inquiryId) === 'conversation') {
+    merge(map, { kind: 'conversation', id: inquiryId, name: senderName });
+  }
   for (const v of Object.values(value)) collect(v, map);
 }
 
@@ -113,7 +130,7 @@ export type AnswerBlock =
   | { type: 'list'; items: { lead: string | null; content: Inline[] }[] };
 
 // `[[bk_147]]`, or a bare ID the model forgot to bracket.
-const MENTION = /\[\[((?:bk|rm|gst)_[A-Za-z0-9-]+)\]\]|\b((?:bk|rm|gst)_[A-Za-z0-9-]+)\b/g;
+const MENTION = /\[\[((?:bk|rm|gst|inq)_[A-Za-z0-9-]+)\]\]|\b((?:bk|rm|gst|inq)_[A-Za-z0-9-]+)\b/g;
 const LIST_ITEM = /^\s*(?:[-•*]|\d+[.)])\s+/;
 
 /** Text with mentions and `**bold**`, as inline pieces. */

@@ -7,6 +7,7 @@ import {
   createSettingsService,
   currentEntries,
   emptyHotelProfile,
+  endedEntries,
   MAX_HOTEL_INFO_ENTRIES,
   normalizeTags,
   withEntry,
@@ -220,6 +221,7 @@ describe('hotel info from the agent', () => {
       'quiet',
       'a',
     ]);
+    expect(endedEntries(withNotices, today).map((e) => e.id)).toEqual(['b']);
   });
 
   it('saves a fact for any staff member and logs it', async () => {

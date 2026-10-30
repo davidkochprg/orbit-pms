@@ -40,7 +40,26 @@ const titles: Record<PendingAction['kind'], string> = {
   update_guest: 'Edit the guest profile',
   adjust_rates: 'Change rates',
   save_hotel_info: 'Save to Knowledge',
+  remove_hotel_info: 'Delete from Knowledge',
+  send_reply: 'Send a reply',
+  hold_inquiry: 'Hold a room for the request',
+  decline_inquiry: 'Decline the request',
+  add_local_event: 'Add a local event',
+  remove_local_event: 'Remove a local event',
+  update_room: 'Change the room',
 };
+
+/** The conversation an action is about, to open once it is done. */
+function conversationOf(action: PendingAction): string | null {
+  switch (action.kind) {
+    case 'send_reply':
+    case 'hold_inquiry':
+    case 'decline_inquiry':
+      return action.input.inquiryId;
+    default:
+      return null;
+  }
+}
 
 /**
  * Confirm card for a change the agent proposed: the booking it concerns, what changes from what
@@ -84,7 +103,13 @@ export function PendingActionCard({
               <BookingRow id={bookingId} />
             </div>
           )}
-          <Details details={details} />
+          {current.kind === 'send_reply' ? (
+            <p className="rounded-lg bg-ink/4 px-3 py-2 text-sm leading-6 whitespace-pre-line">
+              {current.input.body}
+            </p>
+          ) : (
+            <Details details={details} />
+          )}
         </>
       ) : (
         <p className="text-sm">{current?.summary ?? summary}</p>
@@ -127,6 +152,16 @@ export function PendingActionCard({
             onClick={() => openBooking(current.bookingId!)}
           >
             Open booking
+          </Button>
+        )}
+        {current && conversationOf(current) && current.status === 'confirmed' && !bookingId && (
+          <Button size="sm" variant="ghost" className="ml-auto" asChild>
+            <Link
+              to={`/inbox/${encodeURIComponent(conversationOf(current)!)}`}
+              onClick={closePalette}
+            >
+              Open conversation
+            </Link>
           </Button>
         )}
         {current?.kind === 'update_guest' && current.status === 'confirmed' && (

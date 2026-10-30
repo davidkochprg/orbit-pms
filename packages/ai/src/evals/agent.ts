@@ -1,5 +1,7 @@
 import {
   addDays,
+  createActivityService,
+  createInboxService,
   createBillingService,
   createGuestService,
   createHotelService,
@@ -8,12 +10,13 @@ import {
   createRatesService,
   createSettingsService,
   createRevenueService,
+  emptyHotelProfile,
   createRegistrationService,
   createReportService,
   hotelPolicy,
   usDemoPricing,
 } from '@orbit/domain';
-import { createMemoryRepositories } from '@orbit/domain/testing';
+import { conversation, createMemoryRepositories } from '@orbit/domain/testing';
 import type { Booking, IsoDate, PendingActionInput, RoomType } from '@orbit/shared';
 import { createAgentTools } from '../tools';
 
@@ -54,14 +57,30 @@ const stay: Omit<Booking, 'id' | 'guestId' | 'roomId' | 'checkIn' | 'checkOut' |
 
 /**
  * A four-room US inn for agent evals, on the demo's rates, with dates relative to `today`: Anna
- * Example in 104 since yesterday with two extras on her bill and her ID recorded, Jan Dvořák
- * arriving in 201 today without an ID recorded, room 101 dirty and 202 free.
+ * Example in 104 since yesterday with two extras on her bill and her ID recorded (checked in by
+ * Sam Rivera), Jan Dvořák arriving in 201 today without an ID recorded, room 101 dirty and 202
+ * free. The inbox has Ruth Example asking for a week from today, and a spam message; Knowledge
+ * has an ended "Pool closed" notice.
  */
 export function buildAgentEvalHotel(today: IsoDate) {
   const now = new Date(`${today}T09:00:00Z`);
   const clock = () => now;
   const repos = createMemoryRepositories(
     {
+      // An ended notice, still in Knowledge until someone deletes it.
+      profile: {
+        ...emptyHotelProfile,
+        name: 'Eval Lodge',
+        entries: [
+          {
+            id: 'pool-closed',
+            category: 'wellness',
+            title: 'Pool closed',
+            details: 'Closed for repairs.',
+            until: addDays(today, -3),
+          },
+        ],
+      },
       roomTypes: [double],
       rooms: ['101', '104', '201', '202'].map((name) => ({
         id: `rm_${name}`,
@@ -125,6 +144,54 @@ export function buildAgentEvalHotel(today: IsoDate) {
           createdAt: now.toISOString(),
         },
       ],
+      staff: [
+        {
+          id: 'stf_sam',
+          name: 'Sam Rivera',
+          email: null,
+          role: 'receptionist',
+          language: 'en',
+          active: true,
+        },
+      ],
+      audit: [
+        {
+          id: 'aud_1',
+          createdAt: `${addDays(today, -1)}T22:00:00.000Z`,
+          actor: 'user',
+          action: 'booking.check_in',
+          subjectId: 'bk_anna',
+          payload: { by: 'stf_sam' },
+        },
+      ],
+      inquiries: [
+        conversation({
+          id: 'inq_ruth',
+          senderName: 'Ruth Example',
+          senderAddress: 'ruth@example.com',
+          body: 'Hello, do you have a room for two adults for two nights a week from today?',
+          receivedAt: now.toISOString(),
+          parsed: {
+            kind: 'booking_request',
+            language: 'en',
+            guestName: 'Ruth Example',
+            checkIn: addDays(today, 7),
+            checkOut: addDays(today, 9),
+            adults: 2,
+            childAges: [],
+            wishes: { wellness: false, dog: false, apartment: false },
+            question: null,
+          },
+        }),
+        conversation({
+          id: 'inq_spam',
+          senderName: 'Crypto Wins',
+          senderAddress: 'win@example.com',
+          subject: 'Double your money',
+          body: 'Invest in our crypto fund today and double your money!',
+          receivedAt: now.toISOString(),
+        }),
+      ],
       charges: [
         { label: 'Sauna', quantity: 1, unitPrice: 300, id: 'chg_sauna' },
         { label: 'Minibar', quantity: 1, unitPrice: 120, id: 'chg_minibar' },
@@ -150,6 +217,8 @@ export function buildAgentEvalHotel(today: IsoDate) {
   });
   const billing = createBillingService({ repos, pricing: usDemoPricing, clock, newId });
   const registrations = createRegistrationService({ repos, clock, newId });
+  const inbox = createInboxService({ repos, hotel, clock, newId });
+  const revenue = createRevenueService({ repos, defaults: usDemoPricing, clock, newId });
   const actions = createPendingActionService({
     repos,
     rates: createRatesService({ repos, defaults: usDemoPricing, newId }),
@@ -158,6 +227,8 @@ export function buildAgentEvalHotel(today: IsoDate) {
     registrations,
     guests: createGuestService({ repos, newId }),
     settings: createSettingsService({ repos, clock }),
+    inbox,
+    events: revenue,
     clock,
     newId,
   });
@@ -170,10 +241,18 @@ export function buildAgentEvalHotel(today: IsoDate) {
     registrations,
     listRooms: () => repos.rooms.listRooms(),
     listRoomTypes: () => repos.rooms.listRoomTypes(),
-    rateOutlook: (days) =>
-      createRevenueService({ repos, defaults: usDemoPricing, clock, newId }).outlook(days, null),
+    rateOutlook: (days) => revenue.outlook(days, null),
+    inbox,
+    // Drafting is measured in its own suite; here the agent works from the conversation.
+    draftReply: null,
+    activity: createActivityService({ repos }),
+    getGuest: (id) => repos.guests.getGuest(id),
+    guestBookings: (guestId) => repos.bookings.listBookings({ guestId }),
+    listEvents: () => revenue.listEvents(),
+    statedAmounts: () => Promise.resolve([]),
   });
-  return { repos, tools };
+  // Changes from the run come after the history the inn starts with.
+  return { repos, tools, auditBefore: repos.state.audit.length };
 }
 
 /** Problems if the run did not propose exactly one action of `kind` whose input includes `input`. */
@@ -201,7 +280,14 @@ function readOnly(hotel: EvalHotel): string[] {
     ...(pendingActions.length > 0
       ? [`proposed ${pendingActions.map((a) => a.kind).join(', ')}`]
       : []),
-    ...(audit.length > 0 ? [`changed ${audit.map((a) => a.action).join(', ')}`] : []),
+    ...(audit.length > hotel.auditBefore
+      ? [
+          `changed ${audit
+            .slice(hotel.auditBefore)
+            .map((a) => a.action)
+            .join(', ')}`,
+        ]
+      : []),
   ];
 }
 
@@ -214,8 +300,8 @@ function called(calls: EvalToolCall[], ...names: string[]): string[] {
 /** The app turns `[[bk_1]]` into a chip; an ID without brackets would show as raw text. */
 function bareIds(answer: string): string[] {
   const bare = answer
-    .replace(/\[\[(?:bk|rm|gst)_[A-Za-z0-9-]+\]\]/g, '')
-    .match(/\b(?:bk|rm|gst)_\w+/g);
+    .replace(/\[\[(?:bk|rm|gst|inq)_[A-Za-z0-9-]+\]\]/g, '')
+    .match(/\b(?:bk|rm|gst|inq)_\w+/g);
   return bare ? [`answer shows bare IDs ${bare.join(', ')}`] : [];
 }
 
@@ -386,5 +472,51 @@ export const agentFixtures: AgentFixture[] = [
       ...mentions(answer, ['Anna', '[[bk_anna]]', '[[gst_anna]]']),
       ...bareIds(answer),
     ],
+  },
+  {
+    id: 'conversation-hold',
+    prompt: "Hold room 202 for Ruth Example's request.",
+    check: ({ hotel }) =>
+      proposed(hotel, 'hold_inquiry', { inquiryId: 'inq_ruth', roomId: 'rm_202' }),
+  },
+  {
+    id: 'conversation-decline',
+    prompt: 'Decline the crypto spam in the inbox.',
+    check: ({ hotel }) => proposed(hotel, 'decline_inquiry', { inquiryId: 'inq_spam' }),
+  },
+  {
+    id: 'activity-who',
+    prompt: 'Who checked in Anna Example?',
+    check: ({ hotel, calls, answer }) => [
+      ...readOnly(hotel),
+      ...called(calls, 'getActivity'),
+      ...mentions(answer, ['Sam']),
+    ],
+  },
+  {
+    id: 'remove-note',
+    prompt: 'Delete the "Pool closed" note from Knowledge.',
+    check: ({ hotel }) => proposed(hotel, 'remove_hotel_info', { title: 'Pool closed' }),
+  },
+  {
+    id: 'local-event',
+    prompt:
+      'Add the Sierra Marathon as a high-impact local event for tomorrow night and the night after.',
+    check: ({ hotel }) => {
+      const today = hotel.repos.state.bookings.find((b) => b.id === 'bk_jan')!.checkIn;
+      const problems = proposed(hotel, 'add_local_event', {
+        firstNight: addDays(today, 1),
+        lastNight: addDays(today, 2),
+        impact: 'high',
+      });
+      const name = (hotel.repos.state.pendingActions[0]?.input as { name?: string } | undefined)
+        ?.name;
+      return [...problems, ...(name?.includes('Marathon') ? [] : [`named it ${name}`])];
+    },
+  },
+  {
+    id: 'rename-room',
+    prompt: 'Rename room 202 to 202A.',
+    check: ({ hotel }) => proposed(hotel, 'update_room', { roomId: 'rm_202', name: '202A' }),
   },
 ];

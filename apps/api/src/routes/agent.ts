@@ -1,27 +1,34 @@
 import {
+  amountsInText,
   buildSystemPrompt,
   contextNote,
   createAgentTools,
   type HotelContext,
+  hotelFacts,
   type MetaProvider,
   runAgent,
   tokenCostMicroUsd,
   type UsageStore,
 } from '@orbit/ai';
 import {
+  type ActivityService,
   type BillingService,
   DomainError,
   getHotelTimeZone,
   hotelToday,
   type HotelService,
   type HousekeepingService,
+  type InboxService,
   type PendingActionService,
   type RegistrationService,
   type ReportService,
   type Repositories,
+  type RevenueService,
 } from '@orbit/domain';
 import {
   type AgentContext,
+  type HotelInfoEntry,
+  type Inquiry,
   type Relocation,
   type RevenueOutlook,
   type AgentMessageMetadata,
@@ -56,6 +63,13 @@ export interface AgentRouteDeps {
   relocations: (roomId: string) => Promise<Relocation[]>;
   /** Read for every turn, so edits in Settings apply to the next message. */
   hotelContext: () => Promise<HotelContext>;
+  /** Notices whose last day has passed, for the agent only. */
+  endedNotices: () => Promise<HotelInfoEntry[]>;
+  inbox: InboxService;
+  /** The inbox pipeline's guarded reply draft; null when AI drafts are off. */
+  draftReply: ((inquiryId: string) => Promise<Inquiry>) | null;
+  activity: ActivityService;
+  events: Pick<RevenueService, 'listEvents'>;
   limiter: AiLimiter;
   gate: AiGate;
   clock: () => Date;
@@ -78,6 +92,11 @@ export function agentRoutes({
   rateOutlook,
   relocations,
   hotelContext,
+  endedNotices,
+  inbox,
+  draftReply,
+  activity,
+  events,
   limiter,
   clock,
   usage,
@@ -94,6 +113,14 @@ export function agentRoutes({
     listRoomTypes: () => repos.rooms.listRoomTypes(),
     rateOutlook,
     relocations,
+    inbox,
+    draftReply,
+    activity,
+    getGuest: (id) => repos.guests.getGuest(id),
+    guestBookings: (guestId) => repos.bookings.listBookings({ guestId }),
+    listEvents: () => events.listEvents(),
+    // Fees the profile states may be repeated in a reply, as in the inbox's own drafts.
+    statedAmounts: async () => amountsInText(hotelFacts(await hotelContext())),
   });
 
   /** What the staff member was looking at, from the hotel's own data; null if it is gone. */
@@ -129,6 +156,7 @@ export function agentRoutes({
           if (!inquiry) return null;
           return contextNote({
             kind: 'inquiry',
+            inquiryId: inquiry.id,
             senderName: inquiry.senderName,
             senderAddress: inquiry.senderAddress,
             request: inquiry.parsed,
@@ -189,6 +217,7 @@ export function agentRoutes({
         hotel: await hotelContext(),
         today: hotelToday(clock()),
         timezone: getHotelTimeZone(),
+        endedNotices: await endedNotices(),
       }),
       messages: await convertToModelMessages(await withContext(messages.slice(-MAX_HISTORY)), {
         tools,
