@@ -22,8 +22,14 @@ describe('navItemFor', () => {
 });
 
 describe('nav groups', () => {
-  it('lists the front desk before the office', () => {
+  it('lists the front desk, then the office, then the utilities', () => {
     const groups = navItems.map((item) => item.group);
     expect(groups.indexOf('office')).toBeGreaterThan(groups.lastIndexOf('desk'));
+    expect(groups.indexOf('utility')).toBeGreaterThan(groups.lastIndexOf('office'));
+  });
+
+  it('keeps Activity and Settings out of the main list', () => {
+    const utility = navItems.filter((item) => item.group === 'utility').map((item) => item.label);
+    expect(utility).toEqual(['Activity', 'Settings']);
   });
 });

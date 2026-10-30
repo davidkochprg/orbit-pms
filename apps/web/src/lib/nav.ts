@@ -14,8 +14,11 @@ import {
   Users,
 } from 'lucide-react';
 
-/** Front desk: the day-to-day work. Office: rooms and rates, numbers, history and setup. */
-export type NavGroup = 'desk' | 'office';
+/**
+ * Front desk: the day-to-day work. Office: rooms and rates, what guests are told, who to call and
+ * the numbers. Utility: the change history and setup, kept apart at the bottom of the sidebar.
+ */
+export type NavGroup = 'desk' | 'office' | 'utility';
 
 export interface NavItem {
   label: string;
@@ -35,8 +38,8 @@ export const navItems: NavItem[] = [
   { group: 'office', label: 'Knowledge', path: '/knowledge', icon: BookOpenText },
   { group: 'office', label: 'Contacts', path: '/contacts', icon: Contact },
   { group: 'office', label: 'Reports', path: '/reports', icon: ChartColumn },
-  { group: 'office', label: 'Activity', path: '/activity', icon: History },
-  { group: 'office', label: 'Settings', path: '/settings', icon: Settings },
+  { group: 'utility', label: 'Activity', path: '/activity', icon: History },
+  { group: 'utility', label: 'Settings', path: '/settings', icon: Settings },
 ];
 
 export function navItemFor(pathname: string): NavItem | undefined {

@@ -23,9 +23,11 @@ import { folderCounts } from '@/lib/inbox';
 import { type NavGroup, navItemFor, navItems } from '@/lib/nav';
 import { cn, labelCaps } from '@/lib/utils';
 
-const groups: { group: NavGroup; label: string }[] = [
+/** The utilities have no label and sit at the bottom, above the signed-in staff member. */
+const groups: { group: NavGroup; label?: string }[] = [
   { group: 'desk', label: 'Front desk' },
   { group: 'office', label: 'Office' },
+  { group: 'utility' },
 ];
 
 export function AppSidebar() {
@@ -62,8 +64,10 @@ export function AppSidebar() {
 
       <SidebarContent className="gap-1 px-1 pt-2">
         {groups.map(({ group, label }) => (
-          <SidebarGroup key={group}>
-            <SidebarGroupLabel className={cn(labelCaps, 'h-7 px-2')}>{label}</SidebarGroupLabel>
+          <SidebarGroup key={group} className={cn(!label && 'mt-auto')}>
+            {label && (
+              <SidebarGroupLabel className={cn(labelCaps, 'h-7 px-2')}>{label}</SidebarGroupLabel>
+            )}
             <SidebarGroupContent>
               <SidebarMenu className="gap-0.5">
                 {navItems
