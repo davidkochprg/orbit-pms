@@ -1,11 +1,14 @@
 import type { DailyBrief, DayOverview, HousekeepingRoom } from '@orbit/shared';
-import type { ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { Link } from 'react-router';
 import { HouseMap } from '@/components/house-map';
 import { Panel } from '@/components/panel';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { doneOf, occupancyPercent } from '@/lib/brief';
+import { stayByRoom } from '@/lib/house-map';
 
 /** Tonight at a glance: the day's figures in a row over the house map. */
 export function TonightPanel({
@@ -20,6 +23,9 @@ export function TonightPanel({
   className?: string;
 }) {
   const percent = occupancyPercent(brief.occupancy);
+  const { open } = useBookingDrawer();
+  const { openNew } = useBookingEditor();
+  const stays = useMemo(() => day && stayByRoom(day), [day]);
   return (
     <Panel
       title="Tonight"
@@ -69,7 +75,16 @@ export function TonightPanel({
         </Figure>
       </dl>
       <div className="flex-1 p-4">
-        {rooms ? <HouseMap rooms={rooms} /> : <Skeleton className="h-44 w-full" />}
+        {rooms ? (
+          <HouseMap
+            rooms={rooms}
+            stays={stays}
+            onOpenStay={(id) => open(id)}
+            onBook={(roomId) => openNew({ roomId, checkIn: brief.date })}
+          />
+        ) : (
+          <Skeleton className="h-44 w-full" />
+        )}
       </div>
     </Panel>
   );

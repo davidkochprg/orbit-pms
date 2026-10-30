@@ -14,8 +14,22 @@ const stateClass: Record<HouseRoomState, string> = {
   out_of_order: 'bg-hatch text-subtle-foreground ring-1 ring-border ring-inset',
 };
 
-/** The hotel drawn as a building, one row per floor, every room colored by tonight. */
-export function HouseMap({ rooms }: { rooms: HousekeepingRoom[] }) {
+/**
+ * The hotel drawn as a building, one row per floor, every room colored by tonight. A room with a
+ * stay today opens it; a free room starts a booking for it.
+ */
+export function HouseMap({
+  rooms,
+  stays,
+  onOpenStay,
+  onBook,
+}: {
+  rooms: HousekeepingRoom[];
+  /** Today's stay per room id, see `stayByRoom`. */
+  stays?: Map<string, string>;
+  onOpenStay?: (bookingId: string) => void;
+  onBook?: (roomId: string) => void;
+}) {
   const floors = houseFloors(rooms);
   // One column per room on the widest floor, so rooms line up across floors like windows.
   const columns = Math.max(1, ...floors.map((f) => f.rooms.length));
@@ -36,22 +50,50 @@ export function HouseMap({ rooms }: { rooms: HousekeepingRoom[] }) {
               className="grid min-w-0 flex-1 gap-1 sm:gap-1.5"
               style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 4rem))` }}
             >
-              {floor.rooms.map((room) => (
-                <li
-                  key={room.id}
-                  title={room.label}
-                  style={{ animationDelay: `${index++ * 8}ms` }}
-                  className={cn(
-                    'flex h-8 min-w-0 items-center justify-center rounded-md font-mono text-[0.65625rem] motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-90 motion-safe:fill-mode-backwards motion-safe:animation-duration-300',
-                    stateClass[room.state],
-                  )}
-                >
-                  <span className="sr-only">{room.label}</span>
-                  <span aria-hidden className="overflow-hidden">
-                    {room.name}
-                  </span>
-                </li>
-              ))}
+              {floor.rooms.map((room) => {
+                const stay = stays?.get(room.id);
+                const action =
+                  stay && onOpenStay
+                    ? () => onOpenStay(stay)
+                    : room.state === 'vacant' && onBook
+                      ? () => onBook(room.id)
+                      : undefined;
+                const tile = cn(
+                  'flex h-8 w-full min-w-0 items-center justify-center rounded-md font-mono text-[0.65625rem]',
+                  stateClass[room.state],
+                );
+                const name = (
+                  <>
+                    <span className="sr-only">{room.label}</span>
+                    <span aria-hidden className="overflow-hidden">
+                      {room.name}
+                    </span>
+                  </>
+                );
+                return (
+                  <li
+                    key={room.id}
+                    title={room.label}
+                    style={{ animationDelay: `${index++ * 8}ms` }}
+                    className="flex min-w-0 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-90 motion-safe:fill-mode-backwards motion-safe:animation-duration-300"
+                  >
+                    {action ? (
+                      <button
+                        type="button"
+                        onClick={action}
+                        className={cn(
+                          tile,
+                          'cursor-pointer transition-[filter,translate] duration-150 ease-snap outline-none hover:brightness-[1.08] focus-visible:ring-2 focus-visible:ring-ring active:translate-y-px dark:hover:brightness-125',
+                        )}
+                      >
+                        {name}
+                      </button>
+                    ) : (
+                      <span className={tile}>{name}</span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ))}

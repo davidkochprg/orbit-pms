@@ -1,6 +1,6 @@
 import type { HousekeepingRoom, RoomOccupancy, RoomStatus } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
-import { houseFloors } from './house-map';
+import { houseFloors, stayByRoom } from './house-map';
 
 function room(
   name: string,
@@ -57,5 +57,40 @@ describe('houseFloors', () => {
       'Room 205, turnover, Guest B',
       'Room 206, free',
     ]);
+  });
+});
+
+describe('stayByRoom', () => {
+  const summary = (id: string, roomId: string) => ({
+    booking: {
+      id,
+      guestId: 'gst_1',
+      roomId,
+      checkIn: '2026-10-30',
+      checkOut: '2026-11-01',
+      adults: 1,
+      childAges: [],
+      status: 'confirmed' as const,
+      holdExpiresAt: null,
+      source: 'phone' as const,
+      addons: { wellness: false, dogs: 0, extraBeds: 0 },
+      priceSnapshot: null,
+      notes: null,
+    },
+    guestName: 'Test Guest',
+    roomName: roomId,
+  });
+
+  it('opens a turnover room to the arrival, not the guest leaving', () => {
+    const stays = stayByRoom({
+      date: '2026-10-30',
+      arrivals: [summary('bk_in', 'rm_1')],
+      departures: [summary('bk_out', 'rm_1'), summary('bk_gone', 'rm_2')],
+      inHouse: [summary('bk_stay', 'rm_3')],
+    });
+    expect(stays.get('rm_1')).toBe('bk_in');
+    expect(stays.get('rm_2')).toBe('bk_gone');
+    expect(stays.get('rm_3')).toBe('bk_stay');
+    expect(stays.has('rm_4')).toBe(false);
   });
 });

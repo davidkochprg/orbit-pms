@@ -1,4 +1,4 @@
-import type { HousekeepingRoom } from '@orbit/shared';
+import type { DayOverview, HousekeepingRoom } from '@orbit/shared';
 
 /** What a room looks like tonight on the house map. */
 export type HouseRoomState =
@@ -66,4 +66,16 @@ export function houseFloors(rooms: HousekeepingRoom[]): HouseFloor[] {
           return { id: r.room.id, name: r.room.name, state, label: parts.join(', ') };
         }),
     }));
+}
+
+/**
+ * The stay each room opens to from the map: today's arrival first, since they are next, then the
+ * guest staying, then the one leaving. Rooms without one are missing.
+ */
+export function stayByRoom(day: DayOverview): Map<string, string> {
+  const stays = new Map<string, string>();
+  for (const { booking } of [...day.arrivals, ...day.inHouse, ...day.departures]) {
+    if (!stays.has(booking.roomId)) stays.set(booking.roomId, booking.id);
+  }
+  return stays;
 }

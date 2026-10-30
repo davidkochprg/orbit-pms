@@ -7,7 +7,7 @@ import {
   type RoomOption,
 } from '@orbit/shared';
 import { Check, LoaderCircle, Search, X } from 'lucide-react';
-import { type FormEvent, type ReactNode, useMemo, useState } from 'react';
+import { type FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { ErrorNotice } from '@/components/error-notice';
 import { FormField } from '@/components/form-field';
 import { GuestAvatar } from '@/components/guest-avatar';
@@ -476,6 +476,20 @@ function RoomPicker({
 }) {
   const selectedMissing =
     form.roomId !== null && options !== undefined && !options.some((o) => o.roomId === form.roomId);
+  // A room chosen before the list showed (from the house map, the tape chart or an edit) is
+  // scrolled into the list's view, without moving the dialog.
+  const list = useRef<HTMLDivElement>(null);
+  const loaded = options !== undefined && options.length > 0;
+  useEffect(() => {
+    const box = list.current;
+    const row = box?.querySelector<HTMLElement>('[aria-checked="true"]');
+    if (!box || !row) return;
+    const top = row.offsetTop;
+    const bottom = top + row.offsetHeight;
+    if (top < box.scrollTop || bottom > box.scrollTop + box.clientHeight) {
+      box.scrollTop = top - (box.clientHeight - row.offsetHeight) / 2;
+    }
+  }, [form.roomId, loaded]);
   return (
     <Group title="Room">
       {error ? (
@@ -488,10 +502,11 @@ function RoomPicker({
         <p className="text-sm text-muted-foreground">No free rooms for this stay.</p>
       ) : (
         <div
+          ref={list}
           role="radiogroup"
           aria-label="Room"
           className={cn(
-            'scrollbar-thin flex max-h-56 flex-col overflow-y-auto rounded-control border',
+            'scrollbar-thin relative flex max-h-56 flex-col overflow-y-auto rounded-control border',
             loading && 'opacity-60',
           )}
         >
