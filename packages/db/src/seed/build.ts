@@ -373,7 +373,7 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
     staff,
     ...billing,
     stayGuests: buildStayGuests(linked, guests, today),
-    auditLog: buildActivity(linked, rooms, billing.payments, housekeepingTasks, today, now),
+    auditLog: buildActivity(linked, rooms, billing.payments, housekeepingTasks, staff, today, now),
     events,
     contacts,
     labels: mail.labels,

@@ -156,6 +156,12 @@ describe('buildSeed', () => {
     const ids = new Set([...seed.bookings.map((b) => b.id), ...seed.rooms.map((r) => r.id)]);
     expect(seed.auditLog.every((e) => e.subjectId !== null && ids.has(e.subjectId))).toBe(true);
     expect(seed.auditLog.every((e) => e.createdAt <= now.toISOString())).toBe(true);
+    // Every staff change names a seeded team member.
+    const team = new Set(seed.staff.map((m) => m.id));
+    const by = (e: (typeof seed.auditLog)[number]) => (e.payload as { by?: unknown }).by;
+    expect(
+      seed.auditLog.filter((e) => e.actor === 'user').every((e) => team.has(by(e) as string)),
+    ).toBe(true);
   });
 
   it('has a few hundred bookings in the past, present and future', () => {
