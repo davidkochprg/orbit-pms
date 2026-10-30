@@ -3,6 +3,7 @@ import { AppSidebar } from '@/components/app-sidebar';
 import { BookingDrawer } from '@/components/booking-drawer';
 import { BookingEditorProvider } from '@/components/booking-editor';
 import { CommandPaletteProvider } from '@/components/command-palette';
+import { KnockOnStack } from '@/components/knock-on-stack';
 import { RegionProvider } from '@/components/region-provider';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { useSession } from '@/hooks/use-session';
@@ -36,6 +37,7 @@ export function AppLayout() {
               />
             </SidebarInset>
             <BookingDrawer />
+            <KnockOnStack />
           </SidebarProvider>
         </CommandPaletteProvider>
       </BookingEditorProvider>

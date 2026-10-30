@@ -6,6 +6,7 @@ import {
   createHousekeepingService,
   createPendingActionService,
   createRatesService,
+  createSettingsService,
   createRevenueService,
   createRegistrationService,
   createReportService,
@@ -156,6 +157,7 @@ export function buildAgentEvalHotel(today: IsoDate) {
     billing,
     registrations,
     guests: createGuestService({ repos, newId }),
+    settings: createSettingsService({ repos, clock }),
     clock,
     newId,
   });

@@ -6,6 +6,8 @@ import {
   createHousekeepingService,
   createPendingActionService,
   createRatesService,
+  createSettingsService,
+  createKnockOnService,
   createRevenueService,
   createRegistrationService,
   createReportService,
@@ -93,6 +95,7 @@ export function setup() {
     billing,
     registrations,
     guests,
+    settings: createSettingsService({ repos, clock }),
     clock,
     newId,
   });
@@ -109,6 +112,8 @@ export function setup() {
     listRoomTypes: () => repos.rooms.listRoomTypes(),
     rateOutlook: (days) =>
       createRevenueService({ repos, defaults: pricingConfig, clock, newId }).outlook(days, null),
+    relocations: (roomId) =>
+      createKnockOnService({ repos, hotel, policy: hotelPolicy, clock }).relocationsFor(roomId),
   });
   return { repos, hotel, billing, actions, tools };
 }

@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import {
   createHousekeepingNotePipeline,
   createStayNotesReader,
+  createReplyLearner,
   createRevenueBriefWriter,
   createIdScanReader,
   createInboxPipeline,
@@ -24,6 +25,8 @@ import {
   createReportService,
   createRegistrationService,
   createSettingsService,
+  createKnockOnService,
+  currentEntries,
   createStaffService,
   getHotelTimeZone,
   hotelPolicy,
@@ -50,6 +53,7 @@ import { idScanRoutes } from './routes/id-scans';
 import { inboxRoutes } from './routes/inbox';
 import { overviewRoutes } from './routes/overview';
 import { pendingActionRoutes } from './routes/pending-actions';
+import { knockOnRoutes } from './routes/knock-ons';
 import { registrationRoutes } from './routes/registration';
 import { reportRoutes } from './routes/reports';
 import { roomRoutes } from './routes/rooms';
@@ -101,6 +105,7 @@ export function createApp({
   const guests = createGuestService({ repos, newId });
   const housekeeping = createHousekeepingService({ repos, clock, newId });
   const rates = createRatesService({ repos, defaults: pricingConfig, newId });
+  const settings = createSettingsService({ repos, clock });
   const actions = createPendingActionService({
     repos,
     rates,
@@ -108,10 +113,11 @@ export function createApp({
     billing,
     registrations,
     guests,
+    settings,
     clock,
     newId,
   });
-  const settings = createSettingsService({ repos });
+  const knockOns = createKnockOnService({ repos, hotel, policy: hotelPolicy, clock });
   const staff = createStaffService({ repos, newId });
   const revenue = createRevenueService({ repos, defaults: pricingConfig, clock, newId });
   /** The outlook with the forecast at the hotel, when it has coordinates and one loads. */
@@ -121,8 +127,9 @@ export function createApp({
       weather && coordinates ? await weather.forecast(coordinates, getHotelTimeZone()) : null;
     return revenue.outlook(days, forecast);
   };
+  // Notices whose last day has passed are left out, so the agent no longer mentions them.
   const hotelContext = async (): Promise<HotelContext> => ({
-    profile: await settings.getProfile(),
+    profile: currentEntries(await settings.getProfile(), hotelToday(clock())),
     policy: hotelPolicy,
     pricing: await rates.getPricing(),
   });
@@ -203,6 +210,7 @@ export function createApp({
   app.route('/api', guestRoutes(repos, guests));
   app.route('/api', overviewRoutes(repos, hotel));
   app.route('/api', pendingActionRoutes(actions));
+  app.route('/api', knockOnRoutes(knockOns));
   app.route(
     '/api',
     inboxRoutes({
@@ -210,6 +218,10 @@ export function createApp({
       hotel,
       pipeline,
       translator,
+      learner: ai && createReplyLearner({ model: ai.agent, modelId: ai.agentModelId, usage }),
+      actions,
+      hotelEntries: async () => (await hotelContext()).profile.entries,
+      today: () => hotelToday(clock()),
       gate,
       identify: (id) => staff.identify(id),
     }),
@@ -227,6 +239,7 @@ export function createApp({
       housekeeping,
       registrations,
       rateOutlook,
+      relocations: (roomId) => knockOns.relocationsFor(roomId),
       hotelContext,
       limiter,
       gate,

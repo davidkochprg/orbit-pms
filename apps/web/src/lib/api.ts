@@ -39,6 +39,7 @@ import {
   type NewStayGuestBody,
   type NewMessageBody,
   pendingActionSchema,
+  knockOnSchema,
   type PricingConfig,
   pricingConfigSchema,
   type AdjustRatesBody,
@@ -534,6 +535,23 @@ export function useInboxHold(id: string) {
   });
 }
 
+/** Looks for rooms again for a request that had none when it was read. */
+export function useRefreshInboxRooms() {
+  return useRefreshingMutation((id: string) =>
+    apiPost(`${inboxPath(id)}/rooms`, {}, inquirySchema),
+  );
+}
+
+/**
+ * Reads the reply just sent for a fact the hotel information lacks: the proposal to save it, or
+ * null. Nothing else changes, so nothing is refetched.
+ */
+export function useLearnFromReply(id: string) {
+  return useMutation({
+    mutationFn: () => apiPost(`${inboxPath(id)}/learn`, {}, pendingActionSchema.nullable()),
+  });
+}
+
 /** Sends the hotel's reply through the conversation's channel. */
 export function useSendReply(id: string) {
   return useInboxMutation((body: string) =>
@@ -626,6 +644,21 @@ export function useReadStays() {
     mutationFn: () => apiPost('/api/housekeeping/read-stays', {}, housekeepingBoardSchema),
     onSuccess: (board) => queryClient.setQueryData(['housekeeping'], board),
   });
+}
+
+/** What recent changes made worth doing next: stays to move, requests to offer a room. */
+export function useKnockOns() {
+  return useQuery({
+    queryKey: ['knock-ons'],
+    queryFn: () => apiGet('/api/knock-ons', z.array(knockOnSchema)),
+  });
+}
+
+/** Moves stays out of a room that went out of order, to the rooms suggested. */
+export function useRelocate() {
+  return useRefreshingMutation((moves: { bookingId: string; roomId: string }[]) =>
+    apiPost('/api/knock-ons/relocate', { moves }, z.array(bookingSchema)),
+  );
 }
 
 function useRefreshingMutation<T, R>(fn: (input: T) => Promise<R>) {

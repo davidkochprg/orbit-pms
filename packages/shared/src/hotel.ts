@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { isoDateSchema } from './dates';
 import { languageSchema } from './enums';
 
 /** What an entry in the hotel profile describes: a rule, a facility, or anything else guests ask. */
@@ -17,8 +18,22 @@ export const hotelInfoEntrySchema = z.object({
   category: hotelInfoCategorySchema,
   title: z.string().trim().min(1).max(80),
   details: z.string().trim().min(1).max(600),
+  /** The last day a temporary notice applies, e.g. "Sauna closed"; absent or null if it always does. */
+  until: isoDateSchema.nullable().optional(),
 });
 export type HotelInfoEntry = z.infer<typeof hotelInfoEntrySchema>;
+
+/**
+ * A fact to keep in the hotel profile, as the agent proposes it. It replaces the entry with the
+ * same title, so a correction updates what is there instead of adding a second version.
+ */
+export const hotelInfoDraftSchema = z.object({
+  category: hotelInfoCategorySchema,
+  title: z.string().trim().min(1).max(80),
+  details: z.string().trim().min(1).max(600),
+  until: isoDateSchema.nullable(),
+});
+export type HotelInfoDraft = z.infer<typeof hotelInfoDraftSchema>;
 
 const optionalText = (max: number) =>
   z

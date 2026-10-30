@@ -39,6 +39,7 @@ const titles: Record<PendingAction['kind'], string> = {
   remove_stay_guest: 'Remove from the guest book',
   update_guest: 'Edit the guest profile',
   adjust_rates: 'Change rates',
+  save_hotel_info: 'Save to hotel info',
 };
 
 /**

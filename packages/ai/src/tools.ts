@@ -29,6 +29,8 @@ import {
   newTaskBodySchema,
   type PendingAction,
   type PendingActionInput,
+  hotelInfoDraftSchema,
+  type Relocation,
   type RevenueOutlook,
   adjustRatesBodySchema,
   quoteInputSchema,
@@ -58,6 +60,8 @@ export interface ToolDeps {
   listRoomTypes: () => Promise<{ id: string; name: string }[]>;
   /** The next nights with suggested rates, with the forecast when there is one. */
   rateOutlook: (days: number) => Promise<RevenueOutlook>;
+  /** Stays booked into a room that is out of order, with a free room for each. */
+  relocations?: (roomId: string) => Promise<Relocation[]>;
 }
 
 export interface ToolError {
@@ -204,6 +208,7 @@ export const proposalToolNames = [
   'removeFromGuestBook',
   'updateGuestProfile',
   'adjustRates',
+  'saveHotelInfo',
 ] as const;
 
 /** Tools that change data straight away: housekeeping is low-risk and reversible (ADR 0006). */
@@ -228,6 +233,7 @@ export function createAgentTools({
   listRooms,
   listRoomTypes,
   rateOutlook,
+  relocations,
 }: ToolDeps) {
   const propose = (input: PendingActionInput) =>
     safely(async () => toProposal(await actions.propose(input)));
@@ -361,6 +367,12 @@ export function createAgentTools({
       inputSchema: adjustRatesBodySchema,
       execute: (input) => propose({ kind: 'adjust_rates', input }),
     }),
+    saveHotelInfo: tool({
+      description:
+        'Propose saving a fact about the hotel for answering guests later: a house rule ("policy"), a facility or service ("amenity"), or anything else guests ask ("info"). Use it when staff tell you to remember something, or tell you about a temporary notice such as "the sauna is closed until Friday" (until: its last day, YYYY-MM-DD; null if it always applies). A fact with the title of an existing entry replaces it: keep what that entry says and change only what is new. A temporary notice gets its own title, e.g. "Sauna closed", never the title of a lasting entry. Never for room prices, availability or one guest\'s booking. The user must confirm.',
+      inputSchema: hotelInfoDraftSchema,
+      execute: (input) => propose({ kind: 'save_hotel_info', input }),
+    }),
     getBill: tool({
       description:
         "A booking's bill: stay lines, city tax and extras, payments and refunds, and the balance still owed (negative: owed to the guest). Repeat amounts verbatim.",
@@ -432,7 +444,7 @@ export function createAgentTools({
     }),
     setRoomStatus: tool({
       description:
-        "Set a room's housekeeping status: clean, dirty, inspected or out_of_order. This takes effect immediately, without a confirm card, and is logged; say that it is done. An out-of-order room must be marked dirty before it can be clean or inspected.",
+        "Set a room's housekeeping status: clean, dirty, inspected or out_of_order. This takes effect immediately, without a confirm card, and is logged; say that it is done. An out-of-order room must be marked dirty before it can be clean or inspected. For out_of_order the result lists `relocations`: stays still booked in the room, each with a free room (toRoomId) that fits; offer to move them by proposing moveBooking for each, and name any stay with no free room (toRoomId null).",
       inputSchema: z.object({
         roomId: z.string().describe('Room ID, e.g. "rm_104".'),
         status: roomStatusSchema,
@@ -441,12 +453,15 @@ export function createAgentTools({
         safely(async () => {
           const before = (await listRooms()).find((r) => r.id === roomId);
           const room = await housekeeping.setRoomStatus(roomId, status, 'agent');
+          const moves =
+            room.status === 'out_of_order' && relocations ? await relocations(room.id) : [];
           const result: AgentRoomStatusResult = {
             done: true,
             roomId: room.id,
             roomName: room.name,
             from: before ? roomStatusSchema.parse(before.status) : room.status,
             status: room.status,
+            ...(moves.length > 0 && { relocations: moves }),
           };
           return result;
         }),

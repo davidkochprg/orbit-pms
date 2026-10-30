@@ -319,4 +319,27 @@ describe('agent tools', () => {
     ).toMatchObject({ error: { code: 'invalid_transition' } });
     expect(repos.state.rooms.find((r) => r.id === 'rm_201')?.status).toBe('out_of_order');
   });
+
+  it('names the stays to move, with a free room each, when a room goes out of order', async () => {
+    const { tools } = setup();
+    const result = await tools.setRoomStatus.execute(
+      { roomId: 'rm_104', status: 'out_of_order' },
+      callOptions,
+    );
+    expect(result).toMatchObject({
+      done: true,
+      status: 'out_of_order',
+      relocations: [{ bookingId: 'bk_1', toRoomId: 'rm_201', sameType: true }],
+    });
+  });
+
+  it('proposes saving a fact about the hotel instead of saving it', async () => {
+    const { tools, repos } = setup();
+    const result = await tools.saveHotelInfo.execute(
+      { category: 'amenity', title: 'Sauna', details: 'Closed for repairs.', until: '2026-05-15' },
+      callOptions,
+    );
+    expect(result).toMatchObject({ status: 'awaiting_confirmation' });
+    expect(repos.state.profile?.entries ?? []).toEqual([]);
+  });
 });

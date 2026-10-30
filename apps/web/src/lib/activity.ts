@@ -35,6 +35,7 @@ export const activityLabels: Record<string, string> = {
   'task.create': 'Added a task',
   'task.status': 'Updated a task',
   'settings.profile': 'Edited the hotel profile',
+  'settings.entry': 'Saved hotel info',
   'settings.pricing': 'Changed the rates',
   'staff.create': 'Added a team member',
   'staff.update': 'Changed a team member',

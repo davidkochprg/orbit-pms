@@ -5,6 +5,7 @@ import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useDayOverview } from '@/lib/api';
 import { entryHints, newEntry } from '@/lib/settings';
 
 interface Props {
@@ -18,6 +19,7 @@ interface Props {
 export function EntrySettings({ category, profile, onChange, readOnly }: Props) {
   const { title, example } = entryHints[category];
   const entries = profile.entries.filter((e) => e.category === category);
+  const today = useDayOverview().data?.date;
 
   const update = (id: string, patch: Partial<HotelInfoEntry>) =>
     onChange({
@@ -77,6 +79,19 @@ export function EntrySettings({ category, profile, onChange, readOnly }: Props) 
                 value={entry.details}
                 onChange={(e) => update(entry.id, { details: e.target.value })}
               />
+              {/* A temporary notice, e.g. the sauna closed for repairs, ends on its own. */}
+              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                Until
+                <Input
+                  type="date"
+                  value={entry.until ?? ''}
+                  onChange={(e) => update(entry.id, { until: e.target.value || null })}
+                  className="h-8 w-40 text-xs"
+                />
+                {entry.until && today && entry.until < today && (
+                  <span className="text-warning">Ended, not told to guests</span>
+                )}
+              </label>
             </li>
           ))}
         </ul>

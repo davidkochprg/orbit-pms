@@ -79,7 +79,11 @@ export function hotelFacts({ profile, policy, pricing }: HotelContext): string {
   for (const [category, heading] of sections) {
     const entries = profile.entries.filter((e) => e.category === category);
     if (entries.length === 0) continue;
-    lines.push('', `${heading}:`, ...entries.map((e) => `- ${e.title}: ${e.details}`));
+    lines.push(
+      '',
+      `${heading}:`,
+      ...entries.map((e) => `- ${e.title}: ${e.details}${e.until ? ` (until ${e.until})` : ''}`),
+    );
   }
   lines.push('', 'Rules Orbit enforces:', ...enforcedRules(policy).map((r) => `- ${r}`));
   return lines.join('\n');

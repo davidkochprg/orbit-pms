@@ -79,6 +79,7 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - `saveProcessing(id, result)`: stores the agent's extraction and suggestion; a `new` message with options becomes `quoted`.
 - `createHold(id, roomId, actor)`: a hold for the requested stay in the chosen room. Reuses a guest whose email matches the sender (case-insensitive), otherwise creates one. The hold and the message's `bookingId` are saved in one transaction. If the message already has a hold, it moves to the chosen room and is quoted there (`switchHold`); once that booking is confirmed or later, holding again is a `conflict`.
 - `decline(id, actor)`: marks a message `declined`, unless it already led to a booking (`invalid_transition`).
+- `refreshOptions(id)`: looks for rooms again for a request that was read, e.g. one that had none when a cancellation frees a room. The old draft is dropped; a `new` message with rooms becomes `quoted`. `invalid_transition` before the request is read.
 
 ## Guests
 
@@ -95,6 +96,14 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - **Stay readings**: what the model read from a stay's booking notes, guest notes and the guest's own latest messages about the booking (`staySource`): pets, extra mess with a reason, and things to set up. Each is stored with the text it was read from; when that text changes the stay counts as unread (`unreadStays` on the board) and is read again, and the old reading counts until then. The domain trims cues to a few words and saves a stay the model skipped as nothing unusual, so it is not sent again.
 - **Notes**: a housekeeping note (voice or typed) is read by the model into room/status/issue updates. The domain resolves the room names (whole words: "pokoj 104", "A 1"), applies status changes and creates maintenance tasks in one transaction, and skips updates for unknown rooms or forbidden changes with a reason. A note saying a room is clean leaves an already inspected room inspected.
 - Every change is written to the audit log (`room.status`, `task.create`, `task.status`), with the room as subject.
+
+## Knock-ons
+
+`createKnockOnService` (`knock-on.ts`) works out what a change made worth doing next, from current data each time ([ADR 0018](decisions/0018-knock-ons-worked-out-on-read.md)).
+
+- **Relocate**: for each out-of-order room, the stays in it that are in house or arrive within `RELOCATION_DAYS` (7) and still hold the room. `planRelocations` gives each a free room for the whole stay that the party fits, dogs allowed if they bring one: the same room type first, then a clean or inspected room when the guest is here or arrives today, then the room type closest in price, then by name. A room is never planned for two overlapping stays; back-to-back stays may share it. A stay with no free room is listed with none. Moving keeps the booked price.
+- **Opening**: a request that was read when nothing was free (`suggestion.options` empty), still `new` or `replied`, not archived, without a booking and not in the past, that `inboxOptions` now finds rooms for, with how many and the cheapest total.
+- `relocate({ moves }, actor)` moves the stays one by one through `moveBooking`, with its checks and audit entries.
 
 ## Daily brief
 
@@ -119,6 +128,8 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 
 - Until a profile is saved, `getProfile()` returns an empty one (`emptyHotelProfile`).
 - `updateProfile(profile, by)` replaces the whole profile; only an active manager may (`forbidden`). Entry IDs must be unique and check-out must be earlier in the day than check-in, so rooms can be turned over (`invalid_input`). It writes `settings.profile` to the audit log with who saved it (`by`) and the names of the changed fields; a save that changes nothing writes nothing.
+- An entry may have an `until` date: a temporary notice, e.g. "Sauna closed". After that day it is left out of what guests are told (`currentEntries(profile, today)`), and Settings shows it as ended.
+- `saveHotelInfo(draft, actor)` saves one fact, as staff confirm it from the agent or from a reply they sent (`save_hotel_info` proposal). It replaces the entry with the same title, ignoring case, in any category, or adds one with a new ID; a notice with an `until` may not replace an entry that always applies, and one that has already ended is refused (`invalid_input`), as is a new entry beyond 100. Unlike editing Settings it is open to all staff: one entry, confirmed by a person. Audited as `settings.entry`.
 - Rules the system enforces (hold length, which room kinds take dogs, prices) stay in `hotelPolicy` and the rates, not in the profile.
 
 ## Activity

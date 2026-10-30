@@ -189,6 +189,8 @@ Conversations with guests by email, web form, phone note and OTA messaging ([ADR
 | `POST /api/inbox/:id/messages/:messageId/translate` | `{ to: Language }`                                                    | `Inquiry` with the message's `translation`, kept so asking again is free. 404, 422 `translation_failed`, 503, 429.                                                                                                                         |
 | `POST /api/inbox/translate`                         | `{ text, to: Language }`                                              | `{ text }`: any text translated, e.g. a reply as staff edit it. Nothing is stored. 422 `translation_failed`, 503, 429.                                                                                                                     |
 | `POST /api/inbox/:id/hold`                          | `{ roomId }`                                                          | 201 `BookingDetail` of the hold for the requested stay: a new one, or the message's hold moved to this room and re-quoted. 409 if the message has no complete stay request, that room is already held, or its booking is no longer a hold. |
+| `POST /api/inbox/:id/rooms`                         |                                                                       | `Inquiry` with rooms looked up again for its request (`refreshOptions`) and the old draft dropped. 409 `invalid_transition` before it is read.                                                                                             |
+| `POST /api/inbox/:id/learn`                         |                                                                       | The `PendingAction` (`save_hotel_info`) for a fact the latest reply states that the hotel information lacks, or `null`. One model call. 503 `ai_not_configured`, 429 `demo_limit`.                                                         |
 | `POST /api/inbox/:id/decline`                       |                                                                       | `Inquiry` with `status: "declined"`. 409 `invalid_transition` if it already led to a booking.                                                                                                                                              |
 
 ## Housekeeping
@@ -202,6 +204,18 @@ Conversations with guests by email, web form, phone note and OTA messaging ([ADR
 | `POST /api/housekeeping/tasks/:id/status` | `{ status }`                                                    | `HousekeepingTask`                                                                                                                                                                                                                                                                                                                |
 | `POST /api/housekeeping/notes`            | `{ text }`                                                      | `HousekeepingNoteResult`: `{ transcript, changes, skipped, unclear }`. Changes are already applied, as the agent. 503 `ai_not_configured`, 429 `demo_limit`.                                                                                                                                                                      |
 | `POST /api/housekeeping/voice`            | multipart, `audio`: WAV (mono 16-bit PCM, 16 kHz), at most 5 MB | `HousekeepingNoteResult` with the transcript. 400 if not WAV, 413 if too large, 502 `transcription_failed`, 503 when voice is not configured.                                                                                                                                                                                     |
+
+## Knock-ons
+
+What a change made worth doing next, worked out from current data ([ADR 0018](decisions/0018-knock-ons-worked-out-on-read.md), [domain.md](domain.md#knock-ons)).
+
+### `GET /api/knock-ons`
+
+`KnockOn[]`: `{ kind: 'relocate', id, roomId, roomName, moves: [{ bookingId, guestName, checkIn, checkOut, status, toRoomId, toRoomName, sameType }] }` for an out-of-order room with stays to move (`toRoomId` null when no room is free), and `{ kind: 'opening', id, inquiryId, guestName, checkIn, checkOut, rooms, fromTotal }` for a request a room is free for again. `id` stays the same while the situation does.
+
+### `POST /api/knock-ons/relocate`
+
+`{ moves: [{ bookingId, roomId }] }` (1 to 20). Moves each stay, as `POST /api/bookings/:id/move` would; returns the moved `Booking[]`. Stops at the first move that is no longer valid (409).
 
 ## Settings and staff
 

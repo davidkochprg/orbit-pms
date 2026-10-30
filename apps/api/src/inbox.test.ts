@@ -8,7 +8,7 @@ import {
   createUsageStore,
   schema,
 } from '@orbit/db';
-import type { ApiError, BookingDetail, Inquiry } from '@orbit/shared';
+import type { ApiError, BookingDetail, HotelProfile, Inquiry, PendingAction } from '@orbit/shared';
 import { MockLanguageModelV4 } from 'ai/test';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
@@ -100,6 +100,58 @@ beforeEach(async () => {
   await handle.db.delete(schema.aiUsage);
 }, DB_SETUP_TIMEOUT);
 afterAll(() => handle.close());
+
+/** Reads every sent reply as stating a new fact about EV charging. */
+const learningModel = new MockLanguageModelV4({
+  doGenerate: () =>
+    Promise.resolve({
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            save: true,
+            category: 'amenity',
+            title: 'EV charging',
+            details: 'Two chargers in the back lot, free for guests.',
+            until: null,
+          }),
+        },
+      ],
+      finishReason: { unified: 'stop', raw: undefined },
+      usage: {
+        inputTokens: { total: 400, noCache: 400, cacheRead: undefined, cacheWrite: undefined },
+        outputTokens: { total: 40, text: 40, reasoning: undefined },
+      },
+      warnings: [],
+    }),
+});
+
+describe('learning from replies', () => {
+  it('proposes saving a fact staff told a guest, saved only once confirmed', async () => {
+    const app = appWith(learningModel);
+    await call(app, 'POST', '/api/inbox/inq_01/send', {
+      body: 'Yes, two chargers in the back lot, free for guests.',
+    });
+    const learned = await call<PendingAction>(app, 'POST', '/api/inbox/inq_01/learn');
+    expect(learned.body).toMatchObject({
+      kind: 'save_hotel_info',
+      status: 'pending',
+      input: { title: 'EV charging', category: 'amenity' },
+    });
+    const before = await call<HotelProfile>(app, 'GET', '/api/settings/profile');
+    expect(before.body.entries.some((e) => e.title === 'EV charging')).toBe(false);
+
+    await call(app, 'POST', `/api/pending-actions/${learned.body.id}/confirm`);
+    const after = await call<HotelProfile>(app, 'GET', '/api/settings/profile');
+    expect(after.body.entries).toContainEqual(
+      expect.objectContaining({ title: 'EV charging', category: 'amenity' }),
+    );
+  });
+
+  it('needs the AI to be configured', async () => {
+    expect((await call(appWith(null), 'POST', '/api/inbox/inq_01/learn')).status).toBe(503);
+  });
+});
 
 describe('unified inbox', () => {
   it('lists direct and OTA conversations, latest message first, none prepared yet', async () => {

@@ -15,5 +15,6 @@ export const reasoningEffort = {
   revenueBrief: 'minimal',
   idScan: 'minimal',
   translate: 'minimal',
+  learn: 'minimal',
   agent: 'low',
 } as const satisfies Record<string, ReasoningEffort>;

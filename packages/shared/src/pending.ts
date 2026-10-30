@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { chargePatchSchema, newChargeBodySchema, newPaymentBodySchema } from './billing';
 import { isoDateSchema } from './dates';
+import { hotelInfoDraftSchema } from './hotel';
 import { bookingPatchSchema, createHoldInputSchema, guestPatchSchema } from './operations';
 import { moneySchema } from './quote';
 import { newStayGuestBodySchema, stayGuestPatchSchema } from './registration';
@@ -55,6 +56,7 @@ export const pendingActionInputSchema = z.discriminatedUnion('kind', [
     input: guestPatchSchema.extend({ guestId: z.string() }),
   }),
   z.object({ kind: z.literal('adjust_rates'), input: adjustRatesBodySchema }),
+  z.object({ kind: z.literal('save_hotel_info'), input: hotelInfoDraftSchema }),
 ]);
 export type PendingActionInput = z.infer<typeof pendingActionInputSchema>;
 export type PendingActionKind = PendingActionInput['kind'];

@@ -4,6 +4,7 @@ import {
   type Inquiry,
   type Language,
   languages,
+  type PendingAction,
   type StayOption,
 } from '@orbit/shared';
 import {
@@ -11,7 +12,9 @@ import {
   ArchiveRestore,
   ArrowLeft,
   Ban,
+  BookOpenText,
   CalendarPlus,
+  Check,
   Copy,
   Languages,
   Mail,
@@ -45,12 +48,20 @@ import {
   useInquiry,
   useReadInquiry,
   useSendReply,
+  useLearnFromReply,
+  useResolvePendingAction,
   useSetArchived,
   useSetUnread,
   useTranslateMessage,
   useTranslateText,
 } from '@/lib/api';
-import { formatDateTime, formatPrice, languageLabels, statusLabels } from '@/lib/format';
+import {
+  formatDate,
+  formatDateTime,
+  formatPrice,
+  languageLabels,
+  statusLabels,
+} from '@/lib/format';
 import {
   analysisFacts,
   bookingPrefillFor,
@@ -61,6 +72,7 @@ import {
   sendLabel,
   senderLabel,
 } from '@/lib/inbox';
+import { entryHints } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 
 /**
@@ -75,6 +87,7 @@ export function Conversation({ id }: { id: string }) {
   const setUnread = useSetUnread(id);
   const reading = useReadInquiry(id);
   const drafting = useDraftInquiry(id);
+  const learn = useLearnFromReply(id);
   const aiOn = health.data?.ai.configured ?? false;
   const myLanguage: Language = current?.language ?? 'en';
   const m = inquiry.data;
@@ -132,6 +145,7 @@ export function Conversation({ id }: { id: string }) {
           />
         ))}
       </ol>
+      {learn.data && <LearnedFact key={learn.data.id} action={learn.data} />}
       {offerPrepare && (
         <Prepare
           reading={reading.isPending}
@@ -165,9 +179,79 @@ export function Conversation({ id }: { id: string }) {
           heldSinceEdit={heldSinceEdit}
           onEdit={() => setEditedKey(draftKey)}
           onDraft={read ? draft : prepare}
+          // What staff wrote themselves may hold something the hotel information lacks.
+          onSent={() => aiOn && (edited || !m.suggestion?.draft) && learn.mutate()}
         />
       )}
     </article>
+  );
+}
+
+/**
+ * A fact from the reply just sent that the hotel information doesn't have yet, offered to keep
+ * for the next guest who asks. Saving confirms the proposal, so it is in the activity log.
+ */
+function LearnedFact({ action }: { action: PendingAction }) {
+  const resolve = useResolvePendingAction(action.id);
+  const status = resolve.data?.status ?? action.status;
+  if (action.kind !== 'save_hotel_info' || status === 'rejected') return null;
+  const { category, title, details, until } = action.input;
+  const where = entryHints[category].title;
+  // The entry it replaces, as it read when the fact was proposed.
+  const before = action.details?.changes[0]?.before;
+  const was = before && 'text' in before ? before.text : null;
+
+  if (status === 'confirmed') {
+    return (
+      <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Check className="size-4 text-success" /> {was ? 'Updated in' : 'Saved to'} {where}: {title}
+      </p>
+    );
+  }
+  return (
+    <section
+      aria-label={`${was ? 'Update in' : 'Save to'} ${where}`}
+      className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-stage bg-background px-4 py-3 text-sm shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit motion-safe:animate-in motion-safe:fade-in"
+    >
+      <BookOpenText className="size-4 shrink-0 text-muted-foreground" />
+      <p className="min-w-56 flex-1">
+        <span className="text-muted-foreground">
+          {was ? 'Update in' : 'Save to'} {where}:{' '}
+        </span>
+        <span className="font-medium">{title}</span>
+        <span className="text-muted-foreground">
+          {' '}
+          · {details}
+          {until && ` Until ${formatDate(until)}.`}
+        </span>
+        {was && (
+          <span className="mt-0.5 block text-xs text-subtle-foreground line-through decoration-ink/30">
+            {was}
+          </span>
+        )}
+      </p>
+      {(resolve.error || status === 'failed') && (
+        <ErrorNotice message={resolve.error?.message ?? resolve.data?.error ?? 'Could not save'} />
+      )}
+      <span className="flex shrink-0 items-center gap-1.5">
+        <Button
+          variant="ghost"
+          size="xs"
+          disabled={resolve.isPending}
+          onClick={() => resolve.mutate('reject')}
+        >
+          Not now
+        </Button>
+        <Button
+          size="xs"
+          variant="outline"
+          disabled={resolve.isPending}
+          onClick={() => resolve.mutate('confirm')}
+        >
+          {was ? 'Update' : 'Save'}
+        </Button>
+      </span>
+    </section>
   );
 }
 
@@ -561,6 +645,7 @@ function ReplyEditor({
   heldSinceEdit,
   onEdit,
   onDraft,
+  onSent,
 }: {
   inquiry: Inquiry;
   myLanguage: Language;
@@ -575,6 +660,7 @@ function ReplyEditor({
   /** The staff member changed the reply. */
   onEdit: () => void;
   onDraft: () => void;
+  onSent: () => void;
 }) {
   const suggestion = m.suggestion;
   const toTheirs = useTranslateText();
@@ -711,7 +797,7 @@ function ReplyEditor({
             size="sm"
             disabled={!theirs.trim() || send.isPending || behind || translating || busy}
             title={behind ? `Translate your ${myName} changes first` : undefined}
-            onClick={() => send.mutate(theirs)}
+            onClick={() => send.mutate(theirs, { onSuccess: onSent })}
           >
             <Send /> {sendLabel(m)}
           </Button>

@@ -127,6 +127,34 @@ describe('inbox service', () => {
     });
   });
 
+  it('looks for rooms again for a request read when nothing was free', async () => {
+    const { inbox, msg, repos } = await processed();
+    await inbox.saveProcessing(msg.id, {
+      ok: true,
+      parsed: analysis,
+      suggestion: {
+        options: [],
+        note: 'Nothing free',
+        draft: 'Sorry…',
+        draftLanguage: 'de',
+        draftTranslation: null,
+      },
+    });
+    await repos.inquiries.updateInquiry({ ...(await inbox.get(msg.id)), status: 'new' });
+    const refreshed = await inbox.refreshOptions(msg.id);
+    expect(refreshed.status).toBe('quoted');
+    expect(refreshed.suggestion).toMatchObject({ note: null, draft: null });
+    expect(refreshed.suggestion?.options.length).toBeGreaterThan(0);
+  });
+
+  it('refuses to look for rooms before the request is read', async () => {
+    const { inbox } = setup();
+    const msg = await inbox.create({ body: 'x', channel: 'email' });
+    await expect(inbox.refreshOptions(msg.id)).rejects.toMatchObject({
+      code: 'invalid_transition',
+    });
+  });
+
   it('records a processing error without losing the message', async () => {
     const { inbox } = setup();
     const msg = await inbox.create({ body: 'x', channel: 'email' });

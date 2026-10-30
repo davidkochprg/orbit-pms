@@ -3,6 +3,7 @@ export * from './cost';
 export * from './housekeeping';
 export * from './id-scan';
 export * from './inbox';
+export * from './learn';
 export * from './price-guard';
 export * from './prompts/context';
 export * from './prompts/hotel';

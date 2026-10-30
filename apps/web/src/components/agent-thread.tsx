@@ -2,6 +2,7 @@ import { getToolName, isToolUIPart, type UIMessage } from 'ai';
 import {
   BedDouble,
   BookOpen,
+  BookOpenText,
   Braces,
   BrushCleaning,
   Calculator,
@@ -76,6 +77,7 @@ const toolIcons: Record<string, LucideIcon> = {
   checkIn: LogIn,
   checkOut: LogOut,
   moveBooking: BedDouble,
+  saveHotelInfo: BookOpenText,
 };
 
 const isDone = (p: ToolPart) => p.state === 'output-available' || p.state === 'output-error';

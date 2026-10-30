@@ -10,6 +10,7 @@ export * from './hotel';
 export * from './id-scan';
 export * from './housekeeping';
 export * from './inquiry';
+export * from './knock-on';
 export * from './operations';
 export * from './pending';
 export * from './quote';

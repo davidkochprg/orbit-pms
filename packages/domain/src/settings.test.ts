@@ -5,7 +5,10 @@ import {
   assertValidProfile,
   changedProfileFields,
   createSettingsService,
+  currentEntries,
   emptyHotelProfile,
+  MAX_HOTEL_INFO_ENTRIES,
+  withHotelInfo,
 } from './settings';
 import { createMemoryRepositories } from './testing';
 
@@ -101,5 +104,103 @@ describe('createSettingsService', () => {
       createSettingsService({ repos }).updateProfile({ ...profile, checkInFrom: '09:00' }, manager),
     ).rejects.toThrow(DomainError);
     expect(repos.state.profile).toEqual(profile);
+  });
+});
+
+describe('hotel info from the agent', () => {
+  const today = '2026-05-10';
+  const draft = {
+    category: 'info' as const,
+    title: 'EV charging',
+    details: 'Two chargers.',
+    until: null,
+  };
+
+  it('adds a new fact with an ID of its category', () => {
+    const { profile: next, entry, replaced } = withHotelInfo(profile, draft, today);
+    expect(replaced).toBeNull();
+    expect(entry).toMatchObject({ id: 'info-3', title: 'EV charging', until: null });
+    expect(next.entries).toHaveLength(3);
+  });
+
+  it('replaces the entry with the same title, whatever its case', () => {
+    const {
+      profile: next,
+      entry,
+      replaced,
+    } = withHotelInfo(
+      profile,
+      { ...draft, category: 'amenity', title: 'parking ', details: 'Paid now.' },
+      today,
+    );
+    expect(replaced?.id).toBe('parking');
+    expect(entry).toMatchObject({ id: 'parking', title: 'parking', details: 'Paid now.' });
+    expect(next.entries).toHaveLength(2);
+  });
+
+  it('keeps a notice from replacing an entry that always applies', () => {
+    expect(() =>
+      withHotelInfo(
+        profile,
+        { category: 'amenity', title: 'Parking', details: 'Closed today.', until: today },
+        today,
+      ),
+    ).toThrow(/give the notice its own title/);
+  });
+
+  it('refuses a notice that has already ended', () => {
+    expect(() => withHotelInfo(profile, { ...draft, until: '2026-05-09' }, today)).toThrow(
+      DomainError,
+    );
+  });
+
+  it('refuses a new fact when the profile is full', () => {
+    const full = {
+      ...profile,
+      entries: Array.from({ length: MAX_HOTEL_INFO_ENTRIES }, (_, i) => ({
+        id: `e${i}`,
+        category: 'info' as const,
+        title: `Entry ${i}`,
+        details: 'x',
+      })),
+    };
+    expect(() => withHotelInfo(full, draft, today)).toThrow(/at most 100/);
+    expect(() => withHotelInfo(full, { ...draft, title: 'Entry 3' }, today)).not.toThrow();
+  });
+
+  it('leaves out notices whose last day has passed', () => {
+    const withNotices = {
+      ...profile,
+      entries: [
+        ...profile.entries,
+        { id: 'a', category: 'amenity' as const, title: 'Sauna', details: 'Closed.', until: today },
+        {
+          id: 'b',
+          category: 'amenity' as const,
+          title: 'Pool',
+          details: 'Closed.',
+          until: '2026-05-09',
+        },
+      ],
+    };
+    expect(currentEntries(withNotices, today).entries.map((e) => e.id)).toEqual([
+      'parking',
+      'quiet',
+      'a',
+    ]);
+  });
+
+  it('saves a fact for any staff member and logs it', async () => {
+    const repos = createMemoryRepositories({ profile });
+    const service = createSettingsService({ repos, clock: () => new Date('2026-05-10T12:00:00Z') });
+    await service.saveHotelInfo(draft, 'agent');
+    expect(repos.state.profile?.entries.at(-1)).toMatchObject({ title: 'EV charging' });
+    expect(repos.state.audit).toEqual([
+      expect.objectContaining({
+        actor: 'agent',
+        action: 'settings.entry',
+        payload: { title: 'EV charging', category: 'info', replaced: false },
+      }),
+    ]);
   });
 });

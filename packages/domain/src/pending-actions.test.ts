@@ -5,6 +5,7 @@ import { createPendingActionService } from './pending-actions';
 import { hotelPolicy } from './policy';
 import { pricingConfig } from './pricing';
 import { createRatesService } from './rates';
+import { createSettingsService } from './settings';
 import { createRegistrationService } from './registration';
 import { createHotelService } from './service';
 import { booking, czechProfile, double, room } from './test-fixtures';
@@ -84,6 +85,7 @@ function setup() {
       billing,
       registrations,
       guests,
+      settings: createSettingsService({ repos, clock: () => now }),
       clock: () => now,
       newId,
     }),
@@ -526,5 +528,32 @@ describe('pending actions', () => {
     await expect(
       actions.propose({ kind: 'update_guest', input: { guestId: 'gst_1', language: 'en' } }),
     ).rejects.toMatchObject({ code: 'invalid_input' });
+  });
+
+  it('proposes saving a fact for guests, and saves it only on confirm', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'save_hotel_info',
+      input: {
+        category: 'amenity',
+        title: 'Sauna',
+        details: 'Closed for repairs.',
+        until: '2026-05-15',
+      },
+    });
+    expect(proposed.summary).toBe(
+      'Save in Amenities: Sauna: Closed for repairs. (until 2026-05-15)',
+    );
+    expect(proposed.details?.changes).toEqual([
+      { label: 'Amenities', before: null, after: { text: 'Sauna: Closed for repairs.' } },
+      { label: 'Until', before: null, after: { text: '2026-05-15' } },
+    ]);
+    expect(proposed.bookingId).toBeNull();
+    expect(repos.state.profile?.entries).toEqual([]);
+
+    await actions.confirm(proposed.id);
+    expect(repos.state.profile?.entries).toEqual([
+      expect.objectContaining({ title: 'Sauna', until: '2026-05-15' }),
+    ]);
   });
 });

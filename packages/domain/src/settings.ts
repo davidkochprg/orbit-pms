@@ -1,6 +1,14 @@
-import type { HotelProfile, StaffMember } from '@orbit/shared';
+import type {
+  AuditActor,
+  HotelInfoDraft,
+  HotelInfoEntry,
+  HotelProfile,
+  IsoDate,
+  StaffMember,
+} from '@orbit/shared';
 import { DomainError } from './errors';
 import type { Repositories } from './repositories';
+import { hotelToday } from './dates';
 import { assertManager } from './staff';
 
 /** What Settings shows before anyone has described the property. */
@@ -44,18 +52,102 @@ export function changedProfileFields(before: HotelProfile, after: HotelProfile):
   );
 }
 
+/** The most entries a profile holds; all of them go into the agent's prompt. */
+export const MAX_HOTEL_INFO_ENTRIES = 100;
+
+const sameTitle = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** The profile without notices whose last day has passed, as guests should be told about it. */
+export function currentEntries(profile: HotelProfile, today: IsoDate): HotelProfile {
+  return { ...profile, entries: profile.entries.filter((e) => !e.until || e.until >= today) };
+}
+
+/**
+ * The profile with the fact saved: it replaces the entry with the same title, in any category,
+ * or is added as a new one.
+ */
+export function withHotelInfo(
+  profile: HotelProfile,
+  draft: HotelInfoDraft,
+  today: IsoDate,
+): { profile: HotelProfile; entry: HotelInfoEntry; replaced: HotelInfoEntry | null } {
+  if (draft.until && draft.until < today) {
+    throw new DomainError('invalid_input', 'A notice has to last until today or later');
+  }
+  const replaced = profile.entries.find((e) => sameTitle(e.title, draft.title)) ?? null;
+  // A notice ends; the entry it would replace should not end with it.
+  if (replaced && draft.until && !replaced.until) {
+    throw new DomainError(
+      'invalid_input',
+      `"${replaced.title}" always applies; give the notice its own title, e.g. "${replaced.title} closed"`,
+    );
+  }
+  if (!replaced && profile.entries.length >= MAX_HOTEL_INFO_ENTRIES) {
+    throw new DomainError(
+      'invalid_input',
+      `The profile holds at most ${MAX_HOTEL_INFO_ENTRIES} entries; remove one first`,
+    );
+  }
+  const taken = new Set(profile.entries.map((e) => e.id));
+  let n = profile.entries.length + 1;
+  while (taken.has(`${draft.category}-${n}`)) n++;
+  const entry: HotelInfoEntry = {
+    id: replaced?.id ?? `${draft.category}-${n}`,
+    category: draft.category,
+    title: draft.title.trim(),
+    details: draft.details.trim(),
+    until: draft.until,
+  };
+  return {
+    profile: {
+      ...profile,
+      entries: replaced
+        ? profile.entries.map((e) => (e.id === replaced.id ? entry : e))
+        : [...profile.entries, entry],
+    },
+    entry,
+    replaced,
+  };
+}
+
 export interface SettingsDeps {
   repos: Repositories;
+  clock?: () => Date;
 }
 
 /** The hotel profile: property details, policies, amenities and guest information. */
-export function createSettingsService({ repos }: SettingsDeps) {
+export function createSettingsService({ repos, clock = () => new Date() }: SettingsDeps) {
   async function getProfile(): Promise<HotelProfile> {
     return (await repos.settings.getProfile()) ?? emptyHotelProfile;
   }
 
   return {
     getProfile,
+
+    /** What saving the fact would change, without saving it. */
+    async previewHotelInfo(draft: HotelInfoDraft) {
+      return withHotelInfo(await getProfile(), draft, hotelToday(clock()));
+    },
+
+    /**
+     * Saves one fact, as staff confirm it from the agent or a reply. Unlike editing Settings this
+     * is open to all staff: it is one entry, confirmed by a person, and in the audit log.
+     */
+    async saveHotelInfo(draft: HotelInfoDraft, actor: AuditActor): Promise<HotelInfoEntry> {
+      return repos.transaction(async (tx) => {
+        const before = (await tx.settings.getProfile()) ?? emptyHotelProfile;
+        const { profile, entry, replaced } = withHotelInfo(before, draft, hotelToday(clock()));
+        assertValidProfile(profile);
+        await tx.settings.saveProfile(profile);
+        await tx.audit.append({
+          actor,
+          action: 'settings.entry',
+          subjectId: entry.id,
+          payload: { title: entry.title, category: entry.category, replaced: replaced !== null },
+        });
+        return entry;
+      });
+    },
 
     /** Replaces the profile; managers only. A save that changes nothing writes no audit entry. */
     async updateProfile(profile: HotelProfile, by: StaffMember | null): Promise<HotelProfile> {

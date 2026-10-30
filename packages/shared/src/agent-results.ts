@@ -3,6 +3,7 @@ import { isoDateSchema } from './dates';
 import { housekeepingTaskSchema } from './entities';
 import { bookingStatusSchema, housekeepingTaskStatusSchema, roomStatusSchema } from './enums';
 import { moneySchema } from './quote';
+import { relocationSchema } from './knock-on';
 
 /**
  * What the agent's tools return where the app shows it as a card: the tools build these and the
@@ -16,6 +17,8 @@ export const agentRoomStatusResultSchema = z.object({
   roomName: z.string(),
   from: roomStatusSchema,
   status: roomStatusSchema,
+  /** Out of order: the stays still booked in the room, each with a free room to move to. */
+  relocations: z.array(relocationSchema).optional(),
 });
 export type AgentRoomStatusResult = z.infer<typeof agentRoomStatusResultSchema>;
 

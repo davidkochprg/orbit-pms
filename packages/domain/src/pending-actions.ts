@@ -6,6 +6,7 @@ import type {
   Charge,
   Currency,
   GuestPatch,
+  HotelInfoCategory,
   PendingAction,
   PendingActionDetails,
   PendingActionInput,
@@ -24,6 +25,7 @@ import { adjustmentChanges, applyAdjustments, type RatesService } from './rates'
 import type { RegistrationService } from './registration';
 import type { Repositories } from './repositories';
 import type { HotelService } from './service';
+import type { SettingsService } from './settings';
 
 export interface PendingActionDeps {
   repos: Repositories;
@@ -32,6 +34,7 @@ export interface PendingActionDeps {
   registrations: RegistrationService;
   guests: GuestService;
   rates: Pick<RatesService, 'getPricing' | 'adjustRates'>;
+  settings: Pick<SettingsService, 'previewHotelInfo' | 'saveHotelInfo'>;
   clock: () => Date;
   newId: (prefix: string) => string;
 }
@@ -176,6 +179,12 @@ const bookingStatusLabels: Record<BookingStatus, string> = {
 const statusChange = (from: BookingStatus, to: BookingStatus) =>
   changed('Status', text(bookingStatusLabels[from]), text(bookingStatusLabels[to]));
 
+const hotelInfoLabels: Record<HotelInfoCategory, string> = {
+  policy: 'Policies',
+  amenity: 'Amenities',
+  info: 'Guest info',
+};
+
 const profileLabels: Record<keyof GuestPatch, string> = {
   name: 'Name',
   email: 'Email',
@@ -256,6 +265,7 @@ export function createPendingActionService({
   registrations,
   guests,
   rates,
+  settings,
   clock,
   newId,
 }: PendingActionDeps) {
@@ -501,6 +511,22 @@ export function createPendingActionService({
           ),
         };
       }
+      case 'save_hotel_info': {
+        const { entry, replaced } = await settings.previewHotelInfo(action.input);
+        const where = hotelInfoLabels[entry.category];
+        const until = entry.until ? ` (until ${entry.until})` : '';
+        return {
+          summary: `${replaced ? 'Update' : 'Save'} in ${where}: ${entry.title}: ${entry.details}${until}`,
+          details: details([
+            changed(
+              where,
+              replaced ? text(`${replaced.title}: ${replaced.details}`) : null,
+              text(`${entry.title}: ${entry.details}`),
+            ),
+            ...(entry.until ? [added('Until', text(entry.until))] : []),
+          ]),
+        };
+      }
       case 'update_guest': {
         const { guestId, ...patch } = action.input;
         const { guest } = await guests.previewUpdate(guestId, patch);
@@ -582,6 +608,9 @@ export function createPendingActionService({
       }
       case 'adjust_rates':
         await rates.adjustRates(action.input.nights, 'agent');
+        return null;
+      case 'save_hotel_info':
+        await settings.saveHotelInfo(action.input, 'agent');
         return null;
     }
   }

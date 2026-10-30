@@ -206,6 +206,33 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
       });
     },
 
+    /**
+     * Looks for rooms again for a request that had none when it was read, e.g. after a
+     * cancellation. The old draft said nothing was free, so it goes; a new one is prepared on
+     * request. A request still waiting for a reply is `quoted` once rooms are found.
+     */
+    async refreshOptions(id: string): Promise<Inquiry> {
+      const inquiry = await load(repos, id);
+      if (!inquiry.parsed || !inquiry.suggestion) {
+        throw new DomainError('invalid_transition', 'This message has not been read yet');
+      }
+      const { options, note } = await hotel.inboxOptions(inquiry.parsed);
+      const updated: Inquiry = {
+        ...inquiry,
+        suggestion: {
+          ...inquiry.suggestion,
+          options,
+          note,
+          draft: null,
+          draftLanguage: null,
+          draftTranslation: null,
+        },
+        status: inquiry.status === 'new' && options.length > 0 ? 'quoted' : inquiry.status,
+      };
+      await repos.inquiries.updateInquiry(updated);
+      return updated;
+    },
+
     async setUnread(id: string, unread: boolean): Promise<Inquiry> {
       const inquiry = await load(repos, id);
       if (inquiry.unread === unread) return inquiry;
