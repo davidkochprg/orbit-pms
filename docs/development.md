@@ -31,9 +31,9 @@ Read from `.env` at the repo root by the API and the db scripts, and validated w
 | `META_MODEL_TRANSLATE`   | `META_MODEL_AGENT`       | Model for translating messages and drafts                           |
 | `HOTEL_TIMEZONE`         | `America/Los_Angeles`    | The hotel's IANA time zone; decides "today"                         |
 | `SEED_REGION`            | `us`                     | `pnpm db:seed` preset: `us` (demo lodge) or `cz` (Czech guesthouse) |
-| `AI_DAILY_TOKEN_BUDGET`  | `2000000`                | Global daily token budget                                           |
-| `AI_RATE_LIMIT_PER_HOUR` | `20`                     | Agent calls per IP per hour                                         |
-| `AI_MONTHLY_BUDGET_USD`  | `100`                    | Monthly cap on real Meta spend                                      |
+| `AI_DAILY_TOKEN_BUDGET`  | `20000000`               | Daily token budget across all users (about 1,000 agent turns)       |
+| `AI_RATE_LIMIT_PER_HOUR` | `300`                    | AI calls per IP per hour                                            |
+| `AI_MONTHLY_BUDGET_USD`  | `50`                     | Monthly cap on real Meta spend                                      |
 | `PORT`                   | `3001`                   | API port                                                            |
 
 The hourly and daily limits are kept in memory; the monthly budget is computed from the `ai_usage` table. See [ai.md](ai.md#rate-limits).

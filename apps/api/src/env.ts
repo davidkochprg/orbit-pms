@@ -21,10 +21,11 @@ export const envSchema = z.object({
   BASETEN_API_KEY: optional,
   BASETEN_BASE_URL: z.url().default('https://inference.baseten.co/v1'),
   BASETEN_MODEL: optional,
-  AI_DAILY_TOKEN_BUDGET: z.coerce.number().int().positive().default(2_000_000),
-  AI_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(20),
+  /** Generous for one person trying the app on their own key; lower them for a shared demo. */
+  AI_DAILY_TOKEN_BUDGET: z.coerce.number().int().positive().default(20_000_000),
+  AI_RATE_LIMIT_PER_HOUR: z.coerce.number().int().positive().default(300),
   /** Hard cap on real Meta spend per UTC month, from recorded usage. */
-  AI_MONTHLY_BUDGET_USD: z.coerce.number().positive().default(100),
+  AI_MONTHLY_BUDGET_USD: z.coerce.number().positive().default(50),
   /** When set, the app asks for this code before showing anything. Unset leaves it open. */
   DEMO_ACCESS_CODE: optional,
 });

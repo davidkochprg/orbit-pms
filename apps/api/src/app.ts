@@ -78,9 +78,9 @@ const newScanToken = () => randomBytes(18).toString('base64url');
 export function createApp({
   repos,
   ai,
-  limits = { perIpPerHour: 20, dailyTokenBudget: 2_000_000 },
+  limits = { perIpPerHour: 300, dailyTokenBudget: 20_000_000 },
   usage,
-  monthlyBudgetUsd = 100,
+  monthlyBudgetUsd = 50,
   accessCode,
   clock = () => new Date(),
   newId = defaultNewId,

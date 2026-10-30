@@ -239,9 +239,11 @@ Estimate for a 30-room property per month, at 40 agent questions and 30 guest me
 
 The public demo is protected in `apps/api/src/limits.ts` (in memory, reset on restart):
 
-- `AI_RATE_LIMIT_PER_HOUR` agent requests per client IP per rolling hour (IP from `x-forwarded-for`).
-- `AI_DAILY_TOKEN_BUDGET` tokens per UTC day across all visitors, counted from model usage after each turn. The default of 2,000,000 is about 100 agent turns, or roughly $2 a day.
-- `AI_MONTHLY_BUDGET_USD` real spend per UTC month, from the `ai_usage` table. Persisted, so it survives restarts.
+- `AI_RATE_LIMIT_PER_HOUR` AI requests (agent turns, inbox reads and drafts, notes, summaries) per client IP per rolling hour (IP from `x-forwarded-for`), 300 by default.
+- `AI_DAILY_TOKEN_BUDGET` tokens per UTC day across all visitors, counted from model usage after each turn. The default of 20,000,000 is about 1,000 agent turns, or roughly $20 a day.
+- `AI_MONTHLY_BUDGET_USD` real spend per UTC month, from the `ai_usage` table, $50 by default. Persisted, so it survives restarts.
+
+The defaults suit one person trying Orbit on their own key; a shared public demo should set lower ones.
 
 Baseten allows 15 requests a minute on an unverified account and 120 once verified; beyond that a draft or translation falls back to Meta's API.
 
