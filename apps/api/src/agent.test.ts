@@ -122,7 +122,11 @@ describe('POST /api/agent', () => {
     expect(res.headers.get('content-type')).toContain('text/event-stream');
     const body = await res.text();
     expect(body).toContain('awaiting_confirmation');
-    expect(body).toContain('I prepared the cancellation.');
+    // The answer arrives word by word: join the text deltas to read it.
+    const text = [...body.matchAll(/"type":"text-delta","id":"[^"]*","delta":"([^"]*)"/g)]
+      .map((m) => m[1])
+      .join('');
+    expect(text).toContain('I prepared the cancellation.');
 
     // Nothing has changed yet.
     const before = (await (
