@@ -14,7 +14,9 @@ import {
   guestSchema,
   hotelProfileSchema,
   inquirySchema,
+  noteLinks,
   roomSchema,
+  sameNoteTitle,
 } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { buildSeed } from './build';
@@ -34,9 +36,13 @@ describe('buildSeed', () => {
   it('describes the demo hotel with a valid profile and no prices', () => {
     expect(hotelProfileSchema.parse(seed.hotelProfile)).toEqual(seed.hotelProfile);
     expect(() => assertValidProfile(seed.hotelProfile)).not.toThrow();
-    for (const category of ['policy', 'amenity', 'info']) {
-      expect(seed.hotelProfile.entries.some((e) => e.category === category)).toBe(true);
-    }
+    const notes = seed.hotelProfile.entries;
+    expect(new Set(notes.map((e) => e.category)).size).toBeGreaterThanOrEqual(5);
+    expect(notes.every((e) => (e.tags?.length ?? 0) > 0)).toBe(true);
+    // Every link names a note, so Knowledge can open it.
+    const links = notes.flatMap((e) => noteLinks(e.details));
+    expect(links.length).toBeGreaterThan(0);
+    for (const link of links) expect(notes.some((e) => sameNoteTitle(e.title, link))).toBe(true);
     // Prices come from quote(); an amount here would bypass the draft price guard.
     expect(amountsInText(JSON.stringify(seed.hotelProfile))).toEqual([]);
   });

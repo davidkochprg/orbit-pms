@@ -19,10 +19,12 @@ import { createMetaProvider } from '../provider';
 import { reasoningEffort, type ReasoningEffort } from '../reasoning';
 import { readHousekeepingNote } from '../housekeeping';
 import { readIdDocument } from '../id-scan';
+import { fileNote } from '../knowledge';
 import { readStayNotes } from '../stay-notes';
 import { agentFixtures, buildAgentEvalHotel } from './agent';
 import { evalRoomNames, housekeepingNoteFixtures } from './housekeeping-notes';
 import { idDocumentFixtures } from './id-documents';
+import { buildKnowledgeFixtures, evalNotes, scoreFiledNote } from './knowledge';
 import { buildDraftEvalHotel } from './drafts';
 import { buildInquiryFixtures, type InquiryFixture } from './inquiries';
 import { stayNotesFixtures } from './stay-notes';
@@ -58,7 +60,16 @@ const provider = createMetaProvider({
 });
 
 // EVAL_SUITES picks suites, e.g. "drafts,translations"; unset runs them all.
-const suiteKeys = ['inbox', 'notes', 'stays', 'ids', 'agent', 'drafts', 'translations'] as const;
+const suiteKeys = [
+  'inbox',
+  'notes',
+  'stays',
+  'ids',
+  'knowledge',
+  'agent',
+  'drafts',
+  'translations',
+] as const;
 type SuiteKey = (typeof suiteKeys)[number];
 const only = process.env.EVAL_SUITES?.split(',')
   .map((k) => k.trim())
@@ -247,6 +258,32 @@ const idsOk = vision
     )
   : (console.log('\nID scans skipped: set META_MODEL_VISION to run them.'), true);
 
+const knowledgeEffort = reasoning ?? reasoningEffort.knowledge;
+const knowledgeOk = await suite(
+  'knowledge',
+  'Knowledge notes',
+  knowledgeEffort,
+  META_MODEL_AGENT,
+  buildKnowledgeFixtures(today).map((f) => ({
+    id: f.id,
+    run: async () => {
+      const { filed, tokens } = await fileNote(provider.agent, {
+        text: f.text,
+        notes: evalNotes,
+        today,
+        reasoning: knowledgeEffort,
+      });
+      const problems = scoreFiledNote(f, filed);
+      return {
+        passed: problems.length === 0,
+        label: `${f.language}  ${problems.join(', ')}`,
+        detail: `      text     ${f.text}\n      actual   ${JSON.stringify(filed)}`,
+        tokens,
+      };
+    },
+  })),
+);
+
 const agentEffort = reasoning ?? reasoningEffort.agent;
 const agentOk = await suite(
   'agent',
@@ -399,4 +436,8 @@ const translateOk = await suite(
   })),
 );
 
-process.exit(inboxOk && notesOk && staysOk && idsOk && agentOk && draftsOk && translateOk ? 0 : 1);
+process.exit(
+  inboxOk && notesOk && staysOk && idsOk && knowledgeOk && agentOk && draftsOk && translateOk
+    ? 0
+    : 1,
+);

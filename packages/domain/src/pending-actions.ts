@@ -6,7 +6,6 @@ import type {
   Charge,
   Currency,
   GuestPatch,
-  HotelInfoCategory,
   PendingAction,
   PendingActionDetails,
   PendingActionInput,
@@ -15,7 +14,7 @@ import type {
   QuoteAddons,
   StayGuestPatch,
 } from '@orbit/shared';
-import { formatMoney } from '@orbit/shared';
+import { formatMoney, hotelInfoCategoryLabels } from '@orbit/shared';
 import type { BillingService } from './billing';
 import { changedBookingFields } from './bookings';
 import { hotelToday, nightsBetween } from './dates';
@@ -178,12 +177,6 @@ const bookingStatusLabels: Record<BookingStatus, string> = {
 
 const statusChange = (from: BookingStatus, to: BookingStatus) =>
   changed('Status', text(bookingStatusLabels[from]), text(bookingStatusLabels[to]));
-
-const hotelInfoLabels: Record<HotelInfoCategory, string> = {
-  policy: 'Policies',
-  amenity: 'Amenities',
-  info: 'Guest info',
-};
 
 const profileLabels: Record<keyof GuestPatch, string> = {
   name: 'Name',
@@ -513,7 +506,7 @@ export function createPendingActionService({
       }
       case 'save_hotel_info': {
         const { entry, replaced } = await settings.previewHotelInfo(action.input);
-        const where = hotelInfoLabels[entry.category];
+        const where = hotelInfoCategoryLabels[entry.category];
         const until = entry.until ? ` (until ${entry.until})` : '';
         return {
           summary: `${replaced ? 'Update' : 'Save'} in ${where}: ${entry.title}: ${entry.details}${until}`,

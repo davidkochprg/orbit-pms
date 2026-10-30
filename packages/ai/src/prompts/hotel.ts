@@ -1,11 +1,13 @@
 import type { HotelPolicy } from '@orbit/domain';
 import {
   type Currency,
-  type HotelInfoCategory,
+  hotelInfoCategories,
+  hotelInfoCategoryLabels,
   type HotelProfile,
   type PricingConfig,
   type RoomKind,
   roomKinds,
+  withoutLinks,
 } from '@orbit/shared';
 
 /**
@@ -40,12 +42,6 @@ export function pricesSentence({ currency, pricingBasis, tax }: HotelContext['pr
     : `Prices are in whole ${currencyNames[currency]}, ${basis} per night, including ${rates}.`;
 }
 
-const sections: [HotelInfoCategory, string][] = [
-  ['policy', 'House policies'],
-  ['amenity', 'Amenities'],
-  ['info', 'Guest information'],
-];
-
 const kindNames: Record<RoomKind, string> = { room: 'rooms', apartment: 'apartments' };
 
 /** The rules Orbit enforces, in words, so the model never contradicts the domain. */
@@ -76,13 +72,17 @@ export function hotelFacts({ profile, policy, pricing }: HotelContext): string {
     `Check-in from ${timeOfDay(profile.checkInFrom, profile.country)}, check-out by ${timeOfDay(profile.checkOutBy, profile.country)}.`,
     pricesSentence(pricing),
   ];
-  for (const [category, heading] of sections) {
+  // Knowledge, folder by folder; links between notes read as plain words.
+  for (const category of hotelInfoCategories) {
     const entries = profile.entries.filter((e) => e.category === category);
     if (entries.length === 0) continue;
     lines.push(
       '',
-      `${heading}:`,
-      ...entries.map((e) => `- ${e.title}: ${e.details}${e.until ? ` (until ${e.until})` : ''}`),
+      `${hotelInfoCategoryLabels[category]}:`,
+      ...entries.map(
+        (e) =>
+          `- ${e.title}: ${withoutLinks(e.details).replace(/\n+/g, ' ')}${e.until ? ` (until ${e.until})` : ''}`,
+      ),
     );
   }
   lines.push('', 'Rules Orbit enforces:', ...enforcedRules(policy).map((r) => `- ${r}`));

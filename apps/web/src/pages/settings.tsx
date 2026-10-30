@@ -9,7 +9,7 @@ import { TeamSettings } from '@/components/settings-team';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/hooks/use-session';
 import { useHotelProfile, useSaveHotelProfile } from '@/lib/api';
-import { isEntryCategory, isSettingsSection, sameSettings, settingsSections } from '@/lib/settings';
+import { isEntrySection, isSettingsSection, sameSettings, settingsSections } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 
 export function SettingsPage() {
@@ -22,7 +22,7 @@ export function SettingsPage() {
 
   // Rooms and rates have their own pages now; old links still land there.
   if (section === 'rooms' || section === 'rates') return <Navigate to={`/${section}`} replace />;
-  if (isEntryCategory(section)) return <Navigate to={`/knowledge?kind=${section}`} replace />;
+  if (isEntrySection(section)) return <Navigate to="/knowledge" replace />;
   if (!isSettingsSection(section)) return <Navigate to="/settings/property" replace />;
 
   const readOnly = !session.canManage;

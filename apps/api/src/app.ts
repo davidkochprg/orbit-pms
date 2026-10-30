@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import {
   createHousekeepingNotePipeline,
   createStayNotesReader,
+  createNoteFiler,
   createReplyLearner,
   createRevenueBriefWriter,
   createIdScanReader,
@@ -247,7 +248,17 @@ export function createApp({
       usage,
     }),
   );
-  app.route('/api', settingsRoutes({ settings, staff, rates }));
+  app.route(
+    '/api',
+    settingsRoutes({
+      settings,
+      staff,
+      rates,
+      filer: ai && createNoteFiler({ model: ai.agent, modelId: ai.agentModelId, usage }),
+      today: () => hotelToday(clock()),
+      gate,
+    }),
+  );
   app.route(
     '/api',
     revenueRoutes({

@@ -1,4 +1,4 @@
-import type { HotelProfile, StaffMember } from '@orbit/shared';
+import { type HotelProfile, hotelProfileSchema, type StaffMember } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { DomainError } from './errors';
 import {
@@ -8,8 +8,10 @@ import {
   currentEntries,
   emptyHotelProfile,
   MAX_HOTEL_INFO_ENTRIES,
+  normalizeTags,
   withEntry,
   withHotelInfo,
+  withRenamedLinks,
 } from './settings';
 import { createMemoryRepositories } from './testing';
 
@@ -27,8 +29,8 @@ const profile: HotelProfile = {
   name: 'Test Lodge',
   location: 'Test Valley',
   entries: [
-    { id: 'parking', category: 'amenity', title: 'Parking', details: 'Free, behind the house.' },
-    { id: 'quiet', category: 'policy', title: 'Quiet hours', details: 'From 22:00 to 07:00.' },
+    { id: 'parking', category: 'services', title: 'Parking', details: 'Free, behind the house.' },
+    { id: 'quiet', category: 'policies', title: 'Quiet hours', details: 'From 22:00 to 07:00.' },
   ],
 };
 
@@ -119,9 +121,10 @@ describe('hotel info from the agent', () => {
   const today = '2026-05-10';
   const stamp = { source: 'agent' as const, at: '2026-05-10T12:00:00.000Z' };
   const draft = {
-    category: 'info' as const,
+    category: 'services' as const,
     title: 'EV charging',
     details: 'Two chargers.',
+    tags: [],
     until: null,
   };
 
@@ -129,7 +132,7 @@ describe('hotel info from the agent', () => {
     const { profile: next, entry, replaced } = withHotelInfo(profile, draft, today, stamp);
     expect(replaced).toBeNull();
     expect(entry).toMatchObject({
-      id: 'info-3',
+      id: 'services-3',
       title: 'EV charging',
       until: null,
       source: 'agent',
@@ -145,7 +148,7 @@ describe('hotel info from the agent', () => {
       replaced,
     } = withHotelInfo(
       profile,
-      { ...draft, category: 'amenity', title: 'parking ', details: 'Paid now.' },
+      { ...draft, category: 'services', title: 'parking ', details: 'Paid now.' },
       today,
       stamp,
     );
@@ -158,7 +161,13 @@ describe('hotel info from the agent', () => {
     expect(() =>
       withHotelInfo(
         profile,
-        { category: 'amenity', title: 'Parking', details: 'Closed today.', until: today },
+        {
+          category: 'services',
+          title: 'Parking',
+          details: 'Closed today.',
+          tags: [],
+          until: today,
+        },
         today,
         stamp,
       ),
@@ -176,7 +185,7 @@ describe('hotel info from the agent', () => {
       ...profile,
       entries: Array.from({ length: MAX_HOTEL_INFO_ENTRIES }, (_, i) => ({
         id: `e${i}`,
-        category: 'info' as const,
+        category: 'services' as const,
         title: `Entry ${i}`,
         details: 'x',
       })),
@@ -190,10 +199,16 @@ describe('hotel info from the agent', () => {
       ...profile,
       entries: [
         ...profile.entries,
-        { id: 'a', category: 'amenity' as const, title: 'Sauna', details: 'Closed.', until: today },
+        {
+          id: 'a',
+          category: 'services' as const,
+          title: 'Sauna',
+          details: 'Closed.',
+          until: today,
+        },
         {
           id: 'b',
-          category: 'amenity' as const,
+          category: 'services' as const,
           title: 'Pool',
           details: 'Closed.',
           until: '2026-05-09',
@@ -219,9 +234,77 @@ describe('hotel info from the agent', () => {
       expect.objectContaining({
         actor: 'agent',
         action: 'settings.entry',
-        payload: { title: 'EV charging', category: 'info', replaced: false },
+        payload: { title: 'EV charging', category: 'services', replaced: false },
       }),
     ]);
+  });
+});
+
+describe('notes in Knowledge', () => {
+  const stamp = { source: 'staff' as const, at: '2026-05-10T12:00:00.000Z' };
+
+  it('tidies tags: lowercase, without "#" or repeats, at most six', () => {
+    expect(normalizeTags([' Pets', '#dogs', 'pets', '', 'a', 'b', 'c', 'd', 'e'])).toEqual([
+      'pets',
+      'dogs',
+      'a',
+      'b',
+      'c',
+      'd',
+    ]);
+    const { entry } = withEntry(
+      profile,
+      null,
+      { category: 'policies', title: 'Dogs', details: 'Welcome.', tags: ['#Pets'], until: null },
+      '2026-05-10',
+      stamp,
+    );
+    expect(entry.tags).toEqual(['pets']);
+  });
+
+  it('points links at a renamed note, in every other note', () => {
+    const linked: HotelProfile = {
+      ...profile,
+      entries: [
+        ...profile.entries,
+        { id: 'ev', category: 'getting_here', title: 'EV', details: 'Next to [[parking]].' },
+      ],
+    };
+    const { profile: next } = withEntry(
+      linked,
+      'parking',
+      { ...linked.entries[0]!, title: 'Car park', tags: [], until: null },
+      '2026-05-10',
+      stamp,
+    );
+    expect(next.entries.find((e) => e.id === 'ev')?.details).toBe('Next to [[Car park]].');
+  });
+
+  it('keeps a link as it was when the new title would make the note too long', () => {
+    const long = {
+      id: 'long',
+      category: 'services' as const,
+      title: 'Long',
+      details: `${'x'.repeat(986)} [[Parking]]`,
+    };
+    const next = withRenamedLinks(
+      { ...profile, entries: [long] },
+      'Parking',
+      'Parking behind the house',
+    );
+    expect(next.entries[0]).toBe(long);
+  });
+
+  it('reads entries saved with the old three categories into folders', () => {
+    const stored = hotelProfileSchema.parse({
+      ...profile,
+      entries: [
+        { id: 'a', category: 'policy', title: 'Quiet hours', details: 'From 22:00.' },
+        { id: 'b', category: 'amenity', title: 'Sauna', details: 'Open.' },
+        { id: 'c', category: 'info', title: 'Bus', details: 'Stop nearby.' },
+      ],
+    });
+    expect(stored.entries.map((e) => e.category)).toEqual(['policies', 'services', 'services']);
   });
 });
 
@@ -230,15 +313,16 @@ describe('Knowledge entries', () => {
   const stamp = { source: 'staff' as const, at: '2026-05-10T12:00:00.000Z' };
   const receptionist: StaffMember = { ...manager, id: 'stf_r', role: 'receptionist' };
   const draft = {
-    category: 'info' as const,
+    category: 'services' as const,
     title: 'Late arrival',
     details: 'Key box.',
+    tags: [],
     until: null,
   };
 
   it('adds an entry staff wrote', () => {
     const { profile: next, entry } = withEntry(profile, null, draft, today, stamp);
-    expect(entry).toMatchObject({ id: 'info-3', source: 'staff', updatedAt: stamp.at });
+    expect(entry).toMatchObject({ id: 'services-3', source: 'staff', updatedAt: stamp.at });
     expect(next.entries).toHaveLength(3);
   });
 
@@ -246,13 +330,13 @@ describe('Knowledge entries', () => {
     const { profile: next } = withEntry(
       profile,
       'parking',
-      { category: 'info', title: 'Parking', details: 'Paid now.', until: null },
+      { category: 'services', title: 'Parking', details: 'Paid now.', tags: [], until: null },
       today,
       stamp,
     );
     expect(next.entries[0]).toMatchObject({
       id: 'parking',
-      category: 'info',
+      category: 'services',
       details: 'Paid now.',
     });
   });
@@ -276,7 +360,13 @@ describe('Knowledge entries', () => {
       withEntry(
         ended,
         'parking',
-        { category: 'amenity', title: 'Parking', details: 'Reworded.', until: '2026-05-01' },
+        {
+          category: 'services',
+          title: 'Parking',
+          details: 'Reworded.',
+          tags: [],
+          until: '2026-05-01',
+        },
         today,
         stamp,
       ),

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   fromPercent,
   fromSurcharge,
-  isEntryCategory,
+  isEntrySection,
   isSettingsSection,
   newSeason,
   sameSettings,
@@ -13,7 +13,7 @@ import {
 
 const entry = (id: string): HotelInfoEntry => ({
   id,
-  category: 'policy',
+  category: 'policies',
   title: 'Title',
   details: 'Details',
 });
@@ -31,11 +31,12 @@ describe('isSettingsSection', () => {
   });
 });
 
-describe('isEntryCategory', () => {
+describe('isEntrySection', () => {
   it('knows the old Settings tabs that moved to Knowledge', () => {
-    expect(isEntryCategory('amenity')).toBe(true);
-    expect(isEntryCategory('team')).toBe(false);
-    expect(isEntryCategory(undefined)).toBe(false);
+    expect(isEntrySection('amenity')).toBe(true);
+    expect(isEntrySection('policies')).toBe(false);
+    expect(isEntrySection('team')).toBe(false);
+    expect(isEntrySection(undefined)).toBe(false);
   });
 });
 

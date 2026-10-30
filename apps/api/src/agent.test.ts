@@ -162,7 +162,12 @@ describe('POST /api/agent', () => {
     await repos.settings.saveProfile({
       ...seed.hotelProfile,
       entries: [
-        { id: 'pool', category: 'amenity', title: 'Pool', details: 'Indoor pool, 08:00 to 20:00.' },
+        {
+          id: 'pool',
+          category: 'wellness',
+          title: 'Pool',
+          details: 'Indoor pool, 08:00 to 20:00.',
+        },
       ],
     });
     const model = scriptedModel([{ text: 'The pool is open from 08:00 to 20:00.' }]);

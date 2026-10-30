@@ -5,18 +5,20 @@ import { type LearnedFact, toDraft } from './learn';
 const today = '2026-05-10';
 const fact: LearnedFact = {
   save: true,
-  category: 'amenity',
+  category: 'getting_here',
   title: ' EV charging ',
   details: 'Two chargers in the back lot, free for guests. ',
+  tags: ['EV', '#parking', 'ev'],
   until: null,
 };
 
 describe('toDraft', () => {
   it('keeps a fact the reply states, trimmed', () => {
     expect(toDraft(fact, today)).toEqual({
-      category: 'amenity',
+      category: 'getting_here',
       title: 'EV charging',
       details: 'Two chargers in the back lot, free for guests.',
+      tags: ['ev', 'parking'],
       until: null,
     });
   });
@@ -27,7 +29,7 @@ describe('toDraft', () => {
 
   it('saves nothing without a title or details, or when they are too long for an entry', () => {
     expect(toDraft({ ...fact, title: ' ' }, today)).toBeNull();
-    expect(toDraft({ ...fact, details: 'x'.repeat(601) }, today)).toBeNull();
+    expect(toDraft({ ...fact, details: 'x'.repeat(1001) }, today)).toBeNull();
   });
 
   it('drops an end date in the past rather than the fact', () => {
@@ -41,11 +43,19 @@ describe('learnPrompt', () => {
     const prompt = learnPrompt({
       guestMessage: 'Can I charge my car?',
       reply: 'Yes, two chargers in the back lot.',
-      entries: [{ title: 'Parking', details: 'Free, behind the house.' }],
+      entries: [
+        {
+          id: 'parking',
+          category: 'getting_here',
+          title: 'Parking',
+          details: 'Free, behind the house.',
+          tags: ['parking'],
+        },
+      ],
       today,
     });
     expect(prompt).toContain('Today is 2026-05-10.');
-    expect(prompt).toContain('- Parking: Free, behind the house.');
+    expect(prompt).toContain('- Parking (getting_here; #parking): Free, behind the house.');
     expect(prompt).toContain('Can I charge my car?');
     expect(prompt).toContain('Yes, two chargers in the back lot.');
   });

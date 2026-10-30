@@ -1,5 +1,6 @@
 import {
   type BookingDetail,
+  hotelInfoCategoryLabels,
   type InboxMessage,
   type Inquiry,
   type Language,
@@ -72,7 +73,6 @@ import {
   sendLabel,
   senderLabel,
 } from '@/lib/inbox';
-import { entryHints } from '@/lib/settings';
 import { cn } from '@/lib/utils';
 
 /**
@@ -196,7 +196,7 @@ function LearnedFact({ action }: { action: PendingAction }) {
   const status = resolve.data?.status ?? action.status;
   if (action.kind !== 'save_hotel_info' || status === 'rejected') return null;
   const { category, title, details, until } = action.input;
-  const where = entryHints[category].title;
+  const where = hotelInfoCategoryLabels[category];
   // The entry it replaces, as it read when the fact was proposed.
   const before = action.details?.changes[0]?.before;
   const was = before && 'text' in before ? before.text : null;

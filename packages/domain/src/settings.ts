@@ -9,6 +9,7 @@ import type {
   IsoDate,
   StaffMember,
 } from '@orbit/shared';
+import { renameLinks, sameNoteTitle } from '@orbit/shared';
 import { DomainError } from './errors';
 import type { Repositories } from './repositories';
 import { hotelToday } from './dates';
@@ -58,8 +59,6 @@ export function changedProfileFields(before: HotelProfile, after: HotelProfile):
 /** The most entries a profile holds; all of them go into the agent's prompt. */
 export const MAX_HOTEL_INFO_ENTRIES = 100;
 
-const sameTitle = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-
 /** The profile without notices whose last day has passed, as guests should be told about it. */
 export function currentEntries(profile: HotelProfile, today: IsoDate): HotelProfile {
   return { ...profile, entries: profile.entries.filter((e) => !e.until || e.until >= today) };
@@ -87,11 +86,18 @@ function assertRoom(profile: HotelProfile) {
   }
 }
 
+/** Tags as Knowledge lists them: lowercase, without repeats, at most six. */
+export function normalizeTags(tags: string[]): string[] {
+  const clean = tags.map((t) => t.trim().toLowerCase().replace(/^#/, '')).filter(Boolean);
+  return [...new Set(clean)].slice(0, 6);
+}
+
 const toEntry = (id: string, draft: HotelInfoDraft, stamp: EntryStamp): HotelInfoEntry => ({
   id,
   category: draft.category,
   title: draft.title.trim(),
   details: draft.details.trim(),
+  tags: normalizeTags(draft.tags),
   until: draft.until,
   source: stamp.source,
   updatedAt: stamp.at,
@@ -101,6 +107,24 @@ const replace = (profile: HotelProfile, entry: HotelInfoEntry): HotelProfile => 
   ...profile,
   entries: profile.entries.map((e) => (e.id === entry.id ? entry : e)),
 });
+
+/** Most characters a note holds; a renamed link may not push one past it. */
+const MAX_NOTE_LENGTH = 1000;
+
+/**
+ * The profile with links to a renamed note pointing at its new title, in every other note, so
+ * renaming keeps them working. A note the longer title would push past its limit keeps the old.
+ */
+export function withRenamedLinks(profile: HotelProfile, from: string, to: string): HotelProfile {
+  if (from.trim() === to.trim()) return profile;
+  return {
+    ...profile,
+    entries: profile.entries.map((e) => {
+      const details = renameLinks(e.details, from, to);
+      return details === e.details || details.length > MAX_NOTE_LENGTH ? e : { ...e, details };
+    }),
+  };
+}
 
 /**
  * The profile with the fact the agent proposed: it replaces the entry with the same title, in any
@@ -115,7 +139,7 @@ export function withHotelInfo(
   if (draft.until && draft.until < today) {
     throw new DomainError('invalid_input', 'A notice has to last until today or later');
   }
-  const replaced = profile.entries.find((e) => sameTitle(e.title, draft.title)) ?? null;
+  const replaced = profile.entries.find((e) => sameNoteTitle(e.title, draft.title)) ?? null;
   // A notice ends; the entry it would replace should not end with it.
   if (replaced && draft.until && !replaced.until) {
     throw new DomainError(
@@ -136,7 +160,8 @@ export function withHotelInfo(
 
 /**
  * The profile with an entry staff added (`id` null) or edited. Titles stay unique, so the agent's
- * corrections find the one entry they mean; an end date may only be set to today or later.
+ * corrections find the one entry they mean, and links to a renamed note follow it. An end date
+ * may only be set to today or later.
  */
 export function withEntry(
   profile: HotelProfile,
@@ -147,7 +172,7 @@ export function withEntry(
 ): { profile: HotelProfile; entry: HotelInfoEntry } {
   const current = id === null ? null : profile.entries.find((e) => e.id === id);
   if (current === undefined) throw new DomainError('not_found', `Entry ${id} not found`);
-  const clash = profile.entries.find((e) => e.id !== id && sameTitle(e.title, draft.title));
+  const clash = profile.entries.find((e) => e.id !== id && sameNoteTitle(e.title, draft.title));
   if (clash) {
     throw new DomainError('conflict', `There is already an entry called "${clash.title}"`);
   }
@@ -158,7 +183,7 @@ export function withEntry(
   const entry = toEntry(current?.id ?? newEntryId(profile, draft.category), draft, stamp);
   return {
     profile: current
-      ? replace(profile, entry)
+      ? withRenamedLinks(replace(profile, entry), current.title, entry.title)
       : { ...profile, entries: [...profile.entries, entry] },
     entry,
   };
@@ -174,7 +199,7 @@ export interface SettingsDeps {
   clock?: () => Date;
 }
 
-/** The hotel profile: property details, policies, amenities and guest information. */
+/** The hotel profile: property details, and Knowledge, the notes guests are told about. */
 export function createSettingsService({ repos, clock = () => new Date() }: SettingsDeps) {
   async function getProfile(): Promise<HotelProfile> {
     return (await repos.settings.getProfile()) ?? emptyHotelProfile;

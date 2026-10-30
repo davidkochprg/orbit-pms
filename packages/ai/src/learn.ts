@@ -1,3 +1,4 @@
+import { normalizeTags } from '@orbit/domain';
 import {
   type HotelInfoDraft,
   hotelInfoCategorySchema,
@@ -17,6 +18,7 @@ export const learnedFactSchema = z.object({
   category: hotelInfoCategorySchema,
   title: z.string(),
   details: z.string(),
+  tags: z.array(z.string()),
   until: isoDateSchema.nullable(),
 });
 export type LearnedFact = z.infer<typeof learnedFactSchema>;
@@ -24,7 +26,7 @@ export type LearnedFact = z.infer<typeof learnedFactSchema>;
 export interface ReplyToLearnFrom {
   guestMessage: string;
   reply: string;
-  entries: Pick<HotelInfoEntry, 'title' | 'details'>[];
+  entries: HotelInfoEntry[];
   today: string;
 }
 
@@ -32,11 +34,12 @@ export interface ReplyToLearnFrom {
 export function toDraft(fact: LearnedFact, today: string): HotelInfoDraft | null {
   const title = fact.title.trim();
   const details = fact.details.trim();
-  if (!fact.save || !title || !details || title.length > 80 || details.length > 600) return null;
+  if (!fact.save || !title || !details || title.length > 80 || details.length > 1000) return null;
   return {
     category: fact.category,
     title,
     details,
+    tags: normalizeTags(fact.tags).filter((t) => t.length <= 24),
     until: fact.until && fact.until >= today ? fact.until : null,
   };
 }

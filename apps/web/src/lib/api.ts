@@ -28,6 +28,7 @@ import {
   idScanPhoneViewSchema,
   idScanSchema,
   hotelProfileSchema,
+  filedNoteSchema,
   hotelInfoEntrySchema,
   type HotelInfoDraft,
   type HotelProfile,
@@ -722,6 +723,13 @@ export function useSaveEntry() {
       ? apiPost(`/api/hotel-info/${encodeURIComponent(id)}`, draft, hotelInfoEntrySchema, 'PUT')
       : apiPost('/api/hotel-info', draft, hotelInfoEntrySchema),
   );
+}
+
+/** Orbit's note for what staff described: titled, filed, tagged and linked, not saved yet. */
+export function useFileNote() {
+  return useMutation({
+    mutationFn: (text: string) => apiPost('/api/hotel-info/file', { text }, filedNoteSchema),
+  });
 }
 
 export function useRemoveEntry() {

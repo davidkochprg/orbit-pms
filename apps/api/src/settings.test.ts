@@ -1,5 +1,6 @@
 import { applySeed, buildSeed, createDb, createRepositories, createUsageStore } from '@orbit/db';
 import type {
+  FiledNote,
   HotelInfoEntry,
   ActivityItem,
   ApiError,
@@ -11,6 +12,7 @@ import type {
   RoomType,
   StaffMember,
 } from '@orbit/shared';
+import { MockLanguageModelV4 } from 'ai/test';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 
@@ -109,7 +111,7 @@ describe('hotel profile', () => {
 
 describe('Knowledge', () => {
   const draft = {
-    category: 'info',
+    category: 'services',
     title: 'Late arrival',
     details: 'Key box by the door.',
     until: null,
@@ -314,5 +316,75 @@ describe('activity', () => {
     const agent = await call<ActivityItem[]>('GET', '/api/activity?actor=agent');
     expect(agent.body.every((i) => i.actor === 'agent')).toBe(true);
     expect((await call('GET', '/api/activity?actor=robot')).status).toBe(400);
+  });
+});
+
+describe('filing a note staff described', () => {
+  /** Files every description into the seeded Parking note, with a link to one that exists. */
+  const model = new MockLanguageModelV4({
+    doGenerate: () =>
+      Promise.resolve({
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify({
+              update: 'Parking',
+              folder: 'getting_here',
+              title: 'Parking',
+              details: 'Free private parking for about 25 cars. Two EV chargers, see [[Wi-Fi]].',
+              tags: ['Parking', 'EV'],
+              until: null,
+            }),
+          },
+        ],
+        finishReason: { unified: 'stop', raw: undefined },
+        usage: {
+          inputTokens: { total: 900, noCache: 900, cacheRead: undefined, cacheWrite: undefined },
+          outputTokens: { total: 80, text: 80, reasoning: undefined },
+        },
+        warnings: [],
+      }),
+  });
+  const filing = createApp({
+    repos: createRepositories(handle.db),
+    ai: {
+      agent: model,
+      agentModelId: 'muse-spark-1.3',
+      translate: model,
+      translateModelId: 'muse-spark-1.3',
+      draft: model,
+      draftModelId: 'muse-spark-1.3',
+      vision: null,
+      visionModelId: null,
+      transcription: null,
+    },
+    usage: createUsageStore(handle.db),
+    clock: () => now,
+  });
+
+  it('returns the note filed and folded into the one that covers it, saving nothing', async () => {
+    const res = await filing.request('/api/hotel-info/file', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-staff-id': receptionist.id },
+      body: JSON.stringify({ text: 'we have two EV chargers now' }),
+    });
+    expect(res.status).toBe(200);
+    expect((await res.json()) as FiledNote).toEqual({
+      id: 'parking',
+      draft: {
+        category: 'getting_here',
+        title: 'Parking',
+        details: 'Free private parking for about 25 cars. Two EV chargers, see [[Wi-Fi]].',
+        tags: ['parking', 'ev'],
+        until: null,
+      },
+    });
+    const notes = (await call<HotelInfoEntry[]>('GET', '/api/hotel-info')).body;
+    expect(notes.find((n) => n.id === 'parking')?.details).not.toContain('EV');
+  });
+
+  it('needs the AI to be configured and something to file', async () => {
+    expect((await call('POST', '/api/hotel-info/file', { text: 'Pool' })).status).toBe(503);
+    expect((await call('POST', '/api/hotel-info/file', { text: ' ' })).status).toBe(400);
   });
 });

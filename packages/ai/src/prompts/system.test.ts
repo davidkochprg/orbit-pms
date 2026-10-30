@@ -17,9 +17,15 @@ const profile: HotelProfile = {
   language: 'cs',
   coordinates: null,
   entries: [
-    { id: 'quiet', category: 'policy', title: 'Quiet hours', details: 'From 22:00.' },
-    { id: 'sauna', category: 'amenity', title: 'Sauna', details: 'Open 16:00 to 21:00.' },
-    { id: 'bus', category: 'info', title: 'Bus', details: 'Stop 200 m from the house.' },
+    { id: 'quiet', category: 'policies', title: 'Quiet hours', details: 'From 22:00.' },
+    {
+      id: 'sauna',
+      category: 'wellness',
+      title: 'Sauna',
+      details: 'Open 16:00 to 21:00.\nNo dogs, see [[Quiet hours]].',
+      tags: ['sauna'],
+    },
+    { id: 'bus', category: 'getting_here', title: 'Bus', details: 'Stop 200 m from the house.' },
   ],
 };
 const hotel = { profile, policy: hotelPolicy, pricing: pricingConfig };
@@ -27,19 +33,20 @@ const hotel = { profile, policy: hotelPolicy, pricing: pricingConfig };
 describe('hotelFacts', () => {
   const facts = hotelFacts(hotel);
 
-  it('includes the profile, grouped by category', () => {
+  it('includes the profile, grouped by folder in their order', () => {
     expect(facts).toContain('Test Lodge, Test Valley. Twelve rooms by a lake.');
     expect(facts).toContain('Contact: email desk@example.com.');
     expect(facts).toContain('Check-in from 14:00, check-out by 11:00.');
-    expect(facts).toContain('House policies:\n- Quiet hours: From 22:00.');
-    expect(facts).toContain('Amenities:\n- Sauna: Open 16:00 to 21:00.');
-    expect(facts).toContain('Guest information:\n- Bus: Stop 200 m from the house.');
+    expect(facts).toContain('Policies:\n- Quiet hours: From 22:00.');
+    expect(facts).toContain('Wellness:\n- Sauna: Open 16:00 to 21:00. No dogs, see Quiet hours.');
+    expect(facts).toContain('Getting here:\n- Bus: Stop 200 m from the house.');
+    expect(facts.indexOf('Wellness:')).toBeLessThan(facts.indexOf('Getting here:'));
   });
 
   it('leaves out empty sections and contact details', () => {
     const bare = hotelFacts({ ...hotel, profile: { ...profile, email: null, entries: [] } });
     expect(bare).not.toContain('Contact:');
-    expect(bare).not.toContain('Amenities:');
+    expect(bare).not.toContain('Wellness:');
   });
 
   it('states the rules the domain enforces', () => {

@@ -1,6 +1,6 @@
-import { type HotelInfoCategory, hotelInfoCategories, type Season } from '@orbit/shared';
+import type { Season } from '@orbit/shared';
 
-/** The property details and the team. Policies, amenities and guest info are in Knowledge. */
+/** The property details and the team. What guests are told is in Knowledge. */
 export type SettingsSection = 'property' | 'team';
 
 export const settingsSections: { id: SettingsSection; label: string }[] = [
@@ -8,30 +8,14 @@ export const settingsSections: { id: SettingsSection; label: string }[] = [
   { id: 'team', label: 'Team' },
 ];
 
-/** The Settings tabs entries used to have, for links that still point there. */
-export function isEntryCategory(value: string | undefined): value is HotelInfoCategory {
-  return hotelInfoCategories.some((c) => c === value);
+/** The Settings tabs that held policies, amenities and guest info, for links that still point there. */
+export function isEntrySection(value: string | undefined): boolean {
+  return value === 'policy' || value === 'amenity' || value === 'info';
 }
 
 export function isSettingsSection(value: string | undefined): value is SettingsSection {
   return settingsSections.some((s) => s.id === value);
 }
-
-/** The name and title placeholder for each kind of entry. */
-export const entryHints: Record<HotelInfoCategory, { title: string; example: string }> = {
-  policy: {
-    title: 'Policies',
-    example: 'e.g. Quiet hours',
-  },
-  amenity: {
-    title: 'Amenities',
-    example: 'e.g. Sauna',
-  },
-  info: {
-    title: 'Guest info',
-    example: 'e.g. Getting here',
-  },
-};
 
 /** Deep equality for plain JSON settings, e.g. a draft profile or rates against the saved ones. */
 export function sameSettings<T>(a: T, b: T): boolean {

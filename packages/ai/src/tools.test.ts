@@ -336,7 +336,13 @@ describe('agent tools', () => {
   it('proposes saving a fact about the hotel instead of saving it', async () => {
     const { tools, repos } = setup();
     const result = await tools.saveHotelInfo.execute(
-      { category: 'amenity', title: 'Sauna', details: 'Closed for repairs.', until: '2026-05-15' },
+      {
+        category: 'wellness',
+        title: 'Sauna',
+        details: 'Closed for repairs.',
+        tags: ['sauna'],
+        until: '2026-05-15',
+      },
       callOptions,
     );
     expect(result).toMatchObject({ status: 'awaiting_confirmation' });

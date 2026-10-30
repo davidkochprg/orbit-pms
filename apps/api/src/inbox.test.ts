@@ -110,9 +110,10 @@ const learningModel = new MockLanguageModelV4({
           type: 'text',
           text: JSON.stringify({
             save: true,
-            category: 'amenity',
+            category: 'getting_here',
             title: 'EV charging',
             details: 'Two chargers in the back lot, free for guests.',
+            tags: ['ev', 'parking'],
             until: null,
           }),
         },
@@ -136,7 +137,7 @@ describe('learning from replies', () => {
     expect(learned.body).toMatchObject({
       kind: 'save_hotel_info',
       status: 'pending',
-      input: { title: 'EV charging', category: 'amenity' },
+      input: { title: 'EV charging', category: 'getting_here', tags: ['ev', 'parking'] },
     });
     const before = await call<HotelProfile>(app, 'GET', '/api/settings/profile');
     expect(before.body.entries.some((e) => e.title === 'EV charging')).toBe(false);
@@ -144,7 +145,7 @@ describe('learning from replies', () => {
     await call(app, 'POST', `/api/pending-actions/${learned.body.id}/confirm`);
     const after = await call<HotelProfile>(app, 'GET', '/api/settings/profile');
     expect(after.body.entries).toContainEqual(
-      expect.objectContaining({ title: 'EV charging', category: 'amenity' }),
+      expect.objectContaining({ title: 'EV charging', category: 'getting_here' }),
     );
   });
 

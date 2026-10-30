@@ -11,6 +11,7 @@ export * from './id-scan';
 export * from './housekeeping';
 export * from './inquiry';
 export * from './knock-on';
+export * from './notes';
 export * from './operations';
 export * from './pending';
 export * from './quote';

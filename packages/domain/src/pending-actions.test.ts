@@ -535,18 +535,19 @@ describe('pending actions', () => {
     const proposed = await actions.propose({
       kind: 'save_hotel_info',
       input: {
-        category: 'amenity',
+        category: 'wellness',
         title: 'Sauna',
         details: 'Closed for repairs.',
+        tags: ['sauna'],
         until: '2026-05-15',
         source: 'agent',
       },
     });
     expect(proposed.summary).toBe(
-      'Save in Amenities: Sauna: Closed for repairs. (until 2026-05-15)',
+      'Save in Wellness: Sauna: Closed for repairs. (until 2026-05-15)',
     );
     expect(proposed.details?.changes).toEqual([
-      { label: 'Amenities', before: null, after: { text: 'Sauna: Closed for repairs.' } },
+      { label: 'Wellness', before: null, after: { text: 'Sauna: Closed for repairs.' } },
       { label: 'Until', before: null, after: { text: '2026-05-15' } },
     ]);
     expect(proposed.bookingId).toBeNull();
@@ -554,7 +555,7 @@ describe('pending actions', () => {
 
     await actions.confirm(proposed.id);
     expect(repos.state.profile?.entries).toEqual([
-      expect.objectContaining({ title: 'Sauna', until: '2026-05-15' }),
+      expect.objectContaining({ title: 'Sauna', tags: ['sauna'], until: '2026-05-15' }),
     ]);
   });
 });
