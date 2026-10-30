@@ -1,5 +1,6 @@
 import type { ActivityItem, AuditActor } from '@orbit/shared';
-import { History, Sparkles, UserRound } from 'lucide-react';
+import { History, UserRound } from 'lucide-react';
+import { LogoMark } from '@/components/logo-mark';
 import { Link, useSearchParams } from 'react-router';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
@@ -102,7 +103,7 @@ function ActivityRow({ item }: { item: ActivityItem }) {
         }
         aria-hidden
       >
-        {byAgent ? <Sparkles className="size-3.5" /> : <UserRound className="size-3.5" />}
+        {byAgent ? <LogoMark className="size-3.5" /> : <UserRound className="size-3.5" />}
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex flex-wrap items-baseline gap-x-1.5">

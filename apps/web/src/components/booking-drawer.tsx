@@ -5,7 +5,8 @@ import type {
   BookingSource,
   Language,
 } from '@orbit/shared';
-import { CircleDashed, MoreHorizontal, Pencil, ScanLine, Sparkles } from 'lucide-react';
+import { CircleDashed, MoreHorizontal, Pencil, ScanLine } from 'lucide-react';
+import { LogoMark } from '@/components/logo-mark';
 import { type ReactNode, useEffect, useState } from 'react';
 import { Link } from 'react-router';
 import { BookingBill, PaymentForm } from '@/components/booking-bill';
@@ -233,7 +234,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
             openPalette({ mode: 'agent', context: { kind: 'booking', id: booking.id } })
           }
         >
-          <Sparkles className="text-primary-text" /> Ask Orbit
+          <LogoMark className="text-primary-text" /> Ask Orbit
         </Button>
       </footer>
       <CheckInDialog detail={detail} open={checkingIn} onOpenChange={setCheckingIn} />
@@ -557,7 +558,7 @@ function ActivityItem({ entry }: { entry: AuditLogEntry }) {
             {activityLabel(entry.action)}
             {byAgent && (
               <span className="inline-flex items-center gap-1 text-xs text-primary-text">
-                <Sparkles className="size-3" /> by Orbit
+                <LogoMark className="size-3" /> by Orbit
               </span>
             )}
           </span>

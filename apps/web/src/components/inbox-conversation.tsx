@@ -85,7 +85,6 @@ export function Conversation({ id }: { id: string }) {
   // A room held after staff edited the reply: the reply doesn't say so until they update it.
   const [heldSinceEdit, setHeldSinceEdit] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
-  const heldRoom = useHeldRoomName(m?.bookingId ?? null);
 
   // Opening a conversation reads it, as in any mail client.
   const marked = useRef(false);
@@ -161,7 +160,6 @@ export function Conversation({ id }: { id: string }) {
           myLanguage={myLanguage}
           aiOn={aiOn}
           drafting={drafting.isPending}
-          draftingAbout={heldRoom}
           busy={busy}
           error={reading.error ?? drafting.error}
           heldSinceEdit={heldSinceEdit}
@@ -171,12 +169,6 @@ export function Conversation({ id }: { id: string }) {
       )}
     </article>
   );
-}
-
-/** The room the conversation's hold is in, while it is a hold. */
-function useHeldRoomName(bookingId: string | null): string | null {
-  const held = useBookingDetail(bookingId).data;
-  return held?.booking.status === 'hold' ? held.room.name : null;
 }
 
 /** Before Orbit has read the latest message: the buttons to draft a reply or write one. */
@@ -564,7 +556,6 @@ function ReplyEditor({
   myLanguage,
   aiOn,
   drafting,
-  draftingAbout,
   busy,
   error: prepareError,
   heldSinceEdit,
@@ -576,8 +567,6 @@ function ReplyEditor({
   aiOn: boolean;
   /** A draft is being written; it replaces the text. */
   drafting: boolean;
-  /** The room the draft is about, when one is held. */
-  draftingAbout: string | null;
   /** Reading or drafting: sending waits. */
   busy: boolean;
   error: Error | null;
@@ -679,7 +668,7 @@ function ReplyEditor({
       {heldSinceEdit && (
         <div className="mb-1 flex flex-wrap items-center gap-2 rounded-stage bg-primary-soft px-3 py-2 text-sm">
           <span className="min-w-0 flex-1">
-            Room {heldSinceEdit} is held for the guest, but your edited reply doesn't say so yet.
+            Your reply doesn&apos;t mention room {heldSinceEdit} yet.
           </span>
           <Button size="xs" variant="outline" disabled={busy} onClick={onDraft}>
             <RotateCw /> Rewrite for room {heldSinceEdit}
@@ -701,11 +690,7 @@ function ReplyEditor({
               onEdit();
             }}
             placeholder={
-              drafting
-                ? undefined
-                : showing === 'mine'
-                  ? `Write in ${myName}, then translate it into ${theirName}.`
-                  : 'Write a reply…'
+              drafting ? undefined : showing === 'mine' ? `Write in ${myName}…` : 'Write a reply…'
             }
             disabled={drafting || (showing === 'mine' && toMine.isPending)}
             className="min-h-56 resize-none rounded-stage border-0 bg-transparent px-4 py-3 leading-relaxed shadow-none focus-visible:ring-0 disabled:bg-transparent"
@@ -716,9 +701,7 @@ function ReplyEditor({
               className="absolute inset-0 flex items-start gap-3 rounded-t-stage bg-background/90 px-4 py-3 text-sm text-muted-foreground"
             >
               <ThinkingOrb state="composing" size={20} aria-hidden />
-              {draftingAbout
-                ? `Writing the reply about room ${draftingAbout}, held for the guest…`
-                : 'Writing the reply…'}
+              Writing the reply…
             </div>
           )}
         </div>

@@ -15,7 +15,7 @@ import {
   type LucideIcon,
   MoreHorizontal,
   Plus,
-  Sparkles,
+  SprayCan,
   Wrench,
 } from 'lucide-react';
 import type { ComponentProps, PointerEvent } from 'react';
@@ -182,7 +182,7 @@ export function HousekeepingRoomCard({
               {task.type === 'maintenance' ? (
                 <Wrench className="mt-px size-3.5 shrink-0 text-muted-foreground" />
               ) : (
-                <Sparkles className="mt-px size-3.5 shrink-0 text-muted-foreground" />
+                <SprayCan className="mt-px size-3.5 shrink-0 text-muted-foreground" />
               )}
               <span className="min-w-0 leading-snug">{taskLabel(task)}</span>
             </li>

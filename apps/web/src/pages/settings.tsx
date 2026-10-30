@@ -95,8 +95,8 @@ export function SettingsPage() {
               dirty={dirty}
               onSave={() => draft && save.mutate(draft, { onSuccess: () => setDraft(null) })}
               onDiscard={() => setDraft(null)}
-              unsaved="Unsaved changes. The agent uses them from the next message."
-              saved="Saved. The agent uses the new details from the next message."
+              unsaved="Unsaved changes"
+              saved="Saved"
               keepWithin="/settings"
             />
           )}

@@ -1,4 +1,6 @@
-import { ArrowRight, Inbox, type LucideIcon, Mic, Sparkles } from 'lucide-react';
+import type { ComponentType } from 'react';
+import { ArrowRight, Inbox, Mic } from 'lucide-react';
+import { LogoMark } from '@/components/logo-mark';
 import { useMemo, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import { Wordmark } from '@/components/wordmark';
@@ -11,9 +13,9 @@ import { useDailyBrief, useDayOverview } from '@/lib/api';
 import { sceneMessages } from '@/lib/scene-messages';
 import { demoManager, staffRoleLabels } from '@/lib/session';
 
-const features: { icon: LucideIcon; title: string; text: string }[] = [
+const features: { icon: ComponentType<{ className?: string }>; title: string; text: string }[] = [
   {
-    icon: Sparkles,
+    icon: LogoMark,
     title: 'Ask for anything',
     text: 'The agent checks rooms, quotes prices and prepares changes for you to confirm.',
   },

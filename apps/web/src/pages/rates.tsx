@@ -88,8 +88,8 @@ function RateRules({ canManage }: { canManage: boolean }) {
         dirty={dirty}
         onSave={() => draft && save.mutate(draft, { onSuccess: () => setDraft(null) })}
         onDiscard={() => setDraft(null)}
-        unsaved="Unsaved changes. Existing bookings keep their price."
-        saved="Saved. New quotes use these rates; existing bookings keep their price."
+        unsaved="Unsaved changes"
+        saved="Saved"
       />
     </>
   );

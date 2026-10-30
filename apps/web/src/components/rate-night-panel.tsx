@@ -134,7 +134,7 @@ export function RateNightPanel({
               <Input
                 aria-label="Another percent"
                 inputMode="numeric"
-                placeholder="Another %, e.g. 10"
+                placeholder="Other %"
                 value={custom}
                 onChange={(e) => setCustom(e.target.value)}
                 className="h-8 pr-7 text-[0.8125rem]"

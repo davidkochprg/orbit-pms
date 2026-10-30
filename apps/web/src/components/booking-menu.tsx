@@ -1,5 +1,6 @@
 import type { BookingAction } from '@orbit/shared';
-import { Ban, ExternalLink, LoaderCircle, Pencil, Sparkles, User } from 'lucide-react';
+import { Ban, ExternalLink, LoaderCircle, Pencil, User } from 'lucide-react';
+import { LogoMark } from '@/components/logo-mark';
 import { type ComponentType, type ReactElement, type ReactNode, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -156,7 +157,7 @@ function BookingMenuItems({
             openPalette({ mode: 'agent', context: { kind: 'booking', id: d.booking.id } })
           }
         >
-          <Sparkles /> Ask Orbit
+          <LogoMark /> Ask Orbit
         </Item>
       )}
       {d?.allowedActions.includes('cancel') && (
@@ -194,7 +195,7 @@ export function CancelBookingDialog({
           {d
             ? `${d.guest.name}, room ${d.room.name}, ${formatRange(d.booking.checkIn, d.booking.checkOut)}. `
             : ''}
-          The room becomes free again. A cancelled booking cannot be restored.
+          This can&apos;t be undone.
           {action.error && (
             <span className="mt-2 block text-destructive">{action.error.message}</span>
           )}

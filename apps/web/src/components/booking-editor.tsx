@@ -719,7 +719,7 @@ function DetailFields({
         <Textarea
           id="be-notes"
           rows={2}
-          placeholder="Arrival time, requests, anything the team should know"
+          placeholder="Arrival time, requests…"
           value={form.notes}
           onChange={(e) => onChange({ ...form, notes: e.target.value })}
         />

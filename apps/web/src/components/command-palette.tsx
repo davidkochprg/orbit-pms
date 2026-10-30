@@ -12,11 +12,11 @@ import {
   Monitor,
   Moon,
   Search,
-  Sparkles,
   Sun,
   Sunrise,
   UserPlus,
 } from 'lucide-react';
+import { LogoMark } from '@/components/logo-mark';
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -274,7 +274,7 @@ function SearchView({
         {query && aiOn && (
           <CommandPrimitive.Group>
             <Item value={ASK} onSelect={() => onAsk(query)} hint="Ask">
-              <Sparkles className="text-primary-text" />
+              <LogoMark className="text-primary-text" />
               <span className="truncate">
                 Ask Orbit: <span className="text-muted-foreground">{query}</span>
               </span>
@@ -286,7 +286,7 @@ function SearchView({
         {!query && onShowThread && (
           <CommandPrimitive.Group heading="Agent">
             <Item value="Continue conversation" onSelect={onShowThread}>
-              <Sparkles className="text-primary-text" /> Continue the conversation
+              <LogoMark className="text-primary-text" /> Continue the conversation
             </Item>
           </CommandPrimitive.Group>
         )}
@@ -295,7 +295,7 @@ function SearchView({
           <CommandPrimitive.Group heading="Ask Orbit">
             {suggestedQuestions.map((q) => (
               <Item key={q} value={q} onSelect={() => onAsk(q)}>
-                <Sparkles className="text-primary-text" /> {q}
+                <LogoMark className="text-primary-text" /> {q}
               </Item>
             ))}
           </CommandPrimitive.Group>
@@ -488,7 +488,7 @@ function AgentView({
           <ArrowLeft className="size-4" />
         </button>
         <span className="flex items-center gap-1.5 font-medium text-foreground">
-          <Sparkles className="size-3.5 text-primary-text" /> Orbit
+          <LogoMark className="size-3.5 text-primary-text" /> Orbit
         </span>
         {chat.messages.length > 0 && !busy && (
           <button
@@ -536,7 +536,7 @@ function AgentView({
       {resolve.isError && (
         <p className="border-t px-5 py-2 text-xs text-destructive">{resolve.error.message}</p>
       )}
-      <InputRow icon={<Sparkles className="size-[18px] text-primary-text" />} placement="bottom">
+      <InputRow icon={<LogoMark className="size-[18px] text-primary-text" />} placement="bottom">
         {context && <AgentContextChip context={context} onRemove={onClearContext} />}
         <input
           autoFocus

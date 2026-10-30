@@ -113,7 +113,7 @@ function GuestForm({ guest, onDone }: { guest: Guest | undefined; onDone: () => 
           <Textarea
             id="ge-notes"
             rows={3}
-            placeholder="Preferences, allergies, anything to remember"
+            placeholder="Preferences, allergies…"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
           />

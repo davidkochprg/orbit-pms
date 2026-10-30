@@ -130,21 +130,21 @@ function ReportView({
           <Kpi
             label="ADR"
             value={formatMoney(report.adr)}
-            detail="Room revenue per room night sold"
+            hint="Room revenue per room night sold"
             change={previous && relativeChange(report.adr, previous.adr)}
             vs={vs}
           />
           <Kpi
             label="RevPAR"
             value={formatMoney(report.revpar)}
-            detail="Room revenue per available room night"
+            hint="Room revenue per available room night"
             change={previous && relativeChange(report.revpar, previous.revpar)}
             vs={vs}
           />
           <Kpi
             label="Room revenue"
             value={formatMoney(report.roomRevenue)}
-            detail={ahead ? 'On the books' : 'Accommodation after discounts'}
+            detail={ahead ? 'On the books' : undefined}
             change={previous && relativeChange(report.roomRevenue, previous.roomRevenue)}
             vs={vs}
           />
@@ -219,28 +219,31 @@ function ReportView({
 
 function Kpi({
   label,
+  hint,
   value,
   detail,
   change,
   vs,
 }: {
   label: string;
+  /** What the label stands for, as a tooltip. */
+  hint?: string;
   value: string;
-  detail: string;
+  detail?: string;
   change: Change | null | undefined;
   vs: string;
 }) {
   return (
     <div className="flex flex-col gap-2 border-border p-5 max-lg:odd:border-r max-lg:nth-[-n+2]:border-b lg:not-last:border-r">
       <dt className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-        {label}
+        <span title={hint}>{label}</span>
         {change && <ChangeBadge change={change} vs={vs} />}
       </dt>
       <dd className="flex flex-col gap-0.5">
         <span className="text-xl font-semibold tracking-tight whitespace-nowrap tabular-nums sm:text-2xl 2xl:text-3xl">
           {value}
         </span>
-        <span className="truncate text-xs text-muted-foreground">{detail}</span>
+        {detail && <span className="truncate text-xs text-muted-foreground">{detail}</span>}
       </dd>
     </div>
   );
