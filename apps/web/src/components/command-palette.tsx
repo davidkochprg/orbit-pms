@@ -10,6 +10,7 @@ import { BorderBeam } from 'border-beam';
 import { Command as CommandPrimitive } from 'cmdk';
 import {
   ArrowLeft,
+  BedDouble,
   CalendarPlus,
   Contact,
   CornerDownLeft,
@@ -70,10 +71,12 @@ import {
   useGuests,
   useHealth,
   useHotelInfo,
+  useHousekeeping,
   usePendingActions,
   useResolveAnyPendingAction,
 } from '@/lib/api';
 import { formatRecent } from '@/lib/format';
+import { houseRoomState, houseStateLabels, stayByRoom } from '@/lib/house-map';
 import { folderIcons, noteHref } from '@/lib/knowledge';
 import { navItems } from '@/lib/nav';
 import { useTheme } from '@/lib/theme';
@@ -317,6 +320,8 @@ function SearchView({
   const notes = useHotelInfo();
   const contacts = useContacts();
   const day = useDayOverview();
+  const board = useHousekeeping();
+  const stays = useMemo(() => day.data && stayByRoom(day.data), [day.data]);
   const aiOn = health.data?.ai.configured ?? false;
   const query = text.trim();
 
@@ -346,7 +351,7 @@ function SearchView({
           autoFocus
           value={text}
           onValueChange={onTextChange}
-          placeholder={aiOn ? 'Ask Orbit or search…' : 'Search guests, notes, contacts and pages…'}
+          placeholder={aiOn ? 'Ask Orbit or search…' : 'Search guests, rooms, notes and contacts…'}
           className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-subtle-foreground"
         />
       </InputRow>
@@ -443,6 +448,36 @@ function SearchView({
                 {g.email && <span className="truncate text-muted-foreground">{g.email}</span>}
               </Item>
             ))}
+          </CommandPrimitive.Group>
+        )}
+
+        {query && board.data && (
+          <CommandPrimitive.Group heading="Rooms">
+            {board.data.rooms.map((r) => {
+              const stay = stays?.get(r.room.id);
+              const state = houseRoomState(r);
+              return (
+                <Item
+                  key={r.room.id}
+                  value={`Room ${r.room.name}`}
+                  keywords={[r.roomTypeName, r.guestName ?? '']}
+                  // A room opens today's stay in it, or a booking when it is free.
+                  onSelect={run(() =>
+                    stay
+                      ? openBooking(stay)
+                      : openNew({ roomId: r.room.id, checkIn: day.data?.date }),
+                  )}
+                >
+                  <BedDouble />
+                  <span className="shrink-0 font-mono">{r.room.name}</span>
+                  <span className="min-w-0 truncate text-muted-foreground">
+                    {[r.roomTypeName, houseStateLabels[state], stay && r.guestName]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                </Item>
+              );
+            })}
           </CommandPrimitive.Group>
         )}
 
