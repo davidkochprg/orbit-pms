@@ -1130,7 +1130,8 @@ function ReplyEditor({
             variant="ghost"
             size="sm"
             disabled={!theirs.trim()}
-            onClick={() => void navigator.clipboard.writeText(theirs)}
+            // The clipboard is missing on plain-HTTP addresses, e.g. the app opened over the LAN.
+            onClick={() => void navigator.clipboard?.writeText(theirs).catch(() => {})}
           >
             <Copy /> Copy
           </Button>

@@ -170,9 +170,14 @@ export function formatBytes(bytes: number): string {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
-/** A new draft's ID, made here so it can be saved as staff type without waiting for one. */
+/**
+ * A new draft's ID, made here so it can be saved as staff type without waiting for one.
+ * `getRandomValues` works on plain-HTTP addresses too, unlike `randomUUID`, e.g. when the app
+ * is opened from another device on the local network.
+ */
 export function newDraftId(): string {
-  return `drf_${crypto.randomUUID().replaceAll('-', '').slice(0, 16)}`;
+  const bytes = crypto.getRandomValues(new Uint8Array(8));
+  return `drf_${Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')}`;
 }
 
 /** Where a file opens: in the browser when it can show it, else as a download. */
