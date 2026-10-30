@@ -1,5 +1,6 @@
 import type { ActivityItem, AuditActor } from '@orbit/shared';
 import { History, UserRound } from 'lucide-react';
+import { GuestAvatar } from '@/components/guest-avatar';
 import { LogoMark } from '@/components/logo-mark';
 import { Link, useSearchParams } from 'react-router';
 import { EmptyState } from '@/components/empty-state';
@@ -95,23 +96,27 @@ function ActivityRow({ item }: { item: ActivityItem }) {
   const detail = activityDetail(item.action, item.payload);
   return (
     <li className="flex items-start gap-3 rounded-lg px-2 py-2">
-      <span
-        className={
-          byAgent
-            ? 'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-text'
-            : 'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground'
-        }
-        aria-hidden
-      >
-        {byAgent ? <LogoMark className="size-3.5" /> : <UserRound className="size-3.5" />}
-      </span>
+      {!byAgent && item.byName ? (
+        <GuestAvatar name={item.byName} className="mt-0.5 shrink-0" />
+      ) : (
+        <span
+          className={
+            byAgent
+              ? 'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-text'
+              : 'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground'
+          }
+          aria-hidden
+        >
+          {byAgent ? <LogoMark className="size-3.5" /> : <UserRound className="size-3.5" />}
+        </span>
+      )}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex flex-wrap items-baseline gap-x-1.5">
           <span className="font-medium">{activityLabel(item.action)}</span>
           {item.subject && <Subject subject={item.subject} />}
         </span>
         <span className="truncate text-xs text-muted-foreground">
-          {[byAgent ? 'by Orbit' : (item.byName ?? 'Staff'), detail].filter(Boolean).join(' · ')}
+          {[byAgent ? 'Orbit' : (item.byName ?? 'Staff'), detail].filter(Boolean).join(' · ')}
         </span>
       </div>
       <time
