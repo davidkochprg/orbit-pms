@@ -121,8 +121,8 @@ export function WelcomePage() {
               <p className="text-xs text-muted-foreground text-pretty">
                 No sign-up.{' '}
                 {manager
-                  ? `You enter as ${manager.name}, ${staffRoleLabels[manager.role].toLowerCase()} of a fictional ${b?.occupancy.total ?? 50}-room guesthouse.`
-                  : 'You enter as the manager of a fictional guesthouse.'}{' '}
+                  ? `You enter as ${manager.name}, ${staffRoleLabels[manager.role].toLowerCase()} of a fictional ${b?.occupancy.total ?? 50}-room hotel.`
+                  : 'You enter as the manager of a fictional hotel.'}{' '}
                 Press <Kbd>⌘K</Kbd> inside to talk to the agent.
               </p>
             </div>
