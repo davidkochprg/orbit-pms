@@ -221,6 +221,10 @@ describe('conversations (PGlite)', () => {
       sentAt: '2026-10-27T09:00:00.000Z',
       author: 'Martina',
       translation: null,
+      to: [],
+      cc: [{ name: 'Partner', address: 'partner@example.com' }],
+      bcc: [],
+      attachments: [],
     };
     await repos.inquiries.addMessage(reply);
     await repos.inquiries.updateMessage({
@@ -585,5 +589,70 @@ describe('contacts (PGlite)', () => {
     expect((await repos.contacts.list())[0]).toEqual({ ...contact, email: 'test@example.com' });
     await repos.contacts.delete('ct_test');
     expect(await repos.contacts.get('ct_test')).toBeNull();
+  });
+});
+
+describe('mail (PGlite)', () => {
+  it('reads the seeded labels, drafts and files, and stars and trashes conversations', async () => {
+    expect((await repos.mail.listLabels()).map((l) => l.name)).toEqual([
+      'Follow up',
+      'Groups',
+      'Suppliers',
+    ]);
+    expect((await repos.mail.listDrafts()).map((d) => d.id)).toEqual(
+      [...seed.drafts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map((d) => d.id),
+    );
+    const wedding = (await repos.inquiries.getInquiry('inq_seed_wedding'))!;
+    expect(wedding).toMatchObject({ starred: true, labelIds: ['lbl_groups', 'lbl_follow_up'] });
+    expect(wedding.messages[0]?.attachments).toEqual([
+      expect.objectContaining({ name: 'Wedding guest list.csv' }),
+    ]);
+    const file = (await repos.mail.readAttachment('att_seed_guests'))!;
+    expect(new TextDecoder().decode(file.bytes)).toContain('Riley Example');
+    expect(await repos.mail.getAttachments(['att_x', 'att_seed_guests'])).toEqual([
+      file.attachment,
+    ]);
+
+    await repos.inquiries.updateInquiry({ ...wedding, trashedAt: '2026-10-27T09:00:00.000Z' });
+    expect((await repos.inquiries.getInquiry(wedding.id))?.trashedAt).toBe(
+      '2026-10-27T09:00:00.000Z',
+    );
+    await repos.inquiries.deleteInquiry(wedding.id);
+    expect(await repos.inquiries.getInquiry(wedding.id)).toBeNull();
+    // The reply draft goes with its conversation.
+    expect((await repos.mail.listDrafts()).some((d) => d.inquiryId === wedding.id)).toBe(false);
+  });
+
+  it('saves, replaces and deletes labels, drafts and files', async () => {
+    await repos.mail.saveLabel({ id: 'lbl_t', name: 'Aaa', color: 'green' });
+    await repos.mail.saveLabel({ id: 'lbl_t', name: 'Aab', color: 'red' });
+    expect((await repos.mail.listLabels())[0]).toEqual({ id: 'lbl_t', name: 'Aab', color: 'red' });
+    await repos.mail.deleteLabel('lbl_t');
+    const bytes = new Uint8Array([0, 255, 7]);
+    const attachment = {
+      id: 'att_t',
+      name: 'x.bin',
+      contentType: 'application/octet-stream',
+      size: 3,
+    };
+    await repos.mail.saveAttachment(attachment, bytes);
+    expect(Array.from((await repos.mail.readAttachment('att_t'))!.bytes)).toEqual([0, 255, 7]);
+    const draft = {
+      id: 'drf_test01',
+      inquiryId: null,
+      forwardOf: 'inq_01',
+      to: [{ name: null, address: 'a@example.com' }],
+      cc: [],
+      bcc: [],
+      subject: 'Fwd',
+      body: 'See below',
+      attachments: [attachment],
+      updatedAt: '2026-10-27T09:00:00.000Z',
+    };
+    await repos.mail.saveDraft(draft);
+    await repos.mail.saveDraft({ ...draft, body: 'See below!' });
+    expect(await repos.mail.getDraft('drf_test01')).toEqual({ ...draft, body: 'See below!' });
+    await repos.mail.deleteDraft('drf_test01');
+    expect(await repos.mail.getDraft('drf_test01')).toBeNull();
   });
 });

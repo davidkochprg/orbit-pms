@@ -7,6 +7,7 @@ import {
   inquiryChannelSchema,
   languageSchema,
 } from './enums';
+import { MAX_ATTACHMENTS, recipientsSchema } from './mail';
 
 /** Query string for `GET /api/bookings`. `status` is comma-separated. */
 export const bookingListQuerySchema = z.object({
@@ -126,17 +127,39 @@ export const inboxHoldBodySchema = z.object({ roomId: z.string().min(1) });
 
 const messageText = z.string().trim().min(1).max(20_000);
 
-/** `POST /api/inbox/compose`: a new email to a guest. */
+/**
+ * `POST /api/inbox/compose`: a new email, starting a conversation with the first `to`. A forward
+ * (`forwardOf`) may carry the attachments of the conversation it forwards.
+ */
 export const composeBodySchema = z.object({
-  toName: z.string().trim().max(200).nullable().default(null),
-  toAddress: z.email().max(200),
+  to: recipientsSchema.min(1, 'Add someone to send it to'),
+  cc: recipientsSchema.default([]),
+  bcc: recipientsSchema.default([]),
   subject: z.string().trim().min(1).max(300),
   body: messageText,
+  attachmentIds: z.array(z.string()).max(MAX_ATTACHMENTS).default([]),
+  forwardOf: z.string().nullable().default(null),
+  /** The draft this was written in, deleted once sent. */
+  draftId: z.string().nullable().default(null),
 });
 export type ComposeBody = z.infer<typeof composeBodySchema>;
 
-/** `POST /api/inbox/:id/send` (the hotel's reply) and `/receive` (the guest writing again). */
+/** `POST /api/inbox/:id/receive`: the guest writing again. */
 export const messageBodySchema = z.object({ body: messageText });
+
+/**
+ * `POST /api/inbox/:id/send`: the hotel's reply, to the guest unless `to` says otherwise, with
+ * copies and files. Delivered outside Orbit.
+ */
+export const replyBodySchema = z.object({
+  body: messageText,
+  to: recipientsSchema.default([]),
+  cc: recipientsSchema.default([]),
+  bcc: recipientsSchema.default([]),
+  attachmentIds: z.array(z.string()).max(MAX_ATTACHMENTS).default([]),
+  draftId: z.string().nullable().default(null),
+});
+export type ReplyBody = z.infer<typeof replyBodySchema>;
 
 /** A reply the agent proposes to send in a conversation, once staff confirm it. */
 export const replyProposalSchema = z.object({
@@ -146,6 +169,9 @@ export const replyProposalSchema = z.object({
 
 export const unreadBodySchema = z.object({ unread: z.boolean() });
 export const archiveBodySchema = z.object({ archived: z.boolean() });
+export const starBodySchema = z.object({ starred: z.boolean() });
+export const trashBodySchema = z.object({ trashed: z.boolean() });
+export const labelsBodySchema = z.object({ labelIds: z.array(z.string()).max(20) });
 
 /** `POST /api/inbox/translate`: any text into a staff member's or guest's language. */
 export const translateBodySchema = z.object({

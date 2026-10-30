@@ -16,6 +16,7 @@ import {
   roomKinds,
   roomStatuses,
   staffRoles,
+  type Attachment,
   type HotelProfile,
   type IdScanResult,
   type InquiryExtraction,
@@ -24,6 +25,8 @@ import {
   type PendingActionDetails,
   type PendingActionInput,
   type PricingConfig,
+  type Recipient,
+  type LabelColor,
   type Quote,
   type Translation,
   type QuoteAddons,
@@ -37,6 +40,7 @@ import {
   bigint,
   boolean,
   check,
+  customType,
   date,
   index,
   integer,
@@ -46,6 +50,11 @@ import {
   text,
   timestamp,
 } from 'drizzle-orm/pg-core';
+
+/** Raw bytes, e.g. an attached file. */
+const bytea = customType<{ data: Uint8Array; driverData: Uint8Array }>({
+  dataType: () => 'bytea',
+});
 
 export const roomKind = pgEnum('room_kind', roomKinds);
 export const roomStatus = pgEnum('room_status', roomStatuses);
@@ -143,6 +152,9 @@ export const inquiries = pgTable('inquiries', {
   lastMessageAt: timestamp('last_message_at', { withTimezone: true }).notNull(),
   unread: boolean('unread').notNull().default(true),
   archivedAt: timestamp('archived_at', { withTimezone: true }),
+  starred: boolean('starred').notNull().default(false),
+  trashedAt: timestamp('trashed_at', { withTimezone: true }),
+  labelIds: jsonb('label_ids').$type<string[]>().notNull().default([]),
   parsed: jsonb('parsed').$type<InquiryExtraction>(),
   suggestion: jsonb('suggestion').$type<InquirySuggestion>(),
   status: inquiryStatus('status').notNull().default('new'),
@@ -163,9 +175,43 @@ export const inboxMessages = pgTable(
     sentAt: timestamp('sent_at', { withTimezone: true }).notNull(),
     author: text('author'),
     translation: jsonb('translation').$type<Translation>(),
+    to: jsonb('to').$type<Recipient[]>().notNull().default([]),
+    cc: jsonb('cc').$type<Recipient[]>().notNull().default([]),
+    bcc: jsonb('bcc').$type<Recipient[]>().notNull().default([]),
+    attachments: jsonb('attachments').$type<Attachment[]>().notNull().default([]),
   },
   (t) => [index('inbox_messages_inquiry_idx').on(t.inquiryId, t.sentAt)],
 );
+
+export const mailLabels = pgTable('mail_labels', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  color: text('color').$type<LabelColor>().notNull(),
+});
+
+/** Emails not sent yet: new ones, replies (`inquiryId`) and forwards (`forwardOf`). */
+export const mailDrafts = pgTable('mail_drafts', {
+  id: text('id').primaryKey(),
+  inquiryId: text('inquiry_id').references(() => inquiries.id, { onDelete: 'cascade' }),
+  forwardOf: text('forward_of').references(() => inquiries.id, { onDelete: 'set null' }),
+  to: jsonb('to').$type<Recipient[]>().notNull(),
+  cc: jsonb('cc').$type<Recipient[]>().notNull(),
+  bcc: jsonb('bcc').$type<Recipient[]>().notNull(),
+  subject: text('subject').notNull(),
+  body: text('body').notNull(),
+  attachments: jsonb('attachments').$type<Attachment[]>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+});
+
+/** Attached files. Messages and drafts keep the details; the bytes stay here. */
+export const mailAttachments = pgTable('mail_attachments', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  contentType: text('content_type').notNull(),
+  size: integer('size').notNull(),
+  data: bytea('data').notNull(),
+  createdAt: createdAt(),
+});
 
 export const housekeepingTasks = pgTable('housekeeping_tasks', {
   id: text('id').primaryKey(),

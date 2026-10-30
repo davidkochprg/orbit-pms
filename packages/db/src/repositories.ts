@@ -14,6 +14,7 @@ import type {
   StayGuestRepository,
   StayReadingRepository,
   LocalEventRepository,
+  MailRepository,
   Repositories,
   RoomRepository,
   SettingsRepository,
@@ -67,6 +68,9 @@ import {
   stayGuests,
   stayReadings,
   localEvents,
+  mailAttachments,
+  mailDrafts,
+  mailLabels,
   rooms,
   roomTypes,
   staff,
@@ -212,6 +216,7 @@ function toInquiry(row: InquiryRow, messages: InboxMessage[]): Inquiry {
     receivedAt: row.receivedAt.toISOString(),
     lastMessageAt: row.lastMessageAt.toISOString(),
     archivedAt: row.archivedAt?.toISOString() ?? null,
+    trashedAt: row.trashedAt?.toISOString() ?? null,
     processedAt: row.processedAt?.toISOString() ?? null,
     messages,
   };
@@ -223,6 +228,7 @@ function toInquiryRow({ messages: _, ...inquiry }: Inquiry): InquiryRow {
     receivedAt: new Date(inquiry.receivedAt),
     lastMessageAt: new Date(inquiry.lastMessageAt),
     archivedAt: inquiry.archivedAt ? new Date(inquiry.archivedAt) : null,
+    trashedAt: inquiry.trashedAt ? new Date(inquiry.trashedAt) : null,
     processedAt: inquiry.processedAt ? new Date(inquiry.processedAt) : null,
   };
 }
@@ -266,6 +272,67 @@ function inquiryRepository(db: Db): InquiryRepository {
     async updateMessage(message) {
       const { id, ...row } = toMessageRow(message);
       await db.update(inboxMessages).set(row).where(eq(inboxMessages.id, id));
+    },
+    async deleteInquiry(id) {
+      await db.delete(inquiries).where(eq(inquiries.id, id));
+    },
+  };
+}
+
+function mailRepository(db: Db): MailRepository {
+  const fileColumns = {
+    id: mailAttachments.id,
+    name: mailAttachments.name,
+    contentType: mailAttachments.contentType,
+    size: mailAttachments.size,
+  };
+  return {
+    listLabels: () => db.select().from(mailLabels).orderBy(asc(mailLabels.name)),
+    async saveLabel(label) {
+      const { id: _, ...fields } = label;
+      await db
+        .insert(mailLabels)
+        .values(label)
+        .onConflictDoUpdate({ target: mailLabels.id, set: fields });
+    },
+    async deleteLabel(id) {
+      await db.delete(mailLabels).where(eq(mailLabels.id, id));
+    },
+    async listDrafts() {
+      const rows = await db.select().from(mailDrafts).orderBy(desc(mailDrafts.updatedAt));
+      return rows.map((r) => ({ ...r, updatedAt: r.updatedAt.toISOString() }));
+    },
+    async getDraft(id) {
+      const [row] = await db.select().from(mailDrafts).where(eq(mailDrafts.id, id));
+      return row ? { ...row, updatedAt: row.updatedAt.toISOString() } : null;
+    },
+    async saveDraft(draft) {
+      const row = { ...draft, updatedAt: new Date(draft.updatedAt) };
+      const { id: _, ...fields } = row;
+      await db
+        .insert(mailDrafts)
+        .values(row)
+        .onConflictDoUpdate({ target: mailDrafts.id, set: fields });
+    },
+    async deleteDraft(id) {
+      await db.delete(mailDrafts).where(eq(mailDrafts.id, id));
+    },
+    async saveAttachment(attachment, bytes) {
+      await db.insert(mailAttachments).values({ ...attachment, data: bytes });
+    },
+    async getAttachments(ids) {
+      if (ids.length === 0) return [];
+      const rows = await db
+        .select(fileColumns)
+        .from(mailAttachments)
+        .where(inArray(mailAttachments.id, ids));
+      return ids.flatMap((id) => rows.find((r) => r.id === id) ?? []);
+    },
+    async readAttachment(id) {
+      const [row] = await db.select().from(mailAttachments).where(eq(mailAttachments.id, id));
+      if (!row) return null;
+      const { data, createdAt: _, ...attachment } = row;
+      return { attachment, bytes: new Uint8Array(data) };
     },
   };
 }
@@ -643,6 +710,7 @@ export function createRepositories(db: Db): Repositories {
     stayReadings: stayReadingRepository(db),
     events: localEventRepository(db),
     contacts: contactRepository(db),
+    mail: mailRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

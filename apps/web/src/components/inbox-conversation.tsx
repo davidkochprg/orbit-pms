@@ -5,7 +5,9 @@ import {
   type Inquiry,
   type Language,
   languages,
+  type MailDraft,
   type PendingAction,
+  type Recipient,
   type StayOption,
 } from '@orbit/shared';
 import {
@@ -17,31 +19,51 @@ import {
   CalendarPlus,
   Check,
   Copy,
+  Forward,
   Languages,
   Mail,
   MessageSquarePlus,
   PenLine,
   RotateCw,
   Send,
+  Star,
+  Tag,
+  Trash2,
+  Undo2,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router';
+import { type ReactNode, useEffect, useEffectEvent, useRef, useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { ThinkingOrb } from 'thinking-orbs';
+import { AttachButton, AttachmentList } from '@/components/attachments';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { ReceiveDialog } from '@/components/inbox-dialogs';
+import { LabelChips, LabelMenu } from '@/components/mail-labels';
 import { Panel } from '@/components/panel';
+import { RecipientField } from '@/components/recipient-field';
 import { Button } from '@/components/ui/button';
 import { NativeSelect } from '@/components/ui/native-select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { useAddressBook } from '@/hooks/use-address-book';
+import { useAutosave } from '@/hooks/use-autosave';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useSession } from '@/hooks/use-session';
 import { useToast } from '@/hooks/use-toast';
 import {
   useBookingDetail,
   useDeclineInquiry,
+  useDeleteDraft,
+  useDeleteForever,
+  useDrafts,
+  useHotelProfile,
+  useMailLabels,
+  useSaveDraft,
+  useSetLabels,
+  useSetStarred,
+  useSetTrashed,
   useGuests,
   useHealth,
   useDraftInquiry,
@@ -73,6 +95,15 @@ import {
   sendLabel,
   senderLabel,
 } from '@/lib/inbox';
+import {
+  canReplyAll,
+  formatRecipient,
+  newDraftId,
+  forwardLink,
+  recipientLabel,
+  REPLY_EVENT,
+  replyAllCc,
+} from '@/lib/mail';
 import { cn } from '@/lib/utils';
 
 /**
@@ -88,6 +119,10 @@ export function Conversation({ id }: { id: string }) {
   const reading = useReadInquiry(id);
   const drafting = useDraftInquiry(id);
   const learn = useLearnFromReply(id);
+  const drafts = useDrafts();
+  const removeDraft = useDeleteDraft();
+  const hotelAddress = useHotelProfile().data?.email ?? null;
+  const savedDraft = drafts.data?.find((d) => d.inquiryId === id && !d.forwardOf);
   const aiOn = health.data?.ai.configured ?? false;
   const myLanguage: Language = current?.language ?? 'en';
   const m = inquiry.data;
@@ -112,8 +147,10 @@ export function Conversation({ id }: { id: string }) {
   if (inquiry.isError) return <ErrorNotice message={inquiry.error.message} className="m-6" />;
   if (!m) return <Skeleton className="m-6 h-96" />;
 
+  // Orbit's new reply replaces whatever was saved before.
   const draft = () => {
     setHeldSinceEdit(null);
+    if (savedDraft) removeDraft.mutate(savedDraft.id);
     drafting.mutate({ language: myLanguage });
   };
   // Rooms first, from the reading, then the reply written for them.
@@ -167,22 +204,29 @@ export function Conversation({ id }: { id: string }) {
           onHeld={onHeld}
         />
       )}
-      {m.status !== 'declined' && (!offerPrepare || writing || reading.isPending) && (
-        <ReplyEditor
-          key={draftKey}
-          inquiry={m}
-          myLanguage={myLanguage}
-          aiOn={aiOn}
-          drafting={drafting.isPending}
-          busy={busy}
-          error={reading.error ?? drafting.error}
-          heldSinceEdit={heldSinceEdit}
-          onEdit={() => setEditedKey(draftKey)}
-          onDraft={read ? draft : prepare}
-          // What staff wrote themselves may hold something the hotel information lacks.
-          onSent={() => aiOn && (edited || !m.suggestion?.draft) && learn.mutate()}
-        />
-      )}
+      {m.status !== 'declined' &&
+        (!offerPrepare || writing || reading.isPending || savedDraft) &&
+        !drafts.data && <Skeleton className="h-56" />}
+      {m.status !== 'declined' &&
+        (!offerPrepare || writing || reading.isPending || savedDraft) &&
+        drafts.data && (
+          <ReplyEditor
+            key={draftKey}
+            inquiry={m}
+            savedDraft={savedDraft}
+            hotelAddress={hotelAddress}
+            myLanguage={myLanguage}
+            aiOn={aiOn}
+            drafting={drafting.isPending}
+            busy={busy}
+            error={reading.error ?? drafting.error}
+            heldSinceEdit={heldSinceEdit}
+            onEdit={() => setEditedKey(draftKey)}
+            onDraft={read ? draft : prepare}
+            // What staff wrote themselves may hold something the hotel information lacks.
+            onSent={() => aiOn && (edited || !m.suggestion?.draft) && learn.mutate()}
+          />
+        )}
     </article>
   );
 }
@@ -295,11 +339,28 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
   const guests = useGuests();
   const setUnread = useSetUnread(m.id);
   const setArchived = useSetArchived(m.id);
+  const setStarred = useSetStarred(m.id);
+  const setTrashed = useSetTrashed(m.id);
+  const setLabels = useSetLabels(m.id);
+  const remove = useDeleteForever();
+  const labels = useMailLabels();
   const decline = useDeclineInquiry(m.id);
+  const location = useLocation();
+  const navigate = useNavigate();
   const [receiving, setReceiving] = useState(false);
+  const [purging, setPurging] = useState(false);
   const { toast } = useToast();
   const archived = m.archivedAt !== null;
-  const error = setUnread.error ?? setArchived.error ?? decline.error;
+  const trashed = m.trashedAt !== null;
+  const toList = () => void navigate(`/inbox${location.search}`);
+  const error =
+    setUnread.error ??
+    setArchived.error ??
+    setStarred.error ??
+    setTrashed.error ??
+    setLabels.error ??
+    remove.error ??
+    decline.error;
 
   return (
     <header className="flex flex-col gap-3">
@@ -311,8 +372,48 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
         </Button>
         <h2 className="min-w-0 flex-1 text-xl font-semibold tracking-tight">
           {m.subject ?? '(no subject)'}
+          <LabelChips ids={m.labelIds} labels={labels.data ?? []} className="mt-1.5" />
         </h2>
         <div className="flex shrink-0 items-center gap-0.5">
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={m.starred ? 'Unstar' : 'Star'}
+            aria-pressed={m.starred}
+            title={m.starred ? 'Unstar (s)' : 'Star (s)'}
+            onClick={() => setStarred.mutate(!m.starred)}
+            className={m.starred ? 'text-warning' : 'text-muted-foreground'}
+          >
+            <Star className={cn(m.starred && 'fill-current')} />
+          </Button>
+          <LabelMenu
+            checked={(l) => m.labelIds.includes(l)}
+            onToggle={(l, on) =>
+              setLabels.mutate(on ? [...m.labelIds, l] : m.labelIds.filter((x) => x !== l))
+            }
+          >
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Labels"
+              title="Labels"
+              className="text-muted-foreground"
+            >
+              <Tag />
+            </Button>
+          </LabelMenu>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label="Forward"
+            title="Forward (f)"
+            asChild
+            className="text-muted-foreground"
+          >
+            <Link to={forwardLink(m.id, location.search)}>
+              <Forward />
+            </Link>
+          </Button>
           <IconButton label="Add the guest's reply" onClick={() => setReceiving(true)}>
             <MessageSquarePlus />
           </IconButton>
@@ -344,6 +445,33 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
           >
             {archived ? <ArchiveRestore /> : <Archive />}
           </IconButton>
+          {trashed ? (
+            <>
+              <IconButton label="Restore" onClick={() => setTrashed.mutate(false)}>
+                <Undo2 />
+              </IconButton>
+              <IconButton label="Delete forever" onClick={() => setPurging(true)}>
+                <Trash2 />
+              </IconButton>
+            </>
+          ) : (
+            <IconButton
+              label="Move to trash"
+              onClick={() =>
+                setTrashed.mutate(true, {
+                  onSuccess: () => {
+                    toast({
+                      title: 'Moved to the trash',
+                      action: { label: 'Undo', run: () => setTrashed.mutate(false) },
+                    });
+                    toList();
+                  },
+                })
+              }
+            >
+              <Trash2 />
+            </IconButton>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
@@ -407,8 +535,19 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
       {m.status === 'declined' && (
         <p className="text-sm text-muted-foreground">Declined: no booking will be made.</p>
       )}
+      {trashed && <p className="text-sm text-muted-foreground">In the trash</p>}
       {error && <ErrorNotice message={error.message} />}
       <ReceiveDialog id={m.id} open={receiving} onOpenChange={setReceiving} />
+      <ConfirmDialog
+        open={purging}
+        onOpenChange={setPurging}
+        title="Delete this conversation forever?"
+        description="It can't be restored."
+        confirmLabel="Delete forever"
+        destructive
+        busy={remove.isPending}
+        onConfirm={() => remove.mutate(m.id, { onSuccess: toList })}
+      />
     </header>
   );
 }
@@ -478,6 +617,7 @@ function Message({
           {formatDateTime(message.sentAt)}
         </time>
       </div>
+      <Addressees message={message} />
       {translated && !showOriginal ? (
         <div className="flex flex-col gap-1">
           <p className="leading-relaxed whitespace-pre-wrap">{translated.text}</p>
@@ -519,8 +659,36 @@ function Message({
           )}
         </div>
       )}
+      <AttachmentList files={message.attachments} />
       {translate.error && <ErrorNotice message={translate.error.message} />}
     </li>
+  );
+}
+
+/** Who else a message went to, when it went to more than the guest. */
+function Addressees({ message }: { message: InboxMessage }) {
+  const lines: [string, Recipient[]][] = [
+    ['to', message.to],
+    ['cc', message.cc],
+    ['bcc', message.bcc],
+  ];
+  const shown = lines.filter(([, list]) => list.length > 0);
+  if (shown.length === 0) return null;
+  return (
+    <p className="-mt-1 text-xs text-muted-foreground">
+      {shown.map(([kind, list], i) => (
+        <span key={kind}>
+          {i > 0 && ' · '}
+          {kind}{' '}
+          {list.map((r, j) => (
+            <span key={r.address} title={formatRecipient(r)}>
+              {j > 0 && ', '}
+              {recipientLabel(r)}
+            </span>
+          ))}
+        </span>
+      ))}
+    </p>
   );
 }
 
@@ -637,6 +805,8 @@ type Side = 'theirs' | 'mine';
  */
 function ReplyEditor({
   inquiry: m,
+  savedDraft,
+  hotelAddress,
   myLanguage,
   aiOn,
   drafting,
@@ -648,6 +818,10 @@ function ReplyEditor({
   onSent,
 }: {
   inquiry: Inquiry;
+  /** What staff wrote before and didn't send, to carry on with. */
+  savedDraft: MailDraft | undefined;
+  /** The hotel's own address, left out of a reply all. */
+  hotelAddress: string | null;
   myLanguage: Language;
   aiOn: boolean;
   /** A draft is being written; it replaces the text. */
@@ -666,8 +840,80 @@ function ReplyEditor({
   const toTheirs = useTranslateText();
   const toMine = useTranslateText();
   const send = useSendReply(m.id);
+  const save = useSaveDraft();
+  const discard = useDeleteDraft();
+  const book = useAddressBook();
+  const email = m.channel === 'email';
+  const [draftId] = useState(() => savedDraft?.id ?? newDraftId());
+  const [cc, setCc] = useState<Recipient[]>(savedDraft?.cc ?? []);
+  const [bcc, setBcc] = useState<Recipient[]>(savedDraft?.bcc ?? []);
+  const [showCopies, setShowCopies] = useState(cc.length + bcc.length > 0);
+  const [files, setFiles] = useState(savedDraft?.attachments ?? []);
+  // Saved only once staff change something themselves, not for Orbit's own draft.
+  const [touched, setTouched] = useState(savedDraft !== undefined);
+  const [sent, setSent] = useState(false);
+  const textarea = useRef<HTMLTextAreaElement>(null);
   const [theirLanguage, setTheirLanguage] = useState<Language>(guestLanguage(m) ?? myLanguage);
-  const [theirs, setTheirs] = useState(suggestion?.draft ?? '');
+  const [theirs, setTheirs] = useState(savedDraft?.body ?? suggestion?.draft ?? '');
+  const replyAll = canReplyAll(m, hotelAddress);
+  const allCc = replyAll ? replyAllCc(m, hotelAddress) : [];
+  const toAll = replyAll && allCc.every((r) => cc.some((c) => c.address === r.address));
+  useAutosave(
+    { inquiryId: m.id, cc, bcc, body: theirs, attachmentIds: files.map((f) => f.id) },
+    (body) => save.mutate({ id: draftId, body }),
+    touched && !sent,
+  );
+  const change = () => {
+    setTouched(true);
+    onEdit();
+  };
+  const startReply = (all: boolean) => {
+    if (all) {
+      setCc((c) => [...c, ...allCc.filter((r) => !c.some((x) => x.address === r.address))]);
+      setShowCopies(true);
+    } else {
+      setCc((c) => c.filter((x) => !allCc.some((r) => r.address === x.address)));
+    }
+    setTouched(true);
+  };
+
+  // "r" and "a" from the list start a reply here.
+  const onReply = useEffectEvent((e: Event) => {
+    if (!(e instanceof CustomEvent)) return;
+    if (e.detail === 'replyAll' && replyAll) startReply(true);
+    if (e.detail === 'reply') startReply(false);
+    textarea.current?.focus();
+    textarea.current?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
+  useEffect(() => {
+    const listener = (e: Event) => onReply(e);
+    window.addEventListener(REPLY_EVENT, listener);
+    return () => window.removeEventListener(REPLY_EVENT, listener);
+  }, []);
+
+  const sendNow = () => {
+    if (!theirs.trim() || send.isPending) return;
+    setSent(true);
+    send.mutate(
+      {
+        body: theirs,
+        cc: email ? cc : [],
+        bcc: email ? bcc : [],
+        attachmentIds: files.map((f) => f.id),
+        draftId,
+      },
+      { onSuccess: onSent, onError: () => setSent(false) },
+    );
+  };
+  const discardDraft = () => {
+    discard.mutate(draftId);
+    setTheirs('');
+    setMine('');
+    setCc([]);
+    setBcc([]);
+    setFiles([]);
+    setTouched(false);
+  };
   const [mine, setMine] = useState(
     suggestion?.draftTranslation?.language === myLanguage ? suggestion.draftTranslation.text : '',
   );
@@ -730,6 +976,15 @@ function ReplyEditor({
               )}
             </LanguageTab>
           </div>
+        ) : replyAll ? (
+          <div role="tablist" aria-label="Reply to" className="flex items-center gap-0.5">
+            <LanguageTab selected={!toAll} onClick={() => startReply(false)}>
+              Reply
+            </LanguageTab>
+            <LanguageTab selected={toAll} onClick={() => startReply(true)}>
+              Reply all
+            </LanguageTab>
+          </div>
         ) : (
           <h3 className="px-1 text-[0.8125rem] text-muted-foreground">Reply</h3>
         )}
@@ -762,9 +1017,65 @@ function ReplyEditor({
         </div>
       )}
       <div className="relative flex flex-col rounded-stage bg-background shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit">
+        {email && (
+          <>
+            <div className="flex h-10 items-center gap-3 border-b px-4 text-sm">
+              <span className="w-14 shrink-0 text-muted-foreground">To</span>
+              <span className="min-w-0 flex-1 truncate">
+                {m.senderAddress
+                  ? formatRecipient({ name: m.senderName, address: m.senderAddress })
+                  : senderLabel(m)}
+              </span>
+              {!showCopies && (
+                <button
+                  type="button"
+                  onClick={() => setShowCopies(true)}
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                >
+                  Cc Bcc
+                </button>
+              )}
+            </div>
+            {showCopies && (
+              <>
+                <RecipientField
+                  label="Cc"
+                  value={cc}
+                  onChange={(v) => {
+                    setCc(v);
+                    setTouched(true);
+                  }}
+                  book={book}
+                />
+                <RecipientField
+                  label="Bcc"
+                  value={bcc}
+                  onChange={(v) => {
+                    setBcc(v);
+                    setTouched(true);
+                  }}
+                  book={book}
+                />
+              </>
+            )}
+          </>
+        )}
         {/* While a draft is written, it covers the old text, which it is about to replace. */}
         <div className="relative flex flex-col">
           <Textarea
+            ref={textarea}
+            onKeyDown={(e) => {
+              if (
+                e.key === 'Enter' &&
+                (e.metaKey || e.ctrlKey) &&
+                !behind &&
+                !translating &&
+                !busy
+              ) {
+                e.preventDefault();
+                sendNow();
+              }
+            }}
             aria-label={
               showing === 'mine' ? `Reply in ${myName}` : `Reply to the guest in ${theirName}`
             }
@@ -773,7 +1084,7 @@ function ReplyEditor({
               if (showing === 'mine') setMine(e.target.value);
               else setTheirs(e.target.value);
               setEdited(showing);
-              onEdit();
+              change();
             }}
             placeholder={
               drafting ? undefined : showing === 'mine' ? `Write in ${myName}…` : 'Write a reply…'
@@ -792,15 +1103,29 @@ function ReplyEditor({
           )}
         </div>
 
+        <AttachmentList
+          files={files}
+          onRemove={(f) => {
+            setFiles((all) => all.filter((x) => x.id !== f.id));
+            setTouched(true);
+          }}
+          className="px-4 pb-3"
+        />
         <div className="flex items-center gap-2 border-t px-2 py-2">
           <Button
             size="sm"
             disabled={!theirs.trim() || send.isPending || behind || translating || busy}
             title={behind ? `Translate your ${myName} changes first` : undefined}
-            onClick={() => send.mutate(theirs, { onSuccess: onSent })}
+            onClick={sendNow}
           >
             <Send /> {sendLabel(m)}
           </Button>
+          <AttachButton
+            onAttached={(f) => {
+              setFiles((all) => [...all, f]);
+              setTouched(true);
+            }}
+          />
           <Button
             variant="ghost"
             size="sm"
@@ -842,6 +1167,19 @@ function ReplyEditor({
             {aiOn && m.suggestion?.draft && (
               <Button variant="ghost" size="xs" disabled={busy} onClick={onDraft}>
                 <RotateCw /> Redraft
+              </Button>
+            )}
+            {touched &&
+              (save.isPending ? 'Saving…' : save.isSuccess || savedDraft ? 'Draft saved' : null)}
+            {touched && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Discard draft"
+                title="Discard draft"
+                onClick={discardDraft}
+              >
+                <Trash2 />
               </Button>
             )}
           </span>

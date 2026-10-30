@@ -19,6 +19,8 @@ import type {
   Inquiry,
   IsoDate,
   LocalEvent,
+  MailDraft,
+  MailLabel,
   Payment,
   QuoteAddons,
   StayGuest,
@@ -32,6 +34,7 @@ import { seedGuests, seedRooms } from './catalog';
 import { buildContacts } from './contacts';
 import { buildConversations } from './conversations';
 import { buildEvents } from './events';
+import { buildMail, type SeedFile } from './mail';
 import { regionSeeds, type SeedRegion } from './regions';
 import { buildStayGuests } from './registrations';
 import { createRandom } from './random';
@@ -55,6 +58,9 @@ export interface SeedData {
   /** Mock local events behind suggested rates. */
   events: LocalEvent[];
   contacts: Contact[];
+  labels: MailLabel[];
+  drafts: MailDraft[];
+  files: SeedFile[];
 }
 
 /** Share of rooms the seed books for the biggest event, leaving a few free for inbox requests. */
@@ -273,10 +279,17 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
           sentAt: receivedAt,
           author: null,
           translation: null,
+          to: [],
+          cc: [],
+          bcc: [],
+          attachments: [],
         },
       ],
       unread: true,
       archivedAt: null,
+      starred: false,
+      trashedAt: null,
+      labelIds: [],
       parsed: null,
       suggestion: null,
       status: 'new',
@@ -342,14 +355,17 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
   }));
 
   const billing = buildBilling(linked, today, pricing, extras);
+  const contacts = buildContacts(region);
+  const mail = buildMail(region, contacts, staff, hotelProfile, now);
   return {
     roomTypes: seedRoomTypes,
     rooms,
     guests,
     bookings: linked,
     inquiries: [
-      ...inquiries,
+      ...inquiries.map((i) => ({ ...i, ...mail.marks[i.id] })),
       ...buildConversations(linked, guests, staff, hotelProfile, today, now),
+      ...mail.inquiries,
     ],
     housekeepingTasks,
     hotelProfile,
@@ -359,7 +375,10 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
     stayGuests: buildStayGuests(linked, guests, today),
     auditLog: buildActivity(linked, rooms, billing.payments, housekeepingTasks, today, now),
     events,
-    contacts: buildContacts(region),
+    contacts,
+    labels: mail.labels,
+    drafts: mail.drafts,
+    files: mail.files,
   };
 }
 

@@ -85,6 +85,10 @@ export const inquirySchema = z.object({
   unread: z.boolean(),
   /** Archived conversations leave the inbox; a new message from the guest brings them back. */
   archivedAt: z.iso.datetime().nullable(),
+  starred: z.boolean().default(false),
+  /** In the trash: out of every other folder until restored or deleted for good. */
+  trashedAt: z.iso.datetime().nullable().default(null),
+  labelIds: z.array(z.string()).default([]),
   parsed: inquiryExtractionSchema.nullable(),
   suggestion: inquirySuggestionSchema.nullable(),
   status: inquiryStatusSchema,

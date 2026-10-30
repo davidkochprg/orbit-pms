@@ -29,6 +29,7 @@ import {
   createRegistrationService,
   createSettingsService,
   createKnockOnService,
+  createMailboxService,
   currentEntries,
   endedEntries,
   createStaffService,
@@ -59,6 +60,7 @@ import { inboxRoutes } from './routes/inbox';
 import { overviewRoutes } from './routes/overview';
 import { pendingActionRoutes } from './routes/pending-actions';
 import { knockOnRoutes } from './routes/knock-ons';
+import { mailboxRoutes } from './routes/mailbox';
 import { registrationRoutes } from './routes/registration';
 import { reportRoutes } from './routes/reports';
 import { roomRoutes } from './routes/rooms';
@@ -112,6 +114,7 @@ export function createApp({
   const rates = createRatesService({ repos, defaults: pricingConfig, newId });
   const settings = createSettingsService({ repos, clock });
   const inbox = createInboxService({ repos, hotel, clock, newId });
+  const mailbox = createMailboxService({ repos, clock, newId });
   const revenue = createRevenueService({ repos, defaults: pricingConfig, clock, newId });
   const activity = createActivityService({ repos });
   const contacts = createContactService({ repos, clock, newId });
@@ -227,6 +230,7 @@ export function createApp({
     pendingActionRoutes(actions, (id) => staff.identify(id)),
   );
   app.route('/api', knockOnRoutes(knockOns));
+  app.route('/api', mailboxRoutes({ inbox, mailbox }));
   app.route(
     '/api',
     inboxRoutes({

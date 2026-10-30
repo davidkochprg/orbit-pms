@@ -1,6 +1,7 @@
 import type {
   AuditLogEntry,
   Booking,
+  Attachment,
   Charge,
   Contact,
   Guest,
@@ -9,6 +10,8 @@ import type {
   IdScan,
   Inquiry,
   LocalEvent,
+  MailDraft,
+  MailLabel,
   PendingAction,
   Payment,
   PricingConfig,
@@ -45,10 +48,17 @@ export function conversation(overrides: Partial<Inquiry> & { id: string; body?: 
         sentAt: receivedAt,
         author: null,
         translation: null,
+        to: [],
+        cc: [],
+        bcc: [],
+        attachments: [],
       },
     ],
     unread: true,
     archivedAt: null,
+    starred: false,
+    trashedAt: null,
+    labelIds: [],
     parsed: null,
     suggestion: null,
     status: 'new',
@@ -78,6 +88,10 @@ export interface MemoryState {
   stayReadings: SavedStayReading[];
   events: LocalEvent[];
   contacts: Contact[];
+  labels: MailLabel[];
+  drafts: MailDraft[];
+  /** Files as plain numbers, so the state stays plain JSON. */
+  files: { attachment: Attachment; bytes: number[] }[];
 }
 
 function inBilling<T extends { bookingId: string }>(
@@ -119,6 +133,9 @@ export function createMemoryRepositories(
     stayReadings: [],
     events: [],
     contacts: [],
+    labels: [],
+    drafts: [],
+    files: [],
     ...clone(initial),
   };
 
@@ -227,6 +244,10 @@ export function createMemoryRepositories(
         state.inquiries = state.inquiries.map((i) =>
           i.id === message.inquiryId ? { ...i, messages: [...i.messages, message] } : i,
         );
+        return Promise.resolve();
+      },
+      deleteInquiry: (id) => {
+        state.inquiries = state.inquiries.filter((i) => i.id !== id);
         return Promise.resolve();
       },
       updateMessage: (message) => {
@@ -400,6 +421,43 @@ export function createMemoryRepositories(
       delete: (id) => {
         state.contacts = state.contacts.filter((c) => c.id !== id);
         return Promise.resolve();
+      },
+    },
+    mail: {
+      listLabels: () =>
+        Promise.resolve([...state.labels].sort((a, b) => a.name.localeCompare(b.name))),
+      saveLabel: (label) => {
+        state.labels = [...state.labels.filter((l) => l.id !== label.id), label];
+        return Promise.resolve();
+      },
+      deleteLabel: (id) => {
+        state.labels = state.labels.filter((l) => l.id !== id);
+        return Promise.resolve();
+      },
+      listDrafts: () =>
+        Promise.resolve([...state.drafts].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))),
+      getDraft: (id) => Promise.resolve(state.drafts.find((d) => d.id === id) ?? null),
+      saveDraft: (draft) => {
+        state.drafts = [...state.drafts.filter((d) => d.id !== draft.id), draft];
+        return Promise.resolve();
+      },
+      deleteDraft: (id) => {
+        state.drafts = state.drafts.filter((d) => d.id !== id);
+        return Promise.resolve();
+      },
+      saveAttachment: (attachment, bytes) => {
+        state.files.push({ attachment, bytes: Array.from(bytes) });
+        return Promise.resolve();
+      },
+      getAttachments: (ids) =>
+        Promise.resolve(
+          ids.flatMap((id) => state.files.find((f) => f.attachment.id === id)?.attachment ?? []),
+        ),
+      readAttachment: (id) => {
+        const file = state.files.find((f) => f.attachment.id === id);
+        return Promise.resolve(
+          file ? { attachment: file.attachment, bytes: new Uint8Array(file.bytes) } : null,
+        );
       },
     },
     async transaction(fn) {

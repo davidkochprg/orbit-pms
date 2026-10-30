@@ -10,6 +10,7 @@ import {
   conversationsOf,
   filterConversations,
   folderCounts,
+  labelCounts,
   guessLanguage,
   guestLanguage,
   preview,
@@ -157,10 +158,17 @@ function conversation(overrides: Partial<Inquiry> & { id: string }): Inquiry {
         sentAt: '2026-10-27T08:00:00.000Z',
         author: null,
         translation: null,
+        to: [],
+        cc: [],
+        bcc: [],
+        attachments: [],
       },
     ],
     unread: false,
     archivedAt: null,
+    starred: false,
+    trashedAt: null,
+    labelIds: [],
     parsed: null,
     suggestion: null,
     status: 'new',
@@ -187,6 +195,10 @@ describe('mailbox views', () => {
         sentAt: '2026-10-27T09:00:00.000Z',
         author: 'Petr',
         translation: null,
+        to: [],
+        cc: [],
+        bcc: [],
+        attachments: [],
       },
     ],
   });
@@ -195,30 +207,54 @@ describe('mailbox views', () => {
 
   it('sorts conversations into folders', () => {
     const ids = (folder: Parameters<typeof filterConversations>[1]['folder']) =>
-      filterConversations(all, { folder, channel: null, query: '' }).map((m) => m.id);
+      filterConversations(all, { folder, label: null, channel: null, query: '' }).map((m) => m.id);
     expect(ids('inbox')).toEqual(['a', 'b']);
-    expect(ids('unread')).toEqual(['a']);
     expect(ids('awaiting')).toEqual(['a']);
+    expect(ids('sent')).toEqual(['b']);
     expect(ids('archived')).toEqual(['c']);
-    expect(folderCounts(all)).toEqual({ inbox: 2, unread: 1, awaiting: 1, archived: 1 });
+    expect(folderCounts(all)).toEqual({ unread: 1, awaiting: 1, starred: 0, trash: 0 });
+  });
+
+  it('keeps trashed conversations out of every folder and label but Trash', () => {
+    const gone = conversation({ id: 'd', trashedAt: '2026-10-27T10:00:00.000Z', labelIds: ['l'] });
+    const filed = conversation({ id: 'e', labelIds: ['l'], starred: true, unread: true });
+    const list = [...all, gone, filed];
+    const ids = (
+      folder: Parameters<typeof filterConversations>[1]['folder'],
+      label: string | null = null,
+    ) => filterConversations(list, { folder, label, channel: null, query: '' }).map((m) => m.id);
+    expect(ids('trash')).toEqual(['d']);
+    expect(ids('inbox')).not.toContain('d');
+    expect(ids('starred')).toEqual(['e']);
+    expect(ids('inbox', 'l')).toEqual(['e']);
+    expect(labelCounts(list).get('l')).toBe(1);
   });
 
   it('filters by channel and searches without accents', () => {
     expect(channelsOf(all)).toEqual(['Booking.com', 'Email']);
     expect(
-      filterConversations(all, { folder: 'inbox', channel: 'Booking.com', query: '' }).map(
-        (m) => m.id,
-      ),
+      filterConversations(all, {
+        folder: 'inbox',
+        label: null,
+        channel: 'Booking.com',
+        query: '',
+      }).map((m) => m.id),
     ).toEqual(['b']);
     expect(
-      filterConversations(all, { folder: 'inbox', channel: null, query: 'vikend' }).map(
-        (m) => m.id,
-      ),
+      filterConversations(all, {
+        folder: 'inbox',
+        label: null,
+        channel: null,
+        query: 'vikend',
+      }).map((m) => m.id),
     ).toEqual(['a']);
     expect(
-      filterConversations(all, { folder: 'inbox', channel: null, query: 'ano, MAME' }).map(
-        (m) => m.id,
-      ),
+      filterConversations(all, {
+        folder: 'inbox',
+        label: null,
+        channel: null,
+        query: 'ano, MAME',
+      }).map((m) => m.id),
     ).toEqual(['b']);
   });
 

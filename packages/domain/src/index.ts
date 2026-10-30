@@ -15,6 +15,7 @@ export * from './id-scan';
 export * from './inbox';
 export * from './inbox-service';
 export * from './knock-on';
+export * from './mailbox';
 export * from './pending-actions';
 export * from './policy';
 export * from './pricing';

@@ -10,7 +10,7 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 | Room             | name, room type, `kind` (`room` \| `apartment`), floor, `status` (`clean` \| `dirty` \| `inspected` \| `out_of_order`)                                                                                          |
 | Guest            | name, email, phone, `language` (`cs` \| `de` \| `en` \| `pl`), notes                                                                                                                                            |
 | Booking          | guest, room, `checkIn`, `checkOut`, adults, `childAges`, `status`, `holdExpiresAt`, `source`, `addons` (wellness, dogs, extra beds), `priceSnapshot` (a quote), notes                                           |
-| Inquiry          | a conversation: channel, guest, messages (in or out), unread, archived, parsed extraction, `status`, linked booking                                                                                             |
+| Inquiry          | a conversation: channel, guest, messages (in or out, each with to, cc, bcc and attachments), unread, archived, starred, in the trash, labels, parsed extraction, `status`, linked booking                       |
 | HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes, `trade`, contact asked                                                                           | `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes |
 | HotelProfile     | name, location, description, contact, `checkInFrom`, `checkOutBy`, `entries` (notes: folder, title, details with `[[links]]`, tags)                                                                             |
 | Charge           | booking, label, quantity, `unitPrice` (negative for a discount), amount, `vatBracket` (`standard` \| `reduced` \| `none`), `postedOn`                                                                           |
@@ -18,6 +18,8 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 | StayGuest        | booking, guest profile (main guest only), name, `nationality` (ISO alpha-2), `dateOfBirth`, `documentType` (`id_card` \| `passport`), `documentNumber`, address, `registeredAt`, each ID field null until known |
 | IdScan           | booking, stay guest (or none, for a companion still to add), `status` (`waiting` \| `reading` \| `done` \| `failed`), checked result, error, `readingSince`, `expiresAt`                                        |
 | Contact          | name, `person` to ask for, `trades` (one or more), phone, email, `language` to write in, notes                                                                                                                  |
+| MailLabel        | name, `color`                                                                                                                                                                                                   |
+| MailDraft        | a new email, a reply (`inquiryId`) or a forward (`forwardOf`) not sent yet: to, cc, bcc, subject, body, attachments, `updatedAt`                                                                                |
 | StaffMember      | name, email, `role` (`manager` \| `receptionist` \| `housekeeping`), `active`                                                                                                                                   |
 | AuditLog         | `actor` (`user` \| `agent`), action, `subjectId` (e.g. a booking), payload, timestamp                                                                                                                           |
 
@@ -71,10 +73,19 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 
 `createInboxService` (`inbox-service.ts`) keeps conversations with guests from every channel in one stream. Sending records a message; delivering it is a transport's job outside Orbit.
 
-- `create(message)`: a guest's first message starts an unread conversation. `compose(body, author, actor)`: the hotel writes first (`inquiry.compose`).
+- `create(message)`: a guest's first message starts an unread conversation. `compose(input, author, actor)`: the hotel writes first, to one or more people with copies and files, starting a conversation with the first `to` (`inquiry.compose`). A forward is a compose with `forwardOf`, which must exist; it may carry that conversation's files. The draft it was written in (`draftId`) is deleted.
 - `receive(id, body)`: the guest writes again. The conversation is unread, leaves the archive, needs a reply (`new`) unless it is `converted` or `declined`, and its prepared reply is dropped; the parsed request stays for holding a room.
-- `send(id, body, author, actor)`: the hotel's reply, signed by the staff member; the conversation becomes `replied` unless settled, and the draft is used up (`inquiry.replied`).
-- `setUnread(id, unread)`, `setArchived(id, archived)`, `saveTranslation(id, messageId, translation)`.
+- `send(id, reply, author, actor)`: the hotel's reply, signed by the staff member, to the guest and anyone in `to`, `cc` and `bcc`, with files. Only an email takes more recipients; an OTA reply goes to the guest alone. The conversation becomes `replied` unless settled, leaves the trash, the prepared draft is used up and the saved draft deleted (`inquiry.replied`).
+- `setUnread(id, unread)`, `setArchived(id, archived)`, `setStarred(id, starred)`, `setLabels(id, labelIds)` (labels must exist), `saveTranslation(id, messageId, translation)`.
+- `setTrashed(id, trashed, actor)`: the trash takes a conversation out of every other folder (`inquiry.trash`, `inquiry.restore`); a guest writing again brings it back. `deleteForever(id, actor)` only from the trash, with its drafts (`inquiry.delete`).
+- `bulk({ ids, action, labelId }, actor)`: one change to many conversations in one transaction (archive, unarchive, trash, restore, read, unread, star, unstar, label, unlabel); an unknown conversation or label changes none.
+- Folders (`inMailFolder`, `packages/shared/src/mailbox.ts`): Inbox (not archived), Starred, Needs a reply (the guest wrote last, not declined, not archived), Sent (the hotel wrote), Archive and Trash. A conversation in the trash is in no other folder; starred and sent ones stay there when archived.
+
+`createMailboxService` (`mailbox.ts`) keeps what surrounds the conversations:
+
+- Labels: unique names, one of six colors; deleting one takes it off every conversation.
+- Drafts: saved under an ID the app makes (`drf_…`), new or replaced, with their files; a reply or forward draft must point at a conversation that exists.
+- Attachments: up to 4 MB each (`MAX_ATTACHMENT_BYTES`), named by the file's own name without a path, with an `application/octet-stream` type when the browser's isn't a plain media type. Messages and drafts keep the details; the bytes stay in `mail_attachments`.
 
 - `inboxOptions(analysis)`: for a complete booking request, up to three free rooms, one per room type, cheapest first, each with an exact quote. An apartment is required if the guest asks for one, or brings a dog (`hotelPolicy.dogsAllowedIn`, placeholder: apartments only). Wellness and a dog become quote add-ons.
 - `saveProcessing(id, result)`: stores the agent's extraction and suggestion; a `new` message with options becomes `quoted`.

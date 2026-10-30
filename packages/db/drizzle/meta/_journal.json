@@ -155,6 +155,13 @@
       "when": 1793361614054,
       "tag": "0021_contacts",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793364210199,
+      "tag": "0022_mailbox",
+      "breakpoints": true
     }
   ]
 }

@@ -300,7 +300,11 @@ describe('unified inbox', () => {
       app,
       'POST',
       '/api/inbox/compose',
-      { toName: 'Demo Guest', toAddress: 'demo@example.com', subject: 'Hello', body: 'Hi!' },
+      {
+        to: [{ name: 'Demo Guest', address: 'demo@example.com' }],
+        subject: 'Hello',
+        body: 'Hi!',
+      },
       'stf_petr',
     );
     expect(composed.status).toBe(201);
@@ -323,7 +327,7 @@ describe('unified inbox', () => {
     expect(
       (
         await call(app, 'POST', '/api/inbox/compose', {
-          toAddress: 'not-an-email',
+          to: [{ name: null, address: 'not-an-email' }],
           subject: 'x',
           body: 'y',
         })

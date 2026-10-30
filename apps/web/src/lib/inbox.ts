@@ -1,4 +1,13 @@
-import type { Guest, Inquiry, InquiryExtraction, InquiryStatus, Language } from '@orbit/shared';
+import {
+  type Guest,
+  type Inquiry,
+  type InquiryExtraction,
+  type InquiryStatus,
+  inMailFolder,
+  type Language,
+  lastSentAt,
+  type MailFolder,
+} from '@orbit/shared';
 import type { NewBookingPrefill } from './booking-editor';
 import { formatParty, formatRange, languageLabels } from './format';
 
@@ -89,28 +98,18 @@ export function canDecline(m: Inquiry): boolean {
   );
 }
 
-/** The mailbox views: everything not archived, what is unread, what waits for an answer, and the archive. */
-export type InboxFolder = 'inbox' | 'unread' | 'awaiting' | 'archived';
+export type { MailFolder as InboxFolder } from '@orbit/shared';
+export { awaitingReply } from '@orbit/shared';
 
-export const folderLabels: Record<InboxFolder, string> = {
+export const folderLabels: Record<MailFolder, string> = {
   inbox: 'Inbox',
-  unread: 'Unread',
+  starred: 'Starred',
   awaiting: 'Needs a reply',
-  archived: 'Archived',
+  sent: 'Sent',
+  drafts: 'Drafts',
+  archived: 'Archive',
+  trash: 'Trash',
 };
-
-/** The guest wrote last and the conversation isn't turned down: someone should answer. */
-export function awaitingReply(m: Inquiry): boolean {
-  return m.messages.at(-1)?.direction === 'in' && m.status !== 'declined';
-}
-
-export function inFolder(m: Inquiry, folder: InboxFolder): boolean {
-  if (folder === 'archived') return m.archivedAt !== null;
-  if (m.archivedAt !== null) return false;
-  if (folder === 'unread') return m.unread;
-  if (folder === 'awaiting') return awaitingReply(m);
-  return true;
-}
 
 /** The channels conversations came through, e.g. "Booking.com" and "Email", for filtering. */
 export function channelsOf(list: Inquiry[]): string[] {
@@ -133,29 +132,57 @@ export function matchesSearch(m: Inquiry, query: string): boolean {
 }
 
 export interface InboxFilter {
-  folder: InboxFolder;
+  folder: MailFolder;
+  /** Only conversations with this label; null for all. */
+  label: string | null;
   /** A channel label from `channelsOf`, or null for all. */
   channel: string | null;
   query: string;
 }
 
+/**
+ * The conversations a view shows, latest first; Sent by when the hotel last wrote. A label
+ * view shows the label's conversations wherever they are, except in the trash.
+ */
 export function filterConversations(list: Inquiry[], filter: InboxFilter): Inquiry[] {
-  return list.filter(
+  const shown = list.filter(
     (m) =>
-      inFolder(m, filter.folder) &&
+      (filter.label
+        ? m.labelIds.includes(filter.label) && m.trashedAt === null
+        : inMailFolder(m, filter.folder)) &&
       (filter.channel === null || channelLabel(m) === filter.channel) &&
       matchesSearch(m, filter.query),
   );
+  if (filter.folder === 'sent' && !filter.label) {
+    return shown.sort((a, b) => (lastSentAt(b) ?? '').localeCompare(lastSentAt(a) ?? ''));
+  }
+  return shown;
 }
 
-export function folderCounts(list: Inquiry[]): Record<InboxFolder, number> {
-  const count = (folder: InboxFolder) => list.filter((m) => inFolder(m, folder)).length;
+/** What the rail counts: unread in the inbox, conversations waiting for a reply, and the rest. */
+export function folderCounts(list: Inquiry[]): {
+  unread: number;
+  awaiting: number;
+  starred: number;
+  trash: number;
+} {
+  const live = list.filter((m) => m.trashedAt === null);
   return {
-    inbox: count('inbox'),
-    unread: count('unread'),
-    awaiting: count('awaiting'),
-    archived: count('archived'),
+    unread: live.filter((m) => m.unread && m.archivedAt === null).length,
+    awaiting: live.filter((m) => inMailFolder(m, 'awaiting')).length,
+    starred: live.filter((m) => m.starred).length,
+    trash: list.length - live.length,
   };
+}
+
+/** Unread conversations per label, outside the trash. */
+export function labelCounts(list: Inquiry[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const m of list) {
+    if (m.trashedAt !== null || !m.unread) continue;
+    for (const l of m.labelIds) counts.set(l, (counts.get(l) ?? 0) + 1);
+  }
+  return counts;
 }
 
 /** The latest message, one line, marked when the hotel wrote it. */

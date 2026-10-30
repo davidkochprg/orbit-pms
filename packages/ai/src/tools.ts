@@ -34,6 +34,10 @@ import {
   isoDateSchema,
   type LocalEvent,
   localEventBodySchema,
+  bulkActionSchema,
+  inMailFolder,
+  mailFolders,
+  type MailLabel,
   newChargeBodySchema,
   newPaymentBodySchema,
   newStayGuestBodySchema,
@@ -77,8 +81,10 @@ export interface ToolDeps {
   rateOutlook: (days: number) => Promise<RevenueOutlook>;
   /** Stays booked into a room that is out of order, with a free room for each. */
   relocations?: (roomId: string) => Promise<Relocation[]>;
-  /** Guest conversations by email and through OTAs. */
-  inbox: Pick<InboxService, 'list' | 'get'>;
+  /** Guest conversations by email and through OTAs, and filing them. */
+  inbox: Pick<InboxService, 'list' | 'get' | 'bulk'>;
+  /** The labels conversations are filed under. */
+  mailLabels: () => Promise<MailLabel[]>;
   /**
    * Writes a conversation's reply draft with the hotel's rooms and exact prices, checked against
    * the quotes; null when drafting is not configured.
@@ -308,6 +314,7 @@ export const directToolNames = [
   'createHousekeepingTask',
   'setTaskStatus',
   'recordRepairContact',
+  'organizeConversations',
 ] as const;
 
 /** A contact as the model sees it: the ID to use, and how to reach them. */
@@ -345,6 +352,7 @@ export function createAgentTools({
   listEvents,
   statedAmounts,
   contacts,
+  mailLabels,
 }: ToolDeps) {
   const propose = (input: PendingActionInput) =>
     safely(async () => toProposal(await actions.propose(input)));
@@ -493,19 +501,28 @@ export function createAgentTools({
     }),
     listConversations: tool({
       description:
-        'Guest conversations in the inbox (email and OTAs), latest first, without archived ones: who wrote, what they ask for, where it stands (new, quoted, replied, converted, declined) and the start of the last message.',
+        'Conversations in the mailbox (email and OTAs), latest first: who wrote, what they ask for, where it stands (new, quoted, replied, converted, declined), starred, labels and the start of the last message. folder: inbox (default, not archived), starred, awaiting (needs a reply), sent, archived or trash; label: a label name.',
       inputSchema: z.object({
+        folder: z.enum(mailFolders).exclude(['drafts']).default('inbox'),
+        label: z.string().optional().describe('Only conversations with this label, by name.'),
         unreadOnly: z.boolean().default(false),
         query: z
           .string()
           .optional()
           .describe('Part of the sender, subject or a message, e.g. a guest name.'),
       }),
-      execute: ({ unreadOnly, query }) =>
+      execute: ({ folder, label, unreadOnly, query }) =>
         safely(async () => {
           const q = query?.trim().toLowerCase();
+          const labels = await mailLabels();
+          const labelId = label
+            ? labels.find((l) => l.name.toLowerCase() === label.trim().toLowerCase())?.id
+            : undefined;
+          if (label && !labelId) throw new DomainError('not_found', `No label called ${label}`);
+          const names = new Map(labels.map((l) => [l.id, l.name]));
           return (await inbox.list())
-            .filter((i) => !i.archivedAt && (!unreadOnly || i.unread))
+            .filter((i) => inMailFolder(i, folder) && (!unreadOnly || i.unread))
+            .filter((i) => !labelId || i.labelIds.includes(labelId))
             .filter(
               (i) =>
                 !q ||
@@ -514,7 +531,33 @@ export function createAgentTools({
                 ),
             )
             .slice(0, 30)
-            .map(compactConversation);
+            .map((i) => ({
+              ...compactConversation(i),
+              starred: i.starred,
+              labels: i.labelIds.map((l) => names.get(l) ?? l),
+            }));
+        }),
+    }),
+    organizeConversations: tool({
+      description:
+        'File conversations: archive or unarchive, trash or restore, mark read or unread, star or unstar, label or unlabel (label by name, from listConversations). Takes effect immediately and can be undone the same way; say that it is done. Never trash a conversation unless staff ask.',
+      inputSchema: z.object({
+        inquiryIds: z.array(z.string()).min(1).max(50),
+        action: bulkActionSchema,
+        label: z.string().optional().describe('For label and unlabel: the label name.'),
+      }),
+      execute: ({ inquiryIds, action, label }) =>
+        safely(async () => {
+          const needsLabel = action === 'label' || action === 'unlabel';
+          const found = label
+            ? (await mailLabels()).find((l) => l.name.toLowerCase() === label.trim().toLowerCase())
+            : undefined;
+          if (needsLabel && !found) throw new DomainError('not_found', `No label called ${label}`);
+          const done = await inbox.bulk(
+            { ids: inquiryIds, action, labelId: needsLabel ? found!.id : null },
+            'agent',
+          );
+          return { done: true, action, conversations: done.map((i) => i.id) };
         }),
     }),
     getConversation: tool({

@@ -13,6 +13,7 @@ import {
   messageBodySchema,
   newMessageBodySchema,
   processMessageBodySchema,
+  replyBodySchema,
   type HotelInfoEntry,
   type StaffMember,
   STAFF_HEADER,
@@ -93,10 +94,8 @@ export function inboxRoutes({
         }
       })
       .get('/inbox/:id', async (c) => c.json(await inbox.get(c.req.param('id'))))
-      .post('/inbox/:id/send', validate('json', messageBodySchema), async (c) =>
-        c.json(
-          await inbox.send(c.req.param('id'), c.req.valid('json').body, await author(c), 'user'),
-        ),
+      .post('/inbox/:id/send', validate('json', replyBodySchema), async (c) =>
+        c.json(await inbox.send(c.req.param('id'), c.req.valid('json'), await author(c), 'user')),
       )
       // Rooms again for a request that had none when it was read, e.g. after a cancellation.
       .post('/inbox/:id/rooms', async (c) => c.json(await inbox.refreshOptions(c.req.param('id'))))

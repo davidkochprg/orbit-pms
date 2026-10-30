@@ -1,6 +1,8 @@
 import type {
+  Attachment,
   AuditActor,
   Booking,
+  BulkBody,
   ComposeBody,
   BookingPatch,
   CreateHoldInput,
@@ -10,6 +12,8 @@ import type {
   InquiryExtraction,
   InquiryStatus,
   InquirySuggestion,
+  Recipient,
+  ReplyBody,
   Translation,
 } from '@orbit/shared';
 import { DomainError } from './errors';
@@ -32,6 +36,17 @@ export interface NewMessage {
   subject?: string | null;
   senderName?: string | null;
   senderAddress?: string | null;
+}
+
+/** The hotel's reply: its text, and whoever it goes to besides the guest, with files. */
+export type SendInput = Pick<ReplyBody, 'body'> & Partial<Omit<ReplyBody, 'body'>>;
+
+/** Who else a message goes to, and its files. */
+interface Envelope {
+  to?: Recipient[];
+  cc?: Recipient[];
+  bcc?: Recipient[];
+  attachments?: Attachment[];
 }
 
 export type ProcessingResult =
@@ -62,6 +77,7 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
     direction: InboxMessage['direction'],
     body: string,
     author: string | null,
+    envelope: Envelope = {},
   ): InboxMessage {
     const text = body.trim();
     if (!text) throw new DomainError('invalid_input', 'The message is empty');
@@ -73,7 +89,35 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
       sentAt: clock().toISOString(),
       author,
       translation: null,
+      to: envelope.to ?? [],
+      cc: envelope.cc ?? [],
+      bcc: envelope.bcc ?? [],
+      attachments: envelope.attachments ?? [],
     };
+  }
+
+  /** The files with these IDs, refusing any that don't exist. */
+  async function attachmentsFor(r: Repositories, ids: string[]): Promise<Attachment[]> {
+    const unique = [...new Set(ids)];
+    const found = await r.mail.getAttachments(unique);
+    if (found.length !== unique.length) {
+      throw new DomainError('not_found', 'An attached file is no longer there');
+    }
+    return found;
+  }
+
+  /** Moves a conversation in or out of the trash, without auditing (see `setTrashed`). */
+  async function trash(r: Repositories, inquiry: Inquiry, trashed: boolean): Promise<Inquiry> {
+    if ((inquiry.trashedAt !== null) === trashed) return inquiry;
+    const updated = { ...inquiry, trashedAt: trashed ? clock().toISOString() : null };
+    await r.inquiries.updateInquiry(updated);
+    return updated;
+  }
+
+  async function update(r: Repositories, inquiry: Inquiry, patch: Partial<Inquiry>) {
+    const updated = { ...inquiry, ...patch };
+    await r.inquiries.updateInquiry(updated);
+    return updated;
   }
 
   /** Adds a message to a conversation and saves the conversation as `next` says. */
@@ -168,6 +212,9 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
         messages: [first],
         unread: true,
         archivedAt: null,
+        starred: false,
+        trashedAt: null,
+        labelIds: [],
         parsed: null,
         suggestion: null,
         status: 'new',
@@ -189,6 +236,7 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
         return append(tx, inquiry, message(id, 'in', body, null), {
           unread: true,
           archivedAt: null,
+          trashedAt: null,
           status: SETTLED.includes(inquiry.status) ? inquiry.status : 'new',
           suggestion: null,
           processedAt: null,
@@ -197,23 +245,37 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
       });
     },
 
-    /** A new email from the hotel to a guest, starting a conversation. */
+    /**
+     * A new email from the hotel, starting a conversation with its first recipient, e.g. a forward
+     * of another conversation (`forwardOf`) with its files. The draft it was written in goes.
+     */
     async compose(input: ComposeBody, author: string | null, actor: AuditActor): Promise<Inquiry> {
       return repos.transaction(async (tx) => {
+        const [first] = input.to;
+        if (!first) throw new DomainError('invalid_input', 'Add someone to send it to');
+        if (input.forwardOf) await load(tx, input.forwardOf);
         const id = newId('inq');
-        const first = message(id, 'out', input.body, author);
+        const msg = message(id, 'out', input.body, author, {
+          to: input.to,
+          cc: input.cc,
+          bcc: input.bcc,
+          attachments: await attachmentsFor(tx, input.attachmentIds),
+        });
         const inquiry: Inquiry = {
           id,
           channel: 'email',
           partner: null,
           subject: input.subject,
-          senderName: input.toName,
-          senderAddress: input.toAddress,
-          receivedAt: first.sentAt,
-          lastMessageAt: first.sentAt,
-          messages: [first],
+          senderName: first.name,
+          senderAddress: first.address,
+          receivedAt: msg.sentAt,
+          lastMessageAt: msg.sentAt,
+          messages: [msg],
           unread: false,
           archivedAt: null,
+          starred: false,
+          trashedAt: null,
+          labelIds: [],
           parsed: null,
           suggestion: null,
           status: 'replied',
@@ -222,26 +284,38 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
           processingError: null,
         };
         await tx.inquiries.createInquiry(inquiry);
+        if (input.draftId) await tx.mail.deleteDraft(input.draftId);
         await tx.audit.append({
           actor,
           action: 'inquiry.compose',
           subjectId: id,
-          payload: { messageId: first.id },
+          payload: { messageId: msg.id, forwardOf: input.forwardOf },
         });
         return inquiry;
       });
     },
 
     /**
-     * Sends the hotel's reply through the conversation's channel. The prepared draft is used up;
-     * the room options stay for holding one later.
+     * Sends the hotel's reply through the conversation's channel, to the guest unless `to` names
+     * others, with copies and files by email. The prepared draft is used up, as is the saved
+     * draft it was written in; the room options stay for holding one later.
      */
-    async send(id: string, body: string, author: string | null, actor: AuditActor) {
+    async send(id: string, reply: SendInput, author: string | null, actor: AuditActor) {
       return repos.transaction(async (tx) => {
         const inquiry = await load(tx, id);
-        const msg = message(id, 'out', body, author);
+        const extra = [...(reply.to ?? []), ...(reply.cc ?? []), ...(reply.bcc ?? [])];
+        if (inquiry.channel !== 'email' && extra.length > 0) {
+          throw new DomainError('invalid_input', 'Only an email can go to more people');
+        }
+        const msg = message(id, 'out', reply.body, author, {
+          to: reply.to ?? [],
+          cc: reply.cc ?? [],
+          bcc: reply.bcc ?? [],
+          attachments: await attachmentsFor(tx, reply.attachmentIds ?? []),
+        });
         const updated = await append(tx, inquiry, msg, {
           unread: false,
+          trashedAt: null,
           status: SETTLED.includes(inquiry.status) ? inquiry.status : 'replied',
           suggestion: inquiry.suggestion && {
             ...inquiry.suggestion,
@@ -250,6 +324,7 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
             draftTranslation: null,
           },
         });
+        if (reply.draftId) await tx.mail.deleteDraft(reply.draftId);
         await tx.audit.append({
           actor,
           action: 'inquiry.replied',
@@ -301,6 +376,110 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
       const updated = { ...inquiry, archivedAt: archived ? clock().toISOString() : null };
       await repos.inquiries.updateInquiry(updated);
       return updated;
+    },
+
+    async setStarred(id: string, starred: boolean): Promise<Inquiry> {
+      const inquiry = await load(repos, id);
+      return inquiry.starred === starred ? inquiry : update(repos, inquiry, { starred });
+    },
+
+    /** Moves a conversation to the trash, out of every other folder, or back. */
+    async setTrashed(id: string, trashed: boolean, actor: AuditActor): Promise<Inquiry> {
+      return repos.transaction(async (tx) => {
+        const inquiry = await load(tx, id);
+        const updated = await trash(tx, inquiry, trashed);
+        if (updated !== inquiry) {
+          await tx.audit.append({
+            actor,
+            action: trashed ? 'inquiry.trash' : 'inquiry.restore',
+            subjectId: id,
+            payload: null,
+          });
+        }
+        return updated;
+      });
+    },
+
+    /** Deletes a conversation in the trash for good, with its drafts. */
+    async deleteForever(id: string, actor: AuditActor): Promise<void> {
+      return repos.transaction(async (tx) => {
+        const inquiry = await load(tx, id);
+        if (!inquiry.trashedAt) {
+          throw new DomainError('invalid_transition', 'Move the conversation to the trash first');
+        }
+        for (const d of await tx.mail.listDrafts()) {
+          if (d.inquiryId === id) await tx.mail.deleteDraft(d.id);
+        }
+        await tx.inquiries.deleteInquiry(id);
+        await tx.audit.append({
+          actor,
+          action: 'inquiry.delete',
+          subjectId: id,
+          payload: {
+            subject: inquiry.subject,
+            with: inquiry.senderName ?? inquiry.senderAddress,
+            bookingId: inquiry.bookingId,
+          },
+        });
+      });
+    },
+
+    /** Replaces a conversation's labels with these, which must exist. */
+    async setLabels(id: string, labelIds: string[]): Promise<Inquiry> {
+      const inquiry = await load(repos, id);
+      const known = new Set((await repos.mail.listLabels()).map((l) => l.id));
+      const unknown = labelIds.find((l) => !known.has(l));
+      if (unknown) throw new DomainError('not_found', `Label ${unknown} not found`);
+      return update(repos, inquiry, { labelIds: [...new Set(labelIds)] });
+    },
+
+    /** One change to many conversations at once, all or none. */
+    async bulk({ ids, action, labelId }: BulkBody, actor: AuditActor): Promise<Inquiry[]> {
+      return repos.transaction(async (tx) => {
+        if (labelId && !(await tx.mail.listLabels()).some((l) => l.id === labelId)) {
+          throw new DomainError('not_found', `Label ${labelId} not found`);
+        }
+        const done: Inquiry[] = [];
+        for (const id of new Set(ids)) {
+          const m = await load(tx, id);
+          const at = clock().toISOString();
+          switch (action) {
+            case 'archive':
+              done.push(m.archivedAt ? m : await update(tx, m, { archivedAt: at }));
+              break;
+            case 'unarchive':
+              done.push(await update(tx, m, { archivedAt: null }));
+              break;
+            case 'trash':
+            case 'restore':
+              done.push(await trash(tx, m, action === 'trash'));
+              break;
+            case 'read':
+            case 'unread':
+              done.push(await update(tx, m, { unread: action === 'unread' }));
+              break;
+            case 'star':
+            case 'unstar':
+              done.push(await update(tx, m, { starred: action === 'star' }));
+              break;
+            case 'label':
+              done.push(await update(tx, m, { labelIds: [...new Set([...m.labelIds, labelId!])] }));
+              break;
+            case 'unlabel':
+              done.push(await update(tx, m, { labelIds: m.labelIds.filter((l) => l !== labelId) }));
+              break;
+          }
+        }
+        if (action === 'trash' || action === 'restore') {
+          await tx.audit.append({
+            actor,
+            action: action === 'trash' ? 'inquiry.trash' : 'inquiry.restore',
+            subjectId: null,
+            payload: { ids: done.map((m) => m.id) },
+          });
+        }
+        return done;
+      });
     },
 
     /** Keeps a message's translation, so reading it again costs nothing. */

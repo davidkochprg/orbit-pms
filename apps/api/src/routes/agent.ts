@@ -125,6 +125,7 @@ export function agentRoutes({
     // Fees the profile states may be repeated in a reply, as in the inbox's own drafts.
     statedAmounts: async () => amountsInText(hotelFacts(await hotelContext())),
     contacts,
+    mailLabels: () => repos.mail.listLabels(),
   });
 
   /** What the staff member was looking at, from the hotel's own data; null if it is gone. */

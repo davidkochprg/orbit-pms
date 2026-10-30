@@ -135,6 +135,7 @@ export function setup({
     listEvents: () => revenue.listEvents(),
     statedAmounts: () => Promise.resolve([]),
     contacts,
+    mailLabels: () => repos.mail.listLabels(),
   });
   return { repos, hotel, billing, actions, tools };
 }

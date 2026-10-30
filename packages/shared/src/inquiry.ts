@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isoDateSchema } from './dates';
 import { languageSchema, roomKindSchema } from './enums';
+import { attachmentSchema, recipientsSchema } from './mail';
 import { quoteSchema } from './quote';
 
 export const messageKinds = ['booking_request', 'question', 'other'] as const;
@@ -78,6 +79,15 @@ export const inboxMessageSchema = z.object({
   author: z.string().nullable(),
   /** The message in a staff member's language, once someone asked for it. */
   translation: translationSchema.nullable(),
+  /**
+   * Who the hotel wrote to; empty means the conversation's guest. On a guest's message, the
+   * others they wrote to as well.
+   */
+  to: recipientsSchema.default([]),
+  cc: recipientsSchema.default([]),
+  /** Only on the hotel's own messages. */
+  bcc: recipientsSchema.default([]),
+  attachments: z.array(attachmentSchema).default([]),
 });
 export type InboxMessage = z.infer<typeof inboxMessageSchema>;
 export type InquirySuggestion = z.infer<typeof inquirySuggestionSchema>;

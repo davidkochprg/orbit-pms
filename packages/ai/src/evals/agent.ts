@@ -288,6 +288,7 @@ export function buildAgentEvalHotel(today: IsoDate) {
     listEvents: () => revenue.listEvents(),
     statedAmounts: () => Promise.resolve([]),
     contacts,
+    mailLabels: () => repos.mail.listLabels(),
   });
   // Changes from the run come after the history the inn starts with.
   return { repos, tools, auditBefore: repos.state.audit.length };

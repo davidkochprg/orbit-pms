@@ -19,6 +19,9 @@ import {
   stayGuests,
   stayReadings,
   localEvents,
+  mailAttachments,
+  mailDrafts,
+  mailLabels,
 } from '../schema';
 import type { SeedData } from './build';
 
@@ -26,6 +29,9 @@ import type { SeedData } from './build';
 export async function applySeed(db: Db, seed: SeedData): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.delete(pendingActions);
+    await tx.delete(mailDrafts);
+    await tx.delete(mailLabels);
+    await tx.delete(mailAttachments);
     await tx.delete(idScans);
     await tx.delete(stayReadings);
     await tx.delete(localEvents);
@@ -72,6 +78,7 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
         receivedAt: new Date(i.receivedAt),
         lastMessageAt: new Date(i.lastMessageAt),
         archivedAt: i.archivedAt ? new Date(i.archivedAt) : null,
+        trashedAt: i.trashedAt ? new Date(i.trashedAt) : null,
         processedAt: i.processedAt ? new Date(i.processedAt) : null,
       })),
     );
@@ -95,5 +102,16 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
     await tx.insert(staff).values(seed.staff);
     if (seed.events.length > 0) await tx.insert(localEvents).values(seed.events);
     await tx.insert(contacts).values(seed.contacts);
+    if (seed.labels.length > 0) await tx.insert(mailLabels).values(seed.labels);
+    if (seed.files.length > 0) {
+      await tx
+        .insert(mailAttachments)
+        .values(seed.files.map((f) => ({ ...f.attachment, data: f.bytes })));
+    }
+    if (seed.drafts.length > 0) {
+      await tx
+        .insert(mailDrafts)
+        .values(seed.drafts.map((d) => ({ ...d, updatedAt: new Date(d.updatedAt) })));
+    }
   });
 }

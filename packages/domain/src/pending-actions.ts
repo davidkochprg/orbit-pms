@@ -837,7 +837,7 @@ export function createPendingActionService({
         return null;
       case 'send_reply': {
         const { inquiryId, body } = action.input;
-        return (await inbox.send(inquiryId, body, by?.name ?? null, 'agent')).bookingId;
+        return (await inbox.send(inquiryId, { body }, by?.name ?? null, 'agent')).bookingId;
       }
       case 'hold_inquiry':
         return id(await inbox.createHold(action.input.inquiryId, action.input.roomId, 'agent'));

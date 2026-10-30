@@ -400,7 +400,10 @@ describe('agent tools', () => {
   it('lists conversations and reads one with its rooms on offer', async () => {
     const { tools, total, roomId } = await withConversation();
     expect(
-      await tools.listConversations.execute({ unreadOnly: false, query: 'ruth' }, callOptions),
+      await tools.listConversations.execute(
+        { folder: 'inbox', unreadOnly: false, query: 'ruth' },
+        callOptions,
+      ),
     ).toEqual([
       expect.objectContaining({
         inquiryId: 'inq_1',
@@ -411,7 +414,10 @@ describe('agent tools', () => {
       }),
     ]);
     expect(
-      await tools.listConversations.execute({ unreadOnly: false, query: 'nobody' }, callOptions),
+      await tools.listConversations.execute(
+        { folder: 'inbox', unreadOnly: false, query: 'nobody' },
+        callOptions,
+      ),
     ).toEqual([]);
     expect(await tools.getConversation.execute({ inquiryId: 'inq_1' }, callOptions)).toMatchObject({
       messages: [{ from: 'guest', body: 'Do you have a room for two, 20 to 22 May?' }],
@@ -531,5 +537,39 @@ describe('agent tools', () => {
       'remove_contact',
     ]);
     expect(repos.state.contacts.map((c) => c.id)).toEqual(['ct_plumbing']);
+  });
+
+  it('files conversations by folder and label, and organizes them', async () => {
+    const { tools, repos } = await withConversation();
+    repos.state.labels.push({ id: 'lbl_1', name: 'Groups', color: 'blue' });
+    expect(
+      await tools.organizeConversations.execute(
+        { inquiryIds: ['inq_1'], action: 'label', label: 'groups' },
+        callOptions,
+      ),
+    ).toEqual({ done: true, action: 'label', conversations: ['inq_1'] });
+    await tools.organizeConversations.execute(
+      { inquiryIds: ['inq_1'], action: 'star' },
+      callOptions,
+    );
+    expect(
+      await tools.listConversations.execute(
+        { folder: 'starred', label: 'Groups', unreadOnly: false },
+        callOptions,
+      ),
+    ).toEqual([expect.objectContaining({ inquiryId: 'inq_1', starred: true, labels: ['Groups'] })]);
+    await tools.organizeConversations.execute(
+      { inquiryIds: ['inq_1'], action: 'trash' },
+      callOptions,
+    );
+    expect(
+      await tools.listConversations.execute({ folder: 'inbox', unreadOnly: false }, callOptions),
+    ).toEqual([]);
+    expect(
+      await tools.organizeConversations.execute(
+        { inquiryIds: ['inq_1'], action: 'label', label: 'Nope' },
+        callOptions,
+      ),
+    ).toMatchObject({ error: { code: 'not_found' } });
   });
 });

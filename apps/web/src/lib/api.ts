@@ -11,7 +11,14 @@ import {
   type BookingAction,
   type BookingListQuery,
   type ChargePatch,
+  attachmentSchema,
+  type BulkBody,
   type ComposeBody,
+  type DraftBody,
+  type LabelBody,
+  mailDraftSchema,
+  mailLabelSchema,
+  type ReplyBody,
   type ContactBody,
   contactSchema,
   type CreateBookingInput,
@@ -510,8 +517,9 @@ export function useCreateMessage() {
 
 /** A new email from the hotel to a guest. */
 export function useComposeMessage() {
-  return useInboxMutation((body: ComposeBody) =>
-    apiPost('/api/inbox/compose', body, inquirySchema),
+  return useInboxMutation(
+    (body: Partial<ComposeBody> & Pick<ComposeBody, 'to' | 'subject' | 'body'>) =>
+      apiPost('/api/inbox/compose', body, inquirySchema),
   );
 }
 
@@ -560,10 +568,102 @@ export function useLearnFromReply(id: string) {
 }
 
 /** Sends the hotel's reply through the conversation's channel. */
+/** The hotel's reply, with copies and files, from the draft it was written in. */
 export function useSendReply(id: string) {
-  return useInboxMutation((body: string) =>
-    apiPost(`${inboxPath(id)}/send`, { body }, inquirySchema),
+  return useInboxMutation((reply: Partial<ReplyBody> & { body: string }) =>
+    apiPost(`${inboxPath(id)}/send`, reply, inquirySchema),
   );
+}
+
+export function useSetStarred(id: string) {
+  return useInboxMutation((starred: boolean) =>
+    apiPost(`${inboxPath(id)}/star`, { starred }, inquirySchema),
+  );
+}
+
+export function useSetTrashed(id: string) {
+  return useInboxMutation((trashed: boolean) =>
+    apiPost(`${inboxPath(id)}/trash`, { trashed }, inquirySchema),
+  );
+}
+
+export function useSetLabels(id: string) {
+  return useInboxMutation((labelIds: string[]) =>
+    apiPost(`${inboxPath(id)}/labels`, { labelIds }, inquirySchema),
+  );
+}
+
+/** Deletes a conversation in the trash for good. */
+export function useDeleteForever() {
+  return useRefreshingMutation((id: string) => apiDelete(inboxPath(id)));
+}
+
+/** One change to the conversations selected in the list. */
+export function useBulkInbox() {
+  return useRefreshingMutation((body: Partial<BulkBody> & Pick<BulkBody, 'ids' | 'action'>) =>
+    apiPost('/api/inbox/bulk', body, inquiryListSchema),
+  );
+}
+
+export function useMailLabels() {
+  return useQuery({
+    queryKey: ['mail-labels'],
+    queryFn: () => apiGet('/api/inbox/labels', z.array(mailLabelSchema)),
+  });
+}
+
+/** Adds a label (`id` null) or renames or recolors one. */
+export function useSaveLabel() {
+  return useRefreshingMutation(({ id, body }: { id: string | null; body: LabelBody }) =>
+    id
+      ? apiPost(`/api/inbox/labels/${encodeURIComponent(id)}`, body, mailLabelSchema, 'PUT')
+      : apiPost('/api/inbox/labels', body, mailLabelSchema),
+  );
+}
+
+export function useDeleteLabel() {
+  return useRefreshingMutation((id: string) =>
+    apiDelete(`/api/inbox/labels/${encodeURIComponent(id)}`),
+  );
+}
+
+export function useDrafts() {
+  return useQuery({
+    queryKey: ['mail-drafts'],
+    queryFn: () => apiGet('/api/inbox/drafts', z.array(mailDraftSchema)),
+  });
+}
+
+/**
+ * Saves a draft as staff write it. Only the drafts list refreshes, so saving while typing
+ * doesn't reload the page around them.
+ */
+export function useSaveDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: string; body: Partial<DraftBody> }) =>
+      apiPost(`/api/inbox/drafts/${encodeURIComponent(id)}`, body, mailDraftSchema, 'PUT'),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['mail-drafts'] }),
+  });
+}
+
+export function useDeleteDraft() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => apiDelete(`/api/inbox/drafts/${encodeURIComponent(id)}`),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: ['mail-drafts'] }),
+  });
+}
+
+/** Uploads a file to attach. */
+export function useUploadAttachment() {
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.append('file', file, file.name);
+      return apiPostForm('/api/inbox/attachments', form, attachmentSchema);
+    },
+  });
 }
 
 /** Adds the guest's next message to the conversation, e.g. pasted from the mail client. */

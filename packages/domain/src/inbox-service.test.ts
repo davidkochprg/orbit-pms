@@ -1,4 +1,4 @@
-import type { InquiryExtraction } from '@orbit/shared';
+import type { ComposeBody, InquiryExtraction } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { createInboxService } from './inbox-service';
 import { hotelPolicy } from './policy';
@@ -215,7 +215,7 @@ describe('inbox service', () => {
 
   it('sends a reply, which uses up the draft but keeps the rooms on offer', async () => {
     const { repos, inbox, msg } = await processed();
-    const sent = await inbox.send(msg.id, '  Guten Tag, gerne!  ', 'Martina', 'user');
+    const sent = await inbox.send(msg.id, { body: '  Guten Tag, gerne!  ' }, 'Martina', 'user');
     expect(sent).toMatchObject({ status: 'replied', unread: false });
     expect(sent.messages.at(-1)).toMatchObject({
       direction: 'out',
@@ -231,14 +231,14 @@ describe('inbox service', () => {
       subjectId: msg.id,
       actor: 'user',
     });
-    await expect(inbox.send(msg.id, ' ', null, 'user')).rejects.toMatchObject({
+    await expect(inbox.send(msg.id, { body: ' ' }, null, 'user')).rejects.toMatchObject({
       code: 'invalid_input',
     });
   });
 
   it('brings a conversation back when the guest writes again', async () => {
     const { inbox, msg } = await processed();
-    await inbox.send(msg.id, 'Guten Tag', null, 'user');
+    await inbox.send(msg.id, { body: 'Guten Tag' }, null, 'user');
     await inbox.setArchived(msg.id, true);
     const again = await inbox.receive(msg.id, 'Danke! Und ein Parkplatz?');
     expect(again).toMatchObject({
@@ -262,7 +262,16 @@ describe('inbox service', () => {
   it('composes a new email to a guest', async () => {
     const { repos, inbox } = setup();
     const sent = await inbox.compose(
-      { toName: 'Demo Guest', toAddress: 'demo@example.com', subject: 'Your stay', body: 'Hello' },
+      {
+        to: [{ name: 'Demo Guest', address: 'demo@example.com' }],
+        cc: [],
+        bcc: [],
+        subject: 'Your stay',
+        body: 'Hello',
+        attachmentIds: [],
+        forwardOf: null,
+        draftId: null,
+      },
       'Martina',
       'user',
     );
@@ -311,5 +320,154 @@ describe('inbox service', () => {
     await expect(other.inbox.decline(other.msg.id, 'user')).rejects.toMatchObject({
       code: 'invalid_transition',
     });
+  });
+
+  const file = { id: 'att_1', name: 'menu.pdf', contentType: 'application/pdf', size: 3 };
+  const compose = (overrides: Partial<ComposeBody> = {}): ComposeBody => ({
+    to: [{ name: 'Demo Guest', address: 'demo@example.com' }],
+    cc: [],
+    bcc: [],
+    subject: 'Your stay',
+    body: 'Hello',
+    attachmentIds: [],
+    forwardOf: null,
+    draftId: null,
+    ...overrides,
+  });
+
+  it('sends to several people with copies and files, and drops the draft it came from', async () => {
+    const { repos, inbox } = setup();
+    await repos.mail.saveAttachment(file, new Uint8Array([1, 2, 3]));
+    repos.state.drafts.push({
+      id: 'drf_1',
+      inquiryId: null,
+      forwardOf: null,
+      to: [],
+      cc: [],
+      bcc: [],
+      subject: '',
+      body: '',
+      attachments: [],
+      updatedAt: now.toISOString(),
+    });
+    const sent = await inbox.compose(
+      compose({
+        to: [
+          { name: null, address: 'a@example.com' },
+          { name: null, address: 'b@example.com' },
+        ],
+        cc: [{ name: 'Boss', address: 'boss@example.com' }],
+        attachmentIds: ['att_1'],
+        draftId: 'drf_1',
+      }),
+      'Martina',
+      'user',
+    );
+    expect(sent.senderAddress).toBe('a@example.com');
+    expect(sent.messages[0]).toMatchObject({
+      to: [{ address: 'a@example.com' }, { address: 'b@example.com' }],
+      cc: [{ address: 'boss@example.com' }],
+      attachments: [file],
+    });
+    expect(repos.state.drafts).toEqual([]);
+    await expect(
+      inbox.compose(compose({ attachmentIds: ['att_x'] }), null, 'user'),
+    ).rejects.toThrow('no longer there');
+  });
+
+  it('forwards a conversation as a new one, refusing an unknown original', async () => {
+    const { repos, inbox, msg } = await processed();
+    const fwd = await inbox.compose(
+      compose({ subject: 'Fwd: Anfrage', forwardOf: msg.id }),
+      'Martina',
+      'user',
+    );
+    expect(fwd.id).not.toBe(msg.id);
+    expect(repos.state.audit.at(-1)).toMatchObject({
+      action: 'inquiry.compose',
+      payload: { forwardOf: msg.id },
+    });
+    await expect(inbox.compose(compose({ forwardOf: 'inq_x' }), null, 'user')).rejects.toThrow(
+      'not found',
+    );
+  });
+
+  it('copies a reply only by email', async () => {
+    const { repos, inbox } = setup();
+    const email = await inbox.create({ body: 'Hi', channel: 'email' });
+    const reply = await inbox.send(
+      email.id,
+      { body: 'Gerne', cc: [{ name: null, address: 'partner@example.com' }] },
+      null,
+      'user',
+    );
+    expect(reply.messages.at(-1)?.cc).toEqual([{ name: null, address: 'partner@example.com' }]);
+    const ota = await inbox.create({ body: 'Hi', channel: 'ota', partner: 'Booking.com' });
+    await expect(
+      inbox.send(
+        ota.id,
+        { body: 'Hi', cc: [{ name: null, address: 'x@example.com' }] },
+        null,
+        'user',
+      ),
+    ).rejects.toThrow('Only an email');
+    expect(repos.state.inquiries).toHaveLength(2);
+  });
+
+  it('stars, trashes, restores and deletes for good only from the trash', async () => {
+    const { repos, inbox, msg } = await processed();
+    expect((await inbox.setStarred(msg.id, true)).starred).toBe(true);
+    await expect(inbox.deleteForever(msg.id, 'user')).rejects.toThrow('trash first');
+    expect((await inbox.setTrashed(msg.id, true, 'user')).trashedAt).toBe(now.toISOString());
+    // The guest writing again brings it back.
+    expect((await inbox.receive(msg.id, 'Hallo?')).trashedAt).toBeNull();
+    await inbox.setTrashed(msg.id, true, 'user');
+    repos.state.drafts.push({
+      id: 'drf_r',
+      inquiryId: msg.id,
+      forwardOf: null,
+      to: [],
+      cc: [],
+      bcc: [],
+      subject: '',
+      body: 'Draft',
+      attachments: [],
+      updatedAt: now.toISOString(),
+    });
+    await inbox.deleteForever(msg.id, 'user');
+    expect(repos.state.inquiries).toEqual([]);
+    expect(repos.state.drafts).toEqual([]);
+    expect(repos.state.audit.map((a) => a.action).slice(-2)).toEqual([
+      'inquiry.trash',
+      'inquiry.delete',
+    ]);
+  });
+
+  it('labels conversations with labels that exist', async () => {
+    const { repos, inbox, msg } = await processed();
+    repos.state.labels.push({ id: 'lbl_1', name: 'Groups', color: 'blue' });
+    expect((await inbox.setLabels(msg.id, ['lbl_1', 'lbl_1'])).labelIds).toEqual(['lbl_1']);
+    await expect(inbox.setLabels(msg.id, ['lbl_x'])).rejects.toThrow('not found');
+  });
+
+  it('changes many conversations at once, all or none', async () => {
+    const { repos, inbox, msg } = await processed();
+    const other = await inbox.create({ body: 'Second', channel: 'email' });
+    repos.state.labels.push({ id: 'lbl_1', name: 'Groups', color: 'blue' });
+    const ids = [msg.id, other.id];
+    await inbox.bulk({ ids, action: 'star', labelId: null }, 'user');
+    await inbox.bulk({ ids, action: 'label', labelId: 'lbl_1' }, 'user');
+    await inbox.bulk({ ids, action: 'archive', labelId: null }, 'user');
+    await inbox.bulk({ ids, action: 'read', labelId: null }, 'user');
+    for (const m of await inbox.list()) {
+      expect(m).toMatchObject({ starred: true, labelIds: ['lbl_1'], unread: false });
+      expect(m.archivedAt).not.toBeNull();
+    }
+    await inbox.bulk({ ids, action: 'trash', labelId: null }, 'user');
+    expect(repos.state.audit.at(-1)).toMatchObject({ action: 'inquiry.trash', payload: { ids } });
+    await expect(
+      inbox.bulk({ ids: [msg.id, 'inq_x'], action: 'restore', labelId: null }, 'user'),
+    ).rejects.toThrow('not found');
+    expect((await inbox.get(msg.id)).trashedAt).not.toBeNull();
   });
 });

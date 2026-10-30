@@ -1,4 +1,5 @@
 import type {
+  Attachment,
   AuditActor,
   AuditLogEntry,
   Booking,
@@ -14,6 +15,8 @@ import type {
   Inquiry,
   IsoDate,
   LocalEvent,
+  MailDraft,
+  MailLabel,
   PendingAction,
   Payment,
   PricingConfig,
@@ -97,6 +100,27 @@ export interface InquiryRepository {
   addMessage(message: InboxMessage): Promise<void>;
   /** Replaces a stored message, e.g. to keep its translation. */
   updateMessage(message: InboxMessage): Promise<void>;
+  /** Deletes a conversation with its messages. */
+  deleteInquiry(id: string): Promise<void>;
+}
+
+/** Labels, drafts and attachment files of the mailbox. */
+export interface MailRepository {
+  /** By name. */
+  listLabels(): Promise<MailLabel[]>;
+  /** Creates or replaces a label. */
+  saveLabel(label: MailLabel): Promise<void>;
+  deleteLabel(id: string): Promise<void>;
+  /** Latest first. */
+  listDrafts(): Promise<MailDraft[]>;
+  getDraft(id: string): Promise<MailDraft | null>;
+  /** Creates or replaces a draft. */
+  saveDraft(draft: MailDraft): Promise<void>;
+  deleteDraft(id: string): Promise<void>;
+  saveAttachment(attachment: Attachment, bytes: Uint8Array): Promise<void>;
+  /** The files' details, in the order asked, leaving out IDs that don't exist. */
+  getAttachments(ids: string[]): Promise<Attachment[]>;
+  readAttachment(id: string): Promise<{ attachment: Attachment; bytes: Uint8Array } | null>;
 }
 
 export interface PendingActionRepository {
@@ -218,6 +242,7 @@ export interface Repositories {
   stayReadings: StayReadingRepository;
   events: LocalEventRepository;
   contacts: ContactRepository;
+  mail: MailRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

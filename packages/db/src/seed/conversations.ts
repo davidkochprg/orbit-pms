@@ -10,19 +10,24 @@ import type {
 
 const HOUR = 3600_000;
 
-interface Line {
+export interface Line extends Partial<Pick<InboxMessage, 'to' | 'cc' | 'attachments'>> {
   direction: InboxMessage['direction'];
   body: string;
   hoursAgo: number;
   author?: string;
 }
 
-function thread(
+export function thread(
   id: string,
   now: Date,
   lines: Line[],
   fields: Pick<Inquiry, 'channel' | 'partner' | 'subject' | 'senderName' | 'senderAddress'> &
-    Partial<Pick<Inquiry, 'bookingId' | 'archivedAt' | 'status'>>,
+    Partial<
+      Pick<
+        Inquiry,
+        'bookingId' | 'archivedAt' | 'status' | 'unread' | 'starred' | 'trashedAt' | 'labelIds'
+      >
+    >,
 ): Inquiry {
   const messages: InboxMessage[] = lines.map((l, i) => ({
     id: `msg_${id}_${i + 1}`,
@@ -32,6 +37,10 @@ function thread(
     sentAt: new Date(now.getTime() - l.hoursAgo * HOUR).toISOString(),
     author: l.author ?? null,
     translation: null,
+    to: l.to ?? [],
+    cc: l.cc ?? [],
+    bcc: [],
+    attachments: l.attachments ?? [],
   }));
   return {
     id,
@@ -40,6 +49,9 @@ function thread(
     messages,
     unread: false,
     archivedAt: null,
+    starred: false,
+    trashedAt: null,
+    labelIds: [],
     parsed: null,
     suggestion: null,
     status: 'replied',

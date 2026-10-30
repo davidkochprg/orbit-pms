@@ -340,7 +340,7 @@ describe('inbox pipeline', () => {
   it('reads the whole conversation, answering the guest’s latest message', async () => {
     const { inbox, pipeline, calls } = setup([JSON.stringify(request), `Cena ${TOTAL}.`]);
     const msg = await inbox.create(message);
-    await inbox.send(msg.id, 'Dobrý den, na kdy přesně?', null, 'user');
+    await inbox.send(msg.id, { body: 'Dobrý den, na kdy přesně?' }, null, 'user');
     await inbox.receive(msg.id, 'Od 12. do 14. května.');
     await pipeline.process(msg.id);
     expect(calls[0]).toContain('na kdy přesně');
