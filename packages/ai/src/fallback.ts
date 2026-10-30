@@ -2,9 +2,13 @@ import { wrapLanguageModel } from 'ai';
 
 type Model = ReturnType<typeof wrapLanguageModel>;
 
+/** Thrown, and caught below, when the primary model answers with no text at all. */
+class EmptyAnswerError extends Error {}
+
 /**
  * A model that answers with `primary` and, if that call fails (out of credits, rate limited,
- * down), asks `fallback` with the same request. Only for `generateText`: streams are not retried.
+ * down) or comes back with no text, asks `fallback` with the same request. Only for
+ * `generateText` with text output: streams are not retried.
  */
 export function withFallback(
   primary: Model,
@@ -17,7 +21,10 @@ export function withFallback(
     middleware: {
       wrapGenerate: async ({ doGenerate, params }) => {
         try {
-          return await doGenerate();
+          const result = await doGenerate();
+          const text = result.content.some((p) => p.type === 'text' && p.text.trim() !== '');
+          if (!text) throw new EmptyAnswerError(`${primary.modelId} answered with no text`);
+          return result;
         } catch (error) {
           if (params.abortSignal?.aborted) throw error;
           onFallback(error);

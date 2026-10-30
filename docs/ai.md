@@ -214,7 +214,7 @@ Muse Spark Open is Meta's open-weight release of Muse Spark; Orbit uses the date
 
 - Baseten serves it without structured output or JSON mode, so it takes only the two plain-text features.
 - It always reasons and defaults to `xhigh`; the features send `minimal`, which Baseten runs as `low`, its lowest level.
-- `withFallback` (`packages/ai/src/fallback.ts`) wraps it: a call that fails (credits used up, rate limit, outage) is sent again to Meta's model, the agent model for drafts and `META_MODEL_TRANSLATE` for translations. Usage is recorded under the model that answered.
+- `withFallback` (`packages/ai/src/fallback.ts`) wraps it: a call that fails (credits used up, rate limit, outage) or answers with no text is sent again to Meta's model, the agent model for drafts and `META_MODEL_TRANSLATE` for translations. Usage is recorded under the model that answered.
 - Prices are the same as Meta's Standard tier, and its spend counts towards the same `AI_MONTHLY_BUDGET_USD`.
 
 Constraints from Meta's tool-calling docs that the agent respects: `tool_choice` only accepts `"auto"` (the SDK default), and tool arguments are not guaranteed to match the schema, so the SDK validates them with the zod schemas.

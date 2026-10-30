@@ -54,4 +54,19 @@ describe('withFallback', () => {
     expect(onFallback).toHaveBeenCalledOnce();
     expect(fallback.doGenerateCalls[0]?.prompt).toEqual(primary.doGenerateCalls[0]?.prompt);
   });
+
+  it('asks the fallback when the primary answers with no text', async () => {
+    const onFallback = vi.fn();
+    const result = await generateText({
+      model: withFallback(
+        model('open', () => '  '),
+        model('meta', () => 'from meta'),
+        onFallback,
+      ),
+      prompt: 'hi',
+      maxRetries: 0,
+    });
+    expect(result.text).toBe('from meta');
+    expect(onFallback).toHaveBeenCalledOnce();
+  });
 });
