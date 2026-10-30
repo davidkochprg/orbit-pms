@@ -1,6 +1,6 @@
-import { useChat } from '@ai-sdk/react';
+import { Chat, useChat } from '@ai-sdk/react';
 import type { AgentContext } from '@orbit/shared';
-import { DefaultChatTransport } from 'ai';
+import { DefaultChatTransport, type UIMessage } from 'ai';
 import { BorderBeam } from 'border-beam';
 import { Command as CommandPrimitive } from 'cmdk';
 import {
@@ -26,6 +26,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
 } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
 import { AgentStatus } from '@/components/agent-status';
@@ -45,8 +46,16 @@ import {
   type PaletteMode,
 } from '@/hooks/use-command-palette';
 import { useDarkMode } from '@/hooks/use-dark-mode';
+import { useSession } from '@/hooks/use-session';
 import { agentErrorMessage, proposalIds, suggestedQuestions, toolResults } from '@/lib/agent';
 import { contextFromLocation } from '@/lib/agent-context';
+import {
+  recentConversations,
+  rememberConversation,
+  settledMessages,
+  type StoredConversation,
+  subscribeConversations,
+} from '@/lib/agent-history';
 import { paletteMatch } from '@/lib/palette-match';
 import { followUps } from '@/lib/agent-follow-ups';
 import {
@@ -56,6 +65,7 @@ import {
   usePendingActions,
   useResolveAnyPendingAction,
 } from '@/lib/api';
+import { formatRecent } from '@/lib/format';
 import { navItems } from '@/lib/nav';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
@@ -63,17 +73,52 @@ import { cn } from '@/lib/utils';
 const transport = new DefaultChatTransport({ api: '/api/agent' });
 const ASK = '__ask__';
 
+const newChat = (conversation?: StoredConversation) =>
+  new Chat<UIMessage>({ id: conversation?.id, messages: conversation?.messages, transport });
+
 /**
- * The ⌘K command bar: search and navigation, and the agent. The conversation lives here, so it
- * survives closing the bar and is there again on the next ⌘K.
+ * The ⌘K command bar: search and navigation, and the agent. The open conversation lives here, so
+ * it survives closing the bar; the latest few are kept in the browser to go back to.
  */
 export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<PaletteMode>('search');
   const [text, setText] = useState('');
-  const chat = useChat({ transport });
   const dark = useDarkMode();
+
+  // Each staff member has their own recent conversations, and starts on a new one.
+  const { storedId } = useSession();
+  const staffKey = storedId ?? 'signed-out';
+  const recent = useSyncExternalStore(subscribeConversations, () => recentConversations(staffKey));
+  const [instance, setInstance] = useState(() => newChat());
+  const [chatFor, setChatFor] = useState(staffKey);
+  if (chatFor !== staffKey) {
+    setChatFor(staffKey);
+    setInstance(newChat());
+  }
+  const chat = useChat({ chat: instance });
   const working = chat.status === 'submitted' || chat.status === 'streaming';
+
+  /** Shows another conversation; the one left behind stops answering. */
+  const current = useRef(instance);
+  useEffect(() => {
+    current.current = instance;
+  }, [instance]);
+  const switchTo = useCallback((next: Chat<UIMessage>) => {
+    void current.current.stop();
+    setInstance(next);
+  }, []);
+
+  // Kept once a question is asked and again once it is answered. A reply that broke off is
+  // left out, so the conversation can carry on later.
+  useEffect(() => {
+    if (chat.status === 'streaming') return;
+    rememberConversation(
+      staffKey,
+      chat.id,
+      settledMessages(chat.messages, chat.status === 'error'),
+    );
+  }, [chat.id, chat.messages, chat.status, staffKey]);
 
   // What the next questions are about: the page's booking, guest or conversation, read when the
   // bar opens; the staff member can leave it out.
@@ -88,12 +133,17 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     isOpen.current = open;
   }, [open]);
 
-  const openPalette = useCallback((options?: OpenPaletteOptions) => {
-    setMode(options?.mode ?? 'search');
-    setText(options?.text ?? '');
-    setContext(options?.context !== undefined ? options.context : pageContext.current);
-    setOpen(true);
-  }, []);
+  const openPalette = useCallback(
+    (options?: OpenPaletteOptions) => {
+      // "Ask Orbit" on a booking starts a new conversation about it.
+      if (options?.mode === 'agent' && current.current.messages.length > 0) switchTo(newChat());
+      setMode(options?.mode ?? 'search');
+      setText(options?.text ?? '');
+      setContext(options?.context !== undefined ? options.context : pageContext.current);
+      setOpen(true);
+    },
+    [switchTo],
+  );
 
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
@@ -107,12 +157,35 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const send = (target: Chat<UIMessage>, question: string) =>
+    void target.sendMessage({ text: question, ...(context && { metadata: { context } }) });
+
+  /** Asks in the open conversation. */
   const ask = (question: string) => {
     const q = question.trim();
-    if (!q || chat.status === 'submitted' || chat.status === 'streaming') return;
+    if (!q || working) return;
     setMode('agent');
     setText('');
-    void chat.sendMessage({ text: q, ...(context && { metadata: { context } }) });
+    send(instance, q);
+  };
+
+  /** Asks in a new conversation, unless the open one hasn't started. */
+  const askNew = (question: string) => {
+    const q = question.trim();
+    if (!q) return;
+    const target = chat.messages.length === 0 && !working ? instance : newChat();
+    if (target !== instance) switchTo(target);
+    setMode('agent');
+    setText('');
+    send(target, q);
+  };
+
+  /** Opens a conversation from the list, or a new one. */
+  const openConversation = (conversation?: StoredConversation) => {
+    setMode('agent');
+    if (conversation?.id === chat.id) return;
+    if (!conversation && chat.messages.length === 0 && !working) return;
+    switchTo(newChat(conversation));
   };
 
   const closePalette = useCallback(() => setOpen(false), []);
@@ -182,8 +255,9 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                   context={context}
                   text={text}
                   onTextChange={setText}
-                  onAsk={ask}
-                  onShowThread={chat.messages.length > 0 ? () => setMode('agent') : undefined}
+                  onAsk={askNew}
+                  recent={recent}
+                  onOpenConversation={openConversation}
                   close={() => setOpen(false)}
                 />
               ) : (
@@ -195,11 +269,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                   onTextChange={setText}
                   onAsk={ask}
                   onBack={() => setMode('search')}
-                  onNew={() => {
-                    void chat.stop();
-                    chat.setMessages([]);
-                    chat.clearError();
-                  }}
+                  onNew={() => openConversation()}
                 />
               )}
             </div>
@@ -215,14 +285,18 @@ function SearchView({
   text,
   onTextChange,
   onAsk,
-  onShowThread,
+  recent,
+  onOpenConversation,
   close,
 }: {
   context: AgentContext | null;
   text: string;
   onTextChange: (text: string) => void;
+  /** Asks in a new conversation. */
   onAsk: (question: string) => void;
-  onShowThread: (() => void) | undefined;
+  recent: StoredConversation[];
+  /** Opens a recent conversation, or a new one when none is given. */
+  onOpenConversation: (conversation?: StoredConversation) => void;
   close: () => void;
 }) {
   const navigate = useNavigate();
@@ -283,19 +357,24 @@ function SearchView({
           </CommandPrimitive.Group>
         )}
 
-        {!query && onShowThread && (
-          <CommandPrimitive.Group heading="Agent">
-            <Item value="Continue conversation" onSelect={onShowThread}>
-              <LogoMark className="text-primary-text" /> Continue the conversation
-            </Item>
-          </CommandPrimitive.Group>
-        )}
-
         {!query && aiOn && (
-          <CommandPrimitive.Group heading="Ask Orbit">
-            {suggestedQuestions.map((q) => (
-              <Item key={q} value={q} onSelect={() => onAsk(q)}>
-                <LogoMark className="text-primary-text" /> {q}
+          <CommandPrimitive.Group heading="Agent">
+            <Item value="New conversation" onSelect={() => onOpenConversation()}>
+              <LogoMark className="text-primary-text" /> New conversation
+            </Item>
+            {recent.map((c) => (
+              <Item
+                key={c.id}
+                value={`conversation ${c.id}`}
+                onSelect={() => onOpenConversation(c)}
+                className="h-8 text-[0.8125rem] text-muted-foreground data-[selected=true]:text-foreground"
+              >
+                {/* Under the new conversation's icon, so the titles line up with its label. */}
+                <span aria-hidden className="w-4 shrink-0" />
+                <span className="min-w-0 flex-1 truncate">{c.title}</span>
+                <time className="shrink-0 text-xs text-subtle-foreground tabular-nums">
+                  {formatRecent(c.updatedAt)}
+                </time>
               </Item>
             ))}
           </CommandPrimitive.Group>
@@ -519,6 +598,14 @@ function AgentView({
         {chat.error && <ErrorNotice message={agentErrorMessage(chat.error)} className="mt-3" />}
       </div>
 
+      {chat.messages.length === 0 && aiOn && (
+        <div className="shrink-0 px-5 py-2.5">
+          <FollowUps
+            followUps={suggestedQuestions.map((q) => ({ label: q, ask: q }))}
+            onPick={(f) => 'ask' in f && onAsk(f.ask)}
+          />
+        </div>
+      )}
       {next.length > 0 && (
         <div className="shrink-0 border-t px-5 py-2.5">
           <FollowUps
@@ -616,11 +703,13 @@ function Item({
   value,
   onSelect,
   hint,
+  className,
   children,
 }: {
   value: string;
   onSelect: () => void;
   hint?: string;
+  className?: string;
   children: ReactNode;
 }) {
   return (
@@ -630,6 +719,7 @@ function Item({
       className={cn(
         'group flex h-10 cursor-default items-center gap-2.5 rounded-lg px-3 text-sm outline-none select-none',
         'data-[selected=true]:bg-accent [&_svg]:size-4 [&_svg]:shrink-0 [&_svg:not([class*=text-])]:text-muted-foreground',
+        className,
       )}
     >
       {children}

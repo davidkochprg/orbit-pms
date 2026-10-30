@@ -70,6 +70,19 @@ export function formatDateTime(iso: string): string {
   }).format(new Date(iso));
 }
 
+/** A recent moment: only the time when it was today in the hotel, e.g. "3:30 PM", else the date too. */
+export function formatRecent(iso: string, now: Date = new Date()): string {
+  const day = (d: Date) =>
+    new Intl.DateTimeFormat('en-CA', { timeZone: region.timeZone }).format(d);
+  if (day(new Date(iso)) !== day(now)) return formatDateTime(iso);
+  return new Intl.DateTimeFormat(region.usDates ? 'en-US' : 'en-GB', {
+    timeZone: region.timeZone,
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: region.usDates,
+  }).format(new Date(iso));
+}
+
 /** "15:00" as the hotel writes a time of day: "3 PM" in the US. */
 export function formatTimeOfDay(time: string): string {
   if (!region.usDates) return time;

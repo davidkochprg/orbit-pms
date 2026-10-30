@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   formatDateTime,
+  formatRecent,
   formatMoney,
   formatPrice,
   formatTimeOfDay,
@@ -58,6 +59,16 @@ describe('format', () => {
     setDisplayRegion(czech);
     expect(formatDateTime('2026-10-27T22:30:00Z')).toBe('27 Oct, 23:30');
     expect(formatTimeOfDay('15:00')).toBe('15:00');
+  });
+
+  it('shows only the time for a moment earlier the same hotel day', () => {
+    setDisplayRegion(us);
+    // 3:30 PM and 11:30 PM on Oct 27 in Los Angeles, though the second is Oct 28 in UTC.
+    const now = new Date('2026-10-28T06:30:00Z');
+    expect(formatRecent('2026-10-27T22:30:00Z', now)).toBe('3:30 PM');
+    expect(formatRecent('2026-10-26T22:30:00Z', now)).toBe('Oct 26, 3:30 PM');
+    setDisplayRegion(czech);
+    expect(formatRecent('2026-10-28T05:30:00Z', new Date('2026-10-28T20:00:00Z'))).toBe('6:30');
   });
 
   it('describes the party', () => {
