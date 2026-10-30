@@ -784,12 +784,6 @@ function ConversationRow({
         selected && 'bg-primary-soft hover:bg-primary-soft',
       )}
     >
-      {m.unread && (
-        <span
-          aria-label="Unread"
-          className="absolute top-[22px] left-0.5 size-1.5 rounded-full bg-primary"
-        />
-      )}
       <span className="flex shrink-0 flex-col items-center gap-0.5 py-1.5 pl-2">
         <Checkbox
           label={`Select ${senderLabel(m)}`}
@@ -816,6 +810,13 @@ function ConversationRow({
         <GuestAvatar name={senderLabel(m)} size="md" />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <span className="flex items-baseline gap-2">
+            {m.unread && (
+              <span
+                role="img"
+                aria-label="Unread"
+                className="size-2 shrink-0 self-center rounded-full bg-primary"
+              />
+            )}
             <span className={cn('truncate', m.unread ? 'font-semibold' : 'font-medium')}>
               {who}
             </span>
