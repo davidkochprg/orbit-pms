@@ -11,12 +11,13 @@ Business logic lives in `packages/domain`. It is pure TypeScript: no network, no
 | Guest            | name, email, phone, `language` (`cs` \| `de` \| `en` \| `pl`), notes                                                                                                                                            |
 | Booking          | guest, room, `checkIn`, `checkOut`, adults, `childAges`, `status`, `holdExpiresAt`, `source`, `addons` (wellness, dogs, extra beds), `priceSnapshot` (a quote), notes                                           |
 | Inquiry          | a conversation: channel, guest, messages (in or out), unread, archived, parsed extraction, `status`, linked booking                                                                                             |
-| HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes                                                                                                   |
+| HousekeepingTask | room, `type` (`turnover` \| `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes, `trade`, contact asked                                                                           | `stayover` \| `maintenance`), `status` (`open` \| `in_progress` \| `done`), notes |
 | HotelProfile     | name, location, description, contact, `checkInFrom`, `checkOutBy`, `entries` (notes: folder, title, details with `[[links]]`, tags)                                                                             |
 | Charge           | booking, label, quantity, `unitPrice` (negative for a discount), amount, `vatBracket` (`standard` \| `reduced` \| `none`), `postedOn`                                                                           |
 | Payment          | booking, `kind` (`payment` \| `refund`), `method` (`cash` \| `card` \| `bank_transfer`), amount (positive), note, `paidOn`                                                                                      |
 | StayGuest        | booking, guest profile (main guest only), name, `nationality` (ISO alpha-2), `dateOfBirth`, `documentType` (`id_card` \| `passport`), `documentNumber`, address, `registeredAt`, each ID field null until known |
 | IdScan           | booking, stay guest (or none, for a companion still to add), `status` (`waiting` \| `reading` \| `done` \| `failed`), checked result, error, `readingSince`, `expiresAt`                                        |
+| Contact          | name, `person` to ask for, `trades` (one or more), phone, email, `language` to write in, notes                                                                                                                  |
 | StaffMember      | name, email, `role` (`manager` \| `receptionist` \| `housekeeping`), `active`                                                                                                                                   |
 | AuditLog         | `actor` (`user` \| `agent`), action, `subjectId` (e.g. a booking), payload, timestamp                                                                                                                           |
 
@@ -97,12 +98,24 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - **Notes**: a housekeeping note (voice or typed) is read by the model into room/status/issue updates. The domain resolves the room names (whole words: "pokoj 104", "A 1"), applies status changes and creates maintenance tasks in one transaction, and skips updates for unknown rooms or forbidden changes with a reason. A note saying a room is clean leaves an already inspected room inspected.
 - Every change is written to the audit log (`room.status`, `task.create`, `task.status`), with the room as subject.
 
+## Contacts and repairs
+
+`createContactService` (`contacts.ts`). Contacts are the hotel's suppliers and contractors, each with one or more **trades**: `plumbing`, `electrical`, `heating`, `appliances`, `internet`, `locks`, `pests`, `building`, `cleaning`, `supplies` ([ADR 0020](decisions/0020-contacts-and-repairs-by-trade.md)).
+
+- A maintenance task has a `trade` (null for cleaning, or when it isn't clear) and the contact asked to fix it. The model sets the trade when it reads a housekeeping note or a repair added by hand; the agent sets it when it logs one.
+- `contactsForTrade` lists the contacts for a task's trade, the one last asked to fix something of that trade first, then by name.
+- `roomAccess` says when someone can work in the room without disturbing a guest: from today, or from the day the guests in it leave (back-to-back stays count as one), until the next guest arrives. Lapsed holds and cancellations don't count.
+- `repair(taskId)` returns the task with its room, access, contacts for its trade and the contact already asked. `askToRepair(taskId, contactId, actor)` records who was asked (by phone or email), moves the task to `in_progress` and gives a task without a trade the contact's first one. A done task can't be asked about.
+- Contacts are created, edited and deleted by staff or through confirmed agent proposals (`save_contact` sends only what changes, `remove_contact`). Deleting a contact keeps the tasks that name them.
+- Audit actions: `contact.create`, `contact.update`, `contact.remove` (the contact as subject), `task.contact` (the room as subject).
+
 ## Knock-ons
 
 `createKnockOnService` (`knock-on.ts`) works out what a change made worth doing next, from current data each time ([ADR 0018](decisions/0018-knock-ons-worked-out-on-read.md)).
 
 - **Relocate**: for each out-of-order room, the stays in it that are in house or arrive within `RELOCATION_DAYS` (7) and still hold the room. `planRelocations` gives each a free room for the whole stay that the party fits, dogs allowed if they bring one: the same room type first, then a clean or inspected room when the guest is here or arrives today, then the room type closest in price, then by name. A room is never planned for two overlapping stays; back-to-back stays may share it. A stay with no free room is listed with none. Moving keeps the booked price.
 - **Opening**: a request that was read when nothing was free (`suggestion.options` empty), still `new` or `replied`, not archived, without a booking and not in the past, that `inboxOptions` now finds rooms for, with how many and the cheapest total.
+- **Repair**: an `open` maintenance task with a trade that nobody was asked to fix yet, with the first contact for its trade. It goes once someone is asked or the task is started.
 - `relocate({ moves }, actor)` moves the stays one by one through `moveBooking`, with its checks and audit entries.
 
 ## Daily brief

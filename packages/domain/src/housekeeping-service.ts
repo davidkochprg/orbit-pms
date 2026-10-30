@@ -11,6 +11,7 @@ import type {
   Room,
   RoomStatus,
   StayReading,
+  Trade,
 } from '@orbit/shared';
 import { normalizeStayReading, staySource } from './cleaning-effort';
 import { addDays, hotelToday } from './dates';
@@ -41,6 +42,8 @@ export interface NewTask {
   roomId: string;
   type: HousekeepingTaskType;
   notes: string | null;
+  /** Who fixes a repair; ignored for cleaning. */
+  trade?: Trade | null;
 }
 
 const roomStatusLabels: Record<RoomStatus, string> = {
@@ -92,6 +95,8 @@ export function createHousekeepingService({ repos, clock, newId }: HousekeepingD
       type: input.type,
       status: 'open',
       notes: input.notes?.trim() || null,
+      trade: input.type === 'maintenance' ? (input.trade ?? null) : null,
+      contactId: null,
       createdAt: clock().toISOString(),
     };
     await tx.housekeeping.createTask(task);
@@ -247,7 +252,7 @@ export function createHousekeepingService({ repos, clock, newId }: HousekeepingD
           if (update.issue?.trim()) {
             const task = await addTask(
               tx,
-              { roomId: room.id, type: 'maintenance', notes: update.issue },
+              { roomId: room.id, type: 'maintenance', notes: update.issue, trade: update.trade },
               actor,
             );
             changes.push({ kind: 'task_created', roomName: room.name, task });

@@ -3,6 +3,7 @@ import {
   createHousekeepingNotePipeline,
   createStayNotesReader,
   createNoteFiler,
+  createRepairDesk,
   createReplyLearner,
   createRevenueBriefWriter,
   createIdScanReader,
@@ -15,6 +16,7 @@ import {
 import {
   createActivityService,
   createBillingService,
+  createContactService,
   createGuestService,
   createHotelService,
   createHousekeepingService,
@@ -46,6 +48,7 @@ import { type AiLimitsConfig, createAiLimiter } from './limits';
 import { activityRoutes } from './routes/activity';
 import { agentRoutes } from './routes/agent';
 import { billingRoutes } from './routes/billing';
+import { contactRoutes } from './routes/contacts';
 import { bookingRoutes } from './routes/bookings';
 import { guestRoutes } from './routes/guests';
 import { housekeepingRoutes } from './routes/housekeeping';
@@ -111,6 +114,7 @@ export function createApp({
   const inbox = createInboxService({ repos, hotel, clock, newId });
   const revenue = createRevenueService({ repos, defaults: pricingConfig, clock, newId });
   const activity = createActivityService({ repos });
+  const contacts = createContactService({ repos, clock, newId });
   const actions = createPendingActionService({
     repos,
     rates,
@@ -121,6 +125,7 @@ export function createApp({
     settings,
     inbox,
     events: revenue,
+    contacts,
     clock,
     newId,
   });
@@ -177,6 +182,9 @@ export function createApp({
     });
   const stays =
     ai && createStayNotesReader({ model: ai.agent, modelId: ai.agentModelId, housekeeping, usage });
+  const desk =
+    ai &&
+    createRepairDesk({ model: ai.agent, modelId: ai.agentModelId, draftModel: ai.draft, usage });
   const access = createDemoAccess({ code: accessCode, clock });
   const app = new Hono();
   if (log) app.use(logger());
@@ -234,7 +242,18 @@ export function createApp({
       identify: (id) => staff.identify(id),
     }),
   );
-  app.route('/api', housekeepingRoutes({ housekeeping, notes, stays, gate }));
+  app.route('/api', housekeepingRoutes({ housekeeping, notes, stays, desk, gate }));
+  app.route(
+    '/api',
+    contactRoutes({
+      contacts,
+      settings,
+      desk,
+      today: () => hotelToday(clock()),
+      gate,
+      identify: (id) => staff.identify(id),
+    }),
+  );
   app.route(
     '/api',
     agentRoutes({
@@ -254,6 +273,7 @@ export function createApp({
       draftReply: pipeline ? (id) => pipeline.draft(id) : null,
       activity,
       events: revenue,
+      contacts,
       limiter,
       gate,
       clock,

@@ -3,6 +3,7 @@ export * from './agent-results';
 export * from './api';
 export * from './billing';
 export * from './brief';
+export * from './contacts';
 export * from './dates';
 export * from './entities';
 export * from './enums';

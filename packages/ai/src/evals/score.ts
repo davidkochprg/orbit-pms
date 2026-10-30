@@ -46,7 +46,8 @@ export interface NoteScore {
 
 /**
  * Scores a housekeeping note reading: the same rooms (one update each), the same status per room,
- * an issue exactly where one was reported, and `unclear` set exactly when expected.
+ * an issue exactly where one was reported with a trade that fixes it, and `unclear` set exactly
+ * when expected.
  */
 export function scoreHousekeepingNote(
   fixture: Pick<HousekeepingNoteFixture, 'expected' | 'unclear'>,
@@ -70,6 +71,10 @@ export function scoreHousekeepingNote(
     const issue = got.some((u) => Boolean(u.issue?.trim()));
     if (status !== want.status) problems.push(`${want.room} status ${status} != ${want.status}`);
     if (issue !== want.issue) problems.push(`${want.room} issue ${issue} != ${want.issue}`);
+    const trade = got.find((u) => u.issue?.trim())?.trade ?? null;
+    if (issue && want.trade && (!trade || !want.trade.includes(trade))) {
+      problems.push(`${want.room} trade ${trade} not ${want.trade.join('/')}`);
+    }
   }
   for (const extra of byRoom.keys()) problems.push(`unexpected ${extra}`);
   if (Boolean(actual.unclear?.trim()) !== fixture.unclear) {

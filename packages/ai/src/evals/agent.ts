@@ -3,6 +3,7 @@ import {
   createActivityService,
   createInboxService,
   createBillingService,
+  createContactService,
   createGuestService,
   createHotelService,
   createHousekeepingService,
@@ -144,6 +145,40 @@ export function buildAgentEvalHotel(today: IsoDate) {
           createdAt: now.toISOString(),
         },
       ],
+      contacts: [
+        {
+          id: 'ct_plumbing',
+          name: 'Example Plumbing',
+          person: null,
+          trades: ['plumbing'],
+          phone: '(530) 555-0142',
+          email: 'service@plumbing.example',
+          language: 'en',
+          notes: null,
+        },
+        {
+          id: 'ct_electric',
+          name: 'Example Electric',
+          person: null,
+          trades: ['electrical'],
+          phone: '(530) 555-0117',
+          email: null,
+          language: 'en',
+          notes: null,
+        },
+      ],
+      tasks: [
+        {
+          id: 'hk_tap',
+          roomId: 'rm_101',
+          type: 'maintenance',
+          status: 'open',
+          notes: 'Bathroom tap is dripping.',
+          trade: 'plumbing',
+          contactId: null,
+          createdAt: now.toISOString(),
+        },
+      ],
       staff: [
         {
           id: 'stf_sam',
@@ -219,6 +254,7 @@ export function buildAgentEvalHotel(today: IsoDate) {
   const registrations = createRegistrationService({ repos, clock, newId });
   const inbox = createInboxService({ repos, hotel, clock, newId });
   const revenue = createRevenueService({ repos, defaults: usDemoPricing, clock, newId });
+  const contacts = createContactService({ repos, clock, newId });
   const actions = createPendingActionService({
     repos,
     rates: createRatesService({ repos, defaults: usDemoPricing, newId }),
@@ -229,6 +265,7 @@ export function buildAgentEvalHotel(today: IsoDate) {
     settings: createSettingsService({ repos, clock }),
     inbox,
     events: revenue,
+    contacts,
     clock,
     newId,
   });
@@ -250,6 +287,7 @@ export function buildAgentEvalHotel(today: IsoDate) {
     guestBookings: (guestId) => repos.bookings.listBookings({ guestId }),
     listEvents: () => revenue.listEvents(),
     statedAmounts: () => Promise.resolve([]),
+    contacts,
   });
   // Changes from the run come after the history the inn starts with.
   return { repos, tools, auditBefore: repos.state.audit.length };
@@ -342,11 +380,45 @@ export const agentFixtures: AgentFixture[] = [
     id: 'maintenance-task',
     prompt: 'The shower in 202 is leaking, please log it for maintenance.',
     check: ({ hotel }) => {
-      const tasks = hotel.repos.state.tasks;
+      const tasks = hotel.repos.state.tasks.filter((t) => t.id !== 'hk_tap');
       const ok =
-        tasks.length === 1 && tasks[0]!.roomId === 'rm_202' && tasks[0]!.type === 'maintenance';
-      return ok ? [] : [`tasks ${JSON.stringify(tasks.map((t) => [t.roomId, t.type]))}`];
+        tasks.length === 1 &&
+        tasks[0]!.roomId === 'rm_202' &&
+        tasks[0]!.type === 'maintenance' &&
+        tasks[0]!.trade === 'plumbing';
+      return ok ? [] : [`tasks ${JSON.stringify(tasks.map((t) => [t.roomId, t.type, t.trade]))}`];
     },
+  },
+  {
+    id: 'who-fixes',
+    prompt: 'Who can fix the dripping tap in 101?',
+    check: ({ hotel, calls, answer }) => [
+      ...readOnly(hotel),
+      ...called(calls, 'getRepair', 'listContacts'),
+      ...mentions(answer, ['Example Plumbing'], ['555-0142']),
+    ],
+  },
+  {
+    id: 'called-plumber',
+    prompt: 'I just called Example Plumbing about the tap in 101, they are coming tomorrow.',
+    check: ({ hotel }) => {
+      const task = hotel.repos.state.tasks.find((t) => t.id === 'hk_tap');
+      return [
+        ...(task?.contactId === 'ct_plumbing' ? [] : [`contact ${task?.contactId}`]),
+        ...(task?.status === 'in_progress' ? [] : [`status ${task?.status}`]),
+        ...(hotel.repos.state.pendingActions.length > 0 ? ['proposed instead of acting'] : []),
+      ];
+    },
+  },
+  {
+    id: 'add-contact',
+    prompt: 'Add our new locksmith, Example Locks, phone (530) 555-0130.',
+    check: ({ hotel }) =>
+      proposed(hotel, 'save_contact', {
+        name: 'Example Locks',
+        trades: ['locks'],
+        phone: '(530) 555-0130',
+      }),
   },
   {
     id: 'who-needs-id',

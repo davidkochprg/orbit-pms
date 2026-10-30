@@ -42,6 +42,22 @@ export const housekeepingTaskStatuses = ['open', 'in_progress', 'done'] as const
 export const housekeepingTaskStatusSchema = z.enum(housekeepingTaskStatuses);
 export type HousekeepingTaskStatus = z.infer<typeof housekeepingTaskStatusSchema>;
 
+/** Who fixes or supplies what. A maintenance task gets one; contacts have one or more. */
+export const trades = [
+  'plumbing',
+  'electrical',
+  'heating',
+  'appliances',
+  'internet',
+  'locks',
+  'pests',
+  'building',
+  'cleaning',
+  'supplies',
+] as const;
+export const tradeSchema = z.enum(trades);
+export type Trade = z.infer<typeof tradeSchema>;
+
 export const auditActors = ['user', 'agent'] as const;
 export const auditActorSchema = z.enum(auditActors);
 export type AuditActor = z.infer<typeof auditActorSchema>;

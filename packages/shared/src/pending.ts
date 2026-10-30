@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { chargePatchSchema, newChargeBodySchema, newPaymentBodySchema } from './billing';
 import { replyProposalSchema } from './api';
+import { contactProposalSchema } from './contacts';
 import { isoDateSchema } from './dates';
 import { hotelInfoProposalSchema } from './hotel';
 import { bookingPatchSchema, createHoldInputSchema, guestPatchSchema } from './operations';
@@ -68,6 +69,8 @@ export const pendingActionInputSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('decline_inquiry'), input: z.object({ inquiryId: z.string() }) }),
   z.object({ kind: z.literal('add_local_event'), input: localEventBodySchema }),
   z.object({ kind: z.literal('remove_local_event'), input: z.object({ eventId: z.string() }) }),
+  z.object({ kind: z.literal('save_contact'), input: contactProposalSchema }),
+  z.object({ kind: z.literal('remove_contact'), input: z.object({ contactId: z.string() }) }),
   z.object({
     kind: z.literal('update_room'),
     input: roomBodySchema.partial().extend({ roomId: z.string() }),

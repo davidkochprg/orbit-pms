@@ -13,6 +13,7 @@ import {
 import {
   type ActivityService,
   type BillingService,
+  type ContactService,
   DomainError,
   getHotelTimeZone,
   hotelToday,
@@ -70,6 +71,7 @@ export interface AgentRouteDeps {
   draftReply: ((inquiryId: string) => Promise<Inquiry>) | null;
   activity: ActivityService;
   events: Pick<RevenueService, 'listEvents'>;
+  contacts: Pick<ContactService, 'list' | 'repair' | 'askToRepair'>;
   limiter: AiLimiter;
   gate: AiGate;
   clock: () => Date;
@@ -97,6 +99,7 @@ export function agentRoutes({
   draftReply,
   activity,
   events,
+  contacts,
   limiter,
   clock,
   usage,
@@ -121,6 +124,7 @@ export function agentRoutes({
     listEvents: () => events.listEvents(),
     // Fees the profile states may be repeated in a reply, as in the inbox's own drafts.
     statedAmounts: async () => amountsInText(hotelFacts(await hotelContext())),
+    contacts,
   });
 
   /** What the staff member was looking at, from the hotel's own data; null if it is gone. */

@@ -1,10 +1,10 @@
-import type { Inquiry, InquiryExtraction } from '@orbit/shared';
+import type { HousekeepingTask, Inquiry, InquiryExtraction } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { createKnockOnService, planRelocations } from './knock-on';
 import { hotelPolicy } from './policy';
 import { pricingConfig } from './pricing';
 import { createHotelService } from './service';
-import { apartment, booking, czechProfile, double, room } from './test-fixtures';
+import { apartment, booking, czechProfile, double, plumber, room } from './test-fixtures';
 import { conversation, createMemoryRepositories } from './testing';
 
 const now = new Date('2026-05-10T15:00:00Z');
@@ -240,6 +240,48 @@ describe('knock-on service', () => {
         },
       ],
       [room('rm_9', { name: '9' })],
+    );
+    expect(await knockOns.list()).toEqual([]);
+  });
+
+  const repair = (overrides: Partial<HousekeepingTask> = {}): HousekeepingTask => ({
+    id: 'hk_tap',
+    roomId: 'rm_2',
+    type: 'maintenance',
+    status: 'open',
+    notes: 'Tap is dripping.',
+    trade: 'plumbing',
+    contactId: null,
+    createdAt: now.toISOString(),
+    ...overrides,
+  });
+
+  it('suggests who to ask about a repair nobody was asked to fix', async () => {
+    const { knockOns, repos } = setup([], [room('rm_2', { name: '2' })]);
+    repos.state.contacts.push(plumber);
+    repos.state.tasks.push(repair());
+    expect(await knockOns.list()).toEqual([
+      {
+        kind: 'repair',
+        id: 'repair:hk_tap',
+        taskId: 'hk_tap',
+        roomId: 'rm_2',
+        roomName: '2',
+        issue: 'Tap is dripping.',
+        trade: 'plumbing',
+        contact: plumber,
+      },
+    ]);
+  });
+
+  it('leaves out repairs already asked about, started, without a trade or with no contact', async () => {
+    const { knockOns, repos } = setup([], [room('rm_2', { name: '2' })]);
+    repos.state.contacts.push(plumber);
+    repos.state.tasks.push(
+      repair({ id: 'hk_asked', contactId: plumber.id }),
+      repair({ id: 'hk_started', status: 'in_progress' }),
+      repair({ id: 'hk_unknown', trade: null }),
+      repair({ id: 'hk_lamp', trade: 'electrical' }),
     );
     expect(await knockOns.list()).toEqual([]);
   });

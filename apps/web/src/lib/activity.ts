@@ -34,6 +34,10 @@ export const activityLabels: Record<string, string> = {
   'room_type.update': 'Edited a room type',
   'task.create': 'Added a task',
   'task.status': 'Updated a task',
+  'task.contact': 'Asked someone to fix a repair',
+  'contact.create': 'Added a contact',
+  'contact.update': 'Edited a contact',
+  'contact.remove': 'Removed a contact',
   'settings.profile': 'Edited the hotel profile',
   'settings.entry': 'Saved to Knowledge',
   'settings.entry_remove': 'Removed from Knowledge',
@@ -54,6 +58,11 @@ const totalPayload = z.object({
 });
 const changedPayload = z.object({ changed: z.array(z.string()) });
 const guestBookPayload = z.object({ fields: z.array(z.string()), scanned: z.boolean().optional() });
+const contactPayload = z.union([
+  z.object({ after: z.object({ name: z.string() }) }).transform((p) => p.after.name),
+  z.object({ name: z.string() }).transform((p) => p.name),
+]);
+const askedPayload = z.object({ contactName: z.string(), issue: z.string().nullable() });
 
 const words = (s: string) => s.replaceAll('_', ' ');
 
@@ -86,6 +95,15 @@ export function activityDetail(action: string, payload: unknown): string | null 
     if (!p.success) return null;
     if (p.data.scanned) return 'From an ID scan';
     return p.data.fields.length > 0 ? `Changed ${fieldWords(p.data.fields)}` : null;
+  }
+  if (action.startsWith('contact.')) {
+    const p = contactPayload.safeParse(payload);
+    return p.success ? p.data : null;
+  }
+  if (action === 'task.contact') {
+    const p = askedPayload.safeParse(payload);
+    if (!p.success) return null;
+    return p.data.issue ? `${p.data.contactName}: ${p.data.issue}` : p.data.contactName;
   }
   if (action === 'room.status' || action === 'task.status') {
     const p = statusPayload.safeParse(payload);

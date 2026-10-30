@@ -21,6 +21,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { HousekeepingNoteDialog, type NoteMode } from '@/components/housekeeping-note-dialog';
 import { HousekeepingRoomCard } from '@/components/housekeeping-room-card';
 import { PageHeader } from '@/components/page-header';
+import { RepairDialog } from '@/components/repair-panel';
 import { Count } from '@/components/panel';
 import { StatusDot } from '@/components/status-dot';
 import { TaskDialog } from '@/components/task-dialog';
@@ -41,6 +42,7 @@ import {
   useReadStays,
   useSetRoomStatus,
   useSetTaskStatus,
+  useContacts,
 } from '@/lib/api';
 import { formatLongDate } from '@/lib/format';
 import { boardColumns, needsAction, taskLabel } from '@/lib/housekeeping';
@@ -57,6 +59,12 @@ export function HousekeepingPage() {
   const [noteMode, setNoteMode] = useState<NoteMode>('voice');
   // Undefined: closed. A room ID or null: open, with or without a room chosen.
   const [taskRoom, setTaskRoom] = useState<string | null | undefined>(undefined);
+  const [repairTask, setRepairTask] = useState<string | null>(null);
+  const contacts = useContacts();
+  const repairs: RepairLinks = {
+    open: (task) => setRepairTask(task.id),
+    names: new Map(contacts.data?.map((c) => [c.id, c.name])),
+  };
   const aiOn = health.data?.ai.configured ?? false;
   const voiceOn = health.data?.ai.voice ?? false;
   const { mutate: readStays, isPending: readingStays, isError: readStaysFailed } = useReadStays();
@@ -219,6 +227,7 @@ export function HousekeepingPage() {
                   onCompleteTask={completeTask}
                   onSetStatus={changeStatus}
                   onAddTask={setTaskRoom}
+                  repairs={repairs}
                 />
               ))}
             </div>
@@ -238,8 +247,15 @@ export function HousekeepingPage() {
         onOpenChange={(open) => !open && setTaskRoom(undefined)}
         roomId={taskRoom ?? undefined}
       />
+      <RepairDialog taskId={repairTask} onOpenChange={(open) => !open && setRepairTask(null)} />
     </>
   );
+}
+
+/** Opens who can fix a repair, and names whoever was asked. */
+interface RepairLinks {
+  open: (task: HousekeepingTask) => void;
+  names: Map<string, string>;
 }
 
 /** Rooms someone has to see to today first, routine stayovers after; the board's order within. */
@@ -254,6 +270,7 @@ function Column({
   onCompleteTask,
   onSetStatus,
   onAddTask,
+  repairs,
 }: {
   status: RoomStatus;
   rooms: HousekeepingRoom[];
@@ -261,6 +278,7 @@ function Column({
   onCompleteTask: (task: HousekeepingTask) => void;
   onSetStatus: (roomId: string, status: RoomStatus) => void;
   onAddTask: (roomId: string) => void;
+  repairs: RepairLinks;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: status });
   return (
@@ -298,6 +316,8 @@ function Column({
               onCompleteTask={onCompleteTask}
               onSetStatus={(s) => onSetStatus(item.room.id, s)}
               onAddTask={() => onAddTask(item.room.id)}
+              onOpenRepair={repairs.open}
+              contactNames={repairs.names}
             />
           </RoomContextMenu>
         ))}
@@ -320,6 +340,8 @@ function DraggableCard({
   onCompleteTask: (task: HousekeepingTask) => void;
   onSetStatus: (status: RoomStatus) => void;
   onAddTask: () => void;
+  onOpenRepair: (task: HousekeepingTask) => void;
+  contactNames: Map<string, string>;
   /** From a wrapping trigger, e.g. the room's context menu. */
   ref?: Ref<HTMLDivElement>;
 }) {

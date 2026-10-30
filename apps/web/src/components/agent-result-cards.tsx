@@ -8,6 +8,7 @@ import {
   folioSchema,
   quoteAddonsSchema,
   quoteSchema,
+  repairSchema,
   type Report,
   reportSchema,
   roomOptionSchema,
@@ -17,7 +18,7 @@ import {
   type QuoteAddons,
   type RoomOption,
 } from '@orbit/shared';
-import { Calculator, CalendarSearch, ChevronRight, Receipt } from 'lucide-react';
+import { Calculator, CalendarSearch, ChevronRight, Receipt, Wrench } from 'lucide-react';
 import { useState } from 'react';
 import { type BookingListKind, BookingListCard } from '@/components/agent-booking-list-card';
 import { BriefCard } from '@/components/agent-brief-card';
@@ -29,19 +30,20 @@ import {
   HousekeepingCard,
 } from '@/components/agent-housekeeping-card';
 import { Mention, RoomBadge } from '@/components/agent-mention';
+import { RepairContacts, RepairMeta } from '@/components/repair-panel';
 import { Button } from '@/components/ui/button';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import { asToolError, type ToolResult } from '@/lib/agent';
-import { useRoomTypes } from '@/lib/api';
+import { useRepair, useRoomTypes } from '@/lib/api';
 import { formatMoney, formatPrice, formatParty, formatRange } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 /**
  * Cards straight from the tools, so the amounts are exactly what the domain worked out: reports,
  * the day's brief, the bookings a list tool returned, one card per availability check and per quote
- * asked for, the latest bill of each booking, the housekeeping changes the agent made, and the
- * guest books it opened.
+ * asked for, the latest bill of each booking, the housekeeping changes the agent made, the guest
+ * books it opened, and the repairs it looked up.
  */
 const bookingLists: Record<string, BookingListKind> = {
   getArrivals: 'arrivals',
@@ -68,6 +70,7 @@ export function ResultCards({
   const quotes: { key: string; quote: Quote; roomId: string | null }[] = [];
   const bills = new Map<string, Folio>();
   const housekeeping: HousekeepingChangeResult[] = [];
+  const repairs = new Set<string>();
   for (const { id, name, input, output } of results) {
     if (name === 'getGuestBook' && output && !asToolError(output)) {
       const bookingId = (input as { bookingId?: unknown } | undefined)?.bookingId;
@@ -118,6 +121,10 @@ export function ResultCards({
       const roomId = (input as { roomId?: string } | undefined)?.roomId ?? null;
       if (parsed.success) quotes.push({ key: id, quote: parsed.data, roomId });
     }
+    if (name === 'getRepair') {
+      const parsed = repairSchema.safeParse(output);
+      if (parsed.success) repairs.add(parsed.data.task.id);
+    }
     if (name === 'getBill') {
       const parsed = folioSchema.safeParse(output);
       if (parsed.success) bills.set(parsed.data.bookingId, parsed.data);
@@ -130,7 +137,8 @@ export function ResultCards({
     searches.length +
     quotes.length +
     bills.size +
-    housekeeping.length;
+    housekeeping.length +
+    repairs.size;
   // A list the agent read to find the booking another card is about was only a step.
   const shownLists = others > 0 ? [] : lists;
   if (others === 0 && shownLists.length === 0) return null;
@@ -158,6 +166,9 @@ export function ResultCards({
       {[...guestBooks].map((bookingId) => (
         <GuestBookCard key={bookingId} bookingId={bookingId} />
       ))}
+      {[...repairs].map((taskId) => (
+        <RepairCard key={taskId} taskId={taskId} />
+      ))}
     </div>
   );
 }
@@ -177,6 +188,19 @@ function reportPairs(reports: Report[]): { report: Report; previous: Report | nu
     pairs.push({ report, previous });
   }
   return pairs;
+}
+
+/** Who can fix a repair, live, so calling or emailing someone shows them as asked. */
+function RepairCard({ taskId }: { taskId: string }) {
+  const repair = useRepair(taskId);
+  if (!repair.data) return null;
+  return (
+    <AgentCard>
+      <AgentCardHeader icon={Wrench} title={repair.data.task.notes ?? 'Repair'} />
+      <RepairMeta repair={repair.data} className="-mt-1 text-xs" />
+      <RepairContacts repair={repair.data} />
+    </AgentCard>
+  );
 }
 
 function QuoteCard({ quote, roomId }: { quote: Quote; roomId: string | null }) {

@@ -56,7 +56,9 @@ function setup(reading: HousekeepingNoteReading, { voice = true } = {}) {
 }
 
 const reading: HousekeepingNoteReading = {
-  updates: [{ room: '104', status: 'clean', issue: 'Bedside lamp is broken.' }],
+  updates: [
+    { room: '104', status: 'clean', issue: 'Bedside lamp is broken.', trade: 'electrical' },
+  ],
   unclear: null,
 };
 

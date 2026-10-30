@@ -3,6 +3,7 @@ export * from './housekeeping-notes';
 export * from './id-documents';
 export * from './inquiries';
 export * from './knowledge';
+export * from './repairs';
 export * from './score';
 export * from './stay-notes';
 export * from './translations';

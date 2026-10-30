@@ -22,6 +22,8 @@ function setup() {
           type: 'turnover',
           status: 'open',
           notes: null,
+          trade: null,
+          contactId: null,
           createdAt: now.toISOString(),
         },
       ],
@@ -68,10 +70,25 @@ describe('housekeeping service', () => {
       service.createTask({ roomId: 'rm_101', type: 'maintenance', notes: ' ' }, 'user'),
     ).rejects.toThrow('Describe what needs fixing');
     const task = await service.createTask(
-      { roomId: 'rm_101', type: 'maintenance', notes: 'Lamp broken' },
+      { roomId: 'rm_101', type: 'maintenance', notes: 'Lamp broken', trade: 'electrical' },
       'user',
     );
-    expect(task).toMatchObject({ id: 'hk_new1', status: 'open', notes: 'Lamp broken' });
+    expect(task).toMatchObject({
+      id: 'hk_new1',
+      status: 'open',
+      notes: 'Lamp broken',
+      trade: 'electrical',
+      contactId: null,
+    });
+  });
+
+  it('keeps a trade only on a repair', async () => {
+    const { service } = setup();
+    const cleaning = await service.createTask(
+      { roomId: 'rm_101', type: 'turnover', notes: null, trade: 'plumbing' },
+      'user',
+    );
+    expect(cleaning.trade).toBeNull();
   });
 
   it('updates a task status', async () => {
@@ -91,9 +108,14 @@ describe('housekeeping service', () => {
     const result = await service.applyNote(
       {
         updates: [
-          { room: 'pokoj 101', status: 'clean', issue: 'Lamp by the bed is broken' },
-          { room: '102', status: 'inspected', issue: null },
-          { room: '305', status: 'clean', issue: null },
+          {
+            room: 'pokoj 101',
+            status: 'clean',
+            issue: 'Lamp by the bed is broken',
+            trade: 'electrical',
+          },
+          { room: '102', status: 'inspected', issue: null, trade: null },
+          { room: '305', status: 'clean', issue: null, trade: null },
         ],
         unclear: null,
       },
@@ -103,7 +125,9 @@ describe('housekeeping service', () => {
     expect(result.changes.map((c) => c.kind)).toEqual(['room_status', 'task_created']);
     expect(result.changes[0]).toMatchObject({ roomName: '101', from: 'dirty', to: 'clean' });
     expect(result.skipped.map((s) => s.room)).toEqual(['102', '305']);
-    expect(repos.state.tasks.filter((t) => t.type === 'maintenance')).toHaveLength(1);
+    expect(repos.state.tasks.filter((t) => t.type === 'maintenance')).toEqual([
+      expect.objectContaining({ notes: 'Lamp by the bed is broken', trade: 'electrical' }),
+    ]);
     expect(repos.state.audit.every((a) => a.actor === 'agent')).toBe(true);
   });
 

@@ -1,6 +1,7 @@
 import type { StaffMember } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { createBillingService } from './billing';
+import { createContactService } from './contacts';
 import { createGuestService } from './guests';
 import { createInboxService } from './inbox-service';
 import { createPendingActionService } from './pending-actions';
@@ -11,7 +12,7 @@ import { createSettingsService } from './settings';
 import { createRegistrationService } from './registration';
 import { createRevenueService } from './revenue-service';
 import { createHotelService } from './service';
-import { booking, czechProfile, double, room } from './test-fixtures';
+import { booking, czechProfile, double, plumber, room } from './test-fixtures';
 import { conversation, createMemoryRepositories } from './testing';
 
 const now = new Date('2026-05-10T08:00:00Z');
@@ -106,6 +107,7 @@ function setup() {
     lastNight: '2026-05-16',
     impact: 'high',
   });
+  repos.state.contacts.push(plumber);
   let n = 0;
   const newId = (prefix: string) => `${prefix}_${++n}`;
   const hotel = createHotelService({
@@ -136,6 +138,7 @@ function setup() {
       settings: createSettingsService({ repos, clock: () => now }),
       inbox: createInboxService({ repos, hotel, clock: () => now, newId }),
       events: createRevenueService({ repos, defaults: pricingConfig, clock: () => now, newId }),
+      contacts: createContactService({ repos, clock: () => now, newId }),
       clock: () => now,
       newId,
     }),
@@ -706,6 +709,62 @@ describe('pending actions', () => {
     expect(remove.summary).toBe('Remove the local event Jazz festival, 2026-05-15 to 2026-05-16');
     await actions.confirm(remove.id, manager);
     expect(repos.state.events.map((e) => e.name)).toEqual(['Marathon']);
+  });
+
+  it('adds a contact in the hotel language and changes only what a later proposal sends', async () => {
+    const { repos, actions } = setup();
+    const add = await actions.propose({
+      kind: 'save_contact',
+      input: { contactId: null, name: 'Test Electric', trades: ['electrical'], phone: '555 0111' },
+    });
+    expect(add.summary).toBe('Add the contact Test Electric (electrical)');
+    expect(add.details?.changes.map((c) => c.label)).toEqual(['Name', 'Does', 'Phone', 'Language']);
+    await actions.confirm(add.id);
+    const saved = repos.state.contacts.find((c) => c.name === 'Test Electric');
+    expect(saved).toMatchObject({ trades: ['electrical'], phone: '555 0111', language: 'cs' });
+
+    const edit = await actions.propose({
+      kind: 'save_contact',
+      input: { contactId: plumber.id, email: 'new@example.com' },
+    });
+    expect(edit.summary).toBe('Update the contact Test Plumbing: email');
+    expect(edit.details?.changes).toEqual([
+      {
+        label: 'Email',
+        before: { text: 'plumbing@example.com' },
+        after: { text: 'new@example.com' },
+      },
+    ]);
+    await actions.confirm(edit.id);
+    expect(repos.state.contacts.find((c) => c.id === plumber.id)).toMatchObject({
+      email: 'new@example.com',
+      phone: plumber.phone,
+    });
+    expect(repos.state.audit.at(-1)).toMatchObject({ actor: 'agent', action: 'contact.update' });
+  });
+
+  it('rejects a contact proposal that changes nothing or has no trade', async () => {
+    const { actions } = setup();
+    await expect(
+      actions.propose({
+        kind: 'save_contact',
+        input: { contactId: plumber.id, name: plumber.name },
+      }),
+    ).rejects.toThrow('Nothing about the contact changes');
+    await expect(
+      actions.propose({ kind: 'save_contact', input: { contactId: null, name: 'No trade' } }),
+    ).rejects.toThrow('trades');
+  });
+
+  it('removes a contact once confirmed', async () => {
+    const { repos, actions } = setup();
+    const remove = await actions.propose({
+      kind: 'remove_contact',
+      input: { contactId: plumber.id },
+    });
+    expect(remove.summary).toBe('Delete the contact Test Plumbing');
+    await actions.confirm(remove.id);
+    expect(repos.state.contacts).toEqual([]);
   });
 
   it('proposes changing a room, showing only what changes, and checks the new name', async () => {

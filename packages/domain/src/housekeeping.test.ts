@@ -18,6 +18,8 @@ function task(overrides: Partial<HousekeepingTask> & Pick<HousekeepingTask, 'roo
     type: 'turnover',
     status: 'open',
     notes: null,
+    trade: null,
+    contactId: null,
     createdAt: '2026-05-10T06:00:00.000Z',
     ...overrides,
   } satisfies HousekeepingTask;

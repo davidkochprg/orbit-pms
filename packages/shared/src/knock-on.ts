@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isoDateSchema } from './dates';
-import { bookingStatusSchema } from './enums';
+import { contactSchema } from './contacts';
+import { bookingStatusSchema, tradeSchema } from './enums';
 import { moneySchema } from './quote';
 
 /** A stay in a room that went out of order, and the free room it can move to. */
@@ -20,7 +21,8 @@ export type Relocation = z.infer<typeof relocationSchema>;
 
 /**
  * Something a change elsewhere made worth acting on, worked out from current data: stays booked
- * into a room that is out of order, or a guest's request that a room is free for again.
+ * into a room that is out of order, a guest's request that a room is free for again, or a repair
+ * nobody has been asked to fix yet.
  */
 export const knockOnSchema = z.discriminatedUnion('kind', [
   z.object({
@@ -41,6 +43,17 @@ export const knockOnSchema = z.discriminatedUnion('kind', [
     /** How many rooms are free for the request now, and the cheapest total among them. */
     rooms: z.number().int().positive(),
     fromTotal: moneySchema,
+  }),
+  z.object({
+    kind: z.literal('repair'),
+    id: z.string(),
+    taskId: z.string(),
+    roomId: z.string(),
+    roomName: z.string(),
+    issue: z.string(),
+    trade: tradeSchema,
+    /** The contact for the trade to ask first. */
+    contact: contactSchema,
   }),
 ]);
 export type KnockOn = z.infer<typeof knockOnSchema>;

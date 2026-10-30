@@ -1,10 +1,12 @@
-import type { RoomStatus } from '@orbit/shared';
+import type { RoomStatus, Trade } from '@orbit/shared';
 
 export interface ExpectedUpdate {
   room: string;
   status: RoomStatus | null;
   /** Whether the note reports something to fix. The wording is not scored. */
   issue: boolean;
+  /** The trades that would fix the issue; any one of them passes. Not scored when left out. */
+  trade?: Trade[];
 }
 
 export interface HousekeepingNoteFixture {
@@ -76,7 +78,7 @@ export const housekeepingNoteFixtures: HousekeepingNoteFixture[] = [
     id: 'hk_01',
     language: 'en',
     note: 'Room 104 is done. The bedside lamp is broken.',
-    expected: [{ room: '104', status: 'clean', issue: true }],
+    expected: [{ room: '104', status: 'clean', issue: true, trade: ['electrical', 'appliances'] }],
     unclear: false,
   },
   {
@@ -85,7 +87,7 @@ export const housekeepingNoteFixtures: HousekeepingNoteFixture[] = [
     note: 'Sto dva hotovo, sto tři taky. Ve sto třech kape kohoutek.',
     expected: [
       { room: '102', status: 'clean', issue: false },
-      { room: '103', status: 'clean', issue: true },
+      { room: '103', status: 'clean', issue: true, trade: ['plumbing'] },
     ],
     unclear: false,
   },
@@ -100,14 +102,16 @@ export const housekeepingNoteFixtures: HousekeepingNoteFixture[] = [
     id: 'hk_04',
     language: 'pl',
     note: 'Pokój 205 gotowy, brakuje ręczników.',
-    expected: [{ room: '205', status: 'clean', issue: true }],
+    expected: [{ room: '205', status: 'clean', issue: true, trade: ['supplies', 'cleaning'] }],
     unclear: false,
   },
   {
     id: 'hk_05',
     language: 'cs',
     note: 'Apartmán A2 nejde použít, teče voda ze stropu v koupelně.',
-    expected: [{ room: 'A2', status: 'out_of_order', issue: true }],
+    expected: [
+      { room: 'A2', status: 'out_of_order', issue: true, trade: ['plumbing', 'building'] },
+    ],
     unclear: false,
   },
   {
@@ -146,9 +150,30 @@ export const housekeepingNoteFixtures: HousekeepingNoteFixture[] = [
     language: 'de',
     note: 'A1 fertig, aber die Dusche in A1 ist kaputt. 202 bitte noch mal saugen.',
     expected: [
-      { room: 'A1', status: 'clean', issue: true },
+      { room: 'A1', status: 'clean', issue: true, trade: ['plumbing'] },
       { room: '202', status: 'dirty', issue: false },
     ],
+    unclear: false,
+  },
+  {
+    id: 'hk_11',
+    language: 'en',
+    note: "The shower in 104 keeps running, I can't turn it off.",
+    expected: [{ room: '104', status: null, issue: true, trade: ['plumbing'] }],
+    unclear: false,
+  },
+  {
+    id: 'hk_12',
+    language: 'cs',
+    note: 'Dvě stě šest uklizeno, ale netopí tam radiátor.',
+    expected: [{ room: '206', status: 'clean', issue: true, trade: ['heating'] }],
+    unclear: false,
+  },
+  {
+    id: 'hk_13',
+    language: 'en',
+    note: 'Wifi is down in 302 again.',
+    expected: [{ room: '302', status: null, issue: true, trade: ['internet'] }],
     unclear: false,
   },
 ];

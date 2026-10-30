@@ -47,6 +47,8 @@ const titles: Record<PendingAction['kind'], string> = {
   add_local_event: 'Add a local event',
   remove_local_event: 'Remove a local event',
   update_room: 'Change the room',
+  save_contact: 'Save a contact',
+  remove_contact: 'Delete a contact',
 };
 
 /** The conversation an action is about, to open once it is done. */

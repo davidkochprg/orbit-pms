@@ -148,6 +148,13 @@
       "when": 1793317024303,
       "tag": "0020_local_events",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793361614054,
+      "tag": "0021_contacts",
+      "breakpoints": true
     }
   ]
 }

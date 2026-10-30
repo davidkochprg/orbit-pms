@@ -1,14 +1,16 @@
-import type { KnockOn } from '@orbit/shared';
-import { BedDouble, CalendarCheck, X } from 'lucide-react';
+import { type KnockOn, tradeLabels } from '@orbit/shared';
+import { BedDouble, CalendarCheck, Mail, Phone, Wrench, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { RoomBadge } from '@/components/agent-mention';
 import { ErrorNotice } from '@/components/error-notice';
+import { RepairDialog } from '@/components/repair-panel';
 import { Button } from '@/components/ui/button';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useToast } from '@/hooks/use-toast';
-import { useKnockOns, useRefreshInboxRooms, useRelocate } from '@/lib/api';
+import { useAskToRepair, useKnockOns, useRefreshInboxRooms, useRelocate } from '@/lib/api';
 import { formatMoney, formatRange } from '@/lib/format';
+import { contactName, telHref } from '@/lib/repairs';
 
 const DISMISSED_KEY = 'orbit.knockOns.dismissed';
 
@@ -23,8 +25,8 @@ function loadDismissed(): string[] {
 
 /**
  * What a change made worth doing next, in the corner of whatever page staff are on: stays to move
- * out of a room that went out of order, a request a room is free for again. Each has its fix one
- * click away; "Not now" hides it until the situation changes.
+ * out of a room that went out of order, a request a room is free for again, a repair nobody was
+ * asked to fix. Each has its fix one click away; "Not now" hides it until the situation changes.
  */
 export function KnockOnStack() {
   const knockOns = useKnockOns();
@@ -51,8 +53,10 @@ export function KnockOnStack() {
       {shown.map((k) =>
         k.kind === 'relocate' ? (
           <Relocate key={k.id} knockOn={k} onDismiss={() => dismiss(k.id)} />
-        ) : (
+        ) : k.kind === 'opening' ? (
           <Opening key={k.id} knockOn={k} onDismiss={() => dismiss(k.id)} />
+        ) : (
+          <Repair key={k.id} knockOn={k} onDismiss={() => dismiss(k.id)} />
         ),
       )}
     </div>
@@ -195,6 +199,49 @@ function Opening({
       >
         Offer a room
       </Button>
+    </Card>
+  );
+}
+
+function Repair({
+  knockOn,
+  onDismiss,
+}: {
+  knockOn: Extract<KnockOn, { kind: 'repair' }>;
+  onDismiss: () => void;
+}) {
+  const ask = useAskToRepair(knockOn.taskId);
+  const [writing, setWriting] = useState(false);
+  const { contact } = knockOn;
+
+  return (
+    <Card
+      icon={<Wrench />}
+      title={`Room ${knockOn.roomName}: ${knockOn.issue}`}
+      onDismiss={onDismiss}
+    >
+      <p className="flex flex-col">
+        <span>{contactName(contact)}</span>
+        <span className="text-xs text-muted-foreground">{tradeLabels[knockOn.trade]}</span>
+      </p>
+      {ask.error && <ErrorNotice message={ask.error.message} />}
+      <span className="flex items-center justify-end gap-1.5">
+        {contact.phone && (
+          <Button asChild variant="outline" size="sm">
+            <a href={telHref(contact.phone)} onClick={() => ask.mutate(contact.id)}>
+              <Phone /> {contact.phone}
+            </a>
+          </Button>
+        )}
+        <Button size="sm" onClick={() => setWriting(true)}>
+          <Mail /> {contact.email ? 'Email' : 'Contacts'}
+        </Button>
+      </span>
+      <RepairDialog
+        taskId={writing ? knockOn.taskId : null}
+        writeTo={contact.email ? contact.id : undefined}
+        onOpenChange={setWriting}
+      />
     </Card>
   );
 }

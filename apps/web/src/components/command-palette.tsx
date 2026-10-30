@@ -1,11 +1,17 @@
 import { Chat, useChat } from '@ai-sdk/react';
-import { type AgentContext, hotelInfoCategoryLabels, withoutLinks } from '@orbit/shared';
+import {
+  type AgentContext,
+  hotelInfoCategoryLabels,
+  tradeLabels,
+  withoutLinks,
+} from '@orbit/shared';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { BorderBeam } from 'border-beam';
 import { Command as CommandPrimitive } from 'cmdk';
 import {
   ArrowLeft,
   CalendarPlus,
+  Contact,
   CornerDownLeft,
   LogIn,
   LogOut,
@@ -59,6 +65,7 @@ import {
 import { paletteMatch } from '@/lib/palette-match';
 import { followUps } from '@/lib/agent-follow-ups';
 import {
+  useContacts,
   useDayOverview,
   useGuests,
   useHealth,
@@ -308,6 +315,7 @@ function SearchView({
   const health = useHealth();
   const guests = useGuests();
   const notes = useHotelInfo();
+  const contacts = useContacts();
   const day = useDayOverview();
   const aiOn = health.data?.ai.configured ?? false;
   const query = text.trim();
@@ -338,7 +346,7 @@ function SearchView({
           autoFocus
           value={text}
           onValueChange={onTextChange}
-          placeholder={aiOn ? 'Ask Orbit or search…' : 'Search guests, notes and pages…'}
+          placeholder={aiOn ? 'Ask Orbit or search…' : 'Search guests, notes, contacts and pages…'}
           className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-subtle-foreground"
         />
       </InputRow>
@@ -457,6 +465,27 @@ function SearchView({
                 </Item>
               );
             })}
+          </CommandPrimitive.Group>
+        )}
+
+        {query && contacts.data && (
+          <CommandPrimitive.Group heading="Contacts">
+            {contacts.data.map((c) => (
+              <Item
+                key={c.id}
+                value={c.name}
+                keywords={[c.person ?? '', ...c.trades.map((t) => tradeLabels[t])]}
+                onSelect={run(() => void navigate(`/contacts?contact=${encodeURIComponent(c.id)}`))}
+              >
+                <Contact />
+                <span className="max-w-1/2 shrink-0 truncate">{c.name}</span>
+                <span className="min-w-0 truncate text-muted-foreground">
+                  {[c.trades.map((t) => tradeLabels[t]).join(', '), c.phone]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+              </Item>
+            ))}
           </CommandPrimitive.Group>
         )}
 

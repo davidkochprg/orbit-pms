@@ -2,6 +2,7 @@ import type {
   AuditLogEntry,
   Booking,
   Charge,
+  Contact,
   Guest,
   HotelProfile,
   HousekeepingTask,
@@ -76,6 +77,7 @@ export interface MemoryState {
   idScans: IdScan[];
   stayReadings: SavedStayReading[];
   events: LocalEvent[];
+  contacts: Contact[];
 }
 
 function inBilling<T extends { bookingId: string }>(
@@ -116,6 +118,7 @@ export function createMemoryRepositories(
     idScans: [],
     stayReadings: [],
     events: [],
+    contacts: [],
     ...clone(initial),
   };
 
@@ -384,6 +387,18 @@ export function createMemoryRepositories(
       },
       delete: (id) => {
         state.events = state.events.filter((e) => e.id !== id);
+        return Promise.resolve();
+      },
+    },
+    contacts: {
+      list: () => Promise.resolve([...state.contacts].sort((a, b) => a.name.localeCompare(b.name))),
+      get: (id) => Promise.resolve(state.contacts.find((c) => c.id === id) ?? null),
+      save: (contact) => {
+        state.contacts = [...state.contacts.filter((c) => c.id !== contact.id), contact];
+        return Promise.resolve();
+      },
+      delete: (id) => {
+        state.contacts = state.contacts.filter((c) => c.id !== id);
         return Promise.resolve();
       },
     },

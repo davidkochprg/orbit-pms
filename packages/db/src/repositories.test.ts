@@ -257,12 +257,17 @@ describe('housekeeping tasks (PGlite)', () => {
       type: 'maintenance' as const,
       status: 'open' as const,
       notes: 'Lamp broken',
+      trade: 'electrical' as const,
+      contactId: null,
       createdAt: '2026-10-27T09:00:00.000Z',
     };
     await repos.housekeeping.createTask(task);
     expect(await repos.housekeeping.getTask('hk_test')).toEqual(task);
-    await repos.housekeeping.updateTask({ ...task, status: 'done' });
-    expect((await repos.housekeeping.getTask('hk_test'))?.status).toBe('done');
+    await repos.housekeeping.updateTask({ ...task, status: 'done', contactId: 'ct_electric' });
+    expect(await repos.housekeeping.getTask('hk_test')).toMatchObject({
+      status: 'done',
+      contactId: 'ct_electric',
+    });
     expect(await repos.housekeeping.getTask('nope')).toBeNull();
   });
 });
@@ -557,5 +562,28 @@ describe('local events (PGlite)', () => {
     expect((await repos.events.list())[0]).toEqual(event);
     await repos.events.delete('evt_test');
     expect(await repos.events.list()).toEqual(listed);
+  });
+});
+
+describe('contacts (PGlite)', () => {
+  it('lists seeded contacts by name, and creates, replaces and deletes one', async () => {
+    const listed = await repos.contacts.list();
+    expect(listed).toEqual([...seed.contacts].sort((a, b) => a.name.localeCompare(b.name)));
+    const contact = {
+      id: 'ct_test',
+      name: 'Aaa Test Plumbing',
+      person: null,
+      trades: ['plumbing' as const, 'heating' as const],
+      phone: '555 0100',
+      email: null,
+      language: 'en' as const,
+      notes: null,
+    };
+    await repos.contacts.save(contact);
+    expect(await repos.contacts.get('ct_test')).toEqual(contact);
+    await repos.contacts.save({ ...contact, email: 'test@example.com' });
+    expect((await repos.contacts.list())[0]).toEqual({ ...contact, email: 'test@example.com' });
+    await repos.contacts.delete('ct_test');
+    expect(await repos.contacts.get('ct_test')).toBeNull();
   });
 });

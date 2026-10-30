@@ -11,6 +11,7 @@ import {
   languageSchema,
   roomKindSchema,
   roomStatusSchema,
+  tradeSchema,
 } from './enums';
 import { inboxMessageSchema, inquiryExtractionSchema, inquirySuggestionSchema } from './inquiry';
 import { moneySchema, quoteAddonsSchema, quoteSchema } from './quote';
@@ -99,6 +100,10 @@ export const housekeepingTaskSchema = z.object({
   type: housekeepingTaskTypeSchema,
   status: housekeepingTaskStatusSchema,
   notes: z.string().nullable(),
+  /** Who fixes it, for a repair; null for cleaning or when it isn't clear. */
+  trade: tradeSchema.nullable(),
+  /** The contact asked to fix it, once someone has been called or emailed. */
+  contactId: z.string().nullable(),
   createdAt: z.iso.datetime(),
 });
 export type HousekeepingTask = z.infer<typeof housekeepingTaskSchema>;

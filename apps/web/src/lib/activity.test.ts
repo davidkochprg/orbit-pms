@@ -22,6 +22,18 @@ describe('activityDetail', () => {
     expect(activityDetail('booking.add_guest', { stayGuestId: 'sg_2', fields: [] })).toBe(null);
   });
 
+  it('names the contact a change or a repair was about', () => {
+    expect(activityDetail('contact.create', { id: 'ct_1', name: 'Example Plumbing' })).toBe(
+      'Example Plumbing',
+    );
+    expect(
+      activityDetail('contact.update', { before: { name: 'Old' }, after: { name: 'New' } }),
+    ).toBe('New');
+    expect(
+      activityDetail('task.contact', { contactName: 'Example Plumbing', issue: 'Tap drips.' }),
+    ).toBe('Example Plumbing: Tap drips.');
+  });
+
   it('summarises money, status and changed fields', () => {
     expect(activityDetail('folio.payment', { amount: 4500, method: 'bank_transfer' })).toBe(
       '$4,500 by bank transfer',

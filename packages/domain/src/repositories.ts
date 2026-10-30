@@ -4,6 +4,7 @@ import type {
   Booking,
   BookingStatus,
   Charge,
+  Contact,
   Guest,
   HotelProfile,
   HousekeepingTask,
@@ -191,6 +192,16 @@ export interface StayReadingRepository {
   save(reading: SavedStayReading): Promise<void>;
 }
 
+/** Suppliers and contractors the hotel calls. */
+export interface ContactRepository {
+  /** By name. */
+  list(): Promise<Contact[]>;
+  get(id: string): Promise<Contact | null>;
+  /** Creates or replaces a contact. */
+  save(contact: Contact): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+
 export interface Repositories {
   rooms: RoomRepository;
   bookings: BookingRepository;
@@ -206,6 +217,7 @@ export interface Repositories {
   idScans: IdScanRepository;
   stayReadings: StayReadingRepository;
   events: LocalEventRepository;
+  contacts: ContactRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

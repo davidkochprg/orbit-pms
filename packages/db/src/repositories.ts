@@ -5,6 +5,7 @@ import type {
   BillingRepository,
   BookingFilter,
   BookingRepository,
+  ContactRepository,
   GuestRepository,
   HousekeepingRepository,
   InquiryRepository,
@@ -53,6 +54,7 @@ import {
   auditLog,
   bookings,
   charges,
+  contacts,
   guests,
   hotelProfile,
   housekeepingTasks,
@@ -576,6 +578,36 @@ function stayReadingRepository(db: Db): StayReadingRepository {
   };
 }
 
+function contactRepository(db: Db): ContactRepository {
+  const columns = {
+    id: contacts.id,
+    name: contacts.name,
+    person: contacts.person,
+    trades: contacts.trades,
+    phone: contacts.phone,
+    email: contacts.email,
+    language: contacts.language,
+    notes: contacts.notes,
+  };
+  return {
+    list: () => db.select(columns).from(contacts).orderBy(asc(contacts.name), asc(contacts.id)),
+    async get(id) {
+      const [row] = await db.select(columns).from(contacts).where(eq(contacts.id, id));
+      return row ?? null;
+    },
+    async save(contact) {
+      const { id: _, ...fields } = contact;
+      await db
+        .insert(contacts)
+        .values(contact)
+        .onConflictDoUpdate({ target: contacts.id, set: fields });
+    },
+    async delete(id) {
+      await db.delete(contacts).where(eq(contacts.id, id));
+    },
+  };
+}
+
 function localEventRepository(db: Db): LocalEventRepository {
   return {
     async list() {
@@ -610,6 +642,7 @@ export function createRepositories(db: Db): Repositories {
     idScans: idScanRepository(db),
     stayReadings: stayReadingRepository(db),
     events: localEventRepository(db),
+    contacts: contactRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

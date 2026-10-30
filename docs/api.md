@@ -200,10 +200,28 @@ Conversations with guests by email, web form, phone note and OTA messaging ([ADR
 | `GET /api/housekeeping`                   |                                                                 | `{ date, rooms: HousekeepingRoom[] }`: each room with `roomTypeName`, `occupancy` (`turnover`, `arriving`, `departing`, `staying`, `vacant`), `guestName`, `urgent`, `effort` (`light`, `standard`, `heavy` or null), `cues`, `openTasks`; and `unreadStays`. Urgent rooms first, heavier cleans first within the same occupancy. |
 | `POST /api/housekeeping/read-stays`       |                                                                 | The board, after the model read up to 12 unread stays' notes. Returns at once, without a model call, when none are unread. 503 `ai_not_configured`, 429 `demo_limit`.                                                                                                                                                             |
 | `POST /api/rooms/:id/status`              | `{ status }`                                                    | `Room`. 409 `invalid_transition` from `out_of_order` straight to `clean` or `inspected`.                                                                                                                                                                                                                                          |
-| `POST /api/housekeeping/tasks`            | `{ roomId, type, notes }`                                       | 201 `HousekeepingTask`. 400 `invalid_input` for a maintenance task without notes.                                                                                                                                                                                                                                                 |
+| `POST /api/housekeeping/tasks`            | `{ roomId, type, notes, trade? }`                               | 201 `HousekeepingTask`. A repair without `trade` gets one from the model when AI is on and within the limit, else null. 400 `invalid_input` for a maintenance task without notes.                                                                                                                                                 |
 | `POST /api/housekeeping/tasks/:id/status` | `{ status }`                                                    | `HousekeepingTask`                                                                                                                                                                                                                                                                                                                |
 | `POST /api/housekeeping/notes`            | `{ text }`                                                      | `HousekeepingNoteResult`: `{ transcript, changes, skipped, unclear }`. Changes are already applied, as the agent. 503 `ai_not_configured`, 429 `demo_limit`.                                                                                                                                                                      |
 | `POST /api/housekeeping/voice`            | multipart, `audio`: WAV (mono 16-bit PCM, 16 kHz), at most 5 MB | `HousekeepingNoteResult` with the transcript. 400 if not WAV, 413 if too large, 502 `transcription_failed`, 503 when voice is not configured.                                                                                                                                                                                     |
+
+## Contacts and repairs
+
+### `GET /api/contacts`, `POST /api/contacts`, `PUT /api/contacts/:id`, `DELETE /api/contacts/:id`
+
+Suppliers and contractors, by name. The body is `contactBodySchema`: `name`, `person`, `trades` (1 to 4), `phone`, `email`, `language`, `notes`; empty strings save as null. `DELETE` answers 204.
+
+### `GET /api/housekeeping/tasks/:id/repair`
+
+A maintenance task as a `Repair`: the task, its room name, `access` (`guestName`, `freeFrom`, `freeUntil`), the contacts for its trade and the contact already asked. 400 for a cleaning task.
+
+### `POST /api/housekeeping/tasks/:id/contact`
+
+`{ contactId }`. Records that the contact was asked to fix the repair and starts the task. Returns the task.
+
+### `POST /api/housekeeping/tasks/:id/work-order`
+
+`{ contactId }`. Drafts the email asking the contact to come (Muse Spark Open, falling back to Muse Spark), in the contact's language, signed by the staff member in `x-staff-id`. Returns `{ to, subject, body }`; nothing is sent. 503 without AI, 429 over the demo limit.
 
 ## Knock-ons
 

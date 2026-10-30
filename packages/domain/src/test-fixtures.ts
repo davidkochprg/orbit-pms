@@ -1,4 +1,4 @@
-import type { Booking, HotelProfile, Room, RoomType } from '@orbit/shared';
+import type { Booking, Contact, HotelProfile, Room, RoomType } from '@orbit/shared';
 import { emptyHotelProfile } from './settings';
 
 export const double: RoomType = {
@@ -51,3 +51,14 @@ export function booking(overrides: Partial<Booking> & Pick<Booking, 'roomId'>): 
 
 /** A hotel in Czechia, where the guest book records everyone in the room. */
 export const czechProfile: HotelProfile = { ...emptyHotelProfile, country: 'CZ', language: 'cs' };
+
+export const plumber: Contact = {
+  id: 'ct_plumber',
+  name: 'Test Plumbing',
+  person: null,
+  trades: ['plumbing'],
+  phone: '+1 555 0100',
+  email: 'plumbing@example.com',
+  language: 'en',
+  notes: null,
+};

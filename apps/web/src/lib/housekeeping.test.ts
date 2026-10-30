@@ -14,6 +14,8 @@ const task = (overrides: Partial<HousekeepingTask>): HousekeepingTask => ({
   roomId: 'rm_104',
   type: 'maintenance',
   status: 'open',
+  trade: null,
+  contactId: null,
   notes: 'Bedside lamp is broken.',
   createdAt: '2026-10-27T08:00:00.000Z',
   ...overrides,

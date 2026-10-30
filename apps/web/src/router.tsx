@@ -6,6 +6,7 @@ import { DashboardPage } from '@/pages/dashboard';
 import { GuestDetailPage } from '@/pages/guest-detail';
 import { ReportsPage } from '@/pages/reports';
 import { ActivityPage } from '@/pages/activity';
+import { ContactsPage } from '@/pages/contacts';
 import { GuestsPage } from '@/pages/guests';
 import { InboxPage } from '@/pages/inbox';
 import { HousekeepingPage } from '@/pages/housekeeping';
@@ -45,6 +46,7 @@ export const router = createBrowserRouter([
               { path: 'reports', element: <ReportsPage /> },
               { path: 'activity', element: <ActivityPage /> },
               { path: 'knowledge', element: <KnowledgePage /> },
+              { path: 'contacts', element: <ContactsPage /> },
               { path: 'settings/:section?', element: <SettingsPage /> },
               { path: '*', element: <NotFoundPage /> },
             ],

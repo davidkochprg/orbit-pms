@@ -1,6 +1,7 @@
 import {
   type ActivityService,
   type BillingService,
+  type ContactService,
   DomainError,
   type HotelService,
   type HousekeepingService,
@@ -20,6 +21,8 @@ import {
   bookingPatchSchema,
   bookingSearchSchema,
   chargePatchSchema,
+  type Contact,
+  contactProposalSchema,
   createHoldInputSchema,
   currencySchema,
   type Guest,
@@ -50,6 +53,7 @@ import {
   roomBodySchema,
   roomStatusSchema,
   stayGuestPatchSchema,
+  tradeSchema,
 } from '@orbit/shared';
 import { type JSONValue, tool } from 'ai';
 import { compactOutlook } from './outlook';
@@ -87,6 +91,8 @@ export interface ToolDeps {
   listEvents: () => Promise<LocalEvent[]>;
   /** Amounts the hotel facts state, e.g. a fee, which a reply may repeat. */
   statedAmounts: () => Promise<number[]>;
+  /** Suppliers and contractors, and who was asked to fix a repair. */
+  contacts: Pick<ContactService, 'list' | 'repair' | 'askToRepair'>;
 }
 
 export interface ToolError {
@@ -292,6 +298,8 @@ export const proposalToolNames = [
   'addLocalEvent',
   'removeLocalEvent',
   'updateRoom',
+  'saveContact',
+  'removeContact',
 ] as const;
 
 /** Tools that change data straight away: housekeeping is low-risk and reversible (ADR 0006). */
@@ -299,7 +307,19 @@ export const directToolNames = [
   'setRoomStatus',
   'createHousekeepingTask',
   'setTaskStatus',
+  'recordRepairContact',
 ] as const;
+
+/** A contact as the model sees it: the ID to use, and how to reach them. */
+const compactContact = (c: Contact) => ({
+  contactId: c.id,
+  name: c.name,
+  person: c.person,
+  trades: c.trades,
+  phone: c.phone,
+  email: c.email,
+  notes: c.notes,
+});
 
 /**
  * Agent tools: thin wrappers over the same domain services the REST API uses. Read tools and
@@ -324,6 +344,7 @@ export function createAgentTools({
   guestBookings,
   listEvents,
   statedAmounts,
+  contacts,
 }: ToolDeps) {
   const propose = (input: PendingActionInput) =>
     safely(async () => toProposal(await actions.propose(input)));
@@ -717,7 +738,7 @@ export function createAgentTools({
     }),
     createHousekeepingTask: tool({
       description:
-        'Create a housekeeping task for a room: "maintenance" for something to repair (notes must say what), "turnover" or "stayover" for cleaning. This takes effect immediately, without a confirm card, and is logged; say that it is done.',
+        'Create a housekeeping task for a room: "maintenance" for something to repair (notes must say what, and trade who fixes it: plumbing, electrical, heating, appliances, internet, locks, pests, building, cleaning or supplies), "turnover" or "stayover" for cleaning. This takes effect immediately, without a confirm card, and is logged; say that it is done. After a repair, offer to find who can fix it with getRepair.',
       inputSchema: newTaskBodySchema,
       execute: (input) =>
         safely(async () => {
@@ -749,6 +770,48 @@ export function createAgentTools({
           };
           return result;
         }),
+    }),
+    listContacts: tool({
+      description:
+        "The hotel's suppliers and contractors: their contactId, name, who to ask for, trades (what they fix or supply), phone, email and notes. Pass a trade to list only those.",
+      inputSchema: z.object({ trade: tradeSchema.optional() }),
+      execute: ({ trade }) =>
+        safely(async () =>
+          (await contacts.list())
+            .filter((c) => !trade || c.trades.includes(trade))
+            .map(compactContact),
+        ),
+    }),
+    getRepair: tool({
+      description:
+        'A repair task with who can fix it: contacts for its trade (the one asked last time first) with their phone and email, who was already asked, and when the room is free to work in (freeFrom to freeUntil; guestName is who stays until freeFrom). The app shows it as a card where staff call or email them, and the email is drafted there, so name the contact and their phone and do not write the email yourself. The taskId comes from getHousekeeping or createHousekeepingTask.',
+      inputSchema: z.object({ taskId: z.string().describe('Task ID, e.g. "hk_012".') }),
+      execute: ({ taskId }) => safely(() => contacts.repair(taskId)),
+    }),
+    recordRepairContact: tool({
+      description:
+        'Record that staff asked a contact to fix a repair, e.g. "I called the plumber about 203": the task moves to in progress with that contact. This takes effect immediately and is logged; say that it is done.',
+      inputSchema: z.object({
+        taskId: z.string().describe('Task ID, e.g. "hk_012".'),
+        contactId: z.string().describe('The contactId, from listContacts or getRepair.'),
+      }),
+      execute: ({ taskId, contactId }) =>
+        safely(async () => {
+          const task = await contacts.askToRepair(taskId, contactId, 'agent');
+          return { done: true, roomName: await roomName(task.roomId), task };
+        }),
+    }),
+    saveContact: tool({
+      description:
+        "Propose adding a supplier or contractor (leave out contactId; name and trades are required) or changing one (send its contactId and only the fields that change; an empty string clears a field). language is the language to write to them in (cs, de, en, pl); a new contact gets the hotel's when left out. The user must confirm.",
+      inputSchema: contactProposalSchema,
+      execute: (input) => propose({ kind: 'save_contact', input }),
+    }),
+    removeContact: tool({
+      description:
+        'Propose deleting a supplier or contractor by its contactId from listContacts. The user must confirm.',
+      inputSchema: z.object({ contactId: z.string() }),
+      execute: (input) => propose({ kind: 'remove_contact', input }),
     }),
   };
 }

@@ -10,6 +10,7 @@ import type {
   RoomType,
 } from '@orbit/shared';
 import { blocksRoom, findConflicts, fitsRoomType } from './availability';
+import { contactsForTrade } from './contacts';
 import { addDays, hotelToday } from './dates';
 import { stayRequest } from './inbox';
 import type { HotelPolicy } from './policy';
@@ -176,6 +177,32 @@ export function createKnockOnService({ repos, hotel, policy, clock }: KnockOnDep
     return found;
   }
 
+  /** Open repairs nobody was asked to fix yet, with the contact to ask first. */
+  async function repairs(): Promise<KnockOn[]> {
+    const tasks = await repos.housekeeping.listTasks();
+    const open = tasks.filter(
+      (t) => t.type === 'maintenance' && t.status === 'open' && !t.contactId && t.trade,
+    );
+    if (open.length === 0) return [];
+    const [contacts, rooms] = await Promise.all([repos.contacts.list(), repos.rooms.listRooms()]);
+    return open.flatMap((task): KnockOn[] => {
+      const contact = contactsForTrade(task.trade, contacts, tasks)[0];
+      if (!contact || !task.trade) return [];
+      return [
+        {
+          kind: 'repair',
+          id: `repair:${task.id}`,
+          taskId: task.id,
+          roomId: task.roomId,
+          roomName: rooms.find((r) => r.id === task.roomId)?.name ?? task.roomId,
+          issue: task.notes ?? 'Repair',
+          trade: task.trade,
+          contact,
+        },
+      ];
+    });
+  }
+
   return {
     /** Where the stays still to come in an out-of-order room can go; none for a working room. */
     async relocationsFor(roomId: string): Promise<Relocation[]> {
@@ -187,7 +214,7 @@ export function createKnockOnService({ repos, hotel, policy, clock }: KnockOnDep
     async list(): Promise<KnockOn[]> {
       const now = clock();
       const today = hotelToday(now);
-      return [...(await relocations(today, now)), ...(await openings(today))];
+      return [...(await relocations(today, now)), ...(await openings(today)), ...(await repairs())];
     },
 
     /** Moves the stays, each checked as any move is; stops at the first that is no longer valid. */

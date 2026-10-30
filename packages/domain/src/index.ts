@@ -4,6 +4,7 @@ export * from './billing';
 export * from './bookings';
 export * from './brief';
 export * from './cleaning-effort';
+export * from './contacts';
 export * from './dates';
 export * from './day';
 export * from './errors';

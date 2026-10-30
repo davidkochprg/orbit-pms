@@ -1,4 +1,9 @@
-import { type HousekeepingNotePipeline, type StayNotesReader, TranscriptionError } from '@orbit/ai';
+import {
+  type HousekeepingNotePipeline,
+  type RepairDesk,
+  type StayNotesReader,
+  TranscriptionError,
+} from '@orbit/ai';
 import type { HousekeepingService } from '@orbit/domain';
 import {
   housekeepingNoteBodySchema,
@@ -20,6 +25,8 @@ export interface HousekeepingRouteDeps {
   notes: HousekeepingNotePipeline | null;
   /** Null when AI is not configured. */
   stays: StayNotesReader | null;
+  /** Works out who fixes a repair added by hand; null when AI is not configured. */
+  desk: RepairDesk | null;
   gate: AiGate;
 }
 
@@ -32,7 +39,22 @@ function isWav(bytes: Uint8Array): boolean {
  * Room status, housekeeping tasks, notes the agent applies (ADR 0006), and reading stays' notes
  * for the board's cleaning effort.
  */
-export function housekeepingRoutes({ housekeeping, notes, stays, gate }: HousekeepingRouteDeps) {
+export function housekeepingRoutes({
+  housekeeping,
+  notes,
+  stays,
+  desk,
+  gate,
+}: HousekeepingRouteDeps) {
+  /** Who fixes a repair, when the model can say; the task is added either way. */
+  async function tradeFor(issue: string | null, ip: string | undefined) {
+    if (!desk || !issue || (await gate(ip))) return null;
+    return desk.trade(issue).catch((err: unknown) => {
+      console.warn('Could not work out the trade of a repair:', err);
+      return null;
+    });
+  }
+
   return new Hono()
     .get('/housekeeping', async (c) => c.json(await housekeeping.board()))
     .post('/housekeeping/read-stays', async (c) => {
@@ -52,9 +74,14 @@ export function housekeepingRoutes({ housekeeping, notes, stays, gate }: Houseke
         await housekeeping.setRoomStatus(c.req.param('id'), c.req.valid('json').status, 'user'),
       ),
     )
-    .post('/housekeeping/tasks', validate('json', newTaskBodySchema), async (c) =>
-      c.json(await housekeeping.createTask(c.req.valid('json'), 'user'), 201),
-    )
+    .post('/housekeeping/tasks', validate('json', newTaskBodySchema), async (c) => {
+      const body = c.req.valid('json');
+      const trade =
+        body.type === 'maintenance' && body.trade === undefined
+          ? await tradeFor(body.notes, c.req.header('x-forwarded-for'))
+          : body.trade;
+      return c.json(await housekeeping.createTask({ ...body, trade }, 'user'), 201);
+    })
     .post('/housekeeping/tasks/:id/status', validate('json', taskStatusBodySchema), async (c) =>
       c.json(
         await housekeeping.setTaskStatus(c.req.param('id'), c.req.valid('json').status, 'user'),

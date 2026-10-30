@@ -5,6 +5,7 @@ import {
   housekeepingTaskStatusSchema,
   housekeepingTaskTypeSchema,
   roomStatusSchema,
+  tradeSchema,
 } from './enums';
 
 /** What happens in a room today, from the bookings. `turnover` = one guest leaves, another arrives. */
@@ -49,6 +50,8 @@ export const newTaskBodySchema = z.object({
   roomId: z.string().min(1),
   type: housekeepingTaskTypeSchema,
   notes: z.string().trim().max(500).nullable().default(null),
+  /** Who fixes a repair; worked out from the notes when left out. */
+  trade: tradeSchema.nullable().optional(),
 });
 export type NewTaskBody = z.infer<typeof newTaskBodySchema>;
 
@@ -68,6 +71,8 @@ export const housekeepingNoteReadingSchema = z.object({
       status: roomStatusSchema.nullable(),
       /** Something broken or missing that needs a maintenance task, in English. */
       issue: z.string().nullable(),
+      /** Who fixes the issue; null without an issue. A missing or unknown one reads as null. */
+      trade: tradeSchema.nullable().catch(null),
     }),
   ),
   /** Anything the model could not map to a room or status, in English. */

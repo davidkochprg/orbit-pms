@@ -50,7 +50,7 @@ describe('scoreExtraction', () => {
 describe('scoreHousekeepingNote', () => {
   const fixture = {
     expected: [
-      { room: 'A1', status: 'clean' as const, issue: true },
+      { room: 'A1', status: 'clean' as const, issue: true, trade: ['plumbing' as const] },
       { room: '202', status: 'dirty' as const, issue: false },
     ],
     unclear: false,
@@ -59,8 +59,8 @@ describe('scoreHousekeepingNote', () => {
   it('passes matching rooms, statuses and issues, ignoring room case and issue wording', () => {
     const result = scoreHousekeepingNote(fixture, {
       updates: [
-        { room: 'a1', status: 'clean', issue: 'Shower broken.' },
-        { room: '202', status: 'dirty', issue: null },
+        { room: 'a1', status: 'clean', issue: 'Shower broken.', trade: 'plumbing' },
+        { room: '202', status: 'dirty', issue: null, trade: null },
       ],
       unclear: null,
     });
@@ -70,9 +70,9 @@ describe('scoreHousekeepingNote', () => {
   it('reads several updates for one room together', () => {
     const result = scoreHousekeepingNote(fixture, {
       updates: [
-        { room: 'A1', status: 'clean', issue: null },
-        { room: 'A1', status: null, issue: 'Shower broken.' },
-        { room: '202', status: 'dirty', issue: null },
+        { room: 'A1', status: 'clean', issue: null, trade: null },
+        { room: 'A1', status: null, issue: 'Shower broken.', trade: 'plumbing' },
+        { room: '202', status: 'dirty', issue: null, trade: null },
       ],
       unclear: null,
     });
@@ -82,8 +82,8 @@ describe('scoreHousekeepingNote', () => {
   it('reports wrong statuses, missing issues, extra rooms and unexpected unclear notes', () => {
     const result = scoreHousekeepingNote(fixture, {
       updates: [
-        { room: 'A1', status: 'inspected', issue: null },
-        { room: '305', status: 'clean', issue: null },
+        { room: 'A1', status: 'inspected', issue: null, trade: null },
+        { room: '305', status: 'clean', issue: null, trade: null },
       ],
       unclear: 'Something else.',
     });
@@ -94,6 +94,17 @@ describe('scoreHousekeepingNote', () => {
       'unexpected 305',
       'unexpected unclear',
     ]);
+  });
+
+  it('reports an issue sent to the wrong trade', () => {
+    const result = scoreHousekeepingNote(fixture, {
+      updates: [
+        { room: 'A1', status: 'clean', issue: 'Shower broken.', trade: 'electrical' },
+        { room: '202', status: 'dirty', issue: null, trade: null },
+      ],
+      unclear: null,
+    });
+    expect(result.problems).toEqual(['A1 trade electrical not plumbing']);
   });
 });
 

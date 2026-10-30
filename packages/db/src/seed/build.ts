@@ -12,6 +12,7 @@ import type {
   Booking,
   BookingSource,
   Charge,
+  Contact,
   Guest,
   HotelProfile,
   HousekeepingTask,
@@ -28,6 +29,7 @@ import type {
 import { buildActivity } from './activity';
 import { buildBilling } from './billing';
 import { seedGuests, seedRooms } from './catalog';
+import { buildContacts } from './contacts';
 import { buildConversations } from './conversations';
 import { buildEvents } from './events';
 import { regionSeeds, type SeedRegion } from './regions';
@@ -52,6 +54,7 @@ export interface SeedData {
   auditLog: AuditLogEntry[];
   /** Mock local events behind suggested rates. */
   events: LocalEvent[];
+  contacts: Contact[];
 }
 
 /** Share of rooms the seed books for the biggest event, leaving a few free for inbox requests. */
@@ -301,13 +304,39 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
   }));
 
   const createdAt = now.toISOString();
+  const cleaning = { trade: null, contactId: null, status: 'open' as const };
   const housekeepingTasks: HousekeepingTask[] = [
-    ...[...departingToday].map((roomId) => ({ roomId, type: 'turnover' as const, notes: null })),
-    ...inHouse.map((b) => ({ roomId: b.roomId, type: 'stayover' as const, notes: null })),
-    { roomId: 'rm_203', type: 'maintenance' as const, notes: 'Bathroom tap is dripping.' },
+    ...[...departingToday].map((roomId) => ({
+      roomId,
+      type: 'turnover' as const,
+      notes: null,
+      ...cleaning,
+    })),
+    ...inHouse.map((b) => ({
+      roomId: b.roomId,
+      type: 'stayover' as const,
+      notes: null,
+      ...cleaning,
+    })),
+    // Nobody asked yet: Orbit suggests the plumber.
+    {
+      roomId: 'rm_203',
+      type: 'maintenance' as const,
+      notes: 'Bathroom tap is dripping.',
+      trade: 'plumbing' as const,
+      contactId: null,
+      status: 'open' as const,
+    },
+    {
+      roomId: 'rm_305',
+      type: 'maintenance' as const,
+      notes: 'Ceiling light flickers.',
+      trade: 'electrical' as const,
+      contactId: 'ct_electric',
+      status: 'in_progress' as const,
+    },
   ].map((t, i) => ({
     id: `hk_${String(i + 1).padStart(3, '0')}`,
-    status: 'open',
     createdAt,
     ...t,
   }));
@@ -330,6 +359,7 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
     stayGuests: buildStayGuests(linked, guests, today),
     auditLog: buildActivity(linked, rooms, billing.payments, housekeepingTasks, today, now),
     events,
+    contacts: buildContacts(region),
   };
 }
 

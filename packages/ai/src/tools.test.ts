@@ -491,4 +491,45 @@ describe('agent tools', () => {
     expect(repos.state.events).toEqual([]);
     expect(await tools.getLocalEvents.execute({}, callOptions)).toEqual([]);
   });
+
+  it('finds who can fix a repair, records who was asked, and proposes contact changes', async () => {
+    const { tools, repos } = setup();
+    repos.state.contacts.push({
+      id: 'ct_plumbing',
+      name: 'Example Plumbing',
+      person: null,
+      trades: ['plumbing'],
+      phone: '555 0142',
+      email: null,
+      language: 'cs',
+      notes: null,
+    });
+    const created = await tools.createHousekeepingTask.execute(
+      { roomId: 'rm_104', type: 'maintenance', notes: 'Tap is dripping', trade: 'plumbing' },
+      callOptions,
+    );
+    const taskId = (created as { task: { id: string } }).task.id;
+    expect(await tools.listContacts.execute({ trade: 'electrical' }, callOptions)).toEqual([]);
+    expect(await tools.getRepair.execute({ taskId }, callOptions)).toMatchObject({
+      roomName: '104',
+      access: { guestName: 'Tomáš Novák', freeFrom: '2026-05-12', freeUntil: null },
+      contacts: [{ id: 'ct_plumbing' }],
+      contact: null,
+    });
+    expect(
+      await tools.recordRepairContact.execute({ taskId, contactId: 'ct_plumbing' }, callOptions),
+    ).toMatchObject({ done: true, roomName: '104', task: { contactId: 'ct_plumbing' } });
+    expect(repos.state.audit.at(-1)).toMatchObject({ actor: 'agent', action: 'task.contact' });
+
+    await tools.saveContact.execute(
+      { contactId: null, name: 'Example Locks', trades: ['locks'] },
+      callOptions,
+    );
+    await tools.removeContact.execute({ contactId: 'ct_plumbing' }, callOptions);
+    expect(repos.state.pendingActions.map((a) => a.kind)).toEqual([
+      'save_contact',
+      'remove_contact',
+    ]);
+    expect(repos.state.contacts.map((c) => c.id)).toEqual(['ct_plumbing']);
+  });
 });

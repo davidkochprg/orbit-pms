@@ -28,6 +28,7 @@ import {
   type Translation,
   type QuoteAddons,
   type StayReading,
+  type Trade,
   vatBrackets,
 } from '@orbit/shared';
 import type { AiFeature } from '@orbit/ai';
@@ -174,6 +175,9 @@ export const housekeepingTasks = pgTable('housekeeping_tasks', {
   type: housekeepingTaskType('type').notNull(),
   status: housekeepingTaskStatus('status').notNull().default('open'),
   notes: text('notes'),
+  trade: text('trade').$type<Trade>(),
+  /** No foreign key: deleting a contact keeps the repairs they were asked to do. */
+  contactId: text('contact_id'),
   createdAt: createdAt(),
 });
 
@@ -335,6 +339,19 @@ export const localEvents = pgTable('local_events', {
   firstNight: date('first_night', { mode: 'string' }).notNull(),
   lastNight: date('last_night', { mode: 'string' }).notNull(),
   impact: text('impact').$type<EventImpact>().notNull(),
+  createdAt: createdAt(),
+});
+
+/** Suppliers and contractors the hotel calls. */
+export const contacts = pgTable('contacts', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  person: text('person'),
+  trades: jsonb('trades').$type<Trade[]>().notNull(),
+  phone: text('phone'),
+  email: text('email'),
+  language: language('language').notNull(),
+  notes: text('notes'),
   createdAt: createdAt(),
 });
 

@@ -28,6 +28,8 @@ function maintenance(roomId: string, overrides: Partial<HousekeepingTask> = {}):
     type: 'maintenance',
     status: 'open',
     notes: 'Lamp broken.',
+    trade: 'electrical',
+    contactId: null,
     createdAt: '2026-05-10T06:00:00.000Z',
     ...overrides,
   };

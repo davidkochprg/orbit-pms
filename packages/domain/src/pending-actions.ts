@@ -4,6 +4,9 @@ import type {
   BookingSource,
   BookingStatus,
   Charge,
+  Contact,
+  ContactBody,
+  ContactProposal,
   Currency,
   GuestPatch,
   Inquiry,
@@ -18,9 +21,10 @@ import type {
   StaffMember,
   StayGuestPatch,
 } from '@orbit/shared';
-import { formatMoney, hotelInfoCategoryLabels } from '@orbit/shared';
+import { formatMoney, hotelInfoCategoryLabels, tradeLabels } from '@orbit/shared';
 import type { BillingService } from './billing';
 import { changedBookingFields } from './bookings';
+import { contactFromProposal, type ContactService } from './contacts';
 import { hotelToday, nightsBetween } from './dates';
 import { DomainError } from './errors';
 import type { GuestService } from './guests';
@@ -45,6 +49,7 @@ export interface PendingActionDeps {
   >;
   inbox: Pick<InboxService, 'get' | 'previewHold' | 'createHold' | 'send' | 'decline'>;
   events: Pick<RevenueService, 'listEvents' | 'createEvent' | 'deleteEvent'>;
+  contacts: Pick<ContactService, 'get' | 'create' | 'update' | 'remove'>;
   clock: () => Date;
   newId: (prefix: string) => string;
 }
@@ -133,6 +138,23 @@ function profileText(patch: GuestPatch): string {
       return key === 'notes' || key === 'name' ? `${key} "${value}"` : `${key} ${value}`;
     })
     .join(', ');
+}
+
+const contactFields = ['name', 'person', 'trades', 'phone', 'email', 'language', 'notes'] as const;
+const contactLabels: Record<(typeof contactFields)[number], string> = {
+  name: 'Name',
+  person: 'Ask for',
+  trades: 'Does',
+  phone: 'Phone',
+  email: 'Email',
+  language: 'Language',
+  notes: 'Notes',
+};
+
+/** A contact field as the confirm card shows it; null when empty. */
+function contactValue(c: ContactBody | Contact, key: (typeof contactFields)[number]) {
+  if (key === 'trades') return c.trades.map((t) => tradeLabels[t]).join(', ');
+  return c[key];
 }
 
 interface Description {
@@ -298,9 +320,18 @@ export function createPendingActionService({
   settings,
   inbox,
   events,
+  contacts,
   clock,
   newId,
 }: PendingActionDeps) {
+  /** The contact a proposal saves, with the saved one it replaces. */
+  async function contactChange({ contactId, ...proposal }: ContactProposal) {
+    const before = contactId ? await contacts.get(contactId) : null;
+    const language = (await repos.settings.getProfile())?.language ?? 'en';
+    const after = contactFromProposal(before, { contactId, ...proposal }, language);
+    return { before, after };
+  }
+
   async function guestName(guestId: string): Promise<string> {
     return (await repos.guests.getGuest(guestId))?.name ?? 'Unknown guest';
   }
@@ -668,6 +699,33 @@ export function createPendingActionService({
           details: details([removed('Event', text(event.name))], null, managersOnly),
         };
       }
+      case 'save_contact': {
+        const { before, after } = await contactChange(action.input);
+        const rows = contactFields.flatMap((key) => {
+          const was = before && contactValue(before, key);
+          const now = contactValue(after, key);
+          if (before && was === now) return [];
+          if (!before && !now) return [];
+          return [changed(contactLabels[key], was ? text(was) : null, now ? text(now) : null)];
+        });
+        if (before && rows.length === 0) {
+          throw new DomainError('invalid_input', 'Nothing about the contact changes');
+        }
+        const does = after.trades.map((t) => tradeLabels[t].toLowerCase()).join(', ');
+        return {
+          summary: before
+            ? `Update the contact ${before.name}: ${rows.map((r) => r.label.toLowerCase()).join(', ')}`
+            : `Add the contact ${after.name} (${does})`,
+          details: details(rows),
+        };
+      }
+      case 'remove_contact': {
+        const contact = await contacts.get(action.input.contactId);
+        return {
+          summary: `Delete the contact ${contact.name}`,
+          details: details([removed('Contact', text(contact.name))]),
+        };
+      }
       case 'update_room': {
         const { room, before, after, fields, show } = await roomUpdate(action.input);
         return {
@@ -791,6 +849,15 @@ export function createPendingActionService({
         return null;
       case 'remove_local_event':
         await events.deleteEvent(action.input.eventId, by, 'agent');
+        return null;
+      case 'save_contact': {
+        const { before, after } = await contactChange(action.input);
+        if (before) await contacts.update(before.id, after, 'agent');
+        else await contacts.create(after, 'agent');
+        return null;
+      }
+      case 'remove_contact':
+        await contacts.remove(action.input.contactId, 'agent');
         return null;
       case 'update_room': {
         const { after } = await roomUpdate(action.input);

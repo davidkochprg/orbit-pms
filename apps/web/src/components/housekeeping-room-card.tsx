@@ -53,6 +53,10 @@ interface RoomCardProps extends ComponentProps<'div'> {
   /** Sets the room's status, from its button or menu; without it the card has no actions. */
   onSetStatus?: (status: RoomStatus) => void;
   onAddTask?: () => void;
+  /** Opens who can fix a repair. */
+  onOpenRepair?: (task: HousekeepingTask) => void;
+  /** Names of contacts by ID, for the one asked to fix a repair. */
+  contactNames?: Map<string, string>;
   busy?: boolean;
   dragging?: boolean;
 }
@@ -69,6 +73,8 @@ export function HousekeepingRoomCard({
   onCompleteTask,
   onSetStatus,
   onAddTask,
+  onOpenRepair,
+  contactNames,
   busy,
   dragging,
   className,
@@ -184,7 +190,23 @@ export function HousekeepingRoomCard({
               ) : (
                 <SprayCan className="mt-px size-3.5 shrink-0 text-muted-foreground" />
               )}
-              <span className="min-w-0 leading-snug">{taskLabel(task)}</span>
+              {task.type === 'maintenance' && onOpenRepair ? (
+                <button
+                  type="button"
+                  {...noDrag}
+                  onClick={() => onOpenRepair(task)}
+                  className="flex min-w-0 flex-col text-left leading-snug hover:underline-offset-2 [&:hover>span:first-child]:underline"
+                >
+                  <span>{taskLabel(task)}</span>
+                  {task.contactId && (
+                    <span className="text-muted-foreground">
+                      {contactNames?.get(task.contactId) ?? 'Contractor'} asked
+                    </span>
+                  )}
+                </button>
+              ) : (
+                <span className="min-w-0 leading-snug">{taskLabel(task)}</span>
+              )}
             </li>
           ))}
         </ul>

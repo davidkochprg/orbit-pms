@@ -12,6 +12,8 @@ import {
   type BookingListQuery,
   type ChargePatch,
   type ComposeBody,
+  type ContactBody,
+  contactSchema,
   type CreateBookingInput,
   dailyBriefSchema,
   dayOverviewSchema,
@@ -63,8 +65,10 @@ import {
   STAFF_HEADER,
   staffMemberSchema,
   type StayGuestPatch,
+  repairSchema,
   translateResultSchema,
   type UpdateStaffBody,
+  workOrderSchema,
 } from '@orbit/shared';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { z } from 'zod';
@@ -705,6 +709,62 @@ export function useHousekeepingNote() {
     const form = new FormData();
     form.append('audio', note.audio, 'note.wav');
     return apiPostForm('/api/housekeeping/voice', form, housekeepingNoteResultSchema);
+  });
+}
+
+/** Suppliers and contractors the hotel calls. */
+export function useContacts() {
+  return useQuery({
+    queryKey: ['contacts'],
+    queryFn: () => apiGet('/api/contacts', z.array(contactSchema)),
+  });
+}
+
+/** Adds a contact (`id` null) or edits one. */
+export function useSaveContact() {
+  return useRefreshingMutation(({ id, body }: { id: string | null; body: ContactBody }) =>
+    id
+      ? apiPost(`/api/contacts/${encodeURIComponent(id)}`, body, contactSchema, 'PUT')
+      : apiPost('/api/contacts', body, contactSchema),
+  );
+}
+
+export function useRemoveContact() {
+  return useRefreshingMutation((id: string) =>
+    apiDelete(`/api/contacts/${encodeURIComponent(id)}`),
+  );
+}
+
+/** A repair with who can fix it and when the room is free for them. */
+export function useRepair(taskId: string | null) {
+  return useQuery({
+    queryKey: ['repair', taskId],
+    queryFn: () =>
+      apiGet(`/api/housekeeping/tasks/${encodeURIComponent(taskId!)}/repair`, repairSchema),
+    enabled: taskId !== null,
+  });
+}
+
+/** Records that a contact was asked to fix a repair, by phone or email. */
+export function useAskToRepair(taskId: string) {
+  return useRefreshingMutation((contactId: string) =>
+    apiPost(
+      `/api/housekeeping/tasks/${encodeURIComponent(taskId)}/contact`,
+      { contactId },
+      housekeepingTaskSchema,
+    ),
+  );
+}
+
+/** Drafts the email asking a contact to come and fix a repair; nothing is sent. */
+export function useWorkOrder(taskId: string) {
+  return useMutation({
+    mutationFn: (contactId: string) =>
+      apiPost(
+        `/api/housekeeping/tasks/${encodeURIComponent(taskId)}/work-order`,
+        { contactId },
+        workOrderSchema,
+      ),
   });
 }
 

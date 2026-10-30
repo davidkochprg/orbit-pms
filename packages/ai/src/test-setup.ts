@@ -4,6 +4,7 @@ import {
   createHotelService,
   emptyHotelProfile,
   createBillingService,
+  createContactService,
   createGuestService,
   createHousekeepingService,
   createPendingActionService,
@@ -97,6 +98,7 @@ export function setup({
   const guests = createGuestService({ repos, newId });
   const inbox = createInboxService({ repos, hotel, clock, newId });
   const revenue = createRevenueService({ repos, defaults: pricingConfig, clock, newId });
+  const contacts = createContactService({ repos, clock, newId });
   const actions = createPendingActionService({
     repos,
     rates: createRatesService({ repos, defaults: pricingConfig, newId }),
@@ -107,6 +109,7 @@ export function setup({
     settings: createSettingsService({ repos, clock }),
     inbox,
     events: revenue,
+    contacts,
     clock,
     newId,
   });
@@ -131,6 +134,7 @@ export function setup({
     guestBookings: (guestId) => repos.bookings.listBookings({ guestId }),
     listEvents: () => revenue.listEvents(),
     statedAmounts: () => Promise.resolve([]),
+    contacts,
   });
   return { repos, hotel, billing, actions, tools };
 }

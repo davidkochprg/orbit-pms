@@ -20,6 +20,7 @@ import { reasoningEffort, type ReasoningEffort } from '../reasoning';
 import { readHousekeepingNote } from '../housekeeping';
 import { readIdDocument } from '../id-scan';
 import { fileNote } from '../knowledge';
+import { draftWorkOrder, readTrade } from '../repairs';
 import { readStayNotes } from '../stay-notes';
 import { agentFixtures, buildAgentEvalHotel } from './agent';
 import { evalRoomNames, housekeepingNoteFixtures } from './housekeeping-notes';
@@ -27,6 +28,7 @@ import { idDocumentFixtures } from './id-documents';
 import { buildKnowledgeFixtures, evalNotes, scoreFiledNote } from './knowledge';
 import { buildDraftEvalHotel } from './drafts';
 import { buildInquiryFixtures, type InquiryFixture } from './inquiries';
+import { buildWorkOrderFixtures, scoreWorkOrder, tradeFixtures } from './repairs';
 import { stayNotesFixtures } from './stay-notes';
 import { translationFixtures } from './translations';
 import { createTranslator } from '../translate';
@@ -66,8 +68,10 @@ const suiteKeys = [
   'stays',
   'ids',
   'knowledge',
+  'trades',
   'agent',
   'drafts',
+  'repairs',
   'translations',
 ] as const;
 type SuiteKey = (typeof suiteKeys)[number];
@@ -284,6 +288,27 @@ const knowledgeOk = await suite(
   })),
 );
 
+const tradeEffort = reasoning ?? reasoningEffort.repairs;
+const tradesOk = await suite(
+  'trades',
+  'Repair trades',
+  tradeEffort,
+  META_MODEL_AGENT,
+  tradeFixtures.map((f) => ({
+    id: f.id,
+    run: async () => {
+      const { trade, tokens } = await readTrade(provider.agent, f.issue, tradeEffort);
+      const passed =
+        f.trades.length === 0 ? trade === null : trade !== null && f.trades.includes(trade);
+      return {
+        passed,
+        label: `${trade ?? 'null'}${passed ? '' : ` not ${f.trades.join('/') || 'null'}`}  ${f.issue}`,
+        tokens,
+      };
+    },
+  })),
+);
+
 const agentEffort = reasoning ?? reasoningEffort.agent;
 const agentOk = await suite(
   'agent',
@@ -395,6 +420,26 @@ const draftsOk = await suite(
   ],
 );
 
+const repairsOk = await suite(
+  'repairs',
+  'Repair emails',
+  reasoningEffort.draft,
+  provider.draftModelId,
+  buildWorkOrderFixtures(today).map((f) => ({
+    id: f.id,
+    run: async () => {
+      const { subject, body, tokens, modelId } = await draftWorkOrder(provider.draft, f.facts);
+      const problems = scoreWorkOrder(f, { subject, body });
+      return {
+        passed: problems.length === 0,
+        label: `${f.facts.contact.language}  ${modelId}  ${problems.join(', ')}`,
+        detail: `      subject  ${subject}\n      body     ${body.replace(/\n/g, ' ')}`,
+        tokens,
+      };
+    },
+  })),
+);
+
 const translateEffort = reasoningEffort.translate;
 const translateOk = await suite(
   'translations',
@@ -437,7 +482,16 @@ const translateOk = await suite(
 );
 
 process.exit(
-  inboxOk && notesOk && staysOk && idsOk && knowledgeOk && agentOk && draftsOk && translateOk
+  inboxOk &&
+    notesOk &&
+    staysOk &&
+    idsOk &&
+    knowledgeOk &&
+    tradesOk &&
+    agentOk &&
+    draftsOk &&
+    repairsOk &&
+    translateOk
     ? 0
     : 1,
 );
