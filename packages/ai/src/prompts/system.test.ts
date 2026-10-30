@@ -90,6 +90,18 @@ describe('buildSystemPrompt', () => {
     expect(a).toContain(hotelFacts(hotel));
   });
 
+  it('asks for amounts as the cards write them, and plus tax where the bill adds it', () => {
+    expect(a).toContain('Write amounts the way the cards do');
+    const us = buildSystemPrompt({
+      hotel: { ...hotel, pricing: usDemoPricing },
+      today: '2026-10-27',
+      timezone: 'America/Los_Angeles',
+    });
+    expect(us).toContain('e.g. "$1,250"');
+    expect(us).toContain('say "plus tax"');
+    expect(a).not.toContain('plus tax');
+  });
+
   it('keeps everything except the date identical across days, so the prefix stays cacheable', () => {
     const shared = a.slice(0, a.indexOf('Today is'));
     expect(b.startsWith(shared)).toBe(true);
