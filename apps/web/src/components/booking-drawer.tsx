@@ -88,7 +88,7 @@ export function BookingDrawer() {
     <Sheet open={bookingId !== null} onOpenChange={(open) => !open && close()}>
       <SheetContent
         onEscapeKeyDown={keepOpenWhileEditing}
-        className="inset-y-2! right-2! h-auto! w-[calc(100%-1rem)] gap-0 overflow-hidden rounded-card border-0! bg-background shadow-floating sm:max-w-[600px]"
+        className="inset-y-2! right-2! h-auto! w-[calc(100%-1rem)] gap-0 overflow-hidden rounded-card border-0! bg-background shadow-floating sm:max-w-[600px]!"
       >
         {detail.data ? (
           <BookingDetailView key={detail.data.booking.id} detail={detail.data} />
