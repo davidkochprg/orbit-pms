@@ -22,6 +22,7 @@ import {
   Sun,
   Sunrise,
   UserPlus,
+  Wrench,
 } from 'lucide-react';
 import { LogoMark } from '@/components/logo-mark';
 import {
@@ -373,7 +374,7 @@ function SearchView({
             value={text}
             onValueChange={onTextChange}
             placeholder={
-              aiOn ? 'Ask Orbit or search…' : 'Search guests, rooms, notes and contacts…'
+              aiOn ? 'Ask Orbit or search…' : 'Search guests, rooms, repairs, notes and contacts…'
             }
             className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-subtle-foreground"
           />
@@ -506,6 +507,39 @@ function SearchView({
                 </Item>
               );
             })}
+          </CommandPrimitive.Group>
+        )}
+
+        {query && board.data && (
+          <CommandPrimitive.Group heading="Repairs">
+            {board.data.rooms.flatMap(({ room, openTasks }) =>
+              openTasks
+                .filter((t) => t.type === 'maintenance')
+                .map((t) => {
+                  const asked = contacts.data?.find((c) => c.id === t.contactId);
+                  return (
+                    <Item
+                      key={t.id}
+                      value={`Room ${room.name}: ${t.notes ?? 'Repair'}`}
+                      keywords={[
+                        'repair',
+                        ...(t.trade ? [tradeLabels[t.trade]] : []),
+                        ...(asked ? [asked.name] : []),
+                      ]}
+                      onSelect={run(
+                        () => void navigate(`/housekeeping?repair=${encodeURIComponent(t.id)}`),
+                      )}
+                    >
+                      <Wrench />
+                      <span className="shrink-0 font-mono">{room.name}</span>
+                      <span className="min-w-0 truncate">{t.notes ?? 'Repair'}</span>
+                      <span className="min-w-0 truncate text-muted-foreground">
+                        {asked ? `${asked.name} asked` : t.trade && tradeLabels[t.trade]}
+                      </span>
+                    </Item>
+                  );
+                }),
+            )}
           </CommandPrimitive.Group>
         )}
 

@@ -217,6 +217,8 @@ function compactConversation(i: Inquiry) {
         ? { checkIn: r.checkIn, checkOut: r.checkOut, adults: r.adults, childAges: r.childAges }
         : null,
     bookingId: i.bookingId,
+    /** Set for an email with a contractor about a repair (getRepair), not a guest's request. */
+    repairTaskId: i.taskId,
   };
 }
 
