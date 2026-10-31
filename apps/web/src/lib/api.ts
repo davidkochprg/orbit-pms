@@ -550,6 +550,15 @@ export function useInboxHold(id: string) {
   });
 }
 
+/** Holds every room of a conversation's block for the guest, all or none. */
+export function useInboxHoldBlock(id: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost(`${inboxPath(id)}/hold-block`, {}, inquirySchema),
+    onSuccess: () => queryClient.invalidateQueries(),
+  });
+}
+
 /** Looks for rooms again for a request that had none when it was read. */
 export function useRefreshInboxRooms() {
   return useRefreshingMutation((id: string) =>

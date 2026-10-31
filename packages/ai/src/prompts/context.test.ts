@@ -25,6 +25,7 @@ describe('contextNote', () => {
       senderName: 'Demo Sender',
       senderAddress: 'demo@example.com',
       request: {
+        rooms: null,
         kind: 'booking_request',
         language: 'de',
         guestName: 'Demo Sender',

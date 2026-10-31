@@ -7,9 +7,9 @@ const fixtures = buildInquiryFixtures(today);
 const bookings = fixtures.filter((f) => f.expected.kind === 'booking_request');
 
 describe('buildInquiryFixtures', () => {
-  it('builds fourteen messages with unique ids, five of them relayed by Booking.com', () => {
-    expect(fixtures).toHaveLength(14);
-    expect(new Set(fixtures.map((f) => f.id)).size).toBe(14);
+  it('builds fifteen messages with unique ids, five of them relayed by Booking.com', () => {
+    expect(fixtures).toHaveLength(15);
+    expect(new Set(fixtures.map((f) => f.id)).size).toBe(15);
     expect(fixtures.filter((f) => f.partner === 'Booking.com')).toHaveLength(5);
     expect(fixtures.filter((f) => f.expected.kind === 'question')).toHaveLength(3);
   });

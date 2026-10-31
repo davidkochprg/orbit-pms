@@ -1,0 +1,1 @@
+ALTER TABLE "inquiries" ADD COLUMN "block_booking_ids" jsonb DEFAULT '[]'::jsonb NOT NULL;

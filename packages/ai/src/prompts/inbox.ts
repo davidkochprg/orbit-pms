@@ -4,6 +4,7 @@ import {
   type Inquiry,
   type InquiryExtraction,
   type Language,
+  type RoomBlock,
   type StayOption,
 } from '@orbit/shared';
 import { getHotelTimeZone } from '@orbit/domain';
@@ -26,7 +27,8 @@ export const extractionSystemPrompt = `You read guest messages sent to a small h
 - kind: "booking_request" if they ask for a stay, availability or a price; "question" if they ask about an existing booking or the hotel (arrival time, parking, pets, facilities); otherwise "other".
 - language: the language the guest wrote in (cs, de, en or pl).
 - checkIn and checkOut: YYYY-MM-DD. checkOut is the departure day. "3 nights from the 14th" means checkOut is 3 days after checkIn. Dates without a year are the next such date on or after today. Use null if not stated.
-- adults: number of adults, or null if unknown. A couple is 2, and so is a family with children that does not state how many adults.
+- adults: number of adults, or null if unknown. A couple is 2, and so is a family with children that does not state how many adults. For a group, everyone who comes, e.g. "a team of nine" is 9.
+- rooms: how many rooms they ask for, e.g. 8 for "eight rooms" or "a block of about eight rooms"; null if they don't say a number of rooms.
 - childAges: one age per child. Babies under one year are 0.
 - wishes: wellness (sauna, massage, spa), dog (any pet dog), apartment (apartment, holiday flat, "Ferienwohnung", "apartmán").
 - question: one English sentence summarising what they ask, or null if they only ask for a stay.`;
@@ -61,8 +63,9 @@ ${hotelFacts(hotel)}
 
 Rules:
 - Write only in the language you are told to use, and translate every word you take from the options or the facts, such as room types and "total".
-- Prices: state each offered room type with its total exactly as written in the options, e.g. "${formatAmount(1250, hotel.pricing.currency)}". Never calculate, round, convert or invent any amount.${hotel.pricing.tax.mode === 'exclusive' ? '\n- The totals are before tax. Say that taxes are added to the bill; never work them out.' : ''}
-- Do not confirm a booking. Offer to hold the room for the guest and ask them to reply to confirm.
+- Prices: state each offered room type with its total exactly as written in the options, e.g. "${formatAmount(1250, hotel.pricing.currency)}". For a block of rooms, state the block's total and, per room type, how many rooms and their subtotal as written; don't list the rooms one by one. Never calculate, add up, divide, round, convert or invent any amount.
+- Never offer a discount, group rate or special price the facts don't state. If the guest asks for one, give the prices as they are and say you will check with the manager.${hotel.pricing.tax.mode === 'exclusive' ? '\n- The totals are before tax. Say that taxes are added to the bill; never work them out.' : ''}
+- Do not confirm a booking. Offer to hold the room (or the rooms of a block) for the guest and ask them to reply to confirm.
 - Greet the guest by the name they signed with. Don't guess a title such as Mr. or Mrs. from a name.
 - If something is not covered by the facts above, say you will check and get back to them. Never invent facilities or prices.
 - It is a plain-text email: no Markdown, no asterisks or bold, no headings. Short paragraphs; for several rooms, one line each.
@@ -88,18 +91,48 @@ export function holdExpiry(iso: string, country: string, timeZone = getHotelTime
   return `${day} at ${time}`;
 }
 
+const party = (adults: number, childAges: number[]) =>
+  [
+    `${adults} adult${adults === 1 ? '' : 's'}`,
+    childAges.length > 0 ? `children aged ${childAges.join(', ')}` : '',
+  ]
+    .filter(Boolean)
+    .join(' and ');
+
+/** A block of rooms as the draft model reads it: the total, the subtotal per type, each room. */
+export function blockOffer(block: RoomBlock): string {
+  const money = (n: number) => formatAmount(n, block.currency);
+  const nights = block.rooms[0]?.quote.nights ?? 0;
+  return [
+    `A block of ${block.rooms.length} rooms, ${nights} nights: total for the block ${money(block.total)}.`,
+    'By room type:',
+    ...block.byType.map(
+      (t) =>
+        `- ${t.count} × ${t.roomTypeName}${t.kind === 'apartment' ? ' (apartment)' : ''}: ${money(t.total)}${t.count > 1 ? ' together' : ''}`,
+    ),
+    'Rooms:',
+    ...block.rooms.map(
+      (o) =>
+        `- ${o.roomTypeName} ${o.roomName} for ${party(o.quote.adults, o.quote.childAges)}: ${money(o.quote.total)}`,
+    ),
+  ].join('\n');
+}
+
 export function draftPrompt(params: {
   inquiry: Inquiry;
   analysis: InquiryExtraction;
   options: StayOption[];
+  /** Several rooms for the party, offered together instead of `options`. */
+  block?: RoomBlock | null;
   note: string | null;
-  /** A room staff already hold for this guest: the only option, and when the hold ends. */
+  /** A room or block staff already hold for this guest: the only offer, and when the hold ends. */
   held?: { until: string | null } | null;
   feedback?: string;
 }): string {
-  const { inquiry, analysis, options, note, held, feedback } = params;
-  const offer =
-    options.length > 0
+  const { inquiry, analysis, options, block, note, held, feedback } = params;
+  const offer = block
+    ? blockOffer(block)
+    : options.length > 0
       ? options
           .map(
             (o, i) =>
@@ -112,7 +145,7 @@ Guest name: ${analysis.guestName ?? inquiry.senderName ?? 'unknown'}
 ${analysis.question ? `They ask: ${analysis.question}\n` : ''}
 ${held ? 'Already on hold for the guest' : 'Options to offer'}:
 ${offer}
-${held ? `This room is held for them${held.until ? ` until ${held.until}` : ''}. Say so, and ask them to reply to confirm the booking.\n` : ''}${feedback ? `\nYour previous draft was rejected: ${feedback} Use only the amounts listed above.\n` : ''}
+${held ? `${block ? 'These rooms are' : 'This room is'} held for them${held.until ? ` until ${held.until}` : ''}. Say so, and ask them to reply to confirm the booking.\n` : ''}${feedback ? `\nYour previous draft was rejected: ${feedback} Use only the amounts listed above.\n` : ''}
 Reply to the guest's latest message. The conversation, oldest first:
 
 ${transcript(inquiry)}`;

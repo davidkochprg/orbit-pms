@@ -265,6 +265,7 @@ function inquiry(overrides: Partial<Inquiry> = {}): Inquiry {
     suggestion: null,
     status: 'new',
     bookingId: null,
+    blockBookingIds: [],
     processedAt: null,
     processingError: null,
     ...overrides,
@@ -288,6 +289,7 @@ describe('openInquiries', () => {
       inquiry({
         id: 'inq_question',
         parsed: {
+          rooms: null,
           kind: 'question',
           language: 'en',
           guestName: null,

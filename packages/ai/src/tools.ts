@@ -225,6 +225,21 @@ function conversationDetail(i: Inquiry) {
       total: o.quote.total,
       currency: o.quote.currency,
     })),
+    block: i.suggestion?.block
+      ? {
+          total: i.suggestion.block.total,
+          currency: i.suggestion.block.currency,
+          byType: i.suggestion.block.byType,
+          rooms: i.suggestion.block.rooms.map((o) => ({
+            roomName: o.roomName,
+            roomTypeName: o.roomTypeName,
+            adults: o.quote.adults,
+            childAges: o.quote.childAges,
+            total: o.quote.total,
+          })),
+          held: i.blockBookingIds.length > 0,
+        }
+      : null,
     draft: i.suggestion?.draft ?? null,
     note: i.suggestion?.note ?? i.processingError ?? null,
   };
@@ -576,8 +591,10 @@ export function createAgentTools({
           if (!draftReply) {
             return { error: { code: 'not_configured', message: 'Reply drafts are not set up.' } };
           }
-          const { draft, roomOptions, note } = conversationDetail(await draftReply(inquiryId));
-          return { inquiryId, draft, roomOptions, note };
+          const { draft, roomOptions, block, note } = conversationDetail(
+            await draftReply(inquiryId),
+          );
+          return { inquiryId, draft, roomOptions, block, note };
         }),
     }),
     sendReply: tool({
@@ -591,6 +608,7 @@ export function createAgentTools({
             input.body,
             conversation.suggestion?.options ?? [],
             [...(await statedAmounts()), ...amountsInText(conversation.suggestion?.draft ?? '')],
+            conversation.suggestion?.block ?? null,
           );
           if (unexpected.length > 0) {
             return {
@@ -605,11 +623,17 @@ export function createAgentTools({
     }),
     holdFromConversation: tool({
       description:
-        "Propose holding a room for a conversation's booking request, for the dates and party it asks for; the hold is linked to the conversation. Use a roomId from its room options. If it already has a hold, that hold moves to this room. The user must confirm.",
+        "Propose holding a room for a conversation's booking request, for the dates and party it asks for; the hold is linked to the conversation. Use a roomId from its room options. If it already has a hold, that hold moves to this room. When the conversation has a block of rooms instead (a group), leave out roomId to hold every room of the block. The user must confirm.",
       inputSchema: inquiryIdSchema.extend({
-        roomId: z.string().describe('Room ID from the room options, e.g. "rm_201".'),
+        roomId: z
+          .string()
+          .optional()
+          .describe('Room ID from the room options, e.g. "rm_201"; leave out for a block.'),
       }),
-      execute: (input) => propose({ kind: 'hold_inquiry', input }),
+      execute: ({ inquiryId, roomId }) =>
+        roomId
+          ? propose({ kind: 'hold_inquiry', input: { inquiryId, roomId } })
+          : propose({ kind: 'hold_block', input: { inquiryId } }),
     }),
     declineConversation: tool({
       description:

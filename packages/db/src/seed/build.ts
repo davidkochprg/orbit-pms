@@ -294,6 +294,7 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
       suggestion: null,
       status: 'new',
       bookingId: links.get(f.id) ?? null,
+      blockBookingIds: [],
       processedAt: null,
       processingError: null,
     };
@@ -407,6 +408,8 @@ function makeInquiriesBookable(
   for (const f of fixtures) {
     const { checkIn, checkOut, adults } = f.expected;
     if (f.expected.kind !== 'booking_request' || !checkIn || !checkOut || !adults) continue;
+    // A group asks for a block of rooms, found among whatever is free.
+    if ((f.expected.rooms ?? 1) > 1) continue;
     const query = {
       checkIn,
       checkOut,

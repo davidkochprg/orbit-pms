@@ -37,6 +37,7 @@ describe('inbox display helpers', () => {
         checkIn: '2026-11-06',
         checkOut: '2026-11-10',
         adults: 2,
+        rooms: null,
         childAges: [4, 8],
         wishes: { wellness: false, dog: true, apartment: true },
         question: null,
@@ -50,6 +51,23 @@ describe('inbox display helpers', () => {
       'Dog',
     ]);
   });
+
+  it('says how many rooms a group asks for', () => {
+    const group = {
+      kind: 'booking_request',
+      language: 'en',
+      guestName: null,
+      checkIn: '2026-11-17',
+      checkOut: '2026-11-19',
+      adults: 9,
+      rooms: 8,
+      childAges: [],
+      wishes: { wellness: false, dog: false, apartment: false },
+      question: null,
+    } as const;
+    expect(analysisFacts({ ...group, childAges: [] })).toContain('8 rooms');
+    expect(analysisFacts({ ...group, childAges: [], rooms: 1 })).not.toContain('1 rooms');
+  });
 });
 
 describe('bookingPrefillFor', () => {
@@ -61,6 +79,7 @@ describe('bookingPrefillFor', () => {
     senderAddress: 'Familie@Example.com',
     status: 'quoted',
     bookingId: null,
+    blockBookingIds: [],
     parsed: {
       kind: 'booking_request',
       language: 'de',
@@ -173,6 +192,7 @@ function conversation(overrides: Partial<Inquiry> & { id: string }): Inquiry {
     suggestion: null,
     status: 'new',
     bookingId: null,
+    blockBookingIds: [],
     processedAt: null,
     processingError: null,
     ...overrides,

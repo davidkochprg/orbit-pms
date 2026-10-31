@@ -1,4 +1,4 @@
-import type { StayOption } from '@orbit/shared';
+import type { RoomBlock, StayOption } from '@orbit/shared';
 
 // "$1,250", "$1,250.00", "1,250 USD", "12 500 CZK", "12,500 Kč", "CZK 12.500", "12500,- Kč".
 // Thousands may be separated by a space, dot, comma, no-break space (U+00A0) or narrow no-break
@@ -34,23 +34,28 @@ export interface PriceCheck {
 /**
  * The model drafts the wording; prices come only from `quote()`. A draft passes if every amount
  * it states is a quoted total or line amount (or in `alsoAllowed`, e.g. a fee the hotel profile
- * states), and every option's total appears.
+ * states), and every option's total appears. For a block of rooms, the block's total must appear,
+ * and each room's quote and each room type's subtotal may.
  */
 export function checkDraftPrices(
   draft: string,
   options: StayOption[],
   alsoAllowed: number[] = [],
+  block: RoomBlock | null = null,
 ): PriceCheck {
+  const quoted = [...options, ...(block?.rooms ?? [])];
   const allowed = new Set([
     ...alsoAllowed,
-    ...options.flatMap((o) => [
+    ...quoted.flatMap((o) => [
       o.quote.total,
       ...o.quote.lines.map((l) => Math.abs(l.amount)),
       ...o.quote.lines.map((l) => Math.abs(l.unitPrice)),
     ]),
+    ...(block ? [block.total, ...block.byType.map((t) => t.total)] : []),
   ]);
   const found = amountsInText(draft);
   const unexpected = [...new Set(found.filter((a) => !allowed.has(a)))];
-  const missing = options.map((o) => o.quote.total).filter((t) => !found.includes(t));
+  const required = [...options.map((o) => o.quote.total), ...(block ? [block.total] : [])];
+  const missing = required.filter((t) => !found.includes(t));
   return { ok: unexpected.length === 0 && missing.length === 0, unexpected, missing };
 }

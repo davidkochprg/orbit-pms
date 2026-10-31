@@ -40,6 +40,7 @@ export function analysisFacts(a: InquiryExtraction): string[] {
   ];
   if (a.checkIn && a.checkOut) facts.push(formatRange(a.checkIn, a.checkOut));
   if (a.adults) facts.push(formatParty(a.adults, a.childAges));
+  if (a.rooms && a.rooms > 1) facts.push(`${a.rooms} rooms`);
   if (a.wishes.apartment) facts.push('Apartment');
   if (a.wishes.dog) facts.push('Dog');
   if (a.wishes.wellness) facts.push('Wellness');

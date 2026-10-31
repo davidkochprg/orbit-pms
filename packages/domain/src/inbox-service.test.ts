@@ -9,6 +9,7 @@ import { createMemoryRepositories } from './testing';
 
 const now = new Date('2026-05-10T08:00:00Z');
 const analysis: InquiryExtraction = {
+  rooms: null,
   kind: 'booking_request',
   language: 'de',
   guestName: 'Familie Beispiel',
@@ -84,8 +85,38 @@ describe('hotel.inboxOptions', () => {
     const { hotel } = setup();
     expect(await hotel.inboxOptions({ ...analysis, kind: 'question' })).toEqual({
       options: [],
+      block: null,
       note: null,
     });
+  });
+
+  it('offers a block when the guest asks for several rooms, each priced for its share', async () => {
+    const { hotel } = setup();
+    const { options, block, note } = await hotel.inboxOptions({ ...analysis, adults: 3, rooms: 2 });
+    expect(options).toEqual([]);
+    expect(note).toBeNull();
+    expect(block?.rooms.map((o) => [o.roomName, o.quote.adults, o.quote.childAges])).toEqual([
+      ['2', 2, []],
+      ['A1', 1, [4]],
+    ]);
+    expect(block?.total).toBe(block!.rooms[0]!.quote.total + block!.rooms[1]!.quote.total);
+    expect(block?.rooms.every((o) => o.quote.lines.some((l) => l.kind === 'wellness'))).toBe(true);
+  });
+
+  it('splits a party that no one free room sleeps', async () => {
+    const { hotel } = setup();
+    const { block } = await hotel.inboxOptions({ ...analysis, adults: 5, childAges: [] });
+    expect(block?.rooms.map((o) => [o.roomName, o.quote.adults])).toEqual([
+      ['A1', 3],
+      ['2', 2],
+    ]);
+  });
+
+  it('says so when fewer rooms are free than the guest asks for', async () => {
+    const { hotel } = setup();
+    const { block, note } = await hotel.inboxOptions({ ...analysis, adults: 3, rooms: 3 });
+    expect(block).toBeNull();
+    expect(note).toBe('Only 2 rooms are free for 2026-05-20 to 2026-05-22; the guest asks for 3.');
   });
 });
 
@@ -104,6 +135,7 @@ describe('inbox service', () => {
       ok: true,
       parsed: analysis,
       suggestion: {
+        block: null,
         options,
         note,
         draft: 'Guten Tag…',
@@ -133,6 +165,7 @@ describe('inbox service', () => {
       ok: true,
       parsed: analysis,
       suggestion: {
+        block: null,
         options: [],
         note: 'Nothing free',
         draft: 'Sorry…',
@@ -193,6 +226,54 @@ describe('inbox service', () => {
     await hotel.applyBookingAction(first.id, 'confirm', 'user');
     await expect(inbox.createHold(msg.id, 'rm_2', 'user')).rejects.toMatchObject({
       code: 'conflict',
+    });
+  });
+
+  it('holds a block for one guest, all rooms linked to the conversation', async () => {
+    const ctx = setup();
+    const msg = await ctx.inbox.create({
+      body: 'Two rooms for three of us',
+      channel: 'email',
+      senderName: 'Team Lead',
+      senderAddress: 'lead@example.com',
+    });
+    const group = { ...analysis, adults: 3, rooms: 2, question: 'Is there a meeting room?' };
+    const { options, block, note } = await ctx.hotel.inboxOptions(group);
+    await ctx.inbox.saveProcessing(msg.id, {
+      ok: true,
+      parsed: group,
+      suggestion: {
+        options,
+        block,
+        note,
+        draft: null,
+        draftLanguage: null,
+        draftTranslation: null,
+      },
+    });
+    const preview = await ctx.inbox.previewBlock(msg.id);
+    expect(preview.guestName).toBe('Team Lead');
+    expect(preview.previews.map((p) => p.room.name)).toEqual(['2', 'A1']);
+    expect(ctx.repos.state.bookings).toHaveLength(1);
+
+    const held = await ctx.inbox.holdBlock(msg.id, 'user');
+    expect(held.map((b) => [b.roomId, b.status, b.adults])).toEqual([
+      ['rm_2', 'hold', 2],
+      ['rm_a1', 'hold', 1],
+    ]);
+    expect(new Set(held.map((b) => b.guestId)).size).toBe(1);
+    expect(held[0]?.notes).toBe('Block of 2 rooms. Is there a meeting room?');
+    expect(await ctx.inbox.get(msg.id)).toMatchObject({
+      bookingId: held[0]?.id,
+      blockBookingIds: held.map((b) => b.id),
+    });
+    await expect(ctx.inbox.holdBlock(msg.id, 'user')).rejects.toMatchObject({ code: 'conflict' });
+  });
+
+  it('refuses to hold a block for a conversation without one', async () => {
+    const { inbox, msg } = await processed();
+    await expect(inbox.holdBlock(msg.id, 'user')).rejects.toMatchObject({
+      code: 'invalid_transition',
     });
   });
 

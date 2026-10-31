@@ -6,6 +6,7 @@ import {
   assertValidProfile,
   blocksRoom,
   checkAvailability,
+  planBlock,
   pricingConfig,
   rangesOverlap,
 } from '@orbit/domain';
@@ -201,20 +202,26 @@ describe('buildSeed', () => {
     }
   });
 
-  it('leaves a free room for every inquiry', () => {
+  it('leaves a free room for every inquiry, and a block for a group', () => {
     for (const f of buildInquiryFixtures(today)) {
-      const { checkIn, checkOut, adults } = f.expected;
+      const { checkIn, checkOut, adults, childAges, rooms } = f.expected;
       if (f.expected.kind !== 'booking_request' || !checkIn || !checkOut || !adults) continue;
-      const available = checkAvailability(
-        {
-          checkIn,
-          checkOut,
-          adults,
-          childAges: f.expected.childAges,
-          ...(f.expected.wishes.apartment ? { kind: 'apartment' as const } : {}),
-        },
-        { rooms: seed.rooms, roomTypes: seed.roomTypes, bookings: seed.bookings, now },
-      );
+      const ctx = { rooms: seed.rooms, roomTypes: seed.roomTypes, bookings: seed.bookings, now };
+      const kind = f.expected.wishes.apartment ? { kind: 'apartment' as const } : {};
+      if ((rooms ?? 1) > 1) {
+        const free = checkAvailability(
+          { checkIn, checkOut, adults: 1, childAges: [], ...kind },
+          ctx,
+        );
+        const block = planBlock(
+          { adults, childAges },
+          rooms,
+          free.map((r) => ({ roomId: r.room.id, roomType: r.roomType })),
+        );
+        expect(block, f.id).not.toBeNull();
+        continue;
+      }
+      const available = checkAvailability({ checkIn, checkOut, adults, childAges, ...kind }, ctx);
       expect(available.length, f.id).toBeGreaterThan(0);
     }
   });

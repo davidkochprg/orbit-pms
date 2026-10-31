@@ -6,7 +6,7 @@ import {
   type PricingConfig,
 } from '@orbit/domain';
 import { createMemoryRepositories } from '@orbit/domain/testing';
-import type { InquiryExtraction } from '@orbit/shared';
+import type { InquiryExtraction, Room } from '@orbit/shared';
 import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
 import { createInboxPipeline } from './inbox';
@@ -37,6 +37,7 @@ const usageTokens = {
 };
 
 const request: InquiryExtraction = {
+  rooms: null,
   kind: 'booking_request',
   language: 'cs',
   guestName: 'Jana Testová',
@@ -51,7 +52,7 @@ const request: InquiryExtraction = {
 /** 2 adults × 2 nights × 1000 + wellness 2 × 2 × 250 = 5 000 CZK. */
 const TOTAL = '5 000 CZK';
 
-function setup(replies: string[], { budgetLeft = true } = {}) {
+function setup(replies: string[], { budgetLeft = true, roomCount = 1 } = {}) {
   const repos = createMemoryRepositories(
     {
       roomTypes: [
@@ -64,16 +65,26 @@ function setup(replies: string[], { budgetLeft = true } = {}) {
           description: '',
         },
       ],
-      rooms: [
-        {
-          id: 'rm_1',
-          name: '101',
-          roomTypeId: 'rt_double',
-          kind: 'room',
-          floor: 1,
-          status: 'clean',
-        },
-      ],
+      rooms: (
+        [
+          {
+            id: 'rm_1',
+            name: '101',
+            roomTypeId: 'rt_double',
+            kind: 'room',
+            floor: 1,
+            status: 'clean',
+          },
+          {
+            id: 'rm_2',
+            name: '102',
+            roomTypeId: 'rt_double',
+            kind: 'room',
+            floor: 1,
+            status: 'clean',
+          },
+        ] satisfies Room[]
+      ).slice(0, roomCount),
     },
     () => now,
   );
@@ -165,6 +176,35 @@ describe('inbox pipeline', () => {
     expect(result.suggestion?.draft).toBe(heldDraft);
     expect(calls[3]).toContain('Already on hold for the guest');
     expect(calls[3]).toMatch(/held for them until \w+day/);
+  });
+
+  it('offers a group a block of rooms and writes about it once staff hold it', async () => {
+    const group = { ...request, adults: 4, rooms: 2 };
+    const offer = 'Dva dvoulůžkové pokoje za 10 000 CZK celkem.';
+    const held = 'Oba pokoje vám držíme, celkem 10 000 CZK. Potvrďte prosím rezervaci.';
+    const { inbox, pipeline, calls } = setup([JSON.stringify(group), offer, held], {
+      roomCount: 2,
+    });
+    const msg = await inbox.create(message);
+    const result = await pipeline.process(msg.id);
+
+    expect(result.status).toBe('quoted');
+    expect(result.suggestion?.options).toEqual([]);
+    expect(result.suggestion?.block?.rooms.map((o) => [o.roomName, o.quote.total])).toEqual([
+      ['101', 5000],
+      ['102', 5000],
+    ]);
+    expect(result.suggestion?.block?.total).toBe(10000);
+    expect(result.suggestion?.draft).toBe(offer);
+    expect(calls[1]).toContain('A block of 2 rooms, 2 nights: total for the block 10 000 CZK.');
+    expect(calls[1]).toContain('- 2 × Double room: 10 000 CZK together');
+
+    await inbox.holdBlock(msg.id, 'user');
+    const redrafted = await pipeline.draft(msg.id);
+    // Both rooms are taken now, but stay on offer to this group at their quoted prices.
+    expect(redrafted.suggestion?.block?.total).toBe(10000);
+    expect(redrafted.suggestion?.draft).toBe(held);
+    expect(calls[2]).toMatch(/These rooms are held for them until \w+day/);
   });
 
   it('reads the request and finds rooms without writing anything', async () => {
@@ -282,6 +322,7 @@ describe('inbox pipeline', () => {
     expect(result.status).toBe('new');
     expect(result.suggestion).toEqual({
       options: [],
+      block: null,
       note: null,
       draft: reply,
       draftLanguage: 'cs',

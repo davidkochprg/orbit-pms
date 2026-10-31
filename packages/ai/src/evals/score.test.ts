@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { scoreExtraction, scoreHousekeepingNote, scoreStayReadings } from './score';
 
 const expected: InquiryExtraction = {
+  rooms: null,
   kind: 'booking_request',
   question: null,
   language: 'de',

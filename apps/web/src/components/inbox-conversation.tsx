@@ -8,6 +8,7 @@ import {
   type MailDraft,
   type PendingAction,
   type Recipient,
+  type RoomBlock,
   type StayOption,
 } from '@orbit/shared';
 import {
@@ -68,6 +69,7 @@ import {
   useHealth,
   useDraftInquiry,
   useInboxHold,
+  useInboxHoldBlock,
   useInquiry,
   useReadInquiry,
   useSendReply,
@@ -81,6 +83,7 @@ import {
 import {
   formatDate,
   formatDateTime,
+  formatParty,
   formatPrice,
   languageLabels,
   statusLabels,
@@ -157,9 +160,9 @@ export function Conversation({ id }: { id: string }) {
   // Rooms first, from the reading, then the reply written for them.
   const prepare = () =>
     reading.mutate({ force: false }, { onSuccess: (r) => isRead(r) && draft() });
-  const onHeld = (roomName: string) => {
+  const onHeld = (what: string) => {
     if (!aiOn) return;
-    if (edited) setHeldSinceEdit(roomName);
+    if (edited) setHeldSinceEdit(what);
     else draft();
   };
   const read = isRead(m);
@@ -191,7 +194,7 @@ export function Conversation({ id }: { id: string }) {
           onWrite={writing ? undefined : () => setWriting(true)}
         />
       )}
-      {read && m.suggestion?.note && m.suggestion.options.length === 0 && (
+      {read && m.suggestion?.note && m.suggestion.options.length === 0 && !m.suggestion.block && (
         <p className="rounded-stage bg-background px-4 py-3 text-sm text-muted-foreground shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit">
           {m.suggestion.note}
         </p>
@@ -204,6 +207,9 @@ export function Conversation({ id }: { id: string }) {
           locked={drafting.isPending}
           onHeld={onHeld}
         />
+      )}
+      {read && m.suggestion?.block && (
+        <Block inquiry={m} block={m.suggestion.block} locked={drafting.isPending} onHeld={onHeld} />
       )}
       {m.status !== 'declined' &&
         (!offerPrepare || writing || reading.isPending || savedDraft) &&
@@ -712,7 +718,7 @@ function Options({
   note: string | null;
   /** While the reply is being written, the choice it is about stays put. */
   locked: boolean;
-  onHeld: (roomName: string) => void;
+  onHeld: (what: string) => void;
 }) {
   const hold = useInboxHold(inquiry.id);
   const held = useBookingDetail(inquiry.bookingId);
@@ -765,7 +771,9 @@ function Options({
                     size="xs"
                     variant="outline"
                     disabled={hold.isPending || locked}
-                    onClick={() => hold.mutate(o.roomId, { onSuccess: () => onHeld(o.roomName) })}
+                    onClick={() =>
+                      hold.mutate(o.roomId, { onSuccess: () => onHeld(`room ${o.roomName}`) })
+                    }
                   >
                     {holding ? 'Holding…' : booking ? 'Hold instead' : 'Hold'}
                   </Button>
@@ -774,6 +782,93 @@ function Options({
             </li>
           );
         })}
+      </ul>
+      {hold.isError && <ErrorNotice message={hold.error.message} className="m-2" />}
+    </Panel>
+  );
+}
+
+/**
+ * Rooms for a group, priced room by room with who sleeps where, and one button that holds them
+ * all for the guest. Once held, each room opens its booking.
+ */
+function Block({
+  inquiry,
+  block,
+  locked,
+  onHeld,
+}: {
+  inquiry: Inquiry;
+  block: RoomBlock;
+  /** While the reply is being written, the choice it is about stays put. */
+  locked: boolean;
+  onHeld: (what: string) => void;
+}) {
+  const hold = useInboxHoldBlock(inquiry.id);
+  const lead = useBookingDetail(inquiry.bookingId);
+  const { open } = useBookingDrawer();
+  const heldIds = inquiry.blockBookingIds;
+  const booking = lead.data?.booking;
+  const nights = block.rooms[0]?.quote.nights ?? 0;
+  const count = block.rooms.length;
+
+  return (
+    <Panel
+      title="Rooms for this group"
+      count={count}
+      contentClassName="p-0"
+      actions={
+        heldIds.length === 0 &&
+        !inquiry.bookingId && (
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={hold.isPending || locked}
+            onClick={() =>
+              hold.mutate(undefined, { onSuccess: () => onHeld(`the ${count} rooms`) })
+            }
+          >
+            {hold.isPending ? 'Holding…' : `Hold all ${count}`}
+          </Button>
+        )
+      }
+    >
+      {heldIds.length > 0 && booking && (
+        <p className="border-b bg-primary-soft px-3 py-2 text-xs text-primary-text first:rounded-t-stage">
+          {booking.status === 'hold'
+            ? booking.holdExpiresAt
+              ? `Held for the guest until ${formatDateTime(booking.holdExpiresAt)}`
+              : 'Held for the guest'
+            : `${statusLabels[booking.status]} booking`}
+        </p>
+      )}
+      <ul className="flex flex-col">
+        {block.rooms.map((o, i) => {
+          const bookingId = heldIds[i];
+          return (
+            <li key={o.roomId} className="flex items-center gap-3 border-b px-3 py-2">
+              <span className="rounded-[5px] border border-ink/7 bg-background px-1.5 py-px font-mono text-xs">
+                {o.roomName}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
+                {o.roomTypeName} · {formatParty(o.quote.adults, o.quote.childAges)}
+              </span>
+              <span className="font-mono text-sm tabular-nums">{formatPrice(o.quote.total)}</span>
+              {bookingId && (
+                <Button size="xs" variant="ghost" onClick={() => open(bookingId)}>
+                  Open
+                </Button>
+              )}
+            </li>
+          );
+        })}
+        <li className="flex items-center gap-3 px-3 py-2 text-sm">
+          <span className="flex-1 font-medium">
+            Total · {nights} {nights === 1 ? 'night' : 'nights'}
+          </span>
+          <span className="font-mono font-medium tabular-nums">{formatPrice(block.total)}</span>
+          {heldIds.length > 0 && <span className="w-[3.25rem]" aria-hidden />}
+        </li>
       </ul>
       {hold.isError && <ErrorNotice message={hold.error.message} className="m-2" />}
     </Panel>
@@ -832,7 +927,7 @@ function ReplyEditor({
   /** Reading or drafting: sending waits. */
   busy: boolean;
   error: Error | null;
-  /** A room held after the staff member edited the reply, which doesn't mention it yet. */
+  /** What was held after the staff member edited the reply, e.g. "room 104", not in it yet. */
   heldSinceEdit: string | null;
   /** The staff member changed the reply. */
   onEdit: () => void;
@@ -1012,10 +1107,10 @@ function ReplyEditor({
       {heldSinceEdit && (
         <div className="mb-1 flex flex-wrap items-center gap-2 rounded-stage bg-primary-soft px-3 py-2 text-sm">
           <span className="min-w-0 flex-1">
-            Your reply doesn&apos;t mention room {heldSinceEdit} yet.
+            Your reply doesn&apos;t mention {heldSinceEdit} yet.
           </span>
           <Button size="xs" variant="outline" disabled={busy} onClick={onDraft}>
-            <RotateCw /> Rewrite for room {heldSinceEdit}
+            <RotateCw /> Rewrite for {heldSinceEdit}
           </Button>
         </div>
       )}

@@ -47,7 +47,10 @@ export interface PendingActionDeps {
     SettingsService,
     'previewHotelInfo' | 'saveHotelInfo' | 'previewRemoveHotelInfo' | 'removeHotelInfo'
   >;
-  inbox: Pick<InboxService, 'get' | 'previewHold' | 'createHold' | 'send' | 'decline'>;
+  inbox: Pick<
+    InboxService,
+    'get' | 'previewHold' | 'createHold' | 'previewBlock' | 'holdBlock' | 'send' | 'decline'
+  >;
   events: Pick<RevenueService, 'listEvents' | 'createEvent' | 'deleteEvent'>;
   contacts: Pick<ContactService, 'get' | 'create' | 'update' | 'remove'>;
   clock: () => Date;
@@ -657,6 +660,24 @@ export function createPendingActionService({
           ),
         };
       }
+      case 'hold_block': {
+        const { previews, guestName } = await inbox.previewBlock(action.input.inquiryId);
+        const [first] = previews;
+        if (!first) throw new DomainError('invalid_input', 'The block has no rooms');
+        const total = previews.reduce((sum, p) => sum + (p.booking.priceSnapshot?.total ?? 0), 0);
+        const rooms = previews.map((p) => p.room.name).join(', ');
+        return {
+          summary: `Hold ${previews.length} rooms (${rooms}) for ${guestName}, ${stay(first.booking)}, total ${money(total)}`,
+          details: details(
+            [
+              added('Guest', text(guestName)),
+              added('Stay', dates(first.booking)),
+              ...previews.map((p) => added(`Room ${p.room.name}`, text(party(p.booking)))),
+            ],
+            { label: 'Total', before: null, after: total },
+          ),
+        };
+      }
       case 'decline_inquiry': {
         const inquiry = await inbox.get(action.input.inquiryId);
         if (inquiry.status === 'converted' || inquiry.bookingId) {
@@ -841,6 +862,10 @@ export function createPendingActionService({
       }
       case 'hold_inquiry':
         return id(await inbox.createHold(action.input.inquiryId, action.input.roomId, 'agent'));
+      case 'hold_block': {
+        const [first] = await inbox.holdBlock(action.input.inquiryId, 'agent');
+        return first ? id(first) : null;
+      }
       case 'decline_inquiry':
         await inbox.decline(action.input.inquiryId, 'agent');
         return null;

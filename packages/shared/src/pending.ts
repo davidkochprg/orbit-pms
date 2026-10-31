@@ -66,6 +66,7 @@ export const pendingActionInputSchema = z.discriminatedUnion('kind', [
     kind: z.literal('hold_inquiry'),
     input: z.object({ inquiryId: z.string(), roomId: z.string() }),
   }),
+  z.object({ kind: z.literal('hold_block'), input: z.object({ inquiryId: z.string() }) }),
   z.object({ kind: z.literal('decline_inquiry'), input: z.object({ inquiryId: z.string() }) }),
   z.object({ kind: z.literal('add_local_event'), input: localEventBodySchema }),
   z.object({ kind: z.literal('remove_local_event'), input: z.object({ eventId: z.string() }) }),

@@ -32,8 +32,9 @@ export function roomKindForWishes(
   return undefined;
 }
 
-export function addonsForWishes(wishes: InquiryExtraction['wishes']): QuoteAddons {
-  return { wellness: wishes.wellness, dogs: wishes.dog ? 1 : 0, extraBeds: 0 };
+export function addonsForWishes(wishes: InquiryExtraction['wishes'], room = 0): QuoteAddons {
+  // In a block of rooms, the dog stays in the first.
+  return { wellness: wishes.wellness, dogs: wishes.dog && room === 0 ? 1 : 0, extraBeds: 0 };
 }
 
 const sourceForChannel: Record<InquiryChannel, BookingSource> = {

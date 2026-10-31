@@ -138,6 +138,64 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
     return updated;
   }
 
+  /** Who a hold from a conversation is for: a guest with the same email, or the sender. */
+  async function guestFor(
+    inquiry: Inquiry,
+    analysis: InquiryExtraction,
+  ): Promise<CreateHoldInput['guest']> {
+    const email = inquiry.senderAddress && normalizeText(inquiry.senderAddress);
+    const existing = email
+      ? (await repos.guests.listGuests()).find((g) => g.email && normalizeText(g.email) === email)
+      : undefined;
+    return existing
+      ? { guestId: existing.id }
+      : {
+          name: inquiry.senderName ?? analysis.guestName ?? 'Guest',
+          email: inquiry.senderAddress,
+          phone: null,
+          language: analysis.language,
+        };
+  }
+
+  /**
+   * The holds for a conversation's block of rooms, one per room with its share of the party.
+   * Refused once the conversation has a hold or a booking.
+   */
+  async function blockPlan(id: string): Promise<CreateHoldInput[]> {
+    const inquiry = await load(repos, id);
+    const analysis = inquiry.parsed;
+    const stay = analysis && stayRequest(analysis);
+    const block = inquiry.suggestion?.block;
+    if (!analysis || !stay || !block) {
+      throw new DomainError(
+        'invalid_transition',
+        'This conversation has no block of rooms to hold',
+      );
+    }
+    if (inquiry.bookingId) {
+      throw new DomainError(
+        'conflict',
+        `This conversation already has a hold (${inquiry.bookingId})`,
+      );
+    }
+    const guest = await guestFor(inquiry, analysis);
+    const notes = [`Block of ${block.rooms.length} rooms`, analysis.question]
+      .filter(Boolean)
+      .join('. ');
+    return block.rooms.map((o, i) => ({
+      guest,
+      roomId: o.roomId,
+      checkIn: stay.checkIn,
+      checkOut: stay.checkOut,
+      adults: o.quote.adults,
+      childAges: o.quote.childAges,
+      addons: addonsForWishes(analysis.wishes, i),
+      source: bookingSourceFor(inquiry),
+      notes,
+      inquiryId: inquiry.id,
+    }));
+  }
+
   /**
    * How a processed booking request becomes a hold in the chosen room. Reuses a guest with the
    * same email address, otherwise creates one from the sender. If the message already has a hold,
@@ -167,20 +225,9 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
         patch: { roomId, ...stay, addons: addonsForWishes(analysis.wishes) },
       };
     }
-    const email = inquiry.senderAddress && normalizeText(inquiry.senderAddress);
-    const existing = email
-      ? (await repos.guests.listGuests()).find((g) => g.email && normalizeText(g.email) === email)
-      : undefined;
     return {
       input: {
-        guest: existing
-          ? { guestId: existing.id }
-          : {
-              name: inquiry.senderName ?? analysis.guestName ?? 'Guest',
-              email: inquiry.senderAddress,
-              phone: null,
-              language: analysis.language,
-            },
+        guest: await guestFor(inquiry, analysis),
         roomId,
         ...stay,
         addons: addonsForWishes(analysis.wishes),
@@ -219,6 +266,7 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
         suggestion: null,
         status: 'new',
         bookingId: null,
+        blockBookingIds: [],
         processedAt: null,
         processingError: null,
       };
@@ -280,6 +328,7 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
           suggestion: null,
           status: 'replied',
           bookingId: null,
+          blockBookingIds: [],
           processedAt: null,
           processingError: null,
         };
@@ -345,18 +394,20 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
       if (!inquiry.parsed || !inquiry.suggestion) {
         throw new DomainError('invalid_transition', 'This message has not been read yet');
       }
-      const { options, note } = await hotel.inboxOptions(inquiry.parsed);
+      const { options, block, note } = await hotel.inboxOptions(inquiry.parsed);
       const updated: Inquiry = {
         ...inquiry,
         suggestion: {
           ...inquiry.suggestion,
           options,
+          block,
           note,
           draft: null,
           draftLanguage: null,
           draftTranslation: null,
         },
-        status: inquiry.status === 'new' && options.length > 0 ? 'quoted' : inquiry.status,
+        status:
+          inquiry.status === 'new' && (options.length > 0 || block) ? 'quoted' : inquiry.status,
       };
       await repos.inquiries.updateInquiry(updated);
       return updated;
@@ -506,7 +557,8 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
             processedAt: clock().toISOString(),
             processingError: null,
             status:
-              inquiry.status === 'new' && result.suggestion.options.length > 0
+              inquiry.status === 'new' &&
+              (result.suggestion.options.length > 0 || result.suggestion.block)
                 ? 'quoted'
                 : inquiry.status,
           }
@@ -533,6 +585,23 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
       const guestName =
         newGuest?.name ?? (await repos.guests.getGuest(booking.guestId))?.name ?? 'Guest';
       return { booking, room, guestName, moved: 'switch' in plan };
+    },
+
+    /** Holds every room of the conversation's block for the guest, all or none (`blockPlan`). */
+    async holdBlock(id: string, actor: AuditActor): Promise<Booking[]> {
+      return hotel.createHolds(await blockPlan(id), actor);
+    },
+
+    /** The holds `holdBlock` would make, each checked, and the guest they are for. */
+    async previewBlock(id: string) {
+      const inputs = await blockPlan(id);
+      const previews = await hotel.previewHolds(inputs);
+      const [first] = previews;
+      const guestName =
+        first?.newGuest?.name ??
+        (first && (await repos.guests.getGuest(first.booking.guestId))?.name) ??
+        'Guest';
+      return { previews, guestName };
     },
 
     /** Marks a message as not leading to a booking, e.g. spam or a request that can't be met. */

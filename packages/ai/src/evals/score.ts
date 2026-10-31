@@ -7,7 +7,8 @@ import type {
 import type { HousekeepingNoteFixture } from './housekeeping-notes';
 import type { StayNotesFixture } from './stay-notes';
 
-export type ExtractionField = 'kind' | 'language' | 'dates' | 'adults' | 'childAges' | 'wishes';
+export type ExtractionField =
+  'kind' | 'language' | 'dates' | 'adults' | 'rooms' | 'childAges' | 'wishes';
 
 export interface ExtractionScore {
   passed: boolean;
@@ -29,6 +30,8 @@ export function scoreExtraction(
     language: expected.language === actual.language,
     dates: expected.checkIn === actual.checkIn && expected.checkOut === actual.checkOut,
     adults: expected.adults === actual.adults,
+    // "A room" and no number of rooms mean the same to the booking flow.
+    rooms: (expected.rooms ?? 1) === (actual.rooms ?? 1),
     childAges: sameAges(expected.childAges, actual.childAges),
     wishes:
       expected.wishes.wellness === actual.wishes.wellness &&

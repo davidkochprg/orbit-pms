@@ -7,7 +7,7 @@ import {
   usDemoPricing,
 } from '@orbit/domain';
 import { conversation } from '@orbit/domain/testing';
-import type { StayOption } from '@orbit/shared';
+import type { RoomBlock, StayOption } from '@orbit/shared';
 import { runAgent } from '../agent';
 import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from '../cost';
 import { holdExpiry } from '../prompts/inbox';
@@ -374,15 +374,17 @@ async function runDraft(
   options: StayOption[],
   note: string | null,
   held = false,
+  block: RoomBlock | null = null,
 ) {
   const { draft, tokens, modelId } = await draftReply(provider.draft, draftHotel, {
     inquiry: inquiryFor(f),
     analysis: f.expected,
     options,
+    block,
     note,
     held: held ? { until: holdExpiry(holdEnds, draftHotel.profile.country) } : null,
   });
-  const check = checkDraftPrices(draft, options, amountsInText(hotelFacts(draftHotel)));
+  const check = checkDraftPrices(draft, options, amountsInText(hotelFacts(draftHotel)), block);
   const problems = [
     ...(draft ? [] : ['empty draft']),
     // It goes out as a plain-text email, where Markdown shows as stray symbols.
@@ -397,7 +399,7 @@ async function runDraft(
   return {
     passed: problems.length === 0,
     label: `${f.expected.language}  ${modelId}  ${problems.join(', ')}`,
-    detail: `      options  ${options.map((o) => `${o.roomName} ${o.quote.total}`).join(', ') || 'none'}\n      draft    ${draft.replace(/\n/g, ' ')}`,
+    detail: `      options  ${block ? `block of ${block.rooms.length}, ${block.total}` : options.map((o) => `${o.roomName} ${o.quote.total}`).join(', ') || 'none'}\n      draft    ${draft.replace(/\n/g, ' ')}`,
     tokens,
   };
 }
@@ -412,8 +414,8 @@ const draftsOk = await suite(
       id: f.id,
       run: async () => {
         // The expected extraction stands in for the model's, so only the draft is measured.
-        const { options, note } = await buildDraftEvalHotel(today).inboxOptions(f.expected);
-        return runDraft(f, options, note);
+        const { options, block, note } = await buildDraftEvalHotel(today).inboxOptions(f.expected);
+        return runDraft(f, options, note, false, block);
       },
     })),
     ...heldFixtures.map(({ fixture, option }) => ({

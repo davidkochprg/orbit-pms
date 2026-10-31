@@ -64,6 +64,7 @@ export function conversation(overrides: Partial<Inquiry> & { id: string; body?: 
     suggestion: null,
     status: 'new',
     bookingId: null,
+    blockBookingIds: [],
     processedAt: null,
     processingError: null,
     ...rest,

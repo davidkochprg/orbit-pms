@@ -160,6 +160,8 @@ export const inquiries = pgTable('inquiries', {
   suggestion: jsonb('suggestion').$type<InquirySuggestion>(),
   status: inquiryStatus('status').notNull().default('new'),
   bookingId: text('booking_id').references(() => bookings.id),
+  /** Every hold made for a block of rooms; the first is also `booking_id`. */
+  blockBookingIds: jsonb('block_booking_ids').$type<string[]>().notNull().default([]),
   processedAt: timestamp('processed_at', { withTimezone: true }),
   processingError: text('processing_error'),
 });

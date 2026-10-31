@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { isoDateSchema } from './dates';
 import { languageSchema, roomKindSchema } from './enums';
 import { attachmentSchema, recipientsSchema } from './mail';
-import { quoteSchema } from './quote';
+import { currencySchema, moneySchema, quoteSchema } from './quote';
 
 export const messageKinds = ['booking_request', 'question', 'other'] as const;
 export const messageKindSchema = z.enum(messageKinds);
@@ -23,6 +23,13 @@ export const inquiryExtractionSchema = z.object({
     .nullable()
     .describe('Departure date YYYY-MM-DD (the day they leave, not the last night), or null.'),
   adults: z.number().int().positive().nullable(),
+  rooms: z
+    .number()
+    .int()
+    .positive()
+    .nullable()
+    .default(null)
+    .describe('How many rooms they ask for, if they say; otherwise null.'),
   childAges: z.array(z.number().int().min(0).max(17)).describe('Age of each child; [] if none.'),
   wishes: z.object({
     wellness: z.boolean().describe('Asks about sauna, massage, spa or wellness.'),
@@ -46,6 +53,26 @@ export const stayOptionSchema = z.object({
 });
 export type StayOption = z.infer<typeof stayOptionSchema>;
 
+/**
+ * Several rooms for one party, e.g. a team or a wedding: each room with the share of the party it
+ * sleeps and its quote, and the block's total. The domain works out every amount.
+ */
+export const roomBlockSchema = z.object({
+  rooms: z.array(stayOptionSchema).min(2),
+  /** The block by room type, cheapest first: how many rooms and their totals added up. */
+  byType: z.array(
+    z.object({
+      roomTypeName: z.string(),
+      kind: roomKindSchema,
+      count: z.number().int().positive(),
+      total: moneySchema,
+    }),
+  ),
+  total: moneySchema,
+  currency: currencySchema,
+});
+export type RoomBlock = z.infer<typeof roomBlockSchema>;
+
 /** A text put into another language, e.g. a guest's message into the staff member's language. */
 export const translationSchema = z.object({
   language: languageSchema,
@@ -56,6 +83,8 @@ export type Translation = z.infer<typeof translationSchema>;
 /** What the agent prepared for a message: offerable rooms and a reply draft. */
 export const inquirySuggestionSchema = z.object({
   options: z.array(stayOptionSchema),
+  /** Rooms for a party that asks for several, or fits no one room; then `options` is empty. */
+  block: roomBlockSchema.nullable().default(null),
   /** Why there are no options, when there are none. */
   note: z.string().nullable(),
   draft: z.string().nullable(),

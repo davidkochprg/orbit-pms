@@ -17,6 +17,7 @@ import type {
   Quote,
   QuoteInput,
   Room,
+  RoomBlock,
   RoomOption,
   RoomOptionsQuery,
   RoomType,
@@ -39,6 +40,7 @@ import { addDays, type DateRange, hotelToday } from './dates';
 import { arrivalsOn, departuresOn, stayingOver } from './day';
 import { DomainError } from './errors';
 import { addonsForWishes, pickOptions, roomKindForWishes, stayRequest } from './inbox';
+import { planBlock, summarizeBlock } from './room-block';
 import type { HotelPolicy } from './policy';
 import { type PricingConfig, quote } from './pricing';
 import { currentPricing } from './rates';
@@ -311,6 +313,35 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     };
   }
 
+  /**
+   * Holds several rooms for one guest at once, all or none, e.g. a block for a group. The first
+   * hold makes a new guest if needed and the rest are for the same guest. A conversation they come
+   * from keeps every hold (`blockBookingIds`) and points at the first.
+   */
+  async function createHolds(inputs: CreateHoldInput[], actor: AuditActor): Promise<Booking[]> {
+    return repos.transaction(async (tx) => {
+      const held: Booking[] = [];
+      for (const input of inputs) {
+        const p = await planHold(
+          held[0] ? { ...input, guest: { guestId: held[0].guestId } } : input,
+        )(tx);
+        await p.apply(tx);
+        await tx.audit.append({ actor, ...p.audit });
+        held.push(p.booking);
+      }
+      const inquiryId = inputs[0]?.inquiryId;
+      const inquiry = inquiryId ? await tx.inquiries.getInquiry(inquiryId) : null;
+      if (inquiry && held[0]) {
+        await tx.inquiries.updateInquiry({
+          ...inquiry,
+          bookingId: held[0].id,
+          blockBookingIds: held.map((b) => b.id),
+        });
+      }
+      return held;
+    });
+  }
+
   async function preview(plan: (tx: Repositories) => Promise<Plan>) {
     const { booking, room, newGuest } = await plan(repos);
     return { booking, room, newGuest: newGuest ?? null };
@@ -456,29 +487,64 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
   }
 
   /** Up to three priced rooms (one per room type) for the stay a message asks for. */
+  /**
+   * Rooms to offer for a booking request: one per room type for a party that fits one room, or a
+   * block of rooms when the guest asks for several or no one room sleeps the party.
+   */
   async function inboxOptions(
     analysis: InquiryExtraction,
-  ): Promise<{ options: StayOption[]; note: string | null }> {
+  ): Promise<{ options: StayOption[]; block: RoomBlock | null; note: string | null }> {
     const stay = stayRequest(analysis);
-    if (!stay) return { options: [], note: null };
+    if (!stay) return { options: [], block: null, note: null };
     const kind = roomKindForWishes(analysis.wishes, policy);
-    const available = await findAvailableRooms({ ...stay, ...(kind && { kind }) });
-    if (available.length === 0) {
-      return {
-        options: [],
-        note: `No ${kind ?? 'room'} is free for ${stay.checkIn} to ${stay.checkOut} for this party.`,
-      };
-    }
     const addons = addonsForWishes(analysis.wishes);
     const rates = await loadPricing(repos);
-    const options = pickOptions(available).map((r) => ({
-      roomId: r.roomId,
-      roomName: r.roomName,
-      roomTypeName: r.roomType.name,
-      kind: r.kind,
-      quote: quote({ ...stay, roomType: r.roomType, addons }, rates),
+    const wanted = analysis.rooms ?? 1;
+    const dates = `${stay.checkIn} to ${stay.checkOut}`;
+    if (wanted === 1) {
+      const available = await findAvailableRooms({ ...stay, ...(kind && { kind }) });
+      if (available.length > 0) {
+        const options = pickOptions(available).map((r) => ({
+          roomId: r.roomId,
+          roomName: r.roomName,
+          roomTypeName: r.roomType.name,
+          kind: r.kind,
+          quote: quote({ ...stay, roomType: r.roomType, addons }, rates),
+        }));
+        return { options, block: null, note: null };
+      }
+    }
+    // Several rooms: the guest asks for them, or the party fits no one room that is free.
+    const free = await findAvailableRooms({
+      checkIn: stay.checkIn,
+      checkOut: stay.checkOut,
+      adults: 1,
+      childAges: [],
+      ...(kind && { kind }),
+    });
+    const plan = planBlock(stay, analysis.rooms, free);
+    if (!plan) {
+      const what = kind ?? 'room';
+      return {
+        options: [],
+        block: null,
+        note:
+          wanted > 1
+            ? `Only ${free.length} ${what}s are free for ${dates}; the guest asks for ${wanted}.`
+            : `No ${what} is free for ${dates} for this party.`,
+      };
+    }
+    const rooms = plan.map(({ room, party }, i) => ({
+      roomId: room.roomId,
+      roomName: room.roomName,
+      roomTypeName: room.roomType.name,
+      kind: room.kind,
+      quote: quote(
+        { ...stay, ...party, roomType: room.roomType, addons: addonsForWishes(analysis.wishes, i) },
+        rates,
+      ),
     }));
-    return { options, note: null };
+    return { options: [], block: summarizeBlock(rooms), note: null };
   }
 
   return {
@@ -497,6 +563,7 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     changeBookingDates: (id: string, range: DateRange, actor: AuditActor) =>
       commit(planDates(id, range), actor),
     createHold: (input: CreateHoldInput, actor: AuditActor) => commit(planHold(input), actor),
+    createHolds,
     createBooking: (input: CreateBookingInput, actor: AuditActor) =>
       commit(planHold(input, input.status), actor),
     updateBooking: (id: string, patch: BookingPatch, actor: AuditActor) =>
@@ -509,6 +576,9 @@ export function createHotelService({ repos, pricing, policy, clock, newId }: Ser
     previewMove: (id: string, roomId: string) => preview(planMove(id, roomId)),
     previewDates: (id: string, range: DateRange) => preview(planDates(id, range)),
     previewHold: (input: CreateHoldInput) => preview(planHold(input)),
+    /** Checks each hold of a block on its own, as `createHolds` would make them. */
+    previewHolds: (inputs: CreateHoldInput[]) =>
+      Promise.all(inputs.map((input) => preview(planHold(input)))),
     previewUpdate: (id: string, patch: BookingPatch) => preview(planUpdate(id, patch)),
     previewSwitchHold: (id: string, patch: BookingPatch) =>
       preview(planUpdate(id, patch, switchHold)),

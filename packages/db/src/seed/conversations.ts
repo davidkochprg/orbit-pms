@@ -56,6 +56,7 @@ export function thread(
     suggestion: null,
     status: 'replied',
     bookingId: null,
+    blockBookingIds: [],
     processedAt: null,
     processingError: null,
     ...fields,

@@ -43,6 +43,7 @@ const titles: Record<PendingAction['kind'], string> = {
   remove_hotel_info: 'Delete from Knowledge',
   send_reply: 'Send a reply',
   hold_inquiry: 'Hold a room for the request',
+  hold_block: 'Hold rooms for the group',
   decline_inquiry: 'Decline the request',
   add_local_event: 'Add a local event',
   remove_local_event: 'Remove a local event',
@@ -56,6 +57,7 @@ function conversationOf(action: PendingAction): string | null {
   switch (action.kind) {
     case 'send_reply':
     case 'hold_inquiry':
+    case 'hold_block':
     case 'decline_inquiry':
       return action.input.inquiryId;
     default:

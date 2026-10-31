@@ -1,4 +1,4 @@
-import type { StayOption } from '@orbit/shared';
+import type { RoomBlock, StayOption } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { amountsInText, checkDraftPrices } from './price-guard';
 
@@ -87,5 +87,35 @@ describe('checkDraftPrices', () => {
 
   it('accepts amounts the hotel profile states', () => {
     expect(checkDraftPrices('Parking costs 200 CZK per night.', [], [200]).ok).toBe(true);
+  });
+
+  it("needs a block's total, and allows its subtotals and rooms' prices", () => {
+    const block: RoomBlock = {
+      rooms: [option(6000, [3000]), option(6000, [3000]), option(4000)],
+      byType: [
+        { roomTypeName: 'Single', kind: 'room', count: 1, total: 4000 },
+        { roomTypeName: 'Double', kind: 'room', count: 2, total: 12000 },
+      ],
+      total: 16000,
+      currency: 'CZK',
+    };
+    expect(
+      checkDraftPrices(
+        '2 dvoulůžkové 12 000 Kč, 1 jednolůžkový 4 000 Kč, celkem 16 000 Kč.',
+        [],
+        [],
+        block,
+      ),
+    ).toEqual({ ok: true, unexpected: [], missing: [] });
+    expect(checkDraftPrices('Dvoulůžkový pokoj 6 000 Kč, noc 3 000 Kč.', [], [], block)).toEqual({
+      ok: false,
+      unexpected: [],
+      missing: [16000],
+    });
+    expect(checkDraftPrices('Celkem 16 000 Kč, sleva 15 000 Kč.', [], [], block)).toEqual({
+      ok: false,
+      unexpected: [15000],
+      missing: [],
+    });
   });
 });

@@ -27,18 +27,19 @@ function stay(today: IsoDate, offset: number, nights: number): Stay {
 }
 
 const noWishes = { wellness: false, dog: false, apartment: false };
-const noStay = { checkIn: null, checkOut: null, adults: null, childAges: [] };
+const noStay = { checkIn: null, checkOut: null, adults: null, rooms: null, childAges: [] };
 
 function booking(
-  fields: Omit<InquiryExtraction, 'kind' | 'question' | 'checkIn' | 'checkOut'> & Stay,
+  fields: Omit<InquiryExtraction, 'kind' | 'question' | 'checkIn' | 'checkOut' | 'rooms'> &
+    Stay & { rooms?: number },
 ): InquiryExtraction {
-  return { kind: 'booking_request', question: null, ...fields };
+  return { kind: 'booking_request', question: null, rooms: null, ...fields };
 }
 
 /**
- * Fourteen synthetic guest messages in Czech, German, English and Polish, dated relative to
- * `today` so the demo always has upcoming requests: ten direct inquiries and four messages
- * relayed by OTA partners. All names, addresses and reservation numbers are made up.
+ * Fifteen synthetic guest messages in Czech, German, English and Polish, dated relative to
+ * `today` so the demo always has upcoming requests: eleven direct inquiries, one of them a team
+ * asking for a block of rooms, and four messages relayed by OTA partners. All names, addresses and reservation numbers are made up.
  */
 export function buildInquiryFixtures(today: IsoDate): InquiryFixture[] {
   const s1 = stay(today, 3, 2);
@@ -52,6 +53,7 @@ export function buildInquiryFixtures(today: IsoDate): InquiryFixture[] {
   const s9 = stay(today, 25, 3);
   const s10 = stay(today, 30, 7);
   const s13 = stay(today, 17, 2);
+  const s15 = stay(today, 22, 3);
 
   return [
     {
@@ -349,6 +351,32 @@ Katarzyna`,
         wishes: { ...noWishes, dog: true },
         question: 'May they bring a small dog?',
       },
+    },
+    {
+      id: 'inq_15',
+      channel: 'email',
+      partner: null,
+      subject: 'Teamklausur, 6 Zimmer',
+      senderName: 'Petra Beispiel',
+      senderAddress: 'petra.beispiel@example.com',
+      receivedHoursAgo: 9,
+      rawText: `Guten Tag,
+
+wir planen eine Teamklausur mit zehn Kolleginnen und Kollegen und bräuchten dafür sechs Zimmer, vier davon für jeweils zwei Personen. Anreise wäre am ${spokenDate(s15.checkIn, 'de')}, Abreise am ${spokenDate(s15.checkOut, 'de')}.
+
+Gibt es bei Ihnen einen Gruppenpreis?
+
+Viele Grüße
+Petra Beispiel`,
+      expected: booking({
+        language: 'de',
+        guestName: 'Petra Beispiel',
+        ...s15,
+        adults: 10,
+        rooms: 6,
+        childAges: [],
+        wishes: noWishes,
+      }),
     },
   ];
 }

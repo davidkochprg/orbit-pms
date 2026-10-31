@@ -194,6 +194,11 @@ export function inboxRoutes({
         );
         return c.json(await hotel.getBookingDetail(booking.id), 201);
       })
+      .post('/inbox/:id/hold-block', async (c) => {
+        const id = c.req.param('id');
+        await inbox.holdBlock(id, 'user');
+        return c.json(await inbox.get(id), 201);
+      })
       .post('/inbox/:id/decline', async (c) =>
         c.json(await inbox.decline(c.req.param('id'), 'user')),
       )

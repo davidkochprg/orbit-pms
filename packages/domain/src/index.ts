@@ -25,6 +25,7 @@ export * from './reports';
 export type * from './repositories';
 export * from './revenue';
 export * from './revenue-service';
+export * from './room-block';
 export * from './service';
 export * from './settings';
 export * from './staff';

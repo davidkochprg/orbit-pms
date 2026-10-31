@@ -1,10 +1,11 @@
-import type { HotelService, InboxService } from '@orbit/domain';
+import { type HotelService, type InboxService, summarizeBlock } from '@orbit/domain';
 import {
   type Inquiry,
   type InquiryExtraction,
   inquiryExtractionSchema,
   type IsoDate,
   type Language,
+  type RoomBlock,
   type StayOption,
   type Translation,
 } from '@orbit/shared';
@@ -26,6 +27,12 @@ import type { AiFeature, UsageStore } from './usage';
 /** A room held for the guest from this message, and when the hold ends (ISO). */
 interface HeldRoom {
   option: StayOption;
+  until: string | null;
+}
+
+/** A block of rooms held for the guest, and when the first of its holds ends (ISO). */
+interface HeldBlock {
+  block: RoomBlock;
   until: string | null;
 }
 
@@ -120,10 +127,9 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
     });
   }
 
-  /** The message's hold, while it is one, as an option priced at its quote. */
-  async function heldRoom(inquiry: Inquiry): Promise<HeldRoom | null> {
-    if (!inquiry.bookingId) return null;
-    const { booking, room, roomType } = await hotel.getBookingDetail(inquiry.bookingId);
+  /** A booking while it is a hold, as an option priced at its quote. */
+  async function asHeld(bookingId: string): Promise<HeldRoom | null> {
+    const { booking, room, roomType } = await hotel.getBookingDetail(bookingId);
     if (booking.status !== 'hold' || !booking.priceSnapshot) return null;
     return {
       option: {
@@ -137,26 +143,48 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
     };
   }
 
+  /** The message's hold, while it is one. */
+  async function heldRoom(inquiry: Inquiry): Promise<HeldRoom | null> {
+    if (!inquiry.bookingId || inquiry.blockBookingIds.length > 1) return null;
+    return asHeld(inquiry.bookingId);
+  }
+
+  /** The message's block of holds, while every one of them is still a hold. */
+  async function heldBlock(inquiry: Inquiry): Promise<HeldBlock | null> {
+    if (inquiry.blockBookingIds.length < 2) return null;
+    const holds = await Promise.all(inquiry.blockBookingIds.map(asHeld));
+    if (holds.some((h) => !h)) return null;
+    const rooms = holds.filter((h): h is HeldRoom => h !== null);
+    const ends = rooms.map((h) => h.until).filter((u): u is string => u !== null);
+    return {
+      block: summarizeBlock(rooms.map((h) => h.option)),
+      until: ends.sort()[0] ?? null,
+    };
+  }
+
   /**
    * The rooms for a reading, as of now: a room staff already hold is no longer free, so it is
-   * added back and leads the options.
+   * added back and leads the options, and a block staff hold replaces the block on offer.
    */
   async function roomsFor(inquiry: Inquiry, analysis: InquiryExtraction) {
-    const { options: free, note } = await hotel.inboxOptions(analysis);
+    const { options: free, block: freeBlock, note } = await hotel.inboxOptions(analysis);
     const held = await heldRoom(inquiry);
     const options = held
       ? [held.option, ...free.filter((o) => o.roomId !== held.option.roomId)]
       : free;
-    return { options, note, held };
+    const heldRooms = await heldBlock(inquiry);
+    const block = heldRooms?.block ?? freeBlock;
+    return { options, block, note: heldRooms ? null : note, held, heldRooms };
   }
 
   async function draftWithGuard(
     inquiry: Inquiry,
     analysis: InquiryExtraction,
-    options: StayOption[],
+    offer: { options: StayOption[]; block: RoomBlock | null },
     note: string | null,
-    held: HeldRoom | null,
+    held: { until: string | null } | null,
   ): Promise<{ draft: string | null; note: string | null }> {
+    const { options, block } = offer;
     const context = await hotelContext();
     const until = held?.until ? holdExpiry(held.until, context.profile.country) : null;
     // Fees the profile states may be repeated; every other amount must come from a quote.
@@ -171,12 +199,13 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
         inquiry,
         analysis,
         options,
+        block,
         note,
         held: held && { until },
         ...(feedback && { feedback }),
       });
       await record('inbox_draft', tokens, servedBy);
-      const check = checkDraftPrices(draft, options, stated);
+      const check = checkDraftPrices(draft, options, stated, block);
       if (check.ok) return { draft, note };
       feedback = [
         check.unexpected.length
@@ -211,11 +240,18 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
     try {
       const { analysis, tokens } = await extractMessage(model, inquiry, today());
       await record('inbox_extract', tokens);
-      const { options, note } = await roomsFor(inquiry, analysis);
+      const { options, block, note } = await roomsFor(inquiry, analysis);
       return await inbox.saveProcessing(id, {
         ok: true,
         parsed: analysis,
-        suggestion: { options, note, draft: null, draftLanguage: null, draftTranslation: null },
+        suggestion: {
+          options,
+          block,
+          note,
+          draft: null,
+          draftLanguage: null,
+          draftTranslation: null,
+        },
       });
     } catch (err) {
       return failed(id, err);
@@ -238,11 +274,15 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
     const analysis = inquiry.parsed;
     if (!(await canSpend())) return budgetSpent(id);
     try {
-      const { options, note, held } = await roomsFor(inquiry, analysis);
+      const { options, block, note, held, heldRooms } = await roomsFor(inquiry, analysis);
+      // A held room or block is the only offer.
+      const offer = heldRooms
+        ? { options: [], block: heldRooms.block }
+        : { options: held ? [held.option] : options, block: held ? null : block };
       const { draft: text, note: finalNote } =
         analysis.kind === 'other'
           ? { draft: null, note }
-          : await draftWithGuard(inquiry, analysis, held ? [held.option] : options, note, held);
+          : await draftWithGuard(inquiry, analysis, offer, note, held ?? heldRooms);
       let draftTranslation: Translation | null = null;
       if (text && language && language !== analysis.language) {
         // The draft is the result; without its translation staff still have it to send.
@@ -256,6 +296,7 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
         parsed: analysis,
         suggestion: {
           options,
+          block,
           note: finalNote,
           draft: text,
           draftLanguage: text ? analysis.language : null,

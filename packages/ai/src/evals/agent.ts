@@ -207,6 +207,7 @@ export function buildAgentEvalHotel(today: IsoDate) {
           body: 'Hello, do you have a room for two adults for two nights a week from today?',
           receivedAt: now.toISOString(),
           parsed: {
+            rooms: null,
             kind: 'booking_request',
             language: 'en',
             guestName: 'Ruth Example',

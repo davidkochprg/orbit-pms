@@ -93,6 +93,8 @@ export const inquirySchema = z.object({
   suggestion: inquirySuggestionSchema.nullable(),
   status: inquiryStatusSchema,
   bookingId: z.string().nullable(),
+  /** Every hold made for a block of rooms; the first is also `bookingId`. */
+  blockBookingIds: z.array(z.string()).default([]),
   processedAt: z.iso.datetime().nullable(),
   processingError: z.string().nullable(),
 });

@@ -4,6 +4,7 @@ import { addonsForWishes, pickOptions, roomKindForWishes, stayRequest } from './
 import { hotelPolicy } from './policy';
 
 const analysis: InquiryExtraction = {
+  rooms: null,
   kind: 'booking_request',
   language: 'de',
   guestName: 'Test',
@@ -55,6 +56,10 @@ describe('addonsForWishes', () => {
       dogs: 1,
       extraBeds: 0,
     });
+  });
+  it('puts the dog in the first room of a block only', () => {
+    const wishes = { wellness: true, dog: true, apartment: false };
+    expect(addonsForWishes(wishes, 1)).toEqual({ wellness: true, dogs: 0, extraBeds: 0 });
   });
 });
 

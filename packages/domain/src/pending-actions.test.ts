@@ -88,6 +88,7 @@ function setup() {
       senderAddress: 'ruth@example.com',
       body: 'A room for 2 adults, 25 to 27 May?',
       parsed: {
+        rooms: null,
         kind: 'booking_request',
         language: 'en',
         guestName: 'Ruth Example',
@@ -639,6 +640,33 @@ describe('pending actions', () => {
     const confirmed = await actions.confirm(proposed.id);
     expect(confirmed.bookingId).toBeTruthy();
     expect(repos.state.inquiries[0]?.bookingId).toBe(confirmed.bookingId);
+  });
+
+  it('proposes holding a block of rooms from a conversation, all at once', async () => {
+    const { repos, hotel, actions } = setup();
+    const parsed = { ...repos.state.inquiries[0]!.parsed!, adults: 3, rooms: 2 };
+    const { block } = await hotel.inboxOptions(parsed);
+    repos.state.inquiries[0] = {
+      ...repos.state.inquiries[0]!,
+      parsed,
+      suggestion: {
+        options: [],
+        block,
+        note: null,
+        draft: null,
+        draftLanguage: null,
+        draftTranslation: null,
+      },
+    };
+    const proposed = await actions.propose({ kind: 'hold_block', input: { inquiryId: 'inq_1' } });
+    expect(proposed.summary).toMatch(
+      /^Hold 2 rooms \(1, 2\) for Ruth Example, 2026-05-25 to 2026-05-27/,
+    );
+    expect(proposed.details?.amount).toEqual({ label: 'Total', before: null, after: block?.total });
+    const confirmed = await actions.confirm(proposed.id);
+    const inquiry = repos.state.inquiries[0];
+    expect(inquiry?.blockBookingIds).toHaveLength(2);
+    expect(confirmed.bookingId).toBe(inquiry?.bookingId);
   });
 
   it('proposes declining a conversation, unless it led to a booking', async () => {

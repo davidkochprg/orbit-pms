@@ -169,6 +169,13 @@
       "when": 1793444897148,
       "tag": "0023_rate_reviews",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793454043669,
+      "tag": "0024_inquiry_block_holds",
+      "breakpoints": true
     }
   ]
 }

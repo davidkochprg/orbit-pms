@@ -19,6 +19,7 @@ async function withConversation(options: Parameters<typeof setup>[0] = {}) {
     senderAddress: 'ruth@example.com',
     body: 'Do you have a room for two, 20 to 22 May?',
     parsed: {
+      rooms: null,
       kind: 'booking_request',
       language: 'en',
       guestName: 'Ruth Example',
@@ -31,6 +32,7 @@ async function withConversation(options: Parameters<typeof setup>[0] = {}) {
     },
     status: 'quoted',
     suggestion: {
+      block: null,
       options: [
         {
           roomId: option!.roomId,

@@ -174,6 +174,7 @@ const unanswered = (parsed: InquiryExtraction): Inquiry => ({
   ...conversation({ id: 'inq_1', body: 'Do you have a room?' }),
   parsed,
   suggestion: {
+    block: null,
     options: [],
     note: 'Nothing free',
     draft: null,
