@@ -1,7 +1,8 @@
 import { type Contact, type Trade, tradeLabels, tradeSchema } from '@orbit/shared';
-import { Contact as ContactIcon, Mail, Phone, Plus } from 'lucide-react';
+import { Contact as ContactIcon, Mail, Pencil, Phone, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router';
+import { ActionMenu } from '@/components/action-menu';
 import { ContactEditorDialog } from '@/components/contact-editor';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
@@ -99,51 +100,60 @@ export function ContactsPage() {
             </thead>
             <tbody>
               {shown.map((c) => (
-                <tr
+                <ActionMenu
                   key={c.id}
-                  className="cursor-pointer border-b border-grid-line hover:bg-accent"
-                  onClick={() => setEditing(c)}
+                  label={c.name}
+                  actions={[
+                    c.phone && { label: `Call ${c.phone}`, icon: Phone, href: telHref(c.phone) },
+                    c.email && { label: 'Email', icon: Mail, href: `mailto:${c.email}` },
+                    { label: 'Edit…', icon: Pencil, onSelect: () => setEditing(c), group: true },
+                  ]}
                 >
-                  <td className="py-2.5 pr-4 pl-6">
-                    <span className="flex flex-col">
-                      <span className="font-medium">{c.name}</span>
-                      {(c.person || c.notes) && (
-                        <span className="max-w-48 truncate text-xs text-muted-foreground sm:max-w-md">
-                          {[c.person, c.notes].filter(Boolean).join(' · ')}
-                        </span>
+                  <tr
+                    className="cursor-pointer border-b border-grid-line hover:bg-accent"
+                    onClick={() => setEditing(c)}
+                  >
+                    <td className="py-2.5 pr-4 pl-6">
+                      <span className="flex flex-col">
+                        <span className="font-medium">{c.name}</span>
+                        {(c.person || c.notes) && (
+                          <span className="max-w-48 truncate text-xs text-muted-foreground sm:max-w-md">
+                            {[c.person, c.notes].filter(Boolean).join(' · ')}
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-4 text-muted-foreground max-md:hidden">
+                      {c.trades.map((t: Trade) => tradeLabels[t]).join(', ')}
+                    </td>
+                    <td className="px-4 whitespace-nowrap">
+                      {c.phone ? (
+                        <a
+                          href={telHref(c.phone)}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                        >
+                          <Phone className="size-3.5" /> {c.phone}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">–</span>
                       )}
-                    </span>
-                  </td>
-                  <td className="px-4 text-muted-foreground max-md:hidden">
-                    {c.trades.map((t: Trade) => tradeLabels[t]).join(', ')}
-                  </td>
-                  <td className="px-4 whitespace-nowrap">
-                    {c.phone ? (
-                      <a
-                        href={telHref(c.phone)}
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-                      >
-                        <Phone className="size-3.5" /> {c.phone}
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground">–</span>
-                    )}
-                  </td>
-                  <td className="px-4 max-md:hidden">
-                    {c.email ? (
-                      <a
-                        href={`mailto:${c.email}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
-                      >
-                        <Mail className="size-3.5" /> {c.email}
-                      </a>
-                    ) : (
-                      <span className="text-muted-foreground">–</span>
-                    )}
-                  </td>
-                </tr>
+                    </td>
+                    <td className="px-4 max-md:hidden">
+                      {c.email ? (
+                        <a
+                          href={`mailto:${c.email}`}
+                          onClick={(e) => e.stopPropagation()}
+                          className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
+                        >
+                          <Mail className="size-3.5" /> {c.email}
+                        </a>
+                      ) : (
+                        <span className="text-muted-foreground">–</span>
+                      )}
+                    </td>
+                  </tr>
+                </ActionMenu>
               ))}
             </tbody>
           </table>

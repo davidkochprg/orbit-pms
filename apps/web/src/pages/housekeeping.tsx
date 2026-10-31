@@ -8,40 +8,20 @@ import {
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import {
-  type HousekeepingRoom,
-  type HousekeepingTask,
-  type RoomStatus,
-  roomStatuses,
-} from '@orbit/shared';
-import { CalendarRange, Keyboard, Mic, Plus } from 'lucide-react';
-import {
-  type ComponentProps,
-  type ReactElement,
-  type Ref,
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
-import { useNavigate } from 'react-router';
+import { type HousekeepingRoom, type HousekeepingTask, type RoomStatus } from '@orbit/shared';
+import { Keyboard, Mic, Plus } from 'lucide-react';
+import { type ComponentProps, type Ref, useCallback, useEffect, useState } from 'react';
 import { ErrorNotice } from '@/components/error-notice';
 import { HousekeepingNoteDialog, type NoteMode } from '@/components/housekeeping-note-dialog';
 import { HousekeepingRoomCard } from '@/components/housekeeping-room-card';
 import { PageHeader } from '@/components/page-header';
 import { RelocateAfterMarking } from '@/components/relocate-dialog';
+import { RoomContextMenu } from '@/components/room-menu';
 import { RepairDialog } from '@/components/repair-panel';
 import { Count } from '@/components/panel';
 import { StatusDot } from '@/components/status-dot';
 import { TaskDialog } from '@/components/task-dialog';
 import { Button } from '@/components/ui/button';
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuLabel,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from '@/components/ui/context-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -392,40 +372,3 @@ function DraggableCard({
 }
 
 /** Right-click a room: set its status without dragging, or add a task. */
-function RoomContextMenu({
-  item,
-  onSetStatus,
-  onAddTask,
-  children,
-}: {
-  item: HousekeepingRoom;
-  onSetStatus: (roomId: string, status: RoomStatus) => void;
-  onAddTask: (roomId: string) => void;
-  children: ReactElement;
-}) {
-  const navigate = useNavigate();
-  const { room } = item;
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent className="w-52">
-        <ContextMenuLabel>Room {room.name}</ContextMenuLabel>
-        {roomStatuses
-          .filter((s) => s !== room.status)
-          .map((s) => (
-            <ContextMenuItem key={s} onSelect={() => onSetStatus(room.id, s)}>
-              <StatusDot className={roomStatusColor[s]} />
-              Mark {roomStatusLabels[s].toLowerCase()}
-            </ContextMenuItem>
-          ))}
-        <ContextMenuSeparator />
-        <ContextMenuItem onSelect={() => onAddTask(room.id)}>
-          <Plus /> Add task…
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => void navigate('/tape-chart')}>
-          <CalendarRange /> Open tape chart
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
-  );
-}

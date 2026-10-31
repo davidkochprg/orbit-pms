@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 import { cn } from 'cn';
 import { ContextMenu as ContextMenuPrimitive } from 'radix-ui';
 
@@ -76,8 +77,74 @@ function ContextMenuSeparator({
   );
 }
 
+function ContextMenuCheckboxItem({
+  className,
+  children,
+  checked,
+  ...props
+}: React.ComponentProps<typeof ContextMenuPrimitive.CheckboxItem>) {
+  return (
+    <ContextMenuPrimitive.CheckboxItem
+      data-slot="context-menu-checkbox-item"
+      checked={checked}
+      className={cn(itemClass, 'pr-8', className)}
+      {...props}
+    >
+      {children}
+      <span className="pointer-events-none absolute right-2 flex items-center justify-center">
+        <ContextMenuPrimitive.ItemIndicator>
+          <CheckIcon />
+        </ContextMenuPrimitive.ItemIndicator>
+      </span>
+    </ContextMenuPrimitive.CheckboxItem>
+  );
+}
+
+function ContextMenuSub(props: React.ComponentProps<typeof ContextMenuPrimitive.Sub>) {
+  return <ContextMenuPrimitive.Sub data-slot="context-menu-sub" {...props} />;
+}
+
+function ContextMenuSubTrigger({
+  className,
+  children,
+  ...props
+}: React.ComponentProps<typeof ContextMenuPrimitive.SubTrigger>) {
+  return (
+    <ContextMenuPrimitive.SubTrigger
+      data-slot="context-menu-sub-trigger"
+      className={cn(itemClass, 'data-open:bg-accent data-open:text-accent-foreground', className)}
+      {...props}
+    >
+      {children}
+      <ChevronRightIcon className="ml-auto" />
+    </ContextMenuPrimitive.SubTrigger>
+  );
+}
+
+function ContextMenuSubContent({
+  className,
+  ...props
+}: React.ComponentProps<typeof ContextMenuPrimitive.SubContent>) {
+  return (
+    <ContextMenuPrimitive.Portal>
+      <ContextMenuPrimitive.SubContent
+        data-slot="context-menu-sub-content"
+        className={cn(
+          'z-50 min-w-44 origin-(--radix-context-menu-content-transform-origin) overflow-hidden rounded-xl bg-popover p-1.5 text-popover-foreground shadow-floating backdrop-blur-2xl duration-100 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95',
+          className,
+        )}
+        {...props}
+      />
+    </ContextMenuPrimitive.Portal>
+  );
+}
+
 export {
   ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
   ContextMenuTrigger,
   ContextMenuContent,
   ContextMenuItem,

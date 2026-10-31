@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import {
   type ComponentType,
+  type ReactElement,
   type ReactNode,
   useEffect,
   useEffectEvent,
@@ -40,6 +41,17 @@ import { ShortcutsDialog } from '@/components/mail-shortcuts';
 import { PageHeader } from '@/components/page-header';
 import { SearchField } from '@/components/search-field';
 import { Button } from '@/components/ui/button';
+import {
+  ContextMenu,
+  ContextMenuCheckboxItem,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuSub,
+  ContextMenuSubContent,
+  ContextMenuSubTrigger,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -510,6 +522,17 @@ export function InboxPage() {
                         setSelected((s) => (on ? [...s, m.id] : s.filter((x) => x !== m.id)))
                       }
                       onStar={() => act(m.starred ? 'unstar' : 'star', null, [m.id])}
+                      menu={{
+                        // A row in the selection acts for the whole selection, as in Gmail.
+                        ids: selected.includes(m.id) ? selected : [m.id],
+                        trash: inTrash,
+                        archived: folder === 'archived' && !label,
+                        onAct: (action, labelId, ids) => act(action, labelId, ids),
+                        onPurge: (ids) => {
+                          setSelected(ids);
+                          setPurging(true);
+                        },
+                      }}
                     />
                   ))}
                 </ul>
@@ -755,6 +778,7 @@ function ConversationRow({
   label,
   onSelect,
   onStar,
+  menu,
 }: {
   conversation: Inquiry;
   href: string;
@@ -766,6 +790,7 @@ function ConversationRow({
   label: string | null;
   onSelect: (on: boolean) => void;
   onStar: () => void;
+  menu: RowMenu;
 }) {
   const labels = useMailLabels().data ?? [];
   const lastOut = m.messages.findLast((x) => x.direction === 'out');
@@ -777,75 +802,178 @@ function ConversationRow({
         : senderLabel(m);
   const files = m.messages.some((x) => x.attachments.length > 0);
   return (
-    <li
-      className={cn(
-        'group/row relative flex rounded-lg hover:bg-accent',
-        active && 'bg-accent',
-        selected && 'bg-primary-soft hover:bg-primary-soft',
-      )}
-    >
-      <span className="flex shrink-0 flex-col items-center gap-0.5 py-1.5 pl-2">
-        <Checkbox
-          label={`Select ${senderLabel(m)}`}
-          checked={selected}
-          onChange={() => onSelect(!selected)}
-        />
-        <button
-          type="button"
-          aria-label={m.starred ? 'Unstar' : 'Star'}
-          aria-pressed={m.starred}
-          onClick={onStar}
-          className={cn(
-            'grid size-7 place-items-center rounded-md outline-none hover:bg-ink/5 focus-visible:ring-2 focus-visible:ring-ring',
-            m.starred ? 'text-warning' : 'text-subtle-foreground',
-          )}
-        >
-          <Star className={cn('size-4', m.starred && 'fill-current')} />
-        </button>
-      </span>
-      <Link
-        to={href}
-        className="flex min-w-0 flex-1 gap-3 rounded-lg py-2.5 pr-3 pl-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    <ConversationMenu href={href} menu={menu}>
+      <li
+        className={cn(
+          'group/row relative flex rounded-lg hover:bg-accent',
+          active && 'bg-accent',
+          selected && 'bg-primary-soft hover:bg-primary-soft',
+        )}
       >
-        <GuestAvatar name={senderLabel(m)} size="md" />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="flex items-baseline gap-2">
-            {m.unread && (
-              <span
-                role="img"
-                aria-label="Unread"
-                className="size-2 shrink-0 self-center rounded-full bg-primary"
-              />
+        <span className="flex shrink-0 flex-col items-center gap-0.5 py-1.5 pl-2">
+          <Checkbox
+            label={`Select ${senderLabel(m)}`}
+            checked={selected}
+            onChange={() => onSelect(!selected)}
+          />
+          <button
+            type="button"
+            aria-label={m.starred ? 'Unstar' : 'Star'}
+            aria-pressed={m.starred}
+            onClick={onStar}
+            className={cn(
+              'grid size-7 place-items-center rounded-md outline-none hover:bg-ink/5 focus-visible:ring-2 focus-visible:ring-ring',
+              m.starred ? 'text-warning' : 'text-subtle-foreground',
             )}
-            <span className={cn('truncate', m.unread ? 'font-semibold' : 'font-medium')}>
-              {who}
-            </span>
-            {m.messages.length > 1 && (
-              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                {m.messages.length}
-              </span>
-            )}
-            {draft && <span className="shrink-0 text-xs text-destructive">Draft</span>}
-            <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground tabular-nums">
-              {files && <Paperclip aria-label="Has attachments" className="size-3" />}
-              <time>{formatDateTime(m.lastMessageAt)}</time>
-            </span>
-          </span>
-          <span className={cn('truncate', m.unread && 'font-medium')}>
-            {m.subject ?? '(no subject)'}
-          </span>
-          <span className="line-clamp-2 text-xs text-muted-foreground">{preview(m)}</span>
-          <span className="mt-1 flex flex-wrap gap-1.5 text-[0.6875rem] text-muted-foreground">
-            <span className="rounded-full bg-ink/5 px-2 py-px">{channelLabel(m)}</span>
-            {m.bookingId && <span className="rounded-full bg-ink/5 px-2 py-px">Booking</span>}
-            {m.status === 'declined' && (
-              <span className="rounded-full bg-ink/5 px-2 py-px">Declined</span>
-            )}
-            <LabelChips ids={m.labelIds} labels={labels} hide={label} />
-          </span>
+          >
+            <Star className={cn('size-4', m.starred && 'fill-current')} />
+          </button>
         </span>
-      </Link>
-    </li>
+        <Link
+          to={href}
+          className="flex min-w-0 flex-1 gap-3 rounded-lg py-2.5 pr-3 pl-1 outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <GuestAvatar name={senderLabel(m)} size="md" />
+          <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+            <span className="flex items-baseline gap-2">
+              {m.unread && (
+                <span
+                  role="img"
+                  aria-label="Unread"
+                  className="size-2 shrink-0 self-center rounded-full bg-primary"
+                />
+              )}
+              <span className={cn('truncate', m.unread ? 'font-semibold' : 'font-medium')}>
+                {who}
+              </span>
+              {m.messages.length > 1 && (
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {m.messages.length}
+                </span>
+              )}
+              {draft && <span className="shrink-0 text-xs text-destructive">Draft</span>}
+              <span className="ml-auto flex shrink-0 items-center gap-1 text-xs text-muted-foreground tabular-nums">
+                {files && <Paperclip aria-label="Has attachments" className="size-3" />}
+                <time>{formatDateTime(m.lastMessageAt)}</time>
+              </span>
+            </span>
+            <span className={cn('truncate', m.unread && 'font-medium')}>
+              {m.subject ?? '(no subject)'}
+            </span>
+            <span className="line-clamp-2 text-xs text-muted-foreground">{preview(m)}</span>
+            <span className="mt-1 flex flex-wrap gap-1.5 text-[0.6875rem] text-muted-foreground">
+              <span className="rounded-full bg-ink/5 px-2 py-px">{channelLabel(m)}</span>
+              {m.bookingId && <span className="rounded-full bg-ink/5 px-2 py-px">Booking</span>}
+              {m.status === 'declined' && (
+                <span className="rounded-full bg-ink/5 px-2 py-px">Declined</span>
+              )}
+              <LabelChips ids={m.labelIds} labels={labels} hide={label} />
+            </span>
+          </span>
+        </Link>
+      </li>
+    </ConversationMenu>
+  );
+}
+
+interface RowMenu {
+  /** The conversations the menu acts on: the row, or the selection it is part of. */
+  ids: string[];
+  trash: boolean;
+  archived: boolean;
+  onAct: (action: BulkAction, labelId: string | null, ids: string[]) => void;
+  onPurge: (ids: string[]) => void;
+}
+
+/** A conversation's right-click menu: the same actions as the toolbar over the list. */
+function ConversationMenu({
+  href,
+  menu: { ids, trash, archived, onAct, onPurge },
+  children,
+}: {
+  href: string;
+  menu: RowMenu;
+  children: ReactElement;
+}) {
+  const navigate = useNavigate();
+  const all = useInbox().data ?? [];
+  const labels = useMailLabels().data ?? [];
+  const chosen = all.filter((c) => ids.includes(c.id));
+  const many = ids.length > 1;
+  const act = (action: BulkAction, labelId: string | null = null) => onAct(action, labelId, ids);
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+      <ContextMenuContent className="w-56">
+        {!many && (
+          <>
+            <ContextMenuItem onSelect={() => void navigate(href)}>
+              <MailOpen /> Open
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+          </>
+        )}
+        {trash ? (
+          <>
+            <ContextMenuItem onSelect={() => act('restore')}>
+              <Undo2 /> Restore{many && ` ${ids.length}`}
+            </ContextMenuItem>
+            <ContextMenuItem variant="destructive" onSelect={() => onPurge(ids)}>
+              <Trash2 /> Delete forever…
+            </ContextMenuItem>
+          </>
+        ) : (
+          <>
+            {archived ? (
+              <ContextMenuItem onSelect={() => act('unarchive')}>
+                <ArchiveRestore /> Move to the inbox
+              </ContextMenuItem>
+            ) : (
+              <ContextMenuItem onSelect={() => act('archive')}>
+                <Archive /> Archive{many && ` ${ids.length}`}
+              </ContextMenuItem>
+            )}
+            {chosen.some((c) => c.unread) ? (
+              <ContextMenuItem onSelect={() => act('read')}>
+                <MailOpen /> Mark as read
+              </ContextMenuItem>
+            ) : (
+              <ContextMenuItem onSelect={() => act('unread')}>
+                <Mail /> Mark as unread
+              </ContextMenuItem>
+            )}
+            <ContextMenuItem
+              onSelect={() => act(chosen.every((c) => c.starred) ? 'unstar' : 'star')}
+            >
+              <Star /> {chosen.every((c) => c.starred) ? 'Unstar' : 'Star'}
+            </ContextMenuItem>
+            {labels.length > 0 && (
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  <Tag /> Label as
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent>
+                  {labels.map((l) => (
+                    <ContextMenuCheckboxItem
+                      key={l.id}
+                      checked={chosen.length > 0 && chosen.every((c) => c.labelIds.includes(l.id))}
+                      onCheckedChange={(on) => act(on ? 'label' : 'unlabel', l.id)}
+                    >
+                      <LabelDot color={l.color} />
+                      {l.name}
+                    </ContextMenuCheckboxItem>
+                  ))}
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+            )}
+            <ContextMenuSeparator />
+            <ContextMenuItem variant="destructive" onSelect={() => act('trash')}>
+              <Trash2 /> Move to trash{many && ` ${ids.length}`}
+            </ContextMenuItem>
+          </>
+        )}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 

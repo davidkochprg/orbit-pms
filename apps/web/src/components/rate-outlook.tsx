@@ -1,4 +1,5 @@
 import type { NightOutlook } from '@orbit/shared';
+import { Check, PanelRight, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ArrivalRisks } from '@/components/arrival-risks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -8,6 +9,13 @@ import { Panel, ScrollBox } from '@/components/panel';
 import { RateCalendar } from '@/components/rate-calendar';
 import { RateNightPanel } from '@/components/rate-night-panel';
 import { Button } from '@/components/ui/button';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuLabel,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -145,6 +153,33 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
           <RateCalendar
             nights={nights}
             selected={selected?.date ?? null}
+            menu={(night, cell) => (
+              <ContextMenu>
+                <ContextMenuTrigger asChild>{cell}</ContextMenuTrigger>
+                <ContextMenuContent className="w-56">
+                  <ContextMenuLabel>{formatDate(night.date)}</ContextMenuLabel>
+                  <ContextMenuItem onSelect={() => setPicked(night.date)}>
+                    <PanelRight /> Show this night
+                  </ContextMenuItem>
+                  {canManage && night.suggestedPercent !== night.currentPercent && (
+                    <ContextMenuItem
+                      disabled={adjust.isPending}
+                      onSelect={() => set([night], (n) => n.suggestedPercent)}
+                    >
+                      <Check /> Take the suggestion, {signed(night.suggestedPercent)}
+                    </ContextMenuItem>
+                  )}
+                  {canManage && night.currentPercent !== 0 && (
+                    <ContextMenuItem
+                      disabled={adjust.isPending}
+                      onSelect={() => set([night], () => 0)}
+                    >
+                      <RotateCcw /> Go back to the season rate
+                    </ContextMenuItem>
+                  )}
+                </ContextMenuContent>
+              </ContextMenu>
+            )}
             onSelect={(date, via) => {
               setPicked(date);
               // Below the calendar on narrower screens: bring a clicked night into view.

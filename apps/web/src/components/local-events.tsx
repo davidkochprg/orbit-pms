@@ -1,6 +1,7 @@
 import { type EventImpact, eventImpacts, type LocalEvent } from '@orbit/shared';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { ActionMenu } from '@/components/action-menu';
 import { ErrorNotice } from '@/components/error-notice';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Button } from '@/components/ui/button';
@@ -45,37 +46,48 @@ export function LocalEvents({
       )}
       <ul className="flex flex-col">
         {events.map((e) => (
-          <li
+          <ActionMenu
             key={e.id}
-            className="flex items-center gap-3 border-b border-ink/5 px-3 py-2 last:border-b-0"
+            label={e.name}
+            actions={[
+              canManage && {
+                label: 'Remove event',
+                icon: Trash2,
+                destructive: true,
+                disabled: remove.isPending,
+                onSelect: () => remove.mutate(e.id),
+              },
+            ]}
           >
-            <span className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[0.8125rem]">{e.name}</span>
-              <span className="text-xs text-muted-foreground">
-                {formatDate(e.firstNight)}
-                {e.lastNight !== e.firstNight && ` – ${formatDate(e.lastNight)}`}
+            <li className="flex items-center gap-3 border-b border-ink/5 px-3 py-2 last:border-b-0">
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[0.8125rem]">{e.name}</span>
+                <span className="text-xs text-muted-foreground">
+                  {formatDate(e.firstNight)}
+                  {e.lastNight !== e.firstNight && ` – ${formatDate(e.lastNight)}`}
+                </span>
               </span>
-            </span>
-            <span
-              className={cn(
-                'rounded-[5px] px-1.5 text-[0.6875rem] leading-5',
-                impactTone[e.impact],
-              )}
-            >
-              {impactLabels[e.impact]}
-            </span>
-            {canManage && (
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                aria-label={`Remove ${e.name}`}
-                disabled={remove.isPending}
-                onClick={() => remove.mutate(e.id)}
+              <span
+                className={cn(
+                  'rounded-[5px] px-1.5 text-[0.6875rem] leading-5',
+                  impactTone[e.impact],
+                )}
               >
-                <Trash2 />
-              </Button>
-            )}
-          </li>
+                {impactLabels[e.impact]}
+              </span>
+              {canManage && (
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={`Remove ${e.name}`}
+                  disabled={remove.isPending}
+                  onClick={() => remove.mutate(e.id)}
+                >
+                  <Trash2 />
+                </Button>
+              )}
+            </li>
+          </ActionMenu>
         ))}
       </ul>
       {error && <ErrorNotice message={error.message} className="m-2" />}

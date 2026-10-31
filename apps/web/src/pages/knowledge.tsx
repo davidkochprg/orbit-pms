@@ -1,7 +1,18 @@
 import { hotelInfoCategoryLabels, type HotelInfoEntry } from '@orbit/shared';
-import { BookOpenText, CalendarClock, ChevronRight, type LucideIcon, Plus, X } from 'lucide-react';
+import {
+  BookOpenText,
+  CalendarClock,
+  ChevronRight,
+  ExternalLink,
+  type LucideIcon,
+  Pencil,
+  Plus,
+  Trash2,
+  X,
+} from 'lucide-react';
 import { useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import { ActionMenu } from '@/components/action-menu';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
@@ -142,16 +153,30 @@ function NotePane({
 }) {
   const navigate = useNavigate();
   const remove = useRemoveEntry();
-  const [editing, setEditing] = useState(false);
-  const [deleting, setDeleting] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const [editingHere, setEditing] = useState(false);
+  const [deletingHere, setDeleting] = useState(false);
+  // The tree's right-click menu asks for these with `&edit` or `&delete` on the note's link.
+  const editing = editingHere || params.has('edit');
+  const deleting = deletingHere || params.has('delete');
+  const settle = (setter: (on: boolean) => void) => (on: boolean) => {
+    setter(on);
+    if (on || (!params.has('edit') && !params.has('delete'))) return;
+    const next = new URLSearchParams(params);
+    next.delete('edit');
+    next.delete('delete');
+    setParams(next, { replace: true });
+  };
+  const setEditingNow = settle(setEditing);
+  const setDeletingNow = settle(setDeleting);
 
   if (editing) {
     return (
       <NoteEditor
         id={note.id}
         initial={noteDraft(note)}
-        onSaved={() => setEditing(false)}
-        onCancel={() => setEditing(false)}
+        onSaved={() => setEditingNow(false)}
+        onCancel={() => setEditingNow(false)}
       />
     );
   }
@@ -167,7 +192,7 @@ function NotePane({
       />
       <ConfirmDialog
         open={deleting}
-        onOpenChange={setDeleting}
+        onOpenChange={setDeletingNow}
         title={`Delete "${note.title}"?`}
         description="Orbit stops telling guests about it."
         confirmLabel="Delete"
@@ -176,7 +201,7 @@ function NotePane({
         onConfirm={() =>
           remove.mutate(note.id, {
             onSuccess: () => void navigate('/knowledge', { replace: true }),
-            onSettled: () => setDeleting(false),
+            onSettled: () => setDeletingNow(false),
           })
         }
       />
@@ -277,6 +302,7 @@ function TreeGroup({
   today: string | undefined;
   open: boolean;
 }) {
+  const navigate = useNavigate();
   const [folded, setFolded] = useState(false);
   const open = forced || !folded;
   return (
@@ -305,23 +331,46 @@ function TreeGroup({
             const ended = Boolean(n.until && today && n.until < today);
             return (
               <li key={n.id}>
-                <Link
-                  to={noteHref(n.id)}
-                  aria-current={n.id === activeId ? 'page' : undefined}
-                  className={cn(
-                    'flex h-7 items-center gap-2 rounded-md px-2 text-[0.8125rem] text-muted-foreground outline-none transition-colors duration-150 ease-snap hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
-                    n.id === activeId && 'bg-sidebar-accent text-foreground',
-                    ended && 'opacity-60',
-                  )}
+                <ActionMenu
+                  label={n.title}
+                  actions={[
+                    {
+                      label: 'Open',
+                      icon: ExternalLink,
+                      onSelect: () => void navigate(noteHref(n.id)),
+                    },
+                    {
+                      label: 'Edit',
+                      icon: Pencil,
+                      onSelect: () => void navigate(`${noteHref(n.id)}&edit`),
+                    },
+                    {
+                      label: 'Delete…',
+                      icon: Trash2,
+                      destructive: true,
+                      group: true,
+                      onSelect: () => void navigate(`${noteHref(n.id)}&delete`),
+                    },
+                  ]}
                 >
-                  <span className="flex-1 truncate">{n.title}</span>
-                  {n.until && !ended && (
-                    <span
-                      aria-label="Notice"
-                      className="size-1.5 shrink-0 rounded-full bg-warning"
-                    />
-                  )}
-                </Link>
+                  <Link
+                    to={noteHref(n.id)}
+                    aria-current={n.id === activeId ? 'page' : undefined}
+                    className={cn(
+                      'flex h-7 items-center gap-2 rounded-md px-2 text-[0.8125rem] text-muted-foreground outline-none transition-colors duration-150 ease-snap hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+                      n.id === activeId && 'bg-sidebar-accent text-foreground',
+                      ended && 'opacity-60',
+                    )}
+                  >
+                    <span className="flex-1 truncate">{n.title}</span>
+                    {n.until && !ended && (
+                      <span
+                        aria-label="Notice"
+                        className="size-1.5 shrink-0 rounded-full bg-warning"
+                      />
+                    )}
+                  </Link>
+                </ActionMenu>
               </li>
             );
           })}

@@ -1,4 +1,5 @@
 import type { HousekeepingRoom } from '@orbit/shared';
+import type { ReactElement } from 'react';
 import { type HouseRoomState, houseFloors, houseStateLabels, houseStates } from '@/lib/house-map';
 import { cn } from '@/lib/utils';
 import { Tip } from '@/components/ui/tooltip';
@@ -24,12 +25,15 @@ export function HouseMap({
   stays,
   onOpenStay,
   onBook,
+  menu,
 }: {
   rooms: HousekeepingRoom[];
   /** Today's stay per room id, see `stayByRoom`. */
   stays?: Map<string, string>;
   onOpenStay?: (bookingId: string) => void;
   onBook?: (roomId: string) => void;
+  /** Wraps a room's tile in its right-click menu. */
+  menu?: (roomId: string, tile: ReactElement) => ReactElement;
 }) {
   const floors = houseFloors(rooms);
   // One column per room on the widest floor, so rooms line up across floors like windows.
@@ -77,20 +81,23 @@ export function HouseMap({
                       style={{ animationDelay: `${index++ * 8}ms` }}
                       className="flex min-w-0 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-90 motion-safe:fill-mode-backwards motion-safe:animation-duration-300"
                     >
-                      {action ? (
-                        <button
-                          type="button"
-                          onClick={action}
-                          className={cn(
-                            tile,
-                            'cursor-pointer transition-[filter,translate] duration-150 ease-snap outline-none hover:brightness-[1.08] focus-visible:ring-2 focus-visible:ring-ring active:translate-y-px dark:hover:brightness-125',
-                          )}
-                        >
-                          {name}
-                        </button>
-                      ) : (
-                        <span className={tile}>{name}</span>
-                      )}
+                      {(() => {
+                        const inner = action ? (
+                          <button
+                            type="button"
+                            onClick={action}
+                            className={cn(
+                              tile,
+                              'cursor-pointer transition-[filter,translate] duration-150 ease-snap outline-none hover:brightness-[1.08] focus-visible:ring-2 focus-visible:ring-ring active:translate-y-px dark:hover:brightness-125',
+                            )}
+                          >
+                            {name}
+                          </button>
+                        ) : (
+                          <span className={tile}>{name}</span>
+                        );
+                        return menu ? menu(room.id, inner) : inner;
+                      })()}
                     </li>
                   </Tip>
                 );

@@ -11,8 +11,9 @@ import {
   tableFeatures,
   useTable,
 } from '@tanstack/react-table';
-import { ArrowDown, ArrowUp, Plus, Users } from 'lucide-react';
+import { ArrowDown, ArrowUp, CalendarPlus, ExternalLink, Plus, Users } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router';
+import { ActionMenu } from '@/components/action-menu';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
@@ -21,6 +22,7 @@ import { PageHeader } from '@/components/page-header';
 import { SearchField } from '@/components/search-field';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useGuests } from '@/lib/api';
 import { languageLabels } from '@/lib/format';
 import { cn, labelCaps } from '@/lib/utils';
@@ -62,6 +64,7 @@ const noGuests: Guest[] = [];
 
 export function GuestsPage() {
   const guests = useGuests();
+  const { openNew } = useBookingEditor();
   const navigate = useNavigate();
   // `?new=guest` opens the form, so the command bar can link to it.
   const [params, setParams] = useSearchParams();
@@ -145,23 +148,39 @@ export function GuestsPage() {
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr
+                <ActionMenu
                   key={row.id}
-                  className="cursor-pointer border-b border-grid-line hover:bg-accent"
-                  onClick={() => void navigate(`/guests/${row.original.id}`)}
+                  label={row.original.name}
+                  actions={[
+                    {
+                      label: 'Open profile',
+                      icon: ExternalLink,
+                      onSelect: () => void navigate(`/guests/${row.original.id}`),
+                    },
+                    {
+                      label: 'New booking…',
+                      icon: CalendarPlus,
+                      onSelect: () => openNew({ guestId: row.original.id }),
+                    },
+                  ]}
                 >
-                  {row.getAllCells().map((cell) => (
-                    <td
-                      key={cell.id}
-                      className={cn(
-                        'h-11 px-4 text-muted-foreground first:pl-6 first:text-foreground',
-                        wideOnly.has(cell.column.id) && 'max-md:hidden',
-                      )}
-                    >
-                      <table.FlexRender cell={cell} />
-                    </td>
-                  ))}
-                </tr>
+                  <tr
+                    className="cursor-pointer border-b border-grid-line hover:bg-accent"
+                    onClick={() => void navigate(`/guests/${row.original.id}`)}
+                  >
+                    {row.getAllCells().map((cell) => (
+                      <td
+                        key={cell.id}
+                        className={cn(
+                          'h-11 px-4 text-muted-foreground first:pl-6 first:text-foreground',
+                          wideOnly.has(cell.column.id) && 'max-md:hidden',
+                        )}
+                      >
+                        <table.FlexRender cell={cell} />
+                      </td>
+                    ))}
+                  </tr>
+                </ActionMenu>
               ))}
             </tbody>
           </table>

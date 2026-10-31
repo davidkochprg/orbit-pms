@@ -1,14 +1,21 @@
-import type { DailyBrief, DayOverview, HousekeepingRoom } from '@orbit/shared';
-import { type ReactNode, useMemo } from 'react';
+import type { DailyBrief, DayOverview, HousekeepingRoom, RoomStatus } from '@orbit/shared';
+import { ExternalLink, Plus } from 'lucide-react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { HouseMap } from '@/components/house-map';
 import { Panel } from '@/components/panel';
+import { RoomContextMenu } from '@/components/room-menu';
+import { TaskDialog } from '@/components/task-dialog';
 import { Button } from '@/components/ui/button';
+import { ContextMenuItem } from '@/components/ui/context-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
+import { useToast } from '@/hooks/use-toast';
+import { useSetRoomStatus } from '@/lib/api';
 import { doneOf, occupancyPercent } from '@/lib/brief';
 import { stayByRoom } from '@/lib/house-map';
+import { roomStatusLabels } from '@/lib/status';
 
 /** Tonight at a glance: the day's figures in a row over the house map. */
 export function TonightPanel({
@@ -26,6 +33,27 @@ export function TonightPanel({
   const { open } = useBookingDrawer();
   const { openNew } = useBookingEditor();
   const stays = useMemo(() => day && stayByRoom(day), [day]);
+  const setStatus = useSetRoomStatus();
+  const { toast } = useToast();
+  const [taskRoom, setTaskRoom] = useState<string | null>(null);
+
+  /** Sets a room's status from its menu and says so, with Undo back to what it was. */
+  function changeStatus(roomId: string, status: RoomStatus) {
+    const item = rooms?.find((r) => r.room.id === roomId);
+    if (!item) return;
+    const from = item.room.status;
+    setStatus.mutate(
+      { roomId, status },
+      {
+        onSuccess: () =>
+          toast({
+            title: `Room ${item.room.name} marked ${roomStatusLabels[status].toLowerCase()}`,
+            action: { label: 'Undo', run: () => setStatus.mutate({ roomId, status: from }) },
+          }),
+      },
+    );
+  }
+
   return (
     <Panel
       title="Tonight"
@@ -81,11 +109,41 @@ export function TonightPanel({
             stays={stays}
             onOpenStay={(id) => open(id)}
             onBook={(roomId) => openNew({ roomId, checkIn: brief.date })}
+            menu={(roomId, tile) => {
+              const item = rooms.find((r) => r.room.id === roomId);
+              if (!item) return tile;
+              const stay = stays?.get(roomId);
+              return (
+                <RoomContextMenu
+                  item={item}
+                  onSetStatus={changeStatus}
+                  onAddTask={setTaskRoom}
+                  first={
+                    stay ? (
+                      <ContextMenuItem onSelect={() => open(stay)}>
+                        <ExternalLink /> Open the stay
+                      </ContextMenuItem>
+                    ) : item.room.status !== 'out_of_order' ? (
+                      <ContextMenuItem onSelect={() => openNew({ roomId, checkIn: brief.date })}>
+                        <Plus /> New booking tonight…
+                      </ContextMenuItem>
+                    ) : undefined
+                  }
+                >
+                  {tile}
+                </RoomContextMenu>
+              );
+            }}
           />
         ) : (
           <Skeleton className="h-44 w-full" />
         )}
       </div>
+      <TaskDialog
+        open={taskRoom !== null}
+        onOpenChange={(open) => !open && setTaskRoom(null)}
+        roomId={taskRoom ?? undefined}
+      />
     </Panel>
   );
 }

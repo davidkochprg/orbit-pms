@@ -1,7 +1,15 @@
 import type { NightOutlook, WeatherKind } from '@orbit/shared';
 import { addDays, format, parseISO } from 'date-fns';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import {
+  type ComponentProps,
+  Fragment,
+  type KeyboardEvent,
+  type ReactElement,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { Button } from '@/components/ui/button';
 import { calendarMonths, monthPageOf, occupancy, signed, weatherLabels } from '@/lib/revenue';
 import { weatherIcons } from '@/lib/weather-icons';
@@ -23,11 +31,14 @@ export function RateCalendar({
   nights,
   selected,
   onSelect,
+  menu,
 }: {
   nights: NightOutlook[];
   selected: string | null;
   /** `via` says whether the night was clicked or reached with the arrow keys. */
   onSelect: (date: string, via: 'click' | 'key') => void;
+  /** Wraps a night's cell in its right-click menu. */
+  menu?: (night: NightOutlook, cell: ReactElement) => ReactElement;
 }) {
   const pages = calendarMonths(nights);
   const [page, setPage] = useState(() => (selected ? monthPageOf(pages, selected) : 0));
@@ -102,15 +113,21 @@ export function RateCalendar({
           ))}
           {days.map((day) =>
             day.night ? (
-              <NightCell
-                key={day.date}
-                night={day.night}
-                outside={!day.inMonth}
-                selected={day.date === selected}
-                tabbable={day.date === tabStop}
-                onSelect={() => onSelect(day.date, 'click')}
-                onKeyDown={(e) => move(e, day.date)}
-              />
+              <Fragment key={day.date}>
+                {(() => {
+                  const cell = (
+                    <NightCell
+                      night={day.night}
+                      outside={!day.inMonth}
+                      selected={day.date === selected}
+                      tabbable={day.date === tabStop}
+                      onSelect={() => onSelect(day.date, 'click')}
+                      onKeyDown={(e) => move(e, day.date)}
+                    />
+                  );
+                  return menu ? menu(day.night, cell) : cell;
+                })()}
+              </Fragment>
             ) : (
               <span
                 key={day.date}
@@ -134,6 +151,7 @@ function NightCell({
   tabbable,
   onSelect,
   onKeyDown,
+  ...rest
 }: {
   night: NightOutlook;
   /** In the month before or after the page's. */
@@ -142,7 +160,7 @@ function NightCell({
   tabbable: boolean;
   onSelect: () => void;
   onKeyDown: (e: KeyboardEvent) => void;
-}) {
+} & Omit<ComponentProps<'button'>, 'onSelect' | 'onKeyDown'>) {
   const date = parseISO(night.date);
   const share = occupancy(night);
   const changes = night.suggestedPercent !== night.currentPercent;
@@ -158,6 +176,8 @@ function NightCell({
     .join(', ');
   return (
     <button
+      // A right-click menu around the cell passes its trigger props through.
+      {...rest}
       type="button"
       aria-label={label}
       aria-pressed={selected}
