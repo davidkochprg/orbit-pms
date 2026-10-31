@@ -49,7 +49,14 @@ export interface PendingActionDeps {
   >;
   inbox: Pick<
     InboxService,
-    'get' | 'previewHold' | 'createHold' | 'previewBlock' | 'holdBlock' | 'send' | 'decline'
+    | 'get'
+    | 'previewHold'
+    | 'createHold'
+    | 'previewBlock'
+    | 'holdBlock'
+    | 'send'
+    | 'sendArrivalNote'
+    | 'decline'
   >;
   events: Pick<RevenueService, 'listEvents' | 'createEvent' | 'deleteEvent'>;
   contacts: Pick<ContactService, 'get' | 'create' | 'update' | 'remove'>;
@@ -638,6 +645,17 @@ export function createPendingActionService({
           details: details([added('Reply', text(action.input.body.trim()))]),
         };
       }
+      case 'send_arrival_note': {
+        const { booking, guest } = await hotel.getBookingDetail(action.input.bookingId);
+        if (!guest.email) throw new DomainError('invalid_input', 'The guest has no email address');
+        return {
+          summary: `Email ${guest.name} before their stay, ${stay(booking)}: "${excerpt(action.input.subject)}"`,
+          details: details([
+            added('To', text(guest.email)),
+            added('Subject', text(action.input.subject.trim())),
+          ]),
+        };
+      }
       case 'hold_inquiry': {
         const { booking, room, guestName, moved } = await inbox.previewHold(
           action.input.inquiryId,
@@ -859,6 +877,11 @@ export function createPendingActionService({
       case 'send_reply': {
         const { inquiryId, body } = action.input;
         return (await inbox.send(inquiryId, { body }, by?.name ?? null, 'agent')).bookingId;
+      }
+      case 'send_arrival_note': {
+        const { bookingId, subject, body } = action.input;
+        await inbox.sendArrivalNote(bookingId, { subject, body }, by?.name ?? null, 'agent');
+        return bookingId;
       }
       case 'hold_inquiry':
         return id(await inbox.createHold(action.input.inquiryId, action.input.roomId, 'agent'));

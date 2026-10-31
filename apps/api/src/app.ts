@@ -50,7 +50,7 @@ import { createAiGate } from './ai-gate';
 import { errorBody, handleError } from './http';
 import { type AiLimitsConfig, createAiLimiter } from './limits';
 import { activityRoutes } from './routes/activity';
-import { arrivalNoteRoutes } from './routes/arrival-notes';
+import { arrivalNoteRoutes, createArrivalNoteDrafter } from './routes/arrival-notes';
 import { agentRoutes } from './routes/agent';
 import { billingRoutes } from './routes/billing';
 import { contactRoutes } from './routes/contacts';
@@ -191,6 +191,16 @@ export function createApp({
   const desk =
     ai &&
     createRepairDesk({ model: ai.agent, modelId: ai.agentModelId, draftModel: ai.draft, usage });
+  const arrivalNotes = createArrivalNoteService({ repos, clock });
+  const draftArrivalNote =
+    ai &&
+    createArrivalNoteDrafter({
+      hotel,
+      writer: createArrivalNoteWriter({ model: ai.draft, usage, hotelContext }),
+      forecast,
+      country: async () => (await settings.getProfile()).country,
+      today: () => hotelToday(clock()),
+    });
   const access = createDemoAccess({ code: accessCode, clock });
   const app = new Hono();
   if (log) app.use(logger());
@@ -236,13 +246,10 @@ export function createApp({
   app.route(
     '/api',
     arrivalNoteRoutes({
-      arrivalNotes: createArrivalNoteService({ repos, clock }),
+      arrivalNotes,
       hotel,
       inbox,
-      writer: ai && createArrivalNoteWriter({ model: ai.draft, usage, hotelContext }),
-      forecast,
-      country: async () => (await settings.getProfile()).country,
-      today: () => hotelToday(clock()),
+      draft: draftArrivalNote,
       gate,
       identify: (id) => staff.identify(id),
     }),
@@ -295,6 +302,9 @@ export function createApp({
       activity,
       events: revenue,
       contacts,
+      arrivalNotesDue: (date) => arrivalNotes.due(date),
+      // The agent's drafts are signed by the reception; the confirming staff member sends them.
+      draftArrivalNote: draftArrivalNote && ((bookingId) => draftArrivalNote(bookingId, null)),
       limiter,
       gate,
       clock,

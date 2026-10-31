@@ -11,6 +11,9 @@ import {
   type ReportService,
 } from '@orbit/domain';
 import {
+  type ArrivalNote,
+  type ArrivalNotes,
+  type IsoDate,
   type AgentBookingRow,
   type AgentRoomStatusResult,
   type AgentTaskCreatedResult,
@@ -99,6 +102,10 @@ export interface ToolDeps {
   statedAmounts: () => Promise<number[]>;
   /** Suppliers and contractors, and who was asked to fix a repair. */
   contacts: Pick<ContactService, 'list' | 'repair' | 'askToRepair'>;
+  /** Guests arriving on a day who haven't heard from the hotel, tomorrow by default. */
+  arrivalNotesDue?: (date?: IsoDate) => Promise<ArrivalNotes>;
+  /** Writes the note before a stay in the guest's language; null when drafting is off. */
+  draftArrivalNote?: ((bookingId: string) => Promise<ArrivalNote>) | null;
 }
 
 export interface ToolError {
@@ -314,6 +321,7 @@ export const proposalToolNames = [
   'saveHotelInfo',
   'removeHotelInfo',
   'sendReply',
+  'sendArrivalNote',
   'holdFromConversation',
   'declineConversation',
   'addLocalEvent',
@@ -361,6 +369,8 @@ export function createAgentTools({
   relocations,
   inbox,
   draftReply,
+  arrivalNotesDue,
+  draftArrivalNote,
   activity,
   getGuest,
   guestBookings,
@@ -634,6 +644,65 @@ export function createAgentTools({
         roomId
           ? propose({ kind: 'hold_inquiry', input: { inquiryId, roomId } })
           : propose({ kind: 'hold_block', input: { inquiryId } }),
+    }),
+    getArrivalNotes: tool({
+      description:
+        "Guests arriving on a day (tomorrow by default) with a confirmed stay and an email address who haven't heard from the hotel about it yet: who still needs a note before their stay.",
+      inputSchema: z.object({ date: isoDateSchema.optional().describe('Defaults to tomorrow.') }),
+      execute: ({ date }) =>
+        safely(async () => {
+          if (!arrivalNotesDue) {
+            return { error: { code: 'not_configured', message: 'Arrival notes are not set up.' } };
+          }
+          const notes = await arrivalNotesDue(date);
+          return {
+            date: notes.date,
+            due: notes.due.map((d) => ({
+              bookingId: d.bookingId,
+              guestName: d.guestName,
+              language: d.language,
+              roomName: d.roomName,
+              checkIn: d.checkIn,
+              checkOut: d.checkOut,
+            })),
+          };
+        }),
+    }),
+    draftArrivalNote: tool({
+      description:
+        "Write the email before a guest's stay, in their language: arrival day and check-in time, the forecast, what fits their stay from the hotel information, and the ID to bring. Then propose sending it with sendArrivalNote, word for word; the confirm card shows the email, so don't repeat it in your answer.",
+      inputSchema: bookingIdSchema,
+      execute: ({ bookingId }) =>
+        safely(async () => {
+          if (!draftArrivalNote) {
+            return { error: { code: 'not_configured', message: 'Arrival notes are not set up.' } };
+          }
+          return { bookingId, ...(await draftArrivalNote(bookingId)) };
+        }),
+    }),
+    sendArrivalNote: tool({
+      description:
+        'Propose sending the email before a stay to the guest who booked, as written by draftArrivalNote or edited as the staff member asked. It is linked to the booking. The user must confirm.',
+      inputSchema: bookingIdSchema.extend({
+        subject: z.string().min(1).max(200),
+        body: z.string().min(1).max(5000),
+      }),
+      execute: (input) =>
+        safely(async () => {
+          const stated = await statedAmounts();
+          const unknown = amountsInText(`${input.subject}\n${input.body}`).filter(
+            (a) => !stated.includes(a),
+          );
+          if (unknown.length > 0) {
+            return {
+              error: {
+                code: 'unquoted_price',
+                message: `The note states amounts the hotel information doesn't (${[...new Set(unknown)].join(', ')}). Leave prices out.`,
+              },
+            };
+          }
+          return propose({ kind: 'send_arrival_note', input });
+        }),
     }),
     declineConversation: tool({
       description:

@@ -110,6 +110,15 @@ const toolLabels: Record<string, [running: string, done: string]> = {
   addLocalEvent: ['Preparing the local event', 'Prepared the local event'],
   removeLocalEvent: ['Preparing to remove the event', 'Prepared to remove the event'],
   updateRoom: ['Preparing the room change', 'Prepared the room change'],
+  listContacts: ['Looking up contacts', 'Looked up contacts'],
+  getRepair: ['Checking who can fix it', 'Checked who can fix it'],
+  recordRepairContact: ['Noting who was asked', 'Noted who was asked'],
+  saveContact: ['Preparing the contact', 'Prepared the contact'],
+  removeContact: ['Preparing to delete the contact', 'Prepared to delete the contact'],
+  organizeConversations: ['Filing the conversations', 'Filed the conversations'],
+  getArrivalNotes: ["Checking tomorrow's arrivals", "Checked tomorrow's arrivals"],
+  draftArrivalNote: ['Writing the note before the stay', 'Wrote the note before the stay'],
+  sendArrivalNote: ['Preparing the email', 'Prepared the email'],
 };
 
 /** A plain-language line for a tool step, so staff see what the agent looked at. */
@@ -127,6 +136,7 @@ const orbStates: Record<string, AgentOrbState> = {
   getReport: 'solving',
   getBill: 'solving',
   draftReply: 'composing',
+  draftArrivalNote: 'composing',
   setRoomStatus: 'weaving',
   createHousekeepingTask: 'weaving',
   setTaskStatus: 'weaving',

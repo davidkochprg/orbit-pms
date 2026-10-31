@@ -6,6 +6,7 @@ import {
   type InboxService,
 } from '@orbit/domain';
 import {
+  type ArrivalNote,
   arrivalNoteSchema,
   isoDateSchema,
   type StaffMember,
@@ -18,17 +19,57 @@ import type { AiGate } from '../ai-gate';
 import { errorBody } from '../http';
 import { validate } from '../validate';
 
-export interface ArrivalNoteRouteDeps {
-  arrivalNotes: ArrivalNoteService;
+/** What drafting a note needs: the stay, the forecast and the hotel's country. */
+export interface ArrivalNoteDrafterDeps {
   hotel: HotelService;
-  inbox: InboxService;
-  /** Null when AI is not configured. */
-  writer: ArrivalNoteWriter | null;
+  writer: ArrivalNoteWriter;
   /** The daily forecast at the hotel, when there is one. */
   forecast: () => Promise<WeatherDay[] | null>;
   /** The hotel's country, for who shows an ID at check-in. */
   country: () => Promise<string>;
   today: () => string;
+}
+
+/**
+ * Drafts the note before a booking's stay, signed by `signer`: the stay, the forecast for the
+ * arrival day and the region's ID rule go to the writer. Used by the dialog and the agent.
+ */
+export function createArrivalNoteDrafter({
+  hotel,
+  writer,
+  forecast,
+  country,
+  today,
+}: ArrivalNoteDrafterDeps) {
+  return async (bookingId: string, signer: string | null): Promise<ArrivalNote> => {
+    const { booking, guest, roomType } = await hotel.getBookingDetail(bookingId);
+    const [days, where] = await Promise.all([forecast().catch(() => null), country()]);
+    return writer.write({
+      guest: { name: guest.name, language: guest.language },
+      stay: {
+        checkIn: booking.checkIn,
+        checkOut: booking.checkOut,
+        adults: booking.adults,
+        childAges: booking.childAges,
+        roomTypeName: roomType.name,
+        addons: booking.addons,
+      },
+      weather: days?.find((d) => d.date === booking.checkIn) ?? null,
+      idsFrom: guestBookRulesFor(where).scope,
+      signer,
+      today: today(),
+    });
+  };
+}
+
+export type ArrivalNoteDrafter = ReturnType<typeof createArrivalNoteDrafter>;
+
+export interface ArrivalNoteRouteDeps {
+  arrivalNotes: ArrivalNoteService;
+  hotel: HotelService;
+  inbox: InboxService;
+  /** Null when AI is not configured. */
+  draft: ArrivalNoteDrafter | null;
   gate: AiGate;
   identify: (id: string | undefined) => Promise<StaffMember | null>;
 }
@@ -41,10 +82,7 @@ export function arrivalNoteRoutes({
   arrivalNotes,
   hotel,
   inbox,
-  writer,
-  forecast,
-  country,
-  today,
+  draft,
   gate,
   identify,
 }: ArrivalNoteRouteDeps) {
@@ -55,35 +93,17 @@ export function arrivalNoteRoutes({
       async (c) => c.json(await arrivalNotes.due(c.req.valid('query').date)),
     )
     .post('/arrival-notes/:bookingId/draft', async (c) => {
-      if (!writer) {
+      if (!draft) {
         return c.json(errorBody('ai_not_configured', 'The AI agent is not configured.'), 503);
       }
-      const { booking, guest, roomType } = await hotel.getBookingDetail(c.req.param('bookingId'));
+      const bookingId = c.req.param('bookingId');
+      // An unknown booking is a 404 before anything counts against the limits.
+      await hotel.getBookingDetail(bookingId);
       const blocked = await gate(c.req.header('x-forwarded-for'));
       if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
-      const [days, where, signer] = await Promise.all([
-        forecast().catch(() => null),
-        country(),
-        identify(c.req.header(STAFF_HEADER)),
-      ]);
+      const signer = await identify(c.req.header(STAFF_HEADER));
       try {
-        return c.json(
-          await writer.write({
-            guest: { name: guest.name, language: guest.language },
-            stay: {
-              checkIn: booking.checkIn,
-              checkOut: booking.checkOut,
-              adults: booking.adults,
-              childAges: booking.childAges,
-              roomTypeName: roomType.name,
-              addons: booking.addons,
-            },
-            weather: days?.find((d) => d.date === booking.checkIn) ?? null,
-            idsFrom: guestBookRulesFor(where).scope,
-            signer: signer?.name ?? null,
-            today: today(),
-          }),
-        );
+        return c.json(await draft(bookingId, signer?.name ?? null));
       } catch (err) {
         if (err instanceof ArrivalNoteError) {
           return c.json(errorBody('draft_failed', err.message), 422);

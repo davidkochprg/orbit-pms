@@ -32,6 +32,8 @@ import {
 } from '@orbit/domain';
 import {
   type AgentContext,
+  type ArrivalNote,
+  type ArrivalNotes,
   type HotelInfoEntry,
   type Inquiry,
   type Relocation,
@@ -77,6 +79,10 @@ export interface AgentRouteDeps {
   activity: ActivityService;
   events: Pick<RevenueService, 'listEvents'>;
   contacts: Pick<ContactService, 'list' | 'repair' | 'askToRepair'>;
+  /** Guests arriving on a day who haven't heard from the hotel. */
+  arrivalNotesDue: (date?: string) => Promise<ArrivalNotes>;
+  /** Writes the note before a stay; null when AI drafts are off. */
+  draftArrivalNote: ((bookingId: string) => Promise<ArrivalNote>) | null;
   limiter: AiLimiter;
   gate: AiGate;
   clock: () => Date;
@@ -105,6 +111,8 @@ export function agentRoutes({
   activity,
   events,
   contacts,
+  arrivalNotesDue,
+  draftArrivalNote,
   limiter,
   clock,
   usage,
@@ -131,6 +139,8 @@ export function agentRoutes({
     statedAmounts: async () => amountsInText(hotelFacts(await hotelContext())),
     contacts,
     mailLabels: () => repos.mail.listLabels(),
+    arrivalNotesDue,
+    draftArrivalNote,
   });
 
   /** What the staff member was looking at, from the hotel's own data; null if it is gone. */

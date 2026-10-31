@@ -442,6 +442,41 @@ describe('agent tools', () => {
     expect(right).toMatchObject({ status: 'awaiting_confirmation' });
   });
 
+  it("drafts and proposes a guest's note before their stay, without unstated prices", async () => {
+    const { tools, repos, actions } = setup({
+      draftArrivalNote: (bookingId) =>
+        Promise.resolve({ subject: `Note for ${bookingId}`, body: 'Těšíme se na Vás.' }),
+    });
+    repos.state.guests[0] = { ...repos.state.guests[0]!, email: 'tomas@example.com' };
+    expect(await tools.getArrivalNotes.execute({ date: '2026-05-10' }, callOptions)).toMatchObject({
+      date: '2026-05-10',
+      due: [{ bookingId: 'bk_1', guestName: 'Tomáš Novák' }],
+    });
+    expect(await tools.draftArrivalNote.execute({ bookingId: 'bk_1' }, callOptions)).toEqual({
+      bookingId: 'bk_1',
+      subject: 'Note for bk_1',
+      body: 'Těšíme se na Vás.',
+    });
+    const priced = await tools.sendArrivalNote.execute(
+      { bookingId: 'bk_1', subject: 'Zítra', body: 'Pokoj stojí 2 000 Kč.' },
+      callOptions,
+    );
+    expect(priced).toMatchObject({ error: { code: 'unquoted_price' } });
+    const proposed = await tools.sendArrivalNote.execute(
+      { bookingId: 'bk_1', subject: 'Zítra', body: 'Těšíme se na Vás.' },
+      callOptions,
+    );
+    expect(proposed).toMatchObject({ status: 'awaiting_confirmation' });
+    const id = (proposed as { pendingActionId: string }).pendingActionId;
+    expect((await actions.confirm(id)).bookingId).toBe('bk_1');
+    expect(repos.state.inquiries).toEqual([
+      expect.objectContaining({ bookingId: 'bk_1', senderAddress: 'tomas@example.com' }),
+    ]);
+    expect(await tools.getArrivalNotes.execute({ date: '2026-05-10' }, callOptions)).toMatchObject({
+      due: [],
+    });
+  });
+
   it('drafts a reply through the inbox pipeline, when there is one', async () => {
     const drafted = (i: Inquiry): Inquiry => ({
       ...i,

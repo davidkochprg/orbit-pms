@@ -42,6 +42,7 @@ const titles: Record<PendingAction['kind'], string> = {
   save_hotel_info: 'Save to Knowledge',
   remove_hotel_info: 'Delete from Knowledge',
   send_reply: 'Send a reply',
+  send_arrival_note: 'Email before the stay',
   hold_inquiry: 'Hold a room for the request',
   hold_block: 'Hold rooms for the group',
   decline_inquiry: 'Decline the request',
@@ -111,6 +112,11 @@ export function PendingActionCard({
             <p className="rounded-lg bg-ink/4 px-3 py-2 text-sm leading-6 whitespace-pre-line">
               {current.input.body}
             </p>
+          ) : current.kind === 'send_arrival_note' ? (
+            <div className="rounded-lg bg-ink/4 px-3 py-2 text-sm leading-6">
+              <p className="font-medium">{current.input.subject}</p>
+              <p className="whitespace-pre-line">{current.input.body}</p>
+            </div>
           ) : (
             <Details details={details} />
           )}
