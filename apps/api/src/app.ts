@@ -196,6 +196,15 @@ export function createApp({
     createRepairDesk({ model: ai.agent, modelId: ai.agentModelId, draftModel: ai.draft, usage });
   const arrivalNotes = createArrivalNoteService({ repos, clock });
   const memories = createGuestMemoryService({ repos, clock });
+  const memoryReader =
+    ai && createGuestMemoryReader({ model: ai.agent, modelId: ai.agentModelId, usage });
+  /** A guest's memory, read first when their history changed and AI is on. */
+  const remember = async (guestId: string) => {
+    const source = memoryReader && (await memories.sourceToRead(guestId));
+    return source && memoryReader
+      ? memories.save(guestId, source, await memoryReader.read(source))
+      : memories.get(guestId);
+  };
   const draftArrivalNote =
     ai &&
     createArrivalNoteDrafter({
@@ -203,7 +212,7 @@ export function createApp({
       writer: createArrivalNoteWriter({ model: ai.draft, usage, hotelContext }),
       forecast,
       country: async () => (await settings.getProfile()).country,
-      remembered: async (guestId) => (await memories.get(guestId)).items.map((i) => i.text),
+      remembered: async (guestId) => (await remember(guestId)).items.map((i) => i.text),
       today: () => hotelToday(clock()),
     });
   const access = createDemoAccess({ code: accessCode, clock });
@@ -257,7 +266,7 @@ export function createApp({
       repos,
       guests,
       memories,
-      reader: ai && createGuestMemoryReader({ model: ai.agent, modelId: ai.agentModelId, usage }),
+      reader: memoryReader,
       gate,
     }),
   );
@@ -327,7 +336,8 @@ export function createApp({
       events: revenue,
       contacts,
       arrivalNotesDue: (date) => arrivalNotes.due(date),
-      guestMemory: (guestId) => memories.get(guestId),
+      // The agent asked about the guest: worth a reading if the history changed.
+      guestMemory: remember,
       // The agent's drafts are signed by the reception; the confirming staff member sends them.
       draftArrivalNote: draftArrivalNote && ((bookingId) => draftArrivalNote(bookingId, null)),
       limiter,

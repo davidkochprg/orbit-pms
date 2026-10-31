@@ -239,9 +239,9 @@ export function toolResultSummary(toolName: string, output: unknown): string | n
 export const suggestedQuestions = [
   'How does today look?',
   'Which rooms are free this weekend for two adults and a dog?',
-  'Check in the first guest arriving today.',
-  "What's still missing in the guest book for the first arrival today?",
+  'What do we remember about the guests arriving today?',
+  'Who arrives tomorrow without a note from us?',
   'How did the last 7 nights compare with the week before?',
-  'Which rooms are dirty right now?',
+  'Hold the rooms for the team offsite.',
   'The shower in room 307 drips, log it for maintenance.',
 ];
