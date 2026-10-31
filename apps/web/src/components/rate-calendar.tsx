@@ -1,14 +1,17 @@
-import type { NightOutlook } from '@orbit/shared';
-import { format, parseISO } from 'date-fns';
+import type { NightOutlook, WeatherKind } from '@orbit/shared';
+import { addDays, format, parseISO } from 'date-fns';
 import { calendarWeeks, occupancy, signed, weatherLabels } from '@/lib/revenue';
 import { weatherIcons } from '@/lib/weather-icons';
 import { cn } from '@/lib/utils';
 
 const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+/** Forecasts worth an icon on the grid; clear and cloudy days go without. */
+const notableWeather: ReadonlySet<WeatherKind> = new Set(['fog', 'rain', 'snow', 'storm']);
 
 /**
  * The coming nights as a month-style grid from Monday: how full each is, its rate change, and the
- * suggested one where it differs. Events mark the top of a night; the forecast shows as an icon.
+ * suggested one where it differs. Events mark the top of a night; rain, snow, fog and storms show
+ * as an icon. The days of this week already gone are greyed out.
  */
 export function RateCalendar({
   nights,
@@ -20,6 +23,7 @@ export function RateCalendar({
   onSelect: (date: string) => void;
 }) {
   const weeks = calendarWeeks(nights);
+  const lead = weeks[0]?.findIndex((n) => n !== null) ?? 0;
   return (
     // Phones get a narrower week, with the badge under the bar, rather than a sideways scroll
     // that hides the weekend.
@@ -30,21 +34,27 @@ export function RateCalendar({
             {d}
           </div>
         ))}
-        {weeks
-          .flat()
-          .map((night, i) =>
-            night ? (
-              <NightCell
-                key={night.date}
-                night={night}
-                first={i === weeks[0]!.findIndex((n) => n !== null)}
-                selected={night.date === selected}
-                onSelect={() => onSelect(night.date)}
-              />
-            ) : (
-              <div key={`pad-${i}`} aria-hidden />
-            ),
-          )}
+        {weeks.flat().map((night, i) =>
+          night ? (
+            <NightCell
+              key={night.date}
+              night={night}
+              first={i === lead}
+              selected={night.date === selected}
+              onSelect={() => onSelect(night.date)}
+            />
+          ) : i < lead ? (
+            <span
+              key={`past-${i}`}
+              aria-hidden
+              className="px-1.5 pt-1.5 text-xs text-subtle-foreground/60 tabular-nums sm:px-2 sm:pt-2"
+            >
+              {format(addDays(parseISO(nights[0]!.date), i - lead), 'd')}
+            </span>
+          ) : (
+            <div key={`pad-${i}`} aria-hidden />
+          ),
+        )}
       </div>
     </div>
   );
@@ -64,7 +74,8 @@ function NightCell({
   const date = parseISO(night.date);
   const share = occupancy(night);
   const changes = night.suggestedPercent !== night.currentPercent;
-  const Weather = night.weather && weatherIcons[night.weather.kind];
+  const weather = night.weather && notableWeather.has(night.weather.kind) ? night.weather : null;
+  const Weather = weather && weatherIcons[weather.kind];
   const label = [
     format(date, 'EEEE, MMMM d'),
     `${Math.round(share * 100)}% booked`,
@@ -80,7 +91,7 @@ function NightCell({
       aria-pressed={selected}
       onClick={onSelect}
       className={cn(
-        'relative flex h-[5.25rem] min-w-0 flex-col gap-1 overflow-hidden rounded-[10px] bg-background p-1.5 text-left sm:p-2 ring-1 ring-ink/6 transition-[box-shadow,background-color] duration-150 ease-snap ring-inset hover:bg-surface-raised',
+        'relative flex h-[4.75rem] min-w-0 flex-col gap-1 overflow-hidden rounded-[10px] bg-background p-1.5 text-left sm:p-2 ring-1 ring-ink/6 transition-[box-shadow,background-color] duration-150 ease-snap ring-inset hover:bg-surface-raised',
         selected && 'ring-2 ring-primary',
       )}
     >
@@ -94,8 +105,8 @@ function NightCell({
         )}
         {Weather && (
           <Weather
-            aria-label={weatherLabels[night.weather!.kind]}
-            className="ml-auto size-3.5 shrink-0 text-muted-foreground"
+            aria-label={weatherLabels[weather.kind]}
+            className="ml-auto size-3.5 shrink-0 text-muted-foreground max-sm:hidden"
           />
         )}
       </span>
@@ -113,7 +124,7 @@ function NightCell({
             <span
               className={cn(
                 'block h-full rounded-full',
-                share >= 0.9 ? 'bg-warning' : 'bg-primary/70',
+                share >= 0.9 ? 'bg-primary' : 'bg-primary/70',
               )}
               style={{ width: `${Math.min(100, Math.round(share * 100))}%` }}
             />

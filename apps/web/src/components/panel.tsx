@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { ReactNode, Ref } from 'react';
 import { cn } from '@/lib/utils';
 
 interface PanelProps {
@@ -14,6 +14,7 @@ interface PanelProps {
   contentClassName?: string;
   /** Lay the content straight on the well, without the white box (for its own layout). */
   bare?: boolean;
+  ref?: Ref<HTMLElement>;
 }
 
 /**
@@ -28,9 +29,11 @@ export function Panel({
   className,
   contentClassName,
   bare = false,
+  ref,
 }: PanelProps) {
   return (
     <section
+      ref={ref}
       className={cn(
         'flex min-w-0 flex-col rounded-card bg-surface-sunken p-1 ring-1 ring-ink/5 ring-inset',
         className,

@@ -4,7 +4,7 @@ import { CalendarDays, Cloud, type LucideIcon, TrendingUp, UserX } from 'lucide-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatLongDate } from '@/lib/format';
+import { displayRegion, formatMoney } from '@/lib/format';
 import { occupancy, ratePercent, signed, weatherLabels } from '@/lib/revenue';
 import { weatherIcons } from '@/lib/weather-icons';
 import { cn } from '@/lib/utils';
@@ -15,8 +15,9 @@ const factorIcons: Record<Exclude<RateFactor['kind'], 'weather'>, LucideIcon> = 
 };
 
 /**
- * One night of the outlook: how full it is against its usual, why a rate is suggested, and, for a
- * manager, buttons to take the suggestion, set another percent or go back to the season rate.
+ * One night of the outlook: how full it is against its usual, each room type's rate now and with
+ * the suggestion, why, and, for a manager, buttons to take the suggestion, set another percent or
+ * go back to the season rate.
  */
 export function RateNightPanel({
   night,
@@ -43,19 +44,13 @@ export function RateNightPanel({
 
   return (
     <div className="flex flex-col gap-4 p-3">
-      <div className="flex flex-col gap-0.5">
-        <h3 className="text-[0.9375rem] font-medium">{formatLongDate(night.date)}</h3>
-        <p className="text-xs text-muted-foreground">
-          {night.roomsSold} of {night.roomsTotal} rooms booked · {Math.round(share * 100)}%
-          {night.typicalOccupancy !== null &&
-            ` · usually ${Math.round(night.typicalOccupancy * 100)}% on ${weekday}s`}
-        </p>
-      </div>
+      <p className="text-xs text-muted-foreground">
+        {night.roomsSold} of {night.roomsTotal} rooms booked · {Math.round(share * 100)}%
+        {night.typicalOccupancy !== null &&
+          ` · usually ${Math.round(night.typicalOccupancy * 100)}% on ${weekday}s`}
+      </p>
 
-      <dl className="grid grid-cols-2 gap-2">
-        <Figure label="Current rate" value={ratePercent(night.currentPercent)} />
-        <Figure label="Suggested" value={ratePercent(night.suggestedPercent)} highlight={changes} />
-      </dl>
+      <RateTable night={night} changes={changes} />
 
       <section className="flex flex-col gap-1.5">
         <h4 className="text-xs text-subtle-foreground">Why</h4>
@@ -167,32 +162,45 @@ function WeatherIcon({ kind }: { kind: keyof typeof weatherIcons }) {
   return <Icon className="size-3.5 shrink-0" />;
 }
 
-function Figure({
-  label,
-  value,
-  highlight,
-}: {
-  label: string;
-  value: string;
-  highlight?: boolean;
-}) {
+/** "Now", or "Now +10%" with a change. */
+function withPercent(label: string, percent: number): string {
+  return percent === 0 ? label : `${label} ${signed(percent)}`;
+}
+
+/** Each room type's rate tonight, and with the suggestion taken when it differs. */
+function RateTable({ night, changes }: { night: NightOutlook; changes: boolean }) {
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-0.5 rounded-[10px] px-3 py-2 ring-1 ring-ink/6 ring-inset',
-        highlight && 'bg-primary-soft ring-primary/20',
-      )}
-    >
-      <dt className="text-[0.6875rem] text-muted-foreground">{label}</dt>
-      <dd
-        className={cn(
-          'text-[0.9375rem]',
-          /\d/.test(value) && 'font-mono',
-          highlight && 'text-primary-text',
-        )}
-      >
-        {value}
-      </dd>
-    </div>
+    <table className="w-full text-[0.8125rem] tabular-nums">
+      <thead>
+        <tr className="text-[0.6875rem] text-muted-foreground">
+          <th scope="col" className="pb-1 text-left font-normal">
+            {displayRegion().perRoom ? 'Per night' : 'Per guest per night'}
+          </th>
+          <th scope="col" className="pb-1 text-right font-normal">
+            {changes ? withPercent('Now', night.currentPercent) : ratePercent(night.currentPercent)}
+          </th>
+          {changes && (
+            <th scope="col" className="pb-1 pl-3 text-right font-normal text-primary-text">
+              {withPercent('Suggested', night.suggestedPercent)}
+            </th>
+          )}
+        </tr>
+      </thead>
+      <tbody>
+        {night.rates.map((r) => (
+          <tr key={r.roomType} className="border-t border-ink/5">
+            <th scope="row" className="truncate py-1 text-left font-normal">
+              {r.roomType}
+            </th>
+            <td className="py-1 text-right font-mono text-xs">{formatMoney(r.current)}</td>
+            {changes && (
+              <td className="py-1 pl-3 text-right font-mono text-xs font-medium text-primary-text">
+                {formatMoney(r.suggested)}
+              </td>
+            )}
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

@@ -1,5 +1,5 @@
 import type { NightOutlook } from '@orbit/shared';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { ArrivalRisks } from '@/components/arrival-risks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorNotice } from '@/components/error-notice';
@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAdjustRates, useHealth, useRevenueBrief, useRevenueOutlook } from '@/lib/api';
-import { formatDate } from '@/lib/format';
+import { formatDate, formatLongDate } from '@/lib/format';
 import { occupancy, signed, suggestions } from '@/lib/revenue';
 
 const DAYS = 60;
@@ -31,6 +31,7 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
   const { toast } = useToast();
   const [picked, setPicked] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
+  const nightPanel = useRef<HTMLElement>(null);
 
   if (outlook.isError) return <ErrorNotice message={outlook.error.message} />;
   if (!outlook.data) {
@@ -80,31 +81,22 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
           value={`${Math.round(weekShare * 100)}%`}
           note="Booked on average"
         />
-        <Stat label="Likely no-shows" value={weekNoShows.toFixed(1)} note="Rooms, next 7 nights" />
+        <Stat
+          label="Likely no-shows"
+          value={String(Math.round(weekNoShows))}
+          note="Rooms, next 7 nights"
+        />
       </div>
 
-      {aiOn && (
-        <Panel
-          title="Summary"
-          bare={!brief.data && !brief.isError}
-          actions={
-            <Button
-              variant="ghost"
-              size="xs"
-              disabled={brief.isPending}
-              onClick={() => brief.mutate(DAYS)}
-            >
-              {brief.isPending ? 'Reading the outlook…' : brief.data ? 'Again' : 'Summarize'}
-            </Button>
-          }
-        >
+      {(brief.data || brief.isError) && (
+        <Panel title="Summary">
           {brief.isError ? (
             <ErrorNotice message={brief.error.message} className="m-2" />
-          ) : brief.data ? (
+          ) : (
             <p className="max-w-3xl px-3 py-2.5 text-[0.8125rem] leading-relaxed">
-              {brief.data.text}
+              {brief.data?.text}
             </p>
-          ) : null}
+          )}
         </Panel>
       )}
 
@@ -117,9 +109,19 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
           title={`Next ${DAYS} nights`}
           actions={
             <>
-              <span className="text-xs text-subtle-foreground max-sm:hidden">
+              <span className="mr-1 text-xs text-subtle-foreground max-md:hidden">
                 {weatherAvailable ? 'Forecast by Open-Meteo' : 'No forecast'}
               </span>
+              {aiOn && (
+                <Button
+                  variant="ghost"
+                  size="xs"
+                  disabled={brief.isPending}
+                  onClick={() => brief.mutate(DAYS)}
+                >
+                  {brief.isPending ? 'Reading the outlook…' : 'Summarize'}
+                </Button>
+              )}
               {canManage && toApply.length > 0 && (
                 <Button size="xs" disabled={adjust.isPending} onClick={() => setConfirmAll(true)}>
                   Apply {toApply.length} suggestion{toApply.length === 1 ? '' : 's'}
@@ -128,10 +130,24 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
             </>
           }
         >
-          <RateCalendar nights={nights} selected={selected?.date ?? null} onSelect={setPicked} />
+          <RateCalendar
+            nights={nights}
+            selected={selected?.date ?? null}
+            onSelect={(date) => {
+              setPicked(date);
+              // Below the calendar on narrower screens: bring the night into view.
+              if (!window.matchMedia('(min-width: 80rem)').matches) {
+                nightPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+              }
+            }}
+          />
         </Panel>
         {selected && (
-          <Panel title="Night" className="xl:sticky xl:top-0">
+          <Panel
+            ref={nightPanel}
+            title={formatLongDate(selected.date)}
+            className="scroll-mt-4 xl:sticky xl:top-0"
+          >
             <RateNightPanel
               key={selected.date}
               night={selected}

@@ -172,7 +172,7 @@ The board asks for it by itself: when `unreadStays` is above zero and AI is conf
 
 Suggested rates are computed by the domain from occupancy, the usual demand for the weekday, local events and the weather forecast ([domain.md](domain.md#rate-outlook), [ADR 0017](decisions/0017-rate-suggestions-from-domain-rules.md)); the model never works out a rate. It reads and explains them:
 
-- **Summary** on the Rates page: `createRevenueBriefWriter` (`packages/ai/src/revenue-brief.ts`) gives the model the notable nights (a suggested change, an event, demand out of the usual, or likely no-shows) and asks for two or three sentences of advice (`prompts/revenue.ts`). Every percent in the text must be one the outlook states (`unknownPercents`); otherwise it is written again once, then refused. On request only, at `minimal` reasoning, recorded under `rate_brief`; about $0.007 a summary.
+- **Summary** on the Rates page (Summarize, above the calendar): `createRevenueBriefWriter` (`packages/ai/src/revenue-brief.ts`) gives the model the notable nights (a suggested change, an event, demand out of the usual, or likely no-shows) and asks for two or three sentences of advice (`prompts/revenue.ts`). Every percent in the text must be one the outlook states (`unknownPercents`); otherwise it is written again once, then refused. On request only, at `minimal` reasoning, recorded under `rate_brief`; about $0.007 a summary.
 - **Agent**: `getRateOutlook` returns the outlook with percents as text to repeat, and `adjustRates` proposes per-night changes that run when someone confirms them. "Raise next weekend by the suggested amount" reads the outlook, then proposes.
 
 ## ID scans
