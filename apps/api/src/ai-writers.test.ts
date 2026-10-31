@@ -6,7 +6,7 @@ import {
   createUsageStore,
   schema,
 } from '@orbit/db';
-import type { ApiError, ArrivalNote, ArrivalNotes, Inquiry } from '@orbit/shared';
+import type { ApiError, ArrivalNote, ArrivalNotes, GuestMemory, Inquiry } from '@orbit/shared';
 import { MockLanguageModelV4 } from 'ai/test';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
@@ -34,16 +34,16 @@ const model = new MockLanguageModelV4({
     }),
 });
 
-function appWith({ ai = true } = {}) {
+function appWith({ ai = true, with: m = model }: { ai?: boolean; with?: typeof model } = {}) {
   return createApp({
     repos,
     ai: ai
       ? {
-          agent: model,
+          agent: m,
           agentModelId: 'muse-spark-1.3',
-          translate: model,
+          translate: m,
           translateModelId: 'muse-spark-1.3',
-          draft: model,
+          draft: m,
           draftModelId: 'muse-spark-1.3',
           vision: null,
           visionModelId: null,
@@ -163,5 +163,60 @@ describe('report summary', () => {
     expect(
       (await call<ApiError>(appWith({ ai: false }), 'POST', '/api/reports/summary', period)).status,
     ).toBe(503);
+  });
+});
+
+describe('guest memory', () => {
+  it('reads a returning guest once, then serves the reading for free', async () => {
+    const regular = seed.bookings.find(
+      (b) => b.status === 'checked_out' && b.notes && !b.notes.startsWith('Travelling'),
+    );
+    expect(regular).toBeDefined();
+    const id = regular!.guestId;
+    const remembering = new MockLanguageModelV4({
+      doGenerate: () =>
+        Promise.resolve({
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify({
+                items: [{ kind: 'preference', text: 'Prefers a quiet room.' }],
+              }),
+            },
+          ],
+          finishReason: { unified: 'stop', raw: undefined },
+          usage: {
+            inputTokens: { total: 500, noCache: 500, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: 30, text: 30, reasoning: undefined },
+          },
+          warnings: [],
+        }),
+    });
+    const app = appWith({ with: remembering });
+    const before = await call<GuestMemory>(app, 'GET', `/api/guests/${id}/memory`);
+    expect(before.body).toMatchObject({ hasHistory: true, current: false, items: [] });
+
+    const read = await call<GuestMemory>(app, 'POST', `/api/guests/${id}/memory/read`);
+    expect(read.status).toBe(200);
+    expect(read.body).toMatchObject({
+      current: true,
+      items: [{ kind: 'preference', text: 'Prefers a quiet room.' }],
+    });
+    const again = await call<GuestMemory>(
+      appWith({ ai: false }),
+      'POST',
+      `/api/guests/${id}/memory/read`,
+    );
+    expect(again.status).toBe(200);
+  });
+
+  it('needs AI to read a changed history', async () => {
+    const regular = seed.bookings.find((b) => b.status === 'checked_out' && b.notes);
+    const res = await call<ApiError>(
+      appWith({ ai: false }),
+      'POST',
+      `/api/guests/${regular!.guestId}/memory/read`,
+    );
+    expect(res.status).toBe(503);
   });
 });

@@ -32,6 +32,7 @@ import {
   type Translation,
   type QuoteAddons,
   type StayReading,
+  type GuestMemoryItem,
   type Trade,
   vatBrackets,
 } from '@orbit/shared';
@@ -377,6 +378,17 @@ export const stayReadings = pgTable('stay_readings', {
   messReason: text('mess_reason'),
   prepare: jsonb('prepare').$type<string[]>().notNull().default([]),
   /** The text that was read; a different text means it needs reading again. */
+  source: text('source').notNull(),
+  readAt: timestamp('read_at', { withTimezone: true }).notNull(),
+});
+
+/** What the model remembered from a guest's history, one row per guest. */
+export const guestMemories = pgTable('guest_memories', {
+  guestId: text('guest_id')
+    .primaryKey()
+    .references(() => guests.id, { onDelete: 'cascade' }),
+  items: jsonb('items').$type<GuestMemoryItem[]>().notNull().default([]),
+  /** The history that was read; a different history means it needs reading again. */
   source: text('source').notNull(),
   readAt: timestamp('read_at', { withTimezone: true }).notNull(),
 });

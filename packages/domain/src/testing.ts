@@ -18,6 +18,7 @@ import type {
   PricingConfig,
   Room,
   RoomType,
+  SavedGuestMemory,
   SavedStayReading,
   StaffMember,
   StayGuest,
@@ -88,6 +89,7 @@ export interface MemoryState {
   stayGuests: StayGuest[];
   idScans: IdScan[];
   stayReadings: SavedStayReading[];
+  guestMemories: SavedGuestMemory[];
   events: LocalEvent[];
   rateReview: RateReview | null;
   contacts: Contact[];
@@ -134,6 +136,7 @@ export function createMemoryRepositories(
     stayGuests: [],
     idScans: [],
     stayReadings: [],
+    guestMemories: [],
     events: [],
     rateReview: null,
     contacts: [],
@@ -399,6 +402,17 @@ export function createMemoryRepositories(
         state.stayReadings = [
           ...state.stayReadings.filter((r) => r.bookingId !== reading.bookingId),
           reading,
+        ];
+        return Promise.resolve();
+      },
+    },
+    guestMemories: {
+      get: (guestId) =>
+        Promise.resolve(state.guestMemories.find((m) => m.guestId === guestId) ?? null),
+      save: (memory) => {
+        state.guestMemories = [
+          ...state.guestMemories.filter((m) => m.guestId !== memory.guestId),
+          memory,
         ];
         return Promise.resolve();
       },

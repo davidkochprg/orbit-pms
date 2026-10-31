@@ -9,6 +9,7 @@ import { GuestAvatar } from '@/components/guest-avatar';
 import { GuestEditorDialog } from '@/components/guest-editor';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Property, PropertyList } from '@/components/property-list';
+import { GuestMemorySection } from '@/components/guest-memory';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -105,6 +106,8 @@ export function GuestDetailPage() {
                 ))}
               </dl>
             )}
+
+            <GuestMemorySection guestId={g.id} />
 
             <PropertyList>
               <Property label="Language">{languageLabels[g.language]}</Property>

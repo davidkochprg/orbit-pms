@@ -9,6 +9,7 @@ export * from './contacts';
 export * from './dates';
 export * from './day';
 export * from './errors';
+export * from './guest-memory';
 export * from './guests';
 export * from './housekeeping';
 export * from './housekeeping-service';

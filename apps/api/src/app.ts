@@ -1,6 +1,7 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
   createArrivalNoteWriter,
+  createGuestMemoryReader,
   createHousekeepingNotePipeline,
   createStayNotesReader,
   createNoteFiler,
@@ -19,6 +20,7 @@ import {
 import {
   createActivityService,
   createArrivalNoteService,
+  createGuestMemoryService,
   createBillingService,
   createContactService,
   createGuestService,
@@ -193,6 +195,7 @@ export function createApp({
     ai &&
     createRepairDesk({ model: ai.agent, modelId: ai.agentModelId, draftModel: ai.draft, usage });
   const arrivalNotes = createArrivalNoteService({ repos, clock });
+  const memories = createGuestMemoryService({ repos, clock });
   const draftArrivalNote =
     ai &&
     createArrivalNoteDrafter({
@@ -200,6 +203,7 @@ export function createApp({
       writer: createArrivalNoteWriter({ model: ai.draft, usage, hotelContext }),
       forecast,
       country: async () => (await settings.getProfile()).country,
+      remembered: async (guestId) => (await memories.get(guestId)).items.map((i) => i.text),
       today: () => hotelToday(clock()),
     });
   const access = createDemoAccess({ code: accessCode, clock });
@@ -247,7 +251,16 @@ export function createApp({
     }),
   );
   app.route('/api', activityRoutes(activity));
-  app.route('/api', guestRoutes(repos, guests));
+  app.route(
+    '/api',
+    guestRoutes({
+      repos,
+      guests,
+      memories,
+      reader: ai && createGuestMemoryReader({ model: ai.agent, modelId: ai.agentModelId, usage }),
+      gate,
+    }),
+  );
   app.route('/api', overviewRoutes(repos, hotel));
   app.route(
     '/api',
@@ -314,6 +327,7 @@ export function createApp({
       events: revenue,
       contacts,
       arrivalNotesDue: (date) => arrivalNotes.due(date),
+      guestMemory: (guestId) => memories.get(guestId),
       // The agent's drafts are signed by the reception; the confirming staff member sends them.
       draftArrivalNote: draftArrivalNote && ((bookingId) => draftArrivalNote(bookingId, null)),
       limiter,

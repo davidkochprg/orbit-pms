@@ -36,6 +36,7 @@ import { buildConversations } from './conversations';
 import { buildEvents } from './events';
 import { buildMail, type SeedFile } from './mail';
 import { regionSeeds, type SeedRegion } from './regions';
+import { rememberRegulars } from './regulars';
 import { buildStayGuests } from './registrations';
 import { createRandom } from './random';
 
@@ -254,11 +255,10 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
 
   // Guest messages about a reservation belong to one: each gets an upcoming OTA booking, made the
   // sender's, so the inbox opens that booking instead of offering to create one.
-  const {
-    bookings: linked,
-    guests,
-    links,
-  } = linkReservationMessages(kept, seedGuests, inquiryFixtures, today);
+  const reserved = linkReservationMessages(kept, seedGuests, inquiryFixtures, today);
+  const { links } = reserved;
+  // A few arrivals are regulars, with notes from their earlier stays.
+  const { bookings: linked, guests } = rememberRegulars(reserved.bookings, reserved.guests, today);
   const inquiries: Inquiry[] = inquiryFixtures.map((f) => {
     const receivedAt = new Date(now.getTime() - f.receivedHoursAgo * 3600_000).toISOString();
     return {

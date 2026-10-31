@@ -128,6 +128,28 @@ export function buildArrivalNoteFixtures(today: IsoDate): ArrivalNoteFixture[] {
       mentions: [],
     },
     {
+      id: 'an_en_regular',
+      facts: {
+        ...base,
+        guest: { name: 'Pavel Testovy', language: 'en' },
+        stay: {
+          ...stay(3),
+          adults: 2,
+          childAges: [],
+          roomTypeName: 'Queen room',
+          addons: noAddons,
+        },
+        weather: weather('clear'),
+        remembered: [
+          'Allergic to feathers: synthetic pillows and duvet.',
+          'Prefers the ground floor.',
+        ],
+      },
+      nameStem: 'Pavel',
+      checkIn: /3\s?PM/i,
+      mentions: [{ label: 'what is remembered', pattern: /feather|ground floor/i }],
+    },
+    {
       id: 'an_pl_plain',
       facts: {
         ...base,

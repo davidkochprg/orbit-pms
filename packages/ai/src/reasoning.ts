@@ -16,6 +16,7 @@ export const reasoningEffort = {
   stayNotes: 'minimal',
   revenueBrief: 'minimal',
   reportSummary: 'minimal',
+  guestMemory: 'minimal',
   rateReview: 'high',
   idScan: 'minimal',
   translate: 'minimal',

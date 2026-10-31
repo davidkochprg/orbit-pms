@@ -28,6 +28,10 @@ Email, web forms, phone notes and Booking.com messages land in one mail client: 
 
 ![A web-form booking enquiry with a dog: Orbit pulls out the dates, party and wishes, prices a free cabin suite with a Hold button, and drafts the reply](docs/images/inbox.png)
 
+### It remembers your regulars
+
+When a guest comes back, the booking shows what Orbit remembers from their earlier stays: they asked for a quieter room away from the road, their anniversary is tomorrow, they're allergic to feathers, they bring e-bikes. Muse Spark reads the notes staff wrote on earlier stays and the guest's own messages, keeps what helps next time, and leaves out logistics, judgements and anything sensitive. The agent knows it too, and the note before their stay can mention it.
+
 ### A note before every stay
 
 The day before guests arrive, Today lists who hasn't heard from the hotel yet. One click drafts a personal email for each, in their own language: the arrival day and check-in time, the forecast when it matters ("snow tomorrow, chains may be needed on the pass"), the spa they booked or the rules for their dog from Knowledge, and the ID to bring. Staff read, edit and send them all at once; each goes out linked to its booking.
@@ -72,6 +76,7 @@ Every AI feature runs on Meta's models through the Vercel AI SDK: Muse Spark on 
 | Translation         | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Puts drafts and guest messages into the staff member's language and back                          | Changes an amount: such a translation is redone or refused                     |
 | Housekeeping notes  | `muse-voice-transcribe-1.0` + `muse-spark-1.3`      | Transcribes the recording, reads it into room/status/issue updates                                | Changes bookings; unknown rooms and forbidden changes are skipped              |
 | Notes before a stay | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Writes the email before arrival in the guest's language from the stay, the forecast and Knowledge | Sends it, or states a price the hotel facts don't                              |
+| Guest memory        | `muse-spark-1.3`                                    | Reads a returning guest's earlier stays and messages into what to remember                        | Changes a booking, or keeps judgements or sensitive details                    |
 | Spoken questions    | `muse-voice-transcribe-1.0`                         | Turns a question asked out loud in ⌘K into text, listening for guests' names                      | Acts on it: the agent answers it like a typed one, with the same confirmations |
 | ID scans            | `muse-spark-1.3` (vision)                           | Reads a phone photo of an ID card or passport into guest-book fields                              | Saves them: staff review every value; the photo is never stored                |
 | Stay notes          | `muse-spark-1.3`                                    | Reads booking notes and guest messages for pets, mess and things to set up                        | Decides the cleaning order: the domain scores it                               |
@@ -105,7 +110,8 @@ More in [docs/ai.md](docs/ai.md).
 | Agent tools         | 21 staff requests run through the real agent and tools, checked by their effect                                                | 21/21 (100%) |
 | Reply drafts        | 18 replies with real quotes (one a block of rooms for a group), checked by the price guard                                     | 18/18 (100%) |
 | Translations        | 4 drafts and guest messages between Czech, German, English and Polish, amounts kept                                            | 4/4 (100%)   |
-| Notes before a stay | 4 guests in four languages: snow and a spa, a dog, a family in the rain, no forecast                                           | 4/4 (100%)   |
+| Notes before a stay | 5 guests in four languages: snow and a spa, a dog, a family in the rain, a regular, no forecast                                | 5/5 (100%)   |
+| Guest memory        | 4 histories: a regular, pure logistics, a sensitive complaint to leave out, repeats to merge                                   | 4/4 (100%)   |
 | Rate review         | 3 outlooks: a block of rooms (and a single request to ignore), Thanksgiving, an ordinary fortnight                             | 3/3 (100%)   |
 
 Measured on 2026-10-30 and 2026-10-31 with `muse-spark-1.3`, and Muse Spark Open on Baseten for drafts and translations, at `minimal` reasoning effort except the agent (`low`) and the rate review (`high`, measured 2026-10-31: about 6 s and $0.008 a case). An empty answer from Baseten goes to Muse Spark on the Meta API instead. An inbox message takes about 2 s to read; the whole suite costs about $1.80, most of it the agent.

@@ -24,6 +24,7 @@ import type {
   Room,
   RoomStatus,
   RoomType,
+  SavedGuestMemory,
   SavedStayReading,
   StaffMember,
   StayGuest,
@@ -225,6 +226,13 @@ export interface StayReadingRepository {
   save(reading: SavedStayReading): Promise<void>;
 }
 
+/** What was remembered about each guest, with the history it was read from. */
+export interface GuestMemoryRepository {
+  get(guestId: string): Promise<SavedGuestMemory | null>;
+  /** Creates or replaces the guest's memory. */
+  save(memory: SavedGuestMemory): Promise<void>;
+}
+
 /** Suppliers and contractors the hotel calls. */
 export interface ContactRepository {
   /** By name. */
@@ -249,6 +257,7 @@ export interface Repositories {
   stayGuests: StayGuestRepository;
   idScans: IdScanRepository;
   stayReadings: StayReadingRepository;
+  guestMemories: GuestMemoryRepository;
   events: LocalEventRepository;
   rateReview: RateReviewRepository;
   contacts: ContactRepository;

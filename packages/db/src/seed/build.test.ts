@@ -5,6 +5,7 @@ import {
   buildFolio,
   assertValidProfile,
   blocksRoom,
+  addDays,
   checkAvailability,
   planBlock,
   pricingConfig,
@@ -224,6 +225,20 @@ describe('buildSeed', () => {
       const available = checkAvailability({ checkIn, checkOut, adults, childAges, ...kind }, ctx);
       expect(available.length, f.id).toBeGreaterThan(0);
     }
+  });
+
+  it('makes a few arrivals regulars, with notes from their earlier stays', () => {
+    const regulars = seed.bookings.filter((b) => {
+      if (b.status !== 'confirmed' || (b.checkIn !== today && b.checkIn !== addDays(today, 1))) {
+        return false;
+      }
+      return seed.bookings.some(
+        (e) => e.guestId === b.guestId && e.status === 'checked_out' && e.notes?.includes('.'),
+      );
+    });
+    expect(regulars.length).toBeGreaterThanOrEqual(3);
+    expect(regulars.some((b) => b.checkIn === today)).toBe(true);
+    expect(seed.bookings.some((b) => b.notes?.includes('wedding anniversary'))).toBe(true);
   });
 
   it('never puts one guest in two rooms at once', () => {

@@ -145,6 +145,10 @@ Takes `{ kind?: 'payment' | 'refund', method: 'cash' | 'card' | 'bank_transfer',
 
 `Guest[]` ordered by name, or one `Guest`: `id`, `name`, `email`, `phone`, `language`, `notes`.
 
+### `GET /api/guests/:id/memory`, `POST /api/guests/:id/memory/read`
+
+`GuestMemory`: `pastStays`, `items` (`{ kind: "preference" | "occasion" | "care" | "habit", text }`), `current` (the history hasn't changed since it was read), `hasHistory` and `readAt`. `GET` never calls a model. `POST …/read` reads the history with the model when it isn't current, and returns the stored reading at no cost when it is. 404 for an unknown guest, 503 `ai_not_configured` and 429 `demo_limit` only when a reading is needed. See [ai.md](ai.md#guest-memory).
+
 ### `POST /api/guests`, `PATCH /api/guests/:id`
 
 `POST` takes `{ name, email?, phone?, language, notes? }` and returns 201 `Guest`; `PATCH` takes any of those fields. Empty strings become `null`. An email another guest has is 409 `conflict`.

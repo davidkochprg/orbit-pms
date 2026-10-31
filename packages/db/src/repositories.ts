@@ -13,6 +13,7 @@ import type {
   IdScanRepository,
   StayGuestRepository,
   StayReadingRepository,
+  GuestMemoryRepository,
   LocalEventRepository,
   MailRepository,
   RateReviewRepository,
@@ -70,6 +71,7 @@ import {
   rateReviews,
   stayGuests,
   stayReadings,
+  guestMemories,
   localEvents,
   mailAttachments,
   mailDrafts,
@@ -648,6 +650,22 @@ function stayReadingRepository(db: Db): StayReadingRepository {
   };
 }
 
+function guestMemoryRepository(db: Db): GuestMemoryRepository {
+  return {
+    async get(guestId) {
+      const [row] = await db.select().from(guestMemories).where(eq(guestMemories.guestId, guestId));
+      return row ? { ...row, readAt: row.readAt.toISOString() } : null;
+    },
+    async save(memory) {
+      const row = { ...memory, readAt: new Date(memory.readAt) };
+      await db
+        .insert(guestMemories)
+        .values(row)
+        .onConflictDoUpdate({ target: guestMemories.guestId, set: row });
+    },
+  };
+}
+
 function contactRepository(db: Db): ContactRepository {
   const columns = {
     id: contacts.id,
@@ -733,6 +751,7 @@ export function createRepositories(db: Db): Repositories {
     stayGuests: stayGuestRepository(db),
     idScans: idScanRepository(db),
     stayReadings: stayReadingRepository(db),
+    guestMemories: guestMemoryRepository(db),
     events: localEventRepository(db),
     rateReview: rateReviewRepository(db),
     contacts: contactRepository(db),

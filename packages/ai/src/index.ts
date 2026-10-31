@@ -1,6 +1,7 @@
 export * from './agent';
 export * from './arrival-notes';
 export * from './cost';
+export * from './guest-memory';
 export * from './housekeeping';
 export * from './id-scan';
 export * from './inbox';

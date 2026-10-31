@@ -18,6 +18,7 @@ import {
   staff,
   stayGuests,
   stayReadings,
+  guestMemories,
   localEvents,
   rateReviews,
   mailAttachments,
@@ -35,6 +36,7 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
     await tx.delete(mailAttachments);
     await tx.delete(idScans);
     await tx.delete(stayReadings);
+    await tx.delete(guestMemories);
     await tx.delete(localEvents);
     await tx.delete(rateReviews);
     await tx.delete(contacts);

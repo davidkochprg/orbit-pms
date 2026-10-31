@@ -27,6 +27,8 @@ export interface ArrivalNoteDrafterDeps {
   forecast: () => Promise<WeatherDay[] | null>;
   /** The hotel's country, for who shows an ID at check-in. */
   country: () => Promise<string>;
+  /** What was remembered about the guest from earlier stays. */
+  remembered: (guestId: string) => Promise<string[]>;
   today: () => string;
 }
 
@@ -39,11 +41,16 @@ export function createArrivalNoteDrafter({
   writer,
   forecast,
   country,
+  remembered,
   today,
 }: ArrivalNoteDrafterDeps) {
   return async (bookingId: string, signer: string | null): Promise<ArrivalNote> => {
     const { booking, guest, roomType } = await hotel.getBookingDetail(bookingId);
-    const [days, where] = await Promise.all([forecast().catch(() => null), country()]);
+    const [days, where, memory] = await Promise.all([
+      forecast().catch(() => null),
+      country(),
+      remembered(guest.id),
+    ]);
     return writer.write({
       guest: { name: guest.name, language: guest.language },
       stay: {
@@ -56,6 +63,7 @@ export function createArrivalNoteDrafter({
       },
       weather: days?.find((d) => d.date === booking.checkIn) ?? null,
       idsFrom: guestBookRulesFor(where).scope,
+      remembered: memory,
       signer,
       today: today(),
     });

@@ -18,6 +18,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { InlineSelect, InlineText } from '@/components/inline-field';
 import { Property, PropertyList } from '@/components/property-list';
+import { GuestMemorySection } from '@/components/guest-memory';
 import { Section } from '@/components/section';
 import { Button } from '@/components/ui/button';
 import {
@@ -198,6 +199,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
               </div>
             )}
             <StaySection detail={detail} onEditStay={() => openEdit(booking.id)} />
+            <GuestMemorySection guestId={detail.guest.id} />
             <ContactSection detail={detail} />
           </TabsContent>
           <TabsContent value="guests" className="flex flex-col gap-3 p-5">

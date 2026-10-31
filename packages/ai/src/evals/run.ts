@@ -10,6 +10,7 @@ import { conversation } from '@orbit/domain/testing';
 import type { RoomBlock, StayOption } from '@orbit/shared';
 import { runAgent } from '../agent';
 import { draftArrivalNote } from '../arrival-notes';
+import { readGuestMemory } from '../guest-memory';
 import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from '../cost';
 import { holdExpiry } from '../prompts/inbox';
 import { buildSystemPrompt } from '../prompts/system';
@@ -30,6 +31,7 @@ import { idDocumentFixtures } from './id-documents';
 import { buildKnowledgeFixtures, evalNotes, scoreFiledNote } from './knowledge';
 import { arrivalNoteHotel, buildArrivalNoteFixtures, scoreArrivalNote } from './arrival-notes';
 import { buildDraftEvalHotel } from './drafts';
+import { guestMemoryFixtures, scoreGuestMemory } from './guest-memory';
 import { buildInquiryFixtures, type InquiryFixture } from './inquiries';
 import { rateReviewFixtures } from './rates';
 import { buildWorkOrderFixtures, scoreWorkOrder, tradeFixtures } from './repairs';
@@ -79,6 +81,7 @@ const suiteKeys = [
   'translations',
   'rates',
   'arrivals',
+  'memory',
 ] as const;
 type SuiteKey = (typeof suiteKeys)[number];
 const only = process.env.EVAL_SUITES?.split(',')
@@ -550,8 +553,29 @@ const arrivalsOk = await suite(
   })),
 );
 
+const memoryOk = await suite(
+  'memory',
+  'Guest memory',
+  reasoning ?? reasoningEffort.guestMemory,
+  META_MODEL_AGENT,
+  guestMemoryFixtures.map((f) => ({
+    id: f.id,
+    run: async () => {
+      const { items, tokens } = await readGuestMemory(provider.agent, f.source, reasoning);
+      const problems = scoreGuestMemory(f, items);
+      return {
+        passed: problems.length === 0,
+        label: problems.join(', '),
+        detail: items.map((i) => `      ${i.kind}  ${i.text}`).join('\n'),
+        tokens,
+      };
+    },
+  })),
+);
+
 process.exit(
-  arrivalsOk &&
+  memoryOk &&
+    arrivalsOk &&
     inboxOk &&
     notesOk &&
     staysOk &&

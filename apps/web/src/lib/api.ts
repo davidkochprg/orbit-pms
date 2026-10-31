@@ -1,4 +1,5 @@
 import {
+  guestMemorySchema,
   type ArrivalNote,
   arrivalNoteSchema,
   arrivalNotesSchema,
@@ -781,6 +782,24 @@ export function useKnockOns() {
   return useQuery({
     queryKey: ['knock-ons'],
     queryFn: () => apiGet('/api/knock-ons', z.array(knockOnSchema)),
+  });
+}
+
+/** What Orbit remembers about a guest from earlier stays, without reading anything. */
+export function useGuestMemory(guestId: string) {
+  return useQuery({
+    queryKey: ['guest-memory', guestId],
+    queryFn: () => apiGet(`/api/guests/${encodeURIComponent(guestId)}/memory`, guestMemorySchema),
+  });
+}
+
+/** Reads the guest's history again when it changed since; free when it didn't. */
+export function useReadGuestMemory(guestId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () =>
+      apiPost(`/api/guests/${encodeURIComponent(guestId)}/memory/read`, {}, guestMemorySchema),
+    onSuccess: (memory) => queryClient.setQueryData(['guest-memory', guestId], memory),
   });
 }
 

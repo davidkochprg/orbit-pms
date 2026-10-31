@@ -13,6 +13,7 @@ import {
 import {
   type ArrivalNote,
   type ArrivalNotes,
+  type GuestMemory,
   type IsoDate,
   type AgentBookingRow,
   type AgentRoomStatusResult,
@@ -106,6 +107,8 @@ export interface ToolDeps {
   arrivalNotesDue?: (date?: IsoDate) => Promise<ArrivalNotes>;
   /** Writes the note before a stay in the guest's language; null when drafting is off. */
   draftArrivalNote?: ((bookingId: string) => Promise<ArrivalNote>) | null;
+  /** What was remembered about a guest from earlier stays, as last read. */
+  guestMemory?: (guestId: string) => Promise<GuestMemory>;
 }
 
 export interface ToolError {
@@ -371,6 +374,7 @@ export function createAgentTools({
   draftReply,
   arrivalNotesDue,
   draftArrivalNote,
+  guestMemory,
   activity,
   getGuest,
   guestBookings,
@@ -732,7 +736,7 @@ export function createAgentTools({
     }),
     getGuest: tool({
       description:
-        "A guest's profile (email, phone, language, notes) and every stay they booked, newest first.",
+        "A guest's profile (email, phone, language, notes), every stay they booked, newest first, and what Orbit remembers from their earlier stays (preferences, occasions, care needs, habits).",
       inputSchema: z.object({ guestId: z.string().describe('Guest ID, e.g. "gst_12".') }),
       execute: ({ guestId }) =>
         safely(async () => {
@@ -752,7 +756,14 @@ export function createAgentTools({
               status: b.status,
               total: b.priceSnapshot?.total ?? null,
             }));
-          return { ...guest, guestId: guest.id, guestName: guest.name, stays };
+          const memory = guestMemory ? await guestMemory(guestId) : null;
+          return {
+            ...guest,
+            guestId: guest.id,
+            guestName: guest.name,
+            stays,
+            remembered: memory?.items.map((i) => `${i.kind}: ${i.text}`) ?? [],
+          };
         }),
     }),
     getLocalEvents: tool({

@@ -8,6 +8,7 @@ export * from './contacts';
 export * from './dates';
 export * from './entities';
 export * from './enums';
+export * from './guest-memory';
 export * from './hotel';
 export * from './housekeeping';
 export * from './id-scan';

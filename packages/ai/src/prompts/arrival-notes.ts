@@ -17,6 +17,8 @@ export interface ArrivalNoteFacts {
   weather: WeatherDay | null;
   /** Who must show an ID at check-in: everyone staying, or the guest who booked. */
   idsFrom: 'everyone' | 'main_guest';
+  /** What the hotel remembers from the guest's earlier stays, e.g. "Allergic to feathers". */
+  remembered?: string[];
   /** Who signs the email. */
   signer: string | null;
   today: string;
@@ -36,6 +38,7 @@ Write:
 - The weather when it matters for the journey or the stay (snow, ice, heavy rain, a cold night), with advice only if the facts give some.
 - What to bring for check-in: an ID, as you are told.
 - An invitation to reply with their arrival time or any wishes.
+- For a returning guest, a warm word that you are glad to have them back, and at most one thing you remember from their earlier stays, as something the team has noted (e.g. "we have noted your feather allergy"). Never promise a particular room, a gift or anything the facts don't state.
 
 Rules:
 - Write only in the language you are told to use.
@@ -92,5 +95,6 @@ Room: ${stay.roomTypeName}, for ${party}
 Booked: ${booked.length > 0 ? booked.join(', ') : 'nothing extra'}
 Weather forecast for the arrival day: ${f.weather ? weatherLine(f.weather) : 'not known'}
 ID at check-in: ${f.idsFrom === 'everyone' ? 'an ID card or passport for everyone staying' : 'a photo ID for the guest who booked'}
+Remembered from earlier stays: ${f.remembered && f.remembered.length > 0 ? f.remembered.join(' ') : 'nothing, a first stay or nothing noted'}
 Signer: ${f.signer ?? 'none'}${feedback ? `\n\nYour previous email was rejected: ${feedback}` : ''}`;
 }

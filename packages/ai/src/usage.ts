@@ -17,6 +17,7 @@ export const aiFeatures = [
   'repairs',
   'arrival_note',
   'report_summary',
+  'guest_memory',
 ] as const;
 export type AiFeature = (typeof aiFeatures)[number];
 

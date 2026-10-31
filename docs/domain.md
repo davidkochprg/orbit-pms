@@ -105,6 +105,10 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 
 `createGuestService` (`guests.ts`) creates and edits guest records (`name`, `email`, `phone`, `language`, `notes`). An email may belong to only one guest, ignoring case (`conflict`), because the inbox recognises returning guests by email. Changes are audited as `guest.create` and `guest.update` with the guest as subject.
 
+### Guest memory
+
+`guestMemorySource` (`guest-memory.ts`) writes a guest's history as text for the model: the profile notes, every stay that ended (`checked_out`) with its room, party, add-ons and notes, and the last six messages the guest wrote in conversations linked to their bookings or from their email address. The stay at hand is left out; its notes show on the booking. A guest with no profile notes, no notes on earlier stays and no messages has no history. `createGuestMemoryService` keeps what was read (`guest_memories`, one row per guest) with the text it was read from: `get` says whether it is `current`, `sourceToRead` gives the text only when the history changed, and `save` keeps a new reading. The seed makes a few of today's and tomorrow's arrivals regulars, with notes on their earlier stays (a quieter room and an anniversary, a feather allergy, e-bikes, a vegetarian breakfast).
+
 ## Housekeeping
 
 `packages/domain/src/housekeeping.ts` and `housekeeping-service.ts`.
