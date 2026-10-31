@@ -1,4 +1,4 @@
-import type { DailyBrief, KnockOn } from '@orbit/shared';
+import type { ArrivalNotes, DailyBrief, KnockOn } from '@orbit/shared';
 import {
   BrushCleaning,
   CalendarCheck,
@@ -8,6 +8,7 @@ import {
   Clock,
   Inbox,
   type LucideIcon,
+  MailCheck,
   OctagonAlert,
   Phone,
   ScanLine,
@@ -15,6 +16,7 @@ import {
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
+import { ArrivalNotesDialog } from '@/components/arrival-notes-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
 import { Panel, ScrollBox } from '@/components/panel';
@@ -22,7 +24,13 @@ import { RelocateDialog } from '@/components/relocate-dialog';
 import { RepairDialog } from '@/components/repair-panel';
 import { Button } from '@/components/ui/button';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
-import { useAskToRepair, useKnockOns, useRefreshInboxRooms } from '@/lib/api';
+import {
+  useArrivalNotes,
+  useAskToRepair,
+  useHealth,
+  useKnockOns,
+  useRefreshInboxRooms,
+} from '@/lib/api';
 import { type AttentionItem, type AttentionKind, attentionItems, gapItems } from '@/lib/brief';
 import { contactName, telHref } from '@/lib/repairs';
 import { cn } from '@/lib/utils';
@@ -33,6 +41,7 @@ const kindIcons: Record<AttentionKind, { icon: LucideIcon; className: string }> 
   hold: { icon: Clock, className: 'text-status-hold' },
   opening: { icon: CalendarCheck, className: 'text-primary-text' },
   messages: { icon: Inbox, className: 'text-primary-text' },
+  welcome: { icon: MailCheck, className: 'text-primary-text' },
   out_of_order: { icon: OctagonAlert, className: 'text-destructive' },
   maintenance: { icon: Wrench, className: 'text-muted-foreground' },
   gap: { icon: CalendarX2, className: 'text-muted-foreground' },
@@ -45,7 +54,11 @@ const kindIcons: Record<AttentionKind, { icon: LucideIcon; className: string }> 
  */
 export function AttentionPanel({ brief, className }: { brief: DailyBrief; className?: string }) {
   const knockOns = useKnockOns();
-  const items = attentionItems(brief, knockOns.data);
+  const health = useHealth();
+  // Notes before a stay are written by the model, so the row only shows when AI is on.
+  const aiOn = health.data?.ai.configured ?? false;
+  const arrivalNotes = useArrivalNotes(aiOn);
+  const items = attentionItems(brief, knockOns.data, arrivalNotes.data);
   return (
     <Panel
       title="Needs attention"
@@ -151,6 +164,7 @@ function AttentionRow({
     </>
   );
   if (item.knockOn) return <KnockOnRow knockOn={item.knockOn} body={body} />;
+  if (item.arrivalNotes) return <ArrivalNotesRow notes={item.arrivalNotes} body={body} />;
   if ('items' in item.target) {
     return (
       <AttentionGroup
@@ -178,6 +192,19 @@ function AttentionRow({
     <Link to={item.target.path} onClick={onOpen} className={rowClass}>
       {body}
     </Link>
+  );
+}
+
+/** Opens tomorrow's guests with a note for each to draft, read and send. */
+function ArrivalNotesRow({ notes, body }: { notes: ArrivalNotes; body: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={rowClass}>
+        {body}
+      </button>
+      <ArrivalNotesDialog notes={notes} open={open} onOpenChange={setOpen} />
+    </>
   );
 }
 

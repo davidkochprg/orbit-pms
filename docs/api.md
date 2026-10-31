@@ -194,6 +194,14 @@ Conversations with guests by email, web form, phone note and OTA messaging ([ADR
 | `POST /api/inbox/:id/learn`                         |                                                                          | The `PendingAction` (`save_hotel_info`) for a fact the latest reply states that the hotel information lacks, or `null`. One model call. 503 `ai_not_configured`, 429 `demo_limit`.                                                         |
 | `POST /api/inbox/:id/decline`                       |                                                                          | `Inquiry` with `status: "declined"`. 409 `invalid_transition` if it already led to a booking.                                                                                                                                              |
 
+### Notes before a stay
+
+| Endpoint                                   | Body                        | Returns                                                                                                                                                                                                                            |
+| ------------------------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/arrival-notes`                   | `?date=` (default tomorrow) | `{ date, due }`: confirmed arrivals on that day whose guest has an email and hasn't heard from the hotel about the stay, with name, email, language, room, room type, party and add-ons.                                           |
+| `POST /api/arrival-notes/:bookingId/draft` |                             | `{ subject, body }` written by the model in the guest's language; nothing is saved. 422 `draft_failed` when it can't be written without an unstated amount, 503 `ai_not_configured`, 429 `demo_limit`, 404 for an unknown booking. |
+| `POST /api/arrival-notes/:bookingId/send`  | `{ subject, body }`         | 201 `Inquiry`: the note sent as an email linked to the booking, signed by the signed-in staff member. 400 for an empty subject or body or a guest without an email.                                                                |
+
 ### Mailbox
 
 Registered before `/api/inbox/:id`, so these paths win. Nothing here calls a model.

@@ -1,4 +1,5 @@
 export * from './agent';
+export * from './arrival-notes';
 export * from './cost';
 export * from './housekeeping';
 export * from './id-scan';

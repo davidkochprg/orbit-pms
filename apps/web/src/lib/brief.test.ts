@@ -189,6 +189,36 @@ describe('attentionItems with knock-ons', () => {
     ]);
   });
 
+  it("asks to welcome tomorrow's guests who haven't heard from the hotel", () => {
+    const due = (bookingId: string, guestName: string) => ({
+      bookingId,
+      guestId: `gst_${bookingId}`,
+      guestName,
+      email: 'guest@example.com',
+      language: 'de' as const,
+      roomName: '101',
+      roomTypeName: 'Double',
+      checkIn: '2026-10-28',
+      checkOut: '2026-10-30',
+      adults: 2,
+      childAges: [],
+      addons: { wellness: false, dogs: 0, extraBeds: 0 },
+    });
+    const notes = {
+      date: '2026-10-28',
+      due: [due('bk_1', 'Elias Bauer'), due('bk_2', 'Mia Wagner'), due('bk_3', 'Jan Novák')],
+    };
+    const item = attentionItems(brief, [], notes).find((i) => i.kind === 'welcome');
+    expect(item).toMatchObject({
+      title: 'Welcome 3 guests arriving tomorrow',
+      detail: 'Elias Bauer, Mia Wagner and 1 more',
+      arrivalNotes: notes,
+    });
+    expect(attentionItems(brief, [], { ...notes, due: [] }).some((i) => i.kind === 'welcome')).toBe(
+      false,
+    );
+  });
+
   it('leaves rows as they are when their knock-on is gone', () => {
     expect(attentionItems(brief, []).map((i) => i.knockOn)).toEqual(
       attentionItems(brief).map(() => undefined),

@@ -1,10 +1,18 @@
-import type { BookingSummary, DailyBrief, KnockOn } from '@orbit/shared';
+import type { ArrivalNotes, BookingSummary, DailyBrief, KnockOn } from '@orbit/shared';
 import { formatDate, formatDateTime, formatMoney, formatRange } from '@/lib/format';
 import { contactName } from '@/lib/repairs';
 import { roomStatusLabels } from '@/lib/status';
 
 export type AttentionKind =
-  'prepare' | 'ids' | 'hold' | 'opening' | 'messages' | 'out_of_order' | 'maintenance' | 'gap';
+  | 'prepare'
+  | 'ids'
+  | 'hold'
+  | 'opening'
+  | 'messages'
+  | 'welcome'
+  | 'out_of_order'
+  | 'maintenance'
+  | 'gap';
 
 /** One line in the brief's "needs attention" list, with where to go to deal with it. */
 export interface AttentionItem {
@@ -19,6 +27,8 @@ export interface AttentionItem {
   target: { path: string } | { bookingId: string } | { items: AttentionItem[] };
   /** What a change made worth doing for this item; the row then offers the fix itself. */
   knockOn?: KnockOn;
+  /** Guests to write to before they arrive; the row opens the notes to review and send. */
+  arrivalNotes?: ArrivalNotes;
 }
 
 /** From this many items of one kind they share a row that opens into them. */
@@ -65,7 +75,17 @@ export function doneOf(rows: BookingSummary[], done: 'checked_in' | 'checked_out
  * knock-on joins the row it is about (stays to move out of an out-of-order room, who to ask for a
  * repair), or, for a room free again for a request, gets a row of its own.
  */
-export function attentionItems(brief: DailyBrief, knockOns: KnockOn[] = []): AttentionItem[] {
+/** "Elias Bauer, Lukáš Vaněk and 4 more". */
+function nameList(names: string[]): string {
+  if (names.length <= 2) return names.join(' and ');
+  return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
+}
+
+export function attentionItems(
+  brief: DailyBrief,
+  knockOns: KnockOn[] = [],
+  arrivalNotes?: ArrivalNotes,
+): AttentionItem[] {
   const items: AttentionItem[] = [];
   for (const r of brief.roomsToPrepare) {
     items.push({
@@ -136,6 +156,18 @@ export function attentionItems(brief: DailyBrief, knockOns: KnockOn[] = []): Att
       kind: 'messages',
       title: `${plural(brief.unansweredMessages, 'message')} waiting for a reply`,
       target: { path: '/inbox' },
+    });
+  }
+  if (arrivalNotes && arrivalNotes.due.length > 0) {
+    const { due } = arrivalNotes;
+    items.push({
+      id: `welcome:${arrivalNotes.date}`,
+      kind: 'welcome',
+      // The list is for tomorrow's arrivals, the day before they come.
+      title: `Welcome ${plural(due.length, 'guest')} arriving tomorrow`,
+      detail: nameList(due.map((d) => d.guestName)),
+      target: { path: '/inbox' },
+      arrivalNotes,
     });
   }
   for (const r of brief.outOfOrder) {

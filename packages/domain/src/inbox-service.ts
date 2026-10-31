@@ -1,4 +1,5 @@
 import type {
+  ArrivalNote,
   Attachment,
   AuditActor,
   Booking,
@@ -602,6 +603,59 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
         (first && (await repos.guests.getGuest(first.booking.guestId))?.name) ??
         'Guest';
       return { previews, guestName };
+    },
+
+    /**
+     * The email before a stay, to the guest who booked: a new conversation linked to the booking,
+     * so the stay counts as told and the conversation opens the booking.
+     */
+    async sendArrivalNote(
+      bookingId: string,
+      note: ArrivalNote,
+      author: string | null,
+      actor: AuditActor,
+    ): Promise<Inquiry> {
+      return repos.transaction(async (tx) => {
+        const booking = await tx.bookings.getBooking(bookingId);
+        if (!booking) throw new DomainError('not_found', `Booking ${bookingId} not found`);
+        const guest = await tx.guests.getGuest(booking.guestId);
+        if (!guest?.email) {
+          throw new DomainError('invalid_input', 'The guest has no email address');
+        }
+        const id = newId('inq');
+        const msg = message(id, 'out', note.body, author);
+        const inquiry: Inquiry = {
+          id,
+          channel: 'email',
+          partner: null,
+          subject: note.subject.trim(),
+          senderName: guest.name,
+          senderAddress: guest.email,
+          receivedAt: msg.sentAt,
+          lastMessageAt: msg.sentAt,
+          messages: [msg],
+          unread: false,
+          archivedAt: null,
+          starred: false,
+          trashedAt: null,
+          labelIds: [],
+          parsed: null,
+          suggestion: null,
+          status: 'replied',
+          bookingId,
+          blockBookingIds: [],
+          processedAt: null,
+          processingError: null,
+        };
+        await tx.inquiries.createInquiry(inquiry);
+        await tx.audit.append({
+          actor,
+          action: 'inquiry.arrival_note',
+          subjectId: id,
+          payload: { bookingId, messageId: msg.id },
+        });
+        return inquiry;
+      });
     },
 
     /** Marks a message as not leading to a booking, e.g. spam or a request that can't be met. */

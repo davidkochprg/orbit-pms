@@ -9,6 +9,7 @@ import {
 import { conversation } from '@orbit/domain/testing';
 import type { RoomBlock, StayOption } from '@orbit/shared';
 import { runAgent } from '../agent';
+import { draftArrivalNote } from '../arrival-notes';
 import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from '../cost';
 import { holdExpiry } from '../prompts/inbox';
 import { buildSystemPrompt } from '../prompts/system';
@@ -27,6 +28,7 @@ import { agentFixtures, buildAgentEvalHotel } from './agent';
 import { evalRoomNames, housekeepingNoteFixtures } from './housekeeping-notes';
 import { idDocumentFixtures } from './id-documents';
 import { buildKnowledgeFixtures, evalNotes, scoreFiledNote } from './knowledge';
+import { arrivalNoteHotel, buildArrivalNoteFixtures, scoreArrivalNote } from './arrival-notes';
 import { buildDraftEvalHotel } from './drafts';
 import { buildInquiryFixtures, type InquiryFixture } from './inquiries';
 import { rateReviewFixtures } from './rates';
@@ -76,6 +78,7 @@ const suiteKeys = [
   'repairs',
   'translations',
   'rates',
+  'arrivals',
 ] as const;
 type SuiteKey = (typeof suiteKeys)[number];
 const only = process.env.EVAL_SUITES?.split(',')
@@ -523,8 +526,33 @@ const ratesOk = await suite(
   })),
 );
 
+const arrivalsOk = await suite(
+  'arrivals',
+  'Notes before a stay',
+  reasoningEffort.draft,
+  provider.draftModelId,
+  buildArrivalNoteFixtures(today).map((f) => ({
+    id: f.id,
+    run: async () => {
+      const { subject, body, tokens, modelId } = await draftArrivalNote(
+        provider.draft,
+        arrivalNoteHotel,
+        f.facts,
+      );
+      const problems = scoreArrivalNote(f, { subject, body });
+      return {
+        passed: problems.length === 0,
+        label: `${f.facts.guest.language}  ${modelId}  ${problems.join(', ')}`,
+        detail: `      subject  ${subject}\n      body     ${body.replace(/\n/g, ' ')}`,
+        tokens,
+      };
+    },
+  })),
+);
+
 process.exit(
-  inboxOk &&
+  arrivalsOk &&
+    inboxOk &&
     notesOk &&
     staysOk &&
     idsOk &&

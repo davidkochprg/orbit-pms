@@ -1,4 +1,7 @@
 import {
+  type ArrivalNote,
+  arrivalNoteSchema,
+  arrivalNotesSchema,
   accessStatusSchema,
   activityItemSchema,
   type AuditActor,
@@ -778,6 +781,34 @@ export function useKnockOns() {
   return useQuery({
     queryKey: ['knock-ons'],
     queryFn: () => apiGet('/api/knock-ons', z.array(knockOnSchema)),
+  });
+}
+
+/** Tomorrow's guests who haven't heard from the hotel before their stay. */
+export function useArrivalNotes(enabled = true) {
+  return useQuery({
+    queryKey: ['arrival-notes'],
+    queryFn: () => apiGet('/api/arrival-notes', arrivalNotesSchema),
+    enabled,
+  });
+}
+
+/** The model's draft of the note before a stay; nothing is saved or sent. */
+export function useDraftArrivalNote() {
+  return useMutation({
+    mutationFn: (bookingId: string) =>
+      apiPost(`/api/arrival-notes/${encodeURIComponent(bookingId)}/draft`, {}, arrivalNoteSchema),
+  });
+}
+
+/** Sends the note before a stay as an email linked to the booking. */
+export function useSendArrivalNote() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ bookingId, note }: { bookingId: string; note: ArrivalNote }) =>
+      apiPost(`/api/arrival-notes/${encodeURIComponent(bookingId)}/send`, note, inquirySchema),
+    // The list of notes due is refreshed once the dialog closes, so rows don't jump while sending.
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['inbox'] }),
   });
 }
 

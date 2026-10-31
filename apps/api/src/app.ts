@@ -1,5 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import {
+  createArrivalNoteWriter,
   createHousekeepingNotePipeline,
   createStayNotesReader,
   createNoteFiler,
@@ -16,6 +17,7 @@ import {
 } from '@orbit/ai';
 import {
   createActivityService,
+  createArrivalNoteService,
   createBillingService,
   createContactService,
   createGuestService,
@@ -48,6 +50,7 @@ import { createAiGate } from './ai-gate';
 import { errorBody, handleError } from './http';
 import { type AiLimitsConfig, createAiLimiter } from './limits';
 import { activityRoutes } from './routes/activity';
+import { arrivalNoteRoutes } from './routes/arrival-notes';
 import { agentRoutes } from './routes/agent';
 import { billingRoutes } from './routes/billing';
 import { contactRoutes } from './routes/contacts';
@@ -230,6 +233,20 @@ export function createApp({
     pendingActionRoutes(actions, (id) => staff.identify(id)),
   );
   app.route('/api', knockOnRoutes(knockOns));
+  app.route(
+    '/api',
+    arrivalNoteRoutes({
+      arrivalNotes: createArrivalNoteService({ repos, clock }),
+      hotel,
+      inbox,
+      writer: ai && createArrivalNoteWriter({ model: ai.draft, usage, hotelContext }),
+      forecast,
+      country: async () => (await settings.getProfile()).country,
+      today: () => hotelToday(clock()),
+      gate,
+      identify: (id) => staff.identify(id),
+    }),
+  );
   app.route('/api', mailboxRoutes({ inbox, mailbox }));
   app.route(
     '/api',

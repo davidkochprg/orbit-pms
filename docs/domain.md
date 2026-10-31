@@ -95,6 +95,12 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - `decline(id, actor)`: marks a message `declined`, unless it already led to a booking (`invalid_transition`).
 - `refreshOptions(id)`: looks for rooms again for a request that was read, e.g. one that had none when a cancellation frees a room. The old draft is dropped; a `new` message with rooms becomes `quoted`. `invalid_transition` before the request is read.
 
+## Notes before a stay
+
+`arrivalNotesDue` (`arrival-notes.ts`) lists the stays arriving on a day, tomorrow by default (`createArrivalNoteService().due`), that are confirmed, whose guest has an email address, and that the hotel hasn't written to about: no conversation linked to the booking (`bookingId`, or `blockBookingIds` for a group) has a message from the hotel in the 14 days before arrival (`ARRIVAL_NOTE_DAYS`). By guest name, with the room, room type, party and add-ons.
+
+`inbox.sendArrivalNote(bookingId, { subject, body }, author, actor)` sends one as a new email conversation to the guest who booked, linked to the booking and `replied`, audited as `inquiry.arrival_note`. A guest without an email is `invalid_input`.
+
 ## Guests
 
 `createGuestService` (`guests.ts`) creates and edits guest records (`name`, `email`, `phone`, `language`, `notes`). An email may belong to only one guest, ignoring case (`conflict`), because the inbox recognises returning guests by email. Changes are audited as `guest.create` and `guest.update` with the guest as subject.

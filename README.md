@@ -28,6 +28,10 @@ Email, web forms, phone notes and Booking.com messages land in one mail client: 
 
 ![A web-form booking enquiry with a dog: Orbit pulls out the dates, party and wishes, prices a free cabin suite with a Hold button, and drafts the reply](docs/images/inbox.png)
 
+### A note before every stay
+
+The day before guests arrive, Today lists who hasn't heard from the hotel yet. One click drafts a personal email for each, in their own language: the arrival day and check-in time, the forecast when it matters ("snow tomorrow, chains may be needed on the pass"), the spa they booked or the rules for their dog from Knowledge, and the ID to bring. Staff read, edit and send them all at once; each goes out linked to its booking.
+
 ### Housekeeping by voice
 
 Housekeepers record a note on their phone, in their own language: "205 je hotový, v 204 nefunguje televize". Meta's speech-to-text transcribes it, the model reads it into room updates, and Orbit sets the room statuses and creates repair tasks. These are low-risk and easy to undo, so they apply straight away and the note shows exactly what changed. The board highlights rooms where a guest arrives today but the room isn't inspected yet, and cards can be dragged between columns. Within the same deadline it puts the heavier cleans first: children, dogs and long stays come from the booking, and Muse Spark reads the booking notes and guest messages for what only the text says ("we're bringing our labrador", "could you set up a cot"), shown as small cues on each card.
@@ -60,18 +64,19 @@ All guests, bookings and messages in the demo and the screenshots are synthetic.
 
 Every AI feature runs on Meta's models through the Vercel AI SDK: Muse Spark on the Meta Model API, and its open-weight sibling Muse Spark Open on Baseten for reply drafts and translations. The models do language, the domain does the facts:
 
-| Feature            | Model                                               | What the model does                                                          | What it never does                                                             |
-| ------------------ | --------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ⌘K agent           | `muse-spark-1.3`                                    | Plans multi-step tool use over 33 typed tools, writes the answer             | Computes a price or availability, or changes a booking without a click         |
-| Inbox extraction   | `muse-spark-1.3`                                    | Structured output: kind, language, dates, party, rooms, child ages, wishes   | Picks rooms or prices                                                          |
-| Reply drafts       | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Writes the reply in the guest's language around the exact quoted totals      | Runs before staff ask, or sends a reply; a wrong amount is redone or dropped   |
-| Translation        | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Puts drafts and guest messages into the staff member's language and back     | Changes an amount: such a translation is redone or refused                     |
-| Housekeeping notes | `muse-voice-transcribe-1.0` + `muse-spark-1.3`      | Transcribes the recording, reads it into room/status/issue updates           | Changes bookings; unknown rooms and forbidden changes are skipped              |
-| Spoken questions   | `muse-voice-transcribe-1.0`                         | Turns a question asked out loud in ⌘K into text, listening for guests' names | Acts on it: the agent answers it like a typed one, with the same confirmations |
-| ID scans           | `muse-spark-1.3` (vision)                           | Reads a phone photo of an ID card or passport into guest-book fields         | Saves them: staff review every value; the photo is never stored                |
-| Stay notes         | `muse-spark-1.3`                                    | Reads booking notes and guest messages for pets, mess and things to set up   | Decides the cleaning order: the domain scores it                               |
-| Rate summary       | `muse-spark-1.3`                                    | Writes two or three sentences of advice on the coming nights                 | Works out a rate: every percent must be one the domain computed                |
-| Rate review        | `muse-spark-1.3`                                    | Finds holidays, group requests and patterns, graded with their reasons       | Sets a percent: the domain turns each grade into one                           |
+| Feature             | Model                                               | What the model does                                                                               | What it never does                                                             |
+| ------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| ⌘K agent            | `muse-spark-1.3`                                    | Plans multi-step tool use over 33 typed tools, writes the answer                                  | Computes a price or availability, or changes a booking without a click         |
+| Inbox extraction    | `muse-spark-1.3`                                    | Structured output: kind, language, dates, party, rooms, child ages, wishes                        | Picks rooms or prices                                                          |
+| Reply drafts        | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Writes the reply in the guest's language around the exact quoted totals                           | Runs before staff ask, or sends a reply; a wrong amount is redone or dropped   |
+| Translation         | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Puts drafts and guest messages into the staff member's language and back                          | Changes an amount: such a translation is redone or refused                     |
+| Housekeeping notes  | `muse-voice-transcribe-1.0` + `muse-spark-1.3`      | Transcribes the recording, reads it into room/status/issue updates                                | Changes bookings; unknown rooms and forbidden changes are skipped              |
+| Notes before a stay | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Writes the email before arrival in the guest's language from the stay, the forecast and Knowledge | Sends it, or states a price the hotel facts don't                              |
+| Spoken questions    | `muse-voice-transcribe-1.0`                         | Turns a question asked out loud in ⌘K into text, listening for guests' names                      | Acts on it: the agent answers it like a typed one, with the same confirmations |
+| ID scans            | `muse-spark-1.3` (vision)                           | Reads a phone photo of an ID card or passport into guest-book fields                              | Saves them: staff review every value; the photo is never stored                |
+| Stay notes          | `muse-spark-1.3`                                    | Reads booking notes and guest messages for pets, mess and things to set up                        | Decides the cleaning order: the domain scores it                               |
+| Rate summary        | `muse-spark-1.3`                                    | Writes two or three sentences of advice on the coming nights                                      | Works out a rate: every percent must be one the domain computed                |
+| Rate review         | `muse-spark-1.3`                                    | Finds holidays, group requests and patterns, graded with their reasons                            | Sets a percent: the domain turns each grade into one                           |
 
 Muse Spark always reasons before answering, so the reasoning effort is set per feature to the lowest level that keeps quality, measured with the evals and live runs: `minimal` for extraction, drafts, notes, the rate summary and ID scans, `low` for the agent, which plans multi-step tool use, and `high` for the rate review, which weighs sixty nights, the inbox and the country's holidays together and runs only when the outlook changes.
 
