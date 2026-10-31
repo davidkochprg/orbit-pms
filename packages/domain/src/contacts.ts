@@ -15,7 +15,7 @@ import {
   type Trade,
 } from '@orbit/shared';
 import { blocksRoom } from './availability';
-import { hotelToday } from './dates';
+import { addDays, hotelToday } from './dates';
 import { DomainError } from './errors';
 import type { Repositories } from './repositories';
 
@@ -68,6 +68,44 @@ export function roomAccess(
     freeFrom,
     freeUntil: stays.find((b) => b.checkIn >= freeFrom)?.checkIn ?? null,
   };
+}
+
+/**
+ * Whether someone can work in the room on a day: a guest stays all day (`occupied`), the guest
+ * leaves that morning (`after_check_out`), the next guest arrives that afternoon
+ * (`before_check_in`), both (`between_stays`), nobody (`free`), or another stay has begun
+ * (`booked`).
+ */
+export type AccessState =
+  'occupied' | 'after_check_out' | 'before_check_in' | 'between_stays' | 'free' | 'booked';
+
+/**
+ * The next `days` days from `today`, each with whether a contractor can work in the room, so a
+ * reply to them is checked against the bookings rather than worked out by a model.
+ */
+export function accessDays(
+  access: RoomAccess,
+  today: IsoDate,
+  days = 14,
+): { date: IsoDate; state: AccessState }[] {
+  return Array.from({ length: days }, (_, i) => {
+    const date = addDays(today, i);
+    const leaving = access.guestName !== null && date === access.freeFrom;
+    const arriving = date === access.freeUntil;
+    const state: AccessState =
+      date < access.freeFrom
+        ? 'occupied'
+        : access.freeUntil !== null && date > access.freeUntil
+          ? 'booked'
+          : leaving && arriving
+            ? 'between_stays'
+            : leaving
+              ? 'after_check_out'
+              : arriving
+                ? 'before_check_in'
+                : 'free';
+    return { date, state };
+  });
 }
 
 /** The conversations with contractors about a repair, latest first; the trash left out. */

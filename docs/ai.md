@@ -170,6 +170,7 @@ Usage is recorded under the `voice` feature: audio seconds for the transcription
 
 - **Trade**: a repair added by hand without a trade is sorted into one (`readTrade`, one structured call at `minimal` on Muse Spark). Repairs from housekeeping notes get theirs in the same call that reads the note; the agent passes one when it logs a repair. Who to ask is then plain domain logic ([domain.md](domain.md#contacts-and-repairs)).
 - **Email**: `draftWorkOrder` writes the email asking a contact to come, on the draft model (Muse Spark Open on Baseten, falling back to Muse Spark), in the contact's language. It gets the room, the problem, when the room is free (with weekdays and the check-out and check-in times) and the signer, never the guest's name, and answers with a subject line and the body. Staff edit it and send it from the hotel's mailbox: the conversation is linked to the repair, which lists it, and it shows "Open repair" in the inbox. Calling or sending the email records the contact as asked. `createWorkOrderDrafter` puts the repair, contact and hotel together for the drafter, so the repair card and the agent's `draftRepairEmail` write the same email.
+- **Replies**: when the contractor answers, "Prepare reply" in that conversation (and the agent's `draftReply`) writes the hotel's answer with `createRepairReplier` instead of reading the email as a booking request: one call on the draft model, in the contact's language, signed by the hotel. It gets the repair, the conversation with each message's day, and the room's next fourteen days from the domain's `accessDays` (a guest staying, free from check-out, free, free until check-in, between two stays, booked), so a proposed time is checked against the bookings rather than worked out by the model. It accepts a time that works or offers the first one that does, never names the guest, never agrees to a price (the manager confirms), and says it will check what the facts don't answer. The draft is stored like a guest reply's (no reading, `parsed` null), side by side in the staff member's language, and a new message from the contractor clears it.
 
 ## Notes before a stay
 
@@ -267,7 +268,7 @@ Filing Knowledge notes with `muse-spark-1.3` at `minimal` (2026-10-30): 8/8 (100
 
 Agent tools with `muse-spark-1.3` at `low` (2026-10-31): 22/22 (100%), about $0.023 per request, 4.1 s.
 
-Repairs at `minimal` (2026-10-30): housekeeping notes with trades 13/13 (100%, `muse-spark-1.3`, $0.0019 per note, 1.5 s); trades 13/13 (100%, `muse-spark-1.3`, $0.0009 per repair, 1.0 s); contractor emails 3/3 (100%, `muse-spark-open-1026`, $0.003 per email, 2.5 s).
+Repairs at `minimal` (2026-10-30): housekeeping notes with trades 13/13 (100%, `muse-spark-1.3`, $0.0019 per note, 1.5 s); trades 13/13 (100%, `muse-spark-1.3`, $0.0009 per repair, 1.0 s); contractor emails 3/3 (100%, `muse-spark-open-1026`, $0.003 per email, 2.5 s). Replies to contractors (2026-10-31): 4/4 (100%, `muse-spark-open-1026`, $0.0033 per reply, 2.3 s). `EVAL_VERBOSE=1` prints every drafted text, not only failures.
 
 Reply drafts and translations at `minimal` (2026-10-29):
 

@@ -22,7 +22,7 @@ import { reasoningEffort, type ReasoningEffort } from '../reasoning';
 import { readHousekeepingNote } from '../housekeeping';
 import { readIdDocument } from '../id-scan';
 import { fileNote } from '../knowledge';
-import { draftWorkOrder, readTrade } from '../repairs';
+import { draftRepairReply, draftWorkOrder, readTrade } from '../repairs';
 import { createRateReviewer } from '../revenue-review';
 import { readStayNotes } from '../stay-notes';
 import { agentFixtures, buildAgentEvalHotel } from './agent';
@@ -34,7 +34,13 @@ import { buildDraftEvalHotel } from './drafts';
 import { guestMemoryFixtures, scoreGuestMemory } from './guest-memory';
 import { buildInquiryFixtures, type InquiryFixture } from './inquiries';
 import { rateReviewFixtures } from './rates';
-import { buildWorkOrderFixtures, scoreWorkOrder, tradeFixtures } from './repairs';
+import {
+  buildRepairReplyFixtures,
+  buildWorkOrderFixtures,
+  scoreRepairReply,
+  scoreWorkOrder,
+  tradeFixtures,
+} from './repairs';
 import { stayNotesFixtures } from './stay-notes';
 import { translationFixtures } from './translations';
 import { createTranslator } from '../translate';
@@ -140,7 +146,7 @@ async function suite(
       outputTokens += result.tokens.output;
       if (result.passed) passed++;
       console.log(`${result.passed ? 'PASS' : 'FAIL'}  ${c.id}  ${result.label}`);
-      if (!result.passed && result.detail) console.log(result.detail);
+      if ((!result.passed || process.env.EVAL_VERBOSE) && result.detail) console.log(result.detail);
     } catch (err) {
       console.log(`ERROR ${c.id}  ${err instanceof Error ? err.message : String(err)}`);
     }
@@ -451,6 +457,26 @@ const repairsOk = await suite(
   })),
 );
 
+const repairRepliesOk = await suite(
+  'repairs',
+  'Replies to contractors',
+  reasoningEffort.draft,
+  provider.draftModelId,
+  buildRepairReplyFixtures(today).map((f) => ({
+    id: f.id,
+    run: async () => {
+      const { text, tokens, modelId } = await draftRepairReply(provider.draft, f.facts);
+      const problems = scoreRepairReply(f, text);
+      return {
+        passed: problems.length === 0,
+        label: `${f.facts.contact.language}  ${modelId}  ${problems.join(', ')}`,
+        detail: `      reply    ${text.replace(/\n/g, ' ')}`,
+        tokens,
+      };
+    },
+  })),
+);
+
 const translateEffort = reasoningEffort.translate;
 const translateOk = await suite(
   'translations',
@@ -585,6 +611,7 @@ process.exit(
     agentOk &&
     draftsOk &&
     repairsOk &&
+    repairRepliesOk &&
     translateOk &&
     ratesOk
     ? 0

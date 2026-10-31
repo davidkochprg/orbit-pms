@@ -53,7 +53,8 @@ interface Envelope {
 }
 
 export type ProcessingResult =
-  | { ok: true; parsed: InquiryExtraction; suggestion: InquirySuggestion }
+  /** `parsed` is null for a conversation that isn't a guest's request, e.g. about a repair. */
+  | { ok: true; parsed: InquiryExtraction | null; suggestion: InquirySuggestion }
   | { ok: false; error: string };
 
 /** Statuses a conversation keeps whatever is written: it led to a booking, or it was turned down. */

@@ -1,9 +1,13 @@
-import type { Contact, Repair } from '@orbit/shared';
+import { accessDays } from '@orbit/domain';
+import type { Contact, Inquiry, Language, Repair } from '@orbit/shared';
 import { type Trade, tradeSchema, type WorkOrder } from '@orbit/shared';
 import { generateText, type LanguageModel, Output } from 'ai';
 import { z } from 'zod';
 import { fromSdkUsage, tokenCostMicroUsd, type TokenUsage } from './cost';
 import {
+  type RepairReplyFacts,
+  repairReplyPrompt,
+  repairReplySystemPrompt,
   tradePrompt,
   tradeSystemPrompt,
   type WorkOrderFacts,
@@ -13,7 +17,7 @@ import {
 import { reasoningEffort, type ReasoningEffort } from './reasoning';
 import type { UsageStore } from './usage';
 
-export type { WorkOrderFacts } from './prompts/repairs';
+export type { RepairReplyFacts, WorkOrderFacts } from './prompts/repairs';
 
 const tradeReadingSchema = z.object({ trade: tradeSchema.nullable() });
 
@@ -65,6 +69,23 @@ export async function draftWorkOrder(model: LanguageModel, facts: WorkOrderFacts
   };
 }
 
+/** Drafts the hotel's answer to a contractor who wrote back about a repair (one model call). */
+export async function draftRepairReply(model: LanguageModel, facts: RepairReplyFacts) {
+  const result = await generateText({
+    model,
+    system: repairReplySystemPrompt,
+    prompt: repairReplyPrompt(facts),
+    temperature: 0.3,
+    reasoning: reasoningEffort.draft,
+  });
+  return {
+    // A subject line the model added anyway is dropped: the reply keeps the conversation's.
+    text: result.text.trim().replace(/^(subject|předmět|betreff|temat)\s*:.*\n+/i, ''),
+    tokens: fromSdkUsage(result.usage),
+    modelId: result.response.modelId,
+  };
+}
+
 export interface RepairDeskDeps {
   model: LanguageModel;
   modelId: string;
@@ -95,6 +116,12 @@ export function createRepairDesk({ model, modelId, draftModel, usage }: RepairDe
       const { subject, body, tokens, modelId: servedBy } = await draftWorkOrder(draftModel, facts);
       await record(tokens, servedBy);
       return { subject, body };
+    },
+
+    async reply(facts: RepairReplyFacts): Promise<string> {
+      const { text, tokens, modelId: servedBy } = await draftRepairReply(draftModel, facts);
+      await record(tokens, servedBy);
+      return text;
     },
   };
 }
@@ -136,3 +163,57 @@ export function createWorkOrderDrafter({
 }
 
 export type WorkOrderDrafter = ReturnType<typeof createWorkOrderDrafter>;
+
+export interface RepairReplierDeps extends Omit<WorkOrderDrafterDeps, 'desk'> {
+  desk: Pick<RepairDesk, 'reply'>;
+  /** The hotel's calendar day of a moment. */
+  dayOf: (at: Date) => string;
+}
+
+/**
+ * Writes the reply to a contractor's answer in a conversation about a repair, in their language,
+ * with when the room is free day by day (`accessDays`) so a proposed time is checked against the
+ * bookings. Returns the text and the language it is in.
+ */
+export function createRepairReplier({
+  desk,
+  repair,
+  contact,
+  hotel,
+  today,
+  dayOf,
+}: RepairReplierDeps) {
+  return async (
+    inquiry: Inquiry,
+    signer: string | null = null,
+  ): Promise<{ text: string; language: Language }> => {
+    if (!inquiry.taskId) throw new Error('This conversation is not about a repair');
+    const r = await repair(inquiry.taskId);
+    const asked = r.contact ?? (r.task.contactId ? await contact(r.task.contactId) : null);
+    const to = asked ?? {
+      name: inquiry.senderName ?? 'the contractor',
+      person: null,
+      language: 'en' as const,
+    };
+    const profile = await hotel();
+    const now = today();
+    const text = await desk.reply({
+      hotel: profile,
+      signer,
+      contact: to,
+      roomName: r.roomName,
+      issue: r.task.notes ?? 'Repair',
+      access: r.access,
+      today: now,
+      days: accessDays(r.access, now),
+      messages: inquiry.messages.map((m) => ({
+        from: m.direction === 'out' ? 'hotel' : 'contractor',
+        date: dayOf(new Date(m.sentAt)),
+        body: m.body,
+      })),
+    });
+    return { text, language: to.language };
+  };
+}
+
+export type RepairReplier = ReturnType<typeof createRepairReplier>;

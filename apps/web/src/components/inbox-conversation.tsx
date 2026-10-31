@@ -167,12 +167,15 @@ export function Conversation({ id }: { id: string }) {
     if (edited) setHeldSinceEdit(what);
     else draft();
   };
-  const read = isRead(m);
+  // A conversation about a repair has no reading, only the reply Orbit wrote to the contractor.
+  const read = m.taskId
+    ? m.processedAt !== null && !m.processingError && Boolean(m.suggestion?.draft)
+    : isRead(m);
   const busy = reading.isPending || drafting.isPending;
   // Before Orbit has read the guest's latest message, preparing is the main step; the empty
   // reply box waits behind "Write it yourself".
   const offerPrepare =
-    m.status !== 'declined' && aiOn && !m.taskId && !read && m.messages.at(-1)?.direction === 'in';
+    m.status !== 'declined' && aiOn && !read && m.messages.at(-1)?.direction === 'in';
 
   return (
     <article className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-6">
@@ -233,7 +236,7 @@ export function Conversation({ id }: { id: string }) {
             onEdit={() => setEditedKey(draftKey)}
             onDraft={read ? draft : prepare}
             // What staff wrote themselves may hold something the hotel information lacks.
-            onSent={() => aiOn && (edited || !m.suggestion?.draft) && learn.mutate()}
+            onSent={() => aiOn && !m.taskId && (edited || !m.suggestion?.draft) && learn.mutate()}
           />
         )}
     </article>
@@ -1101,7 +1104,7 @@ function ReplyEditor({
         )}
         {aiOn && (
           <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-            Guest writes
+            {m.taskId ? 'Writes' : 'Guest writes'}
             <Select
               value={theirLanguage}
               onValueChange={(value) => setTheirLanguage(value as Language)}

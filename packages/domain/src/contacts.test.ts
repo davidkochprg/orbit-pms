@@ -2,6 +2,7 @@ import { type Contact, contactProposalSchema, type HousekeepingTask } from '@orb
 import { describe, expect, it } from 'vitest';
 import { buildDailyBrief } from './brief';
 import {
+  accessDays,
   contactFromProposal,
   contactsForTrade,
   createContactService,
@@ -179,6 +180,48 @@ describe('contactFromProposal', () => {
     expect(() =>
       contactFromProposal(plumber, { contactId: plumber.id, email: 'nope' }, 'en'),
     ).toThrow('email');
+  });
+});
+
+describe('accessDays', () => {
+  const states = (access: Parameters<typeof accessDays>[0]) =>
+    accessDays(access, today, 6).map((d) => `${d.date.slice(8)} ${d.state}`);
+
+  it('waits for the guest to leave and stops at the next arrival', () => {
+    expect(
+      states({ guestName: 'Anna Example', freeFrom: '2026-05-12', freeUntil: '2026-05-14' }),
+    ).toEqual([
+      '10 occupied',
+      '11 occupied',
+      '12 after_check_out',
+      '13 free',
+      '14 before_check_in',
+      '15 booked',
+    ]);
+  });
+
+  it('is free from today when nobody is in, for as long as nobody is booked', () => {
+    expect(states({ guestName: null, freeFrom: today, freeUntil: null })).toEqual([
+      '10 free',
+      '11 free',
+      '12 free',
+      '13 free',
+      '14 free',
+      '15 free',
+    ]);
+  });
+
+  it('has only the hours between stays on a turnover day', () => {
+    expect(
+      states({ guestName: 'Anna Example', freeFrom: '2026-05-11', freeUntil: '2026-05-11' }).slice(
+        0,
+        3,
+      ),
+    ).toEqual(['10 occupied', '11 between_stays', '12 booked']);
+    expect(states({ guestName: null, freeFrom: today, freeUntil: today }).slice(0, 2)).toEqual([
+      '10 before_check_in',
+      '11 booked',
+    ]);
   });
 });
 

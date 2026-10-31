@@ -6,6 +6,7 @@ import {
   createStayNotesReader,
   createNoteFiler,
   createRepairDesk,
+  createRepairReplier,
   createWorkOrderDrafter,
   createReplyLearner,
   createReportSummaryWriter,
@@ -165,6 +166,19 @@ export function createApp({
       usage,
       canSpend: withinBudget,
     });
+  const desk =
+    ai &&
+    createRepairDesk({ model: ai.agent, modelId: ai.agentModelId, draftModel: ai.draft, usage });
+  const repairReply =
+    desk &&
+    createRepairReplier({
+      desk,
+      repair: (taskId) => contacts.repair(taskId),
+      contact: (contactId) => contacts.get(contactId),
+      hotel: () => settings.getProfile(),
+      today: () => hotelToday(clock()),
+      dayOf: (at) => hotelToday(at),
+    });
   const pipeline =
     ai &&
     translator &&
@@ -179,6 +193,7 @@ export function createApp({
       canSpend: withinBudget,
       today: () => hotelToday(clock()),
       translator,
+      ...(repairReply && { repairReply: (inquiry) => repairReply(inquiry) }),
     });
   const notes =
     ai &&
@@ -192,9 +207,6 @@ export function createApp({
     });
   const stays =
     ai && createStayNotesReader({ model: ai.agent, modelId: ai.agentModelId, housekeeping, usage });
-  const desk =
-    ai &&
-    createRepairDesk({ model: ai.agent, modelId: ai.agentModelId, draftModel: ai.draft, usage });
   const arrivalNotes = createArrivalNoteService({ repos, clock });
   const memories = createGuestMemoryService({ repos, clock });
   const memoryReader =

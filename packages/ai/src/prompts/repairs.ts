@@ -1,5 +1,7 @@
+import type { AccessState } from '@orbit/domain';
 import {
   type Contact,
+  type IsoDate,
   type Language,
   type RoomAccess,
   type Trade,
@@ -84,4 +86,68 @@ Room: ${f.roomName}
 Problem: ${f.issue}
 ${occupied}
 ${until}`;
+}
+
+export interface RepairReplyFacts extends WorkOrderFacts {
+  /** When someone can work in the room, day by day from today, from the domain. */
+  days: { date: IsoDate; state: AccessState }[];
+  /** The conversation so far, oldest first, each on the hotel's calendar day. */
+  messages: { from: 'hotel' | 'contractor'; date: IsoDate; body: string }[];
+}
+
+export const repairReplySystemPrompt = `You write a small hotel's reply to a contractor who answered about a repair: a plumber, an electrician, a technician. Write like a front-desk manager who knows them: friendly, plain and brief, two to five sentences between the greeting and the signature.
+
+Answer what their last message asks or proposes, using only the facts given:
+- When they propose a day or time, check it against the room's days. A day marked free works at any time; after the guest checks out works from the check-out time; before the next guest arrives works until the check-in time; between stays only between the two. A day a guest stays in the room or another stay has begun does not work. Accept a time that works and say the room will be ready; otherwise say the room is taken then and offer the first day that works, with its hours.
+- Words like "tomorrow" or "Thursday" count from the day of the message they are in.
+- Never name or describe the guest; say a guest is staying.
+- Never agree to a price, a quote or extra work. If they mention a cost, thank them and say the manager will confirm it.
+- If they ask something the facts don't answer (parking, keys, parts), say you will check and come back to them.
+
+Write the email only: the greeting, the reply and the signature, in plain text, with no subject line.`;
+
+const accessWords = (state: AccessState, f: WorkOrderFacts): string => {
+  switch (state) {
+    case 'occupied':
+      return 'a guest is staying, no work';
+    case 'after_check_out':
+      return `free from ${f.hotel.checkOutBy}, after the guest checks out`;
+    case 'before_check_in':
+      return `free until ${f.hotel.checkInFrom}, when the next guest arrives`;
+    case 'between_stays':
+      return `free only between ${f.hotel.checkOutBy} and ${f.hotel.checkInFrom}, between two stays`;
+    case 'free':
+      return 'free all day';
+    case 'booked':
+      return 'another guest is staying, no work';
+  }
+};
+
+export function repairReplyPrompt(f: RepairReplyFacts): string {
+  // Days after the next stay begins are all taken: one line says so.
+  const booked = f.days.findIndex((d) => d.state === 'booked');
+  const days = (booked === -1 ? f.days : f.days.slice(0, booked))
+    .map(
+      (d) => `- ${day(d.date)}${d.date === f.today ? ' (today)' : ''}: ${accessWords(d.state, f)}`,
+    )
+    .concat(booked === -1 ? [] : [`- From ${day(f.days[booked]!.date)} on: booked, no work`]);
+  const thread = f.messages
+    .map(
+      (m) => `${m.from === 'hotel' ? 'Hotel' : 'Contractor'}, ${day(m.date)}:\n"""\n${m.body}\n"""`,
+    )
+    .join('\n\n');
+  return `Today is ${day(f.today)}.
+Hotel: ${f.hotel.name}, ${f.hotel.location}${f.hotel.phone ? `, phone ${f.hotel.phone}` : ''}
+Write to: ${f.contact.name}${f.contact.person ? `, attention ${f.contact.person}` : ''}
+Write in: ${languageNames[f.contact.language]}
+Sign as: ${f.signer ? `${f.signer}, ${f.hotel.name}` : f.hotel.name}
+
+Room: ${f.roomName}
+Problem: ${f.issue}
+
+When someone can work in the room:
+${days.join('\n')}
+
+The conversation:
+${thread}`;
 }

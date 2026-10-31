@@ -52,6 +52,11 @@ export interface InboxPipelineDeps {
   today: () => IsoDate;
   /** Puts the draft into the staff member's language, to read side by side. */
   translator: Translator;
+  /**
+   * Answers a contractor in a conversation about a repair, which is not a booking request;
+   * without it such a conversation is left for staff to answer.
+   */
+  repairReply?: (inquiry: Inquiry) => Promise<{ text: string; language: Language }>;
 }
 
 export async function extractMessage(
@@ -232,9 +237,57 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
   const budgetSpent = (id: string) =>
     inbox.saveProcessing(id, { ok: false, error: 'The AI budget for this month is used up.' });
 
+  /** The draft, in the staff member's language as well when theirs differs. */
+  async function sideBySide(
+    text: string,
+    from: Language,
+    language: Language | null,
+  ): Promise<Translation | null> {
+    if (!language || language === from) return null;
+    // The draft is the result; without its translation staff still have it to send.
+    return translator
+      .translate(text, language)
+      .then((t) => ({ language, text: t }))
+      .catch(() => null);
+  }
+
+  /**
+   * A conversation about a repair is answered with the repair in hand (who, which room, when it
+   * is free), never read as a booking request.
+   */
+  async function replyAboutRepair(inquiry: Inquiry, language: Language | null): Promise<Inquiry> {
+    const { repairReply } = deps;
+    if (!repairReply) return failed(inquiry.id, new Error('Replies about repairs are not set up.'));
+    if (!(await canSpend())) return budgetSpent(inquiry.id);
+    try {
+      const { text, language: draftLanguage } = await repairReply(inquiry);
+      return await inbox.saveProcessing(inquiry.id, {
+        ok: true,
+        parsed: null,
+        suggestion: {
+          options: [],
+          block: null,
+          note: null,
+          draft: text,
+          draftLanguage,
+          draftTranslation: await sideBySide(text, draftLanguage, language),
+        },
+      });
+    } catch (err) {
+      return failed(inquiry.id, err);
+    }
+  }
+
+  /** Whether a conversation about a repair has a reply for its latest message. */
+  const hasRepairReply = (inquiry: Inquiry) =>
+    inquiry.processedAt !== null && !inquiry.processingError && inquiry.suggestion?.draft != null;
+
   /** Extracts the request and finds its rooms; a draft from an earlier reading is dropped. */
   async function read(id: string, { force = false }: { force?: boolean } = {}): Promise<Inquiry> {
     const inquiry = await inbox.get(id);
+    if (inquiry.taskId) {
+      return hasRepairReply(inquiry) && !force ? inquiry : replyAboutRepair(inquiry, null);
+    }
     if (hasReading(inquiry) && !force) return inquiry;
     if (!(await canSpend())) return budgetSpent(id);
     try {
@@ -267,6 +320,7 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
     { language = null }: { language?: Language | null } = {},
   ): Promise<Inquiry> {
     let inquiry = await inbox.get(id);
+    if (inquiry.taskId) return replyAboutRepair(inquiry, language);
     if (!hasReading(inquiry)) {
       inquiry = await read(id, { force: true });
       if (!hasReading(inquiry)) return inquiry;
@@ -283,14 +337,7 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
         analysis.kind === 'other'
           ? { draft: null, note }
           : await draftWithGuard(inquiry, analysis, offer, note, held ?? heldRooms);
-      let draftTranslation: Translation | null = null;
-      if (text && language && language !== analysis.language) {
-        // The draft is the result; without its translation staff still have it to send.
-        draftTranslation = await translator
-          .translate(text, language)
-          .then((t) => ({ language, text: t }))
-          .catch(() => null);
-      }
+      const draftTranslation = text ? await sideBySide(text, analysis.language, language) : null;
       return await inbox.saveProcessing(id, {
         ok: true,
         parsed: analysis,
@@ -321,6 +368,7 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
     ): Promise<Inquiry> {
       const inquiry = await inbox.get(id);
       if (inquiry.processedAt && !inquiry.processingError && !force) return inquiry;
+      if (inquiry.taskId) return replyAboutRepair(inquiry, language);
       const reading = await read(id, { force: true });
       if (!hasReading(reading)) return reading;
       return draft(id, { language });

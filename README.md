@@ -110,6 +110,7 @@ More in [docs/ai.md](docs/ai.md).
 | Agent tools         | 22 staff requests run through the real agent and tools, checked by their effect                                                | 22/22 (100%) |
 | Reply drafts        | 18 replies with real quotes (one a block of rooms for a group), checked by the price guard                                     | 18/18 (100%) |
 | Translations        | 4 drafts and guest messages between Czech, German, English and Polish, amounts kept                                            | 4/4 (100%)   |
+| Contractor replies  | 4 answers about a repair: a time that works, one while a guest is in the room, in Czech, and a price to agree to               | 4/4 (100%)   |
 | Notes before a stay | 5 guests in four languages: snow and a spa, a dog, a family in the rain, a regular, no forecast                                | 5/5 (100%)   |
 | Guest memory        | 4 histories: a regular, pure logistics, a sensitive complaint to leave out, repeats to merge                                   | 4/4 (100%)   |
 | Rate review         | 3 outlooks: a block of rooms (and a single request to ignore), Thanksgiving, an ordinary fortnight                             | 3/3 (100%)   |

@@ -9,6 +9,7 @@ Contacts and repairs ([ADR 0020](0020-contacts-and-repairs-by-trade.md)) came be
 - The email to a contractor is sent from the mailbox, like any other: a new conversation with the contact, linked to the repair by `Inquiry.taskId` (migration 0026; a plain ID, like task IDs in the audit log, since tasks can be cleared).
 - Sending records the contact as asked and starts the task in the same transaction, as a call does.
 - The repair lists its conversations with their latest message; a conversation about a repair shows "Open repair" instead of the booking actions, can't be declined, and isn't read as a booking request. Today's repair row says whether the contractor answered, and opens the repair.
+- A contractor's answer is not read as a booking request. "Prepare reply" writes the hotel's answer from the repair, the conversation and the room's days from the domain (`accessDays`), so a proposed time is checked against the bookings, not by the model.
 - The agent drafts the same email (`draftRepairEmail`, through the drafter the repair card uses) and proposes sending it (`sendRepairEmail`, confirmed like any outgoing email).
 
 ## Consequences

@@ -9,7 +9,7 @@ import { createMemoryRepositories } from '@orbit/domain/testing';
 import type { InquiryExtraction, Room } from '@orbit/shared';
 import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
-import { createInboxPipeline } from './inbox';
+import { createInboxPipeline, type InboxPipelineDeps } from './inbox';
 import { createTranslator } from './translate';
 import type { UsageRecord } from './usage';
 
@@ -52,7 +52,18 @@ const request: InquiryExtraction = {
 /** 2 adults × 2 nights × 1000 + wellness 2 × 2 × 250 = 5 000 CZK. */
 const TOTAL = '5 000 CZK';
 
-function setup(replies: string[], { budgetLeft = true, roomCount = 1 } = {}) {
+function setup(
+  replies: string[],
+  {
+    budgetLeft = true,
+    roomCount = 1,
+    repairReply,
+  }: {
+    budgetLeft?: boolean;
+    roomCount?: number;
+    repairReply?: InboxPipelineDeps['repairReply'];
+  } = {},
+) {
   const repos = createMemoryRepositories(
     {
       roomTypes: [
@@ -126,6 +137,7 @@ function setup(replies: string[], { budgetLeft = true, roomCount = 1 } = {}) {
     canSpend,
     today: () => '2026-05-10',
     translator: createTranslator({ model, modelId: 'muse-spark-1.3', usage, canSpend }),
+    ...(repairReply && { repairReply }),
   });
   return { repos, inbox, pipeline, calls, records };
 }
@@ -135,6 +147,57 @@ const message = {
   channel: 'email' as const,
   senderName: 'Jana Testová',
 };
+
+describe('inbox pipeline for a repair', () => {
+  async function repairThread(inbox: ReturnType<typeof setup>['inbox']) {
+    const msg = await inbox.create({ ...message, body: 'Could you come?' });
+    return { ...msg, taskId: 'hk_1' };
+  }
+
+  it("answers a contractor with the repair's reply, never reading it as a booking", async () => {
+    const asked: string[] = [];
+    const { inbox, repos, pipeline, calls } = setup(['Ahoj, rozumím.'], {
+      repairReply: (inquiry) => {
+        asked.push(inquiry.id);
+        return Promise.resolve({ text: 'Dear Sam, tomorrow at 9 works.', language: 'en' });
+      },
+    });
+    const thread = await repairThread(inbox);
+    await repos.inquiries.updateInquiry(thread);
+    const read = await pipeline.read(thread.id);
+    expect(read).toMatchObject({
+      parsed: null,
+      processingError: null,
+      suggestion: {
+        options: [],
+        block: null,
+        draft: 'Dear Sam, tomorrow at 9 works.',
+        draftLanguage: 'en',
+      },
+    });
+    // Read once until the contractor writes again; the model was only asked to translate.
+    expect(await pipeline.read(thread.id)).toEqual(read);
+    expect(asked).toHaveLength(1);
+    const drafted = await pipeline.draft(thread.id, { language: 'cs' });
+    expect(drafted.suggestion?.draftTranslation).toEqual({
+      language: 'cs',
+      text: 'Ahoj, rozumím.',
+    });
+    expect(asked).toHaveLength(2);
+    expect(calls).toHaveLength(1);
+  });
+
+  it('leaves a repair conversation to staff when there is no one to write the reply', async () => {
+    const { inbox, repos, pipeline, calls } = setup(['{}']);
+    const thread = await repairThread(inbox);
+    await repos.inquiries.updateInquiry(thread);
+    expect(await pipeline.process(thread.id)).toMatchObject({
+      parsed: null,
+      processingError: 'Replies about repairs are not set up.',
+    });
+    expect(calls).toEqual([]);
+  });
+});
 
 describe('inbox pipeline', () => {
   it('extracts, offers a priced room and drafts a reply with the exact total', async () => {
