@@ -3,6 +3,7 @@ import type {
   Attachment,
   Contact,
   HotelProfile,
+  HousekeepingTask,
   Inquiry,
   IsoDate,
   MailDraft,
@@ -304,4 +305,48 @@ Ops lead, Example Labs`,
     // The group request in the seed's guest messages is starred and filed with groups.
     marks: { inq_07: { labelIds: ['lbl_groups'], starred: true } },
   };
+}
+
+/**
+ * The email asking a contractor to fix a seeded repair and their answer, offering a time, linked
+ * to the repair: the repair lists it, and the answer waits in the inbox to be replied to.
+ */
+export function repairThread(
+  region: SeedRegion,
+  task: HousekeepingTask,
+  contact: Contact,
+  roomName: string,
+  team: StaffMember[],
+  profile: HotelProfile,
+  now: Date,
+): Inquiry {
+  const signer = team.find((s) => s.active && s.role === 'manager')?.name;
+  const czech = region === 'cz';
+  const greeting = czech ? 'Dobrý den,' : `Hi ${contact.person ?? 'there'},`;
+  const ask = czech
+    ? `${greeting}\n\nv pokoji ${roomName} bliká stropní světlo. Mohli byste se na to tento týden podívat? Dejte nám prosím vědět, kdy se vám to hodí, a pokoj připravíme.\n\nDěkuji,\n${signer ?? 'Recepce'}\n${profile.name}`
+    : `${greeting}\n\nthe ceiling light in room ${roomName} keeps flickering. Could you come and take a look this week? Let us know when suits you and we'll make sure the room is ready.\n\nThanks,\n${signer ?? 'Reception'}\n${profile.name}`;
+  const answer = czech
+    ? `Dobrý den,\n\nnejspíš to bude vadný zdroj nebo uvolněný kontakt. Můžu přijet zítra mezi 9. a 11. hodinou, zabere to asi hodinu. Hodí se vám to?\n\nS pozdravem\n${contact.name}`
+    : `Hi,\n\nsounds like a failing driver or a loose connection. I can come by tomorrow between 9 and 11 am, it takes about an hour. Does that work for the room?\n\n${[contact.person, contact.name].filter(Boolean).join('\n')}`;
+  return thread(
+    'inq_seed_repair',
+    now,
+    [
+      { direction: 'out', hoursAgo: 26, ...(signer && { author: signer }), body: ask },
+      { direction: 'in', hoursAgo: 2, body: answer },
+    ],
+    {
+      channel: 'email',
+      partner: null,
+      subject: czech
+        ? `Pokoj ${roomName}: bliká stropní světlo`
+        : `Room ${roomName}: ceiling light flickers`,
+      senderName: contact.name,
+      senderAddress: contact.email,
+      taskId: task.id,
+      status: 'new',
+      unread: true,
+    },
+  );
 }

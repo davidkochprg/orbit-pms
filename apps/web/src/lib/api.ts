@@ -79,6 +79,7 @@ import {
   repairSchema,
   translateResultSchema,
   type UpdateStaffBody,
+  type WorkOrderBody,
   workOrderSchema,
 } from '@orbit/shared';
 import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -944,6 +945,13 @@ export function useWorkOrder(taskId: string) {
         workOrderSchema,
       ),
   });
+}
+
+/** Sends the email to a contractor from the mailbox, linked to the repair. */
+export function useSendWorkOrder(taskId: string) {
+  return useRefreshingMutation((body: WorkOrderBody) =>
+    apiPost(`/api/housekeeping/tasks/${encodeURIComponent(taskId)}/email`, body, inquirySchema),
+  );
 }
 
 /** Knowledge: what guests are told about the hotel, kept by the whole team. */

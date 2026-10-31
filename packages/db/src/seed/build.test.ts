@@ -269,6 +269,17 @@ describe('buildSeed', () => {
     for (const i of seed.inquiries) inquirySchema.parse(i);
   });
 
+  it("links the electrician's emails to the repair they were asked about", () => {
+    for (const built of [seed, buildSeed(today, now, 'us')]) {
+      const thread = built.inquiries.find((i) => i.taskId !== null);
+      const task = built.housekeepingTasks.find((t) => t.id === thread?.taskId);
+      expect(task).toMatchObject({ type: 'maintenance', status: 'in_progress' });
+      const contact = built.contacts.find((c) => c.id === task?.contactId);
+      expect(thread).toMatchObject({ senderAddress: contact?.email, status: 'new', unread: true });
+      expect(thread?.messages.map((m) => m.direction)).toEqual(['out', 'in']);
+    }
+  });
+
   it('uses only example.com email addresses', () => {
     for (const g of seed.guests) expect(g.email).toMatch(/^[a-z.]+@example\.com$/);
   });

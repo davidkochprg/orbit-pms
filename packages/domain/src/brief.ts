@@ -13,6 +13,7 @@ import type {
   StayGuest,
 } from '@orbit/shared';
 import { blocksRoom } from './availability';
+import { repairEmails } from './contacts';
 import { addDays, nightsBetween } from './dates';
 import { arrivalsOn, departuresOn } from './day';
 import type { GuestBookRules } from './policy';
@@ -195,12 +196,17 @@ export function buildDailyBrief(input: BriefInput): DailyBrief {
       .sort(byRoomName),
     maintenance: tasks
       .filter((t) => t.type === 'maintenance' && t.status !== 'done')
-      .map((t) => ({
-        taskId: t.id,
-        roomId: t.roomId,
-        roomName: roomName(t.roomId),
-        notes: t.notes,
-      }))
+      .map((t) => {
+        const [latest] = repairEmails(t.id, inquiries);
+        return {
+          taskId: t.id,
+          roomId: t.roomId,
+          roomName: roomName(t.roomId),
+          notes: t.notes,
+          asked: t.contactId !== null,
+          answeredBy: latest?.answered ? latest.name : null,
+        };
+      })
       .sort(byRoomName),
     missingIds: missingIds.sort((a, b) => byRoomName(a.summary, b.summary)),
     unansweredMessages: inquiries.filter((i) => i.status === 'new' || i.status === 'quoted').length,

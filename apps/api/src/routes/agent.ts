@@ -34,6 +34,7 @@ import {
   type AgentContext,
   type ArrivalNote,
   type ArrivalNotes,
+  type WorkOrder,
   type GuestMemory,
   type HotelInfoEntry,
   type Inquiry,
@@ -84,6 +85,8 @@ export interface AgentRouteDeps {
   arrivalNotesDue: (date?: string) => Promise<ArrivalNotes>;
   /** Writes the note before a stay; null when AI drafts are off. */
   draftArrivalNote: ((bookingId: string) => Promise<ArrivalNote>) | null;
+  /** Writes the email asking a contractor to fix a repair; null when drafting is off. */
+  draftWorkOrder?: ((taskId: string, contactId: string) => Promise<WorkOrder>) | null;
   /** What was remembered about a guest, as last read. */
   guestMemory: (guestId: string) => Promise<GuestMemory>;
   limiter: AiLimiter;
@@ -116,6 +119,7 @@ export function agentRoutes({
   contacts,
   arrivalNotesDue,
   draftArrivalNote,
+  draftWorkOrder = null,
   guestMemory,
   limiter,
   clock,
@@ -145,6 +149,7 @@ export function agentRoutes({
     mailLabels: () => repos.mail.listLabels(),
     arrivalNotesDue,
     draftArrivalNote,
+    draftWorkOrder,
     guestMemory,
   });
 

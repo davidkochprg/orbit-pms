@@ -56,10 +56,11 @@ export interface PendingActionDeps {
     | 'holdBlock'
     | 'send'
     | 'sendArrivalNote'
+    | 'sendWorkOrder'
     | 'decline'
   >;
   events: Pick<RevenueService, 'listEvents' | 'createEvent' | 'deleteEvent'>;
-  contacts: Pick<ContactService, 'get' | 'create' | 'update' | 'remove'>;
+  contacts: Pick<ContactService, 'get' | 'create' | 'update' | 'remove' | 'repair'>;
   clock: () => Date;
   newId: (prefix: string) => string;
 }
@@ -738,6 +739,23 @@ export function createPendingActionService({
           details: details([removed('Event', text(event.name))], null, managersOnly),
         };
       }
+      case 'send_work_order': {
+        const { taskId, contactId, subject } = action.input;
+        const [repair, contact] = await Promise.all([
+          contacts.repair(taskId),
+          contacts.get(contactId),
+        ]);
+        if (!contact.email) {
+          throw new DomainError('invalid_input', `${contact.name} has no email address`);
+        }
+        return {
+          summary: `Email ${contact.name} about room ${repair.roomName}: "${excerpt(subject)}"`,
+          details: details([
+            added('To', text(`${contact.name} <${contact.email}>`)),
+            added('Repair', text(`Room ${repair.roomName}: ${repair.task.notes ?? 'Repair'}`)),
+          ]),
+        };
+      }
       case 'save_contact': {
         const { before, after } = await contactChange(action.input);
         const rows = contactFields.flatMap((key) => {
@@ -898,6 +916,11 @@ export function createPendingActionService({
       case 'remove_local_event':
         await events.deleteEvent(action.input.eventId, by, 'agent');
         return null;
+      case 'send_work_order': {
+        const { taskId, ...email } = action.input;
+        await inbox.sendWorkOrder(taskId, email, by?.name ?? null, 'agent');
+        return null;
+      }
       case 'save_contact': {
         const { before, after } = await contactChange(action.input);
         if (before) await contacts.update(before.id, after, 'agent');

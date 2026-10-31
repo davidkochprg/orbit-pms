@@ -30,7 +30,16 @@ const brief: DailyBrief = {
   ],
   holds: [{ summary: { booking: hold, guestName: 'Guest B', roomName: '201' }, expired: false }],
   outOfOrder: [{ roomId: 'rm_203', roomName: '203' }],
-  maintenance: [{ taskId: 'hk_1', roomId: 'rm_203', roomName: '203', notes: 'Tap is dripping.' }],
+  maintenance: [
+    {
+      taskId: 'hk_1',
+      roomId: 'rm_203',
+      roomName: '203',
+      notes: 'Tap is dripping.',
+      asked: false,
+      answeredBy: null,
+    },
+  ],
   missingIds: [
     {
       summary: {
@@ -61,8 +70,21 @@ describe('attentionItems', () => {
       ['hold', 'Hold for Guest B not confirmed'],
       ['messages', '1 message waiting for a reply'],
       ['out_of_order', 'Room 203 is out of order'],
-      ['maintenance', 'Room 203 needs a repair'],
+      ['maintenance', 'Room 203: Tap is dripping'],
     ]);
+  });
+
+  it('says where a repair stands and opens it', () => {
+    const repair = (patch: Partial<DailyBrief['maintenance'][number]>) =>
+      attentionItems({ ...brief, maintenance: [{ ...brief.maintenance[0]!, ...patch }] }).find(
+        (i) => i.kind === 'maintenance',
+      );
+    expect(repair({})).toMatchObject({ detail: 'Nobody asked yet', target: { taskId: 'hk_1' } });
+    expect(repair({ asked: true })?.detail).toBe('Waiting for the contractor');
+    expect(repair({ asked: true, answeredBy: 'Alpine Electric' })?.detail).toBe(
+      'Alpine Electric answered',
+    );
+    expect(repair({ notes: null })?.title).toBe('Room 203 needs a repair');
   });
 
   it('links each item to where it is handled', () => {

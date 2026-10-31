@@ -784,6 +784,47 @@ describe('pending actions', () => {
     ).rejects.toThrow('trades');
   });
 
+  it('emails a contractor about a repair once confirmed, linked to the repair', async () => {
+    const { repos, actions } = setup();
+    repos.state.tasks.push({
+      id: 'hk_tap',
+      roomId: 'rm_2',
+      type: 'maintenance',
+      status: 'open',
+      notes: 'Tap is dripping.',
+      trade: 'plumbing',
+      contactId: null,
+      createdAt: now.toISOString(),
+    });
+    const email = await actions.propose({
+      kind: 'send_work_order',
+      input: {
+        taskId: 'hk_tap',
+        contactId: plumber.id,
+        subject: 'Room 2: dripping tap',
+        body: 'Could you come tomorrow?',
+      },
+    });
+    expect(email.summary).toBe('Email Test Plumbing about room 2: "Room 2: dripping tap"');
+    expect(email.details?.changes.map((c) => [c.label, c.after])).toEqual([
+      ['To', { text: 'Test Plumbing <plumbing@example.com>' }],
+      ['Repair', { text: 'Room 2: Tap is dripping.' }],
+    ]);
+    await actions.confirm(email.id);
+    expect(repos.state.inquiries.find((i) => i.taskId === 'hk_tap')).toMatchObject({
+      senderAddress: 'plumbing@example.com',
+      messages: [{ direction: 'out', body: 'Could you come tomorrow?' }],
+    });
+    expect(repos.state.tasks.find((t) => t.id === 'hk_tap')).toMatchObject({
+      contactId: plumber.id,
+      status: 'in_progress',
+    });
+    expect(repos.state.audit.at(-1)).toMatchObject({
+      actor: 'agent',
+      action: 'inquiry.work_order',
+    });
+  });
+
   it('removes a contact once confirmed', async () => {
     const { repos, actions } = setup();
     const remove = await actions.propose({

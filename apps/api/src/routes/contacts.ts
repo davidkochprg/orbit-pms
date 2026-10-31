@@ -1,11 +1,11 @@
-import type { RepairDesk } from '@orbit/ai';
-import type { ContactService, SettingsService } from '@orbit/domain';
+import type { WorkOrderDrafter } from '@orbit/ai';
+import type { ContactService, InboxService } from '@orbit/domain';
 import {
   contactBodySchema,
   repairContactBodySchema,
   STAFF_HEADER,
   type StaffMember,
-  type WorkOrder,
+  workOrderBodySchema,
 } from '@orbit/shared';
 import { Hono } from 'hono';
 import type { AiGate } from '../ai-gate';
@@ -14,10 +14,10 @@ import { validate } from '../validate';
 
 export interface ContactRouteDeps {
   contacts: ContactService;
-  settings: Pick<SettingsService, 'getProfile'>;
-  /** Null when AI is not configured. */
-  desk: RepairDesk | null;
-  today: () => string;
+  /** Sends the email to a contractor, linked to the repair. */
+  inbox: Pick<InboxService, 'sendWorkOrder'>;
+  /** Writes the email to a contractor; null when AI is not configured. */
+  draftWorkOrder: WorkOrderDrafter | null;
   gate: AiGate;
   identify: (id: string | undefined) => Promise<StaffMember | null>;
 }
@@ -25,9 +25,8 @@ export interface ContactRouteDeps {
 /** Suppliers and contractors, and asking one of them to fix a repair. */
 export function contactRoutes({
   contacts,
-  settings,
-  desk,
-  today,
+  inbox,
+  draftWorkOrder,
   gate,
   identify,
 }: ContactRouteDeps) {
@@ -53,27 +52,27 @@ export function contactRoutes({
       '/housekeeping/tasks/:id/work-order',
       validate('json', repairContactBodySchema),
       async (c) => {
-        if (!desk) {
+        if (!draftWorkOrder) {
           return c.json(errorBody('ai_not_configured', 'The AI agent is not configured.'), 503);
         }
-        const [repair, contact, profile, staff] = await Promise.all([
-          contacts.repair(c.req.param('id')),
-          contacts.get(c.req.valid('json').contactId),
-          settings.getProfile(),
-          identify(c.req.header(STAFF_HEADER)),
-        ]);
+        const staff = await identify(c.req.header(STAFF_HEADER));
         const blocked = await gate(c.req.header('x-forwarded-for'));
         if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
-        const draft = await desk.workOrder({
-          hotel: profile,
-          signer: staff?.name ?? null,
-          contact,
-          roomName: repair.roomName,
-          issue: repair.task.notes ?? 'Repair',
-          access: repair.access,
-          today: today(),
-        });
-        return c.json<WorkOrder>({ to: contact.email, ...draft });
+        // Unknown repairs and contacts fail before the model is asked.
+        return c.json(
+          await draftWorkOrder(
+            c.req.param('id'),
+            c.req.valid('json').contactId,
+            staff?.name ?? null,
+          ),
+        );
       },
-    );
+    )
+    .post('/housekeeping/tasks/:id/email', validate('json', workOrderBodySchema), async (c) => {
+      const author = (await identify(c.req.header(STAFF_HEADER)))?.name ?? null;
+      return c.json(
+        await inbox.sendWorkOrder(c.req.param('id'), c.req.valid('json'), author, 'user'),
+        201,
+      );
+    });
 }

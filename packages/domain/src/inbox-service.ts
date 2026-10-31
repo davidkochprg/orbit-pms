@@ -16,7 +16,9 @@ import type {
   Recipient,
   ReplyBody,
   Translation,
+  WorkOrderBody,
 } from '@orbit/shared';
+import { recordAskedToRepair } from './contacts';
 import { DomainError } from './errors';
 import { addonsForWishes, bookingSourceFor, stayRequest } from './inbox';
 import type { Repositories } from './repositories';
@@ -94,6 +96,37 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
       cc: envelope.cc ?? [],
       bcc: envelope.bcc ?? [],
       attachments: envelope.attachments ?? [],
+    };
+  }
+  /** A conversation the hotel starts with one email, already answered as far as the inbox goes. */
+  function startedByHotel(
+    id: string,
+    msg: InboxMessage,
+    to: { subject: string; name: string | null; address: string | null },
+    links: Pick<Inquiry, 'bookingId' | 'taskId'> = { bookingId: null, taskId: null },
+  ): Inquiry {
+    return {
+      id,
+      channel: 'email',
+      partner: null,
+      subject: to.subject,
+      senderName: to.name,
+      senderAddress: to.address,
+      receivedAt: msg.sentAt,
+      lastMessageAt: msg.sentAt,
+      messages: [msg],
+      unread: false,
+      archivedAt: null,
+      starred: false,
+      trashedAt: null,
+      labelIds: [],
+      parsed: null,
+      suggestion: null,
+      status: 'replied',
+      ...links,
+      blockBookingIds: [],
+      processedAt: null,
+      processingError: null,
     };
   }
 
@@ -268,6 +301,7 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
         status: 'new',
         bookingId: null,
         blockBookingIds: [],
+        taskId: null,
         processedAt: null,
         processingError: null,
       };
@@ -310,29 +344,11 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
           bcc: input.bcc,
           attachments: await attachmentsFor(tx, input.attachmentIds),
         });
-        const inquiry: Inquiry = {
-          id,
-          channel: 'email',
-          partner: null,
+        const inquiry = startedByHotel(id, msg, {
           subject: input.subject,
-          senderName: first.name,
-          senderAddress: first.address,
-          receivedAt: msg.sentAt,
-          lastMessageAt: msg.sentAt,
-          messages: [msg],
-          unread: false,
-          archivedAt: null,
-          starred: false,
-          trashedAt: null,
-          labelIds: [],
-          parsed: null,
-          suggestion: null,
-          status: 'replied',
-          bookingId: null,
-          blockBookingIds: [],
-          processedAt: null,
-          processingError: null,
-        };
+          name: first.name,
+          address: first.address,
+        });
         await tx.inquiries.createInquiry(inquiry);
         if (input.draftId) await tx.mail.deleteDraft(input.draftId);
         await tx.audit.append({
@@ -624,35 +640,53 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
         }
         const id = newId('inq');
         const msg = message(id, 'out', note.body, author);
-        const inquiry: Inquiry = {
+        const inquiry = startedByHotel(
           id,
-          channel: 'email',
-          partner: null,
-          subject: note.subject.trim(),
-          senderName: guest.name,
-          senderAddress: guest.email,
-          receivedAt: msg.sentAt,
-          lastMessageAt: msg.sentAt,
-          messages: [msg],
-          unread: false,
-          archivedAt: null,
-          starred: false,
-          trashedAt: null,
-          labelIds: [],
-          parsed: null,
-          suggestion: null,
-          status: 'replied',
-          bookingId,
-          blockBookingIds: [],
-          processedAt: null,
-          processingError: null,
-        };
+          msg,
+          { subject: note.subject.trim(), name: guest.name, address: guest.email },
+          { bookingId, taskId: null },
+        );
         await tx.inquiries.createInquiry(inquiry);
         await tx.audit.append({
           actor,
           action: 'inquiry.arrival_note',
           subjectId: id,
           payload: { bookingId, messageId: msg.id },
+        });
+        return inquiry;
+      });
+    },
+
+    /**
+     * The email asking a contractor to fix a repair: a new conversation linked to the repair, so
+     * the repair lists it and the contractor's answer opens the repair. The contractor counts as
+     * asked, as with a call.
+     */
+    async sendWorkOrder(
+      taskId: string,
+      { contactId, subject, body }: WorkOrderBody,
+      author: string | null,
+      actor: AuditActor,
+    ): Promise<Inquiry> {
+      return repos.transaction(async (tx) => {
+        const { contact } = await recordAskedToRepair(tx, taskId, contactId, actor);
+        if (!contact.email) {
+          throw new DomainError('invalid_input', `${contact.name} has no email address`);
+        }
+        const id = newId('inq');
+        const msg = message(id, 'out', body, author);
+        const inquiry = startedByHotel(
+          id,
+          msg,
+          { subject: subject.trim(), name: contact.name, address: contact.email },
+          { bookingId: null, taskId },
+        );
+        await tx.inquiries.createInquiry(inquiry);
+        await tx.audit.append({
+          actor,
+          action: 'inquiry.work_order',
+          subjectId: id,
+          payload: { taskId, contactId, messageId: msg.id },
         });
         return inquiry;
       });

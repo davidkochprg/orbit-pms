@@ -25,7 +25,14 @@ export function thread(
     Partial<
       Pick<
         Inquiry,
-        'bookingId' | 'archivedAt' | 'status' | 'unread' | 'starred' | 'trashedAt' | 'labelIds'
+        | 'bookingId'
+        | 'taskId'
+        | 'archivedAt'
+        | 'status'
+        | 'unread'
+        | 'starred'
+        | 'trashedAt'
+        | 'labelIds'
       >
     >,
 ): Inquiry {
@@ -57,6 +64,7 @@ export function thread(
     status: 'replied',
     bookingId: null,
     blockBookingIds: [],
+    taskId: null,
     processedAt: null,
     processingError: null,
     ...fields,

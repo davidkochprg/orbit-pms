@@ -14,6 +14,7 @@ import {
   type ArrivalNote,
   type ArrivalNotes,
   type GuestMemory,
+  type WorkOrder,
   type IsoDate,
   type AgentBookingRow,
   type AgentRoomStatusResult,
@@ -109,6 +110,8 @@ export interface ToolDeps {
   draftArrivalNote?: ((bookingId: string) => Promise<ArrivalNote>) | null;
   /** What was remembered about a guest from earlier stays, as last read. */
   guestMemory?: (guestId: string) => Promise<GuestMemory>;
+  /** Writes the email asking a contractor to fix a repair; null when drafting is off. */
+  draftWorkOrder?: ((taskId: string, contactId: string) => Promise<WorkOrder>) | null;
 }
 
 export interface ToolError {
@@ -373,6 +376,7 @@ export function createAgentTools({
   inbox,
   draftReply,
   arrivalNotesDue,
+  draftWorkOrder,
   draftArrivalNote,
   guestMemory,
   activity,
@@ -931,9 +935,36 @@ export function createAgentTools({
     }),
     getRepair: tool({
       description:
-        'A repair task with who can fix it: contacts for its trade (the one asked last time first) with their phone and email, who was already asked, and when the room is free to work in (freeFrom to freeUntil; guestName is who stays until freeFrom). The app shows it as a card where staff call or email them, and the email is drafted there, so name the contact and their phone and do not write the email yourself. The taskId comes from getHousekeeping or createHousekeepingTask.',
+        'A repair task with who can fix it: contacts for its trade (the one asked last time first) with their phone and email, who was already asked, when the room is free to work in (freeFrom to freeUntil; guestName is who stays until freeFrom), and the emails about it (answered: the contractor wrote back). The app shows it as a card where staff call or email them; to email one from here, use draftRepairEmail. The taskId comes from getHousekeeping or createHousekeepingTask.',
       inputSchema: z.object({ taskId: z.string().describe('Task ID, e.g. "hk_012".') }),
       execute: ({ taskId }) => safely(() => contacts.repair(taskId)),
+    }),
+    draftRepairEmail: tool({
+      description:
+        "Write the email asking a contractor to fix a repair, in the contractor's language: the room, the issue and when they can get in. Then propose sending it with sendRepairEmail, word for word; the confirm card shows the email, so don't repeat it in your answer.",
+      inputSchema: z.object({
+        taskId: z.string().describe('Task ID, e.g. "hk_012".'),
+        contactId: z.string().describe('The contactId, from getRepair.'),
+      }),
+      execute: ({ taskId, contactId }) =>
+        safely(async () => {
+          if (!draftWorkOrder) {
+            return { error: { code: 'not_configured', message: 'Email drafts are not set up.' } };
+          }
+          const { to, subject, body } = await draftWorkOrder(taskId, contactId);
+          return { taskId, contactId, to, subject, body };
+        }),
+    }),
+    sendRepairEmail: tool({
+      description:
+        'Propose sending the email to a contractor about a repair, as written by draftRepairEmail or edited as the staff member asked. It is linked to the repair, and the contractor counts as asked. The user must confirm.',
+      inputSchema: z.object({
+        taskId: z.string(),
+        contactId: z.string(),
+        subject: z.string().min(1).max(300),
+        body: z.string().min(1).max(20_000),
+      }),
+      execute: (input) => propose({ kind: 'send_work_order', input }),
     }),
     recordRepairContact: tool({
       description:

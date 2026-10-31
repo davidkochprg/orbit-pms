@@ -290,6 +290,13 @@ export function buildAgentEvalHotel(today: IsoDate) {
     statedAmounts: () => Promise.resolve([]),
     contacts,
     mailLabels: () => repos.mail.listLabels(),
+    // Repair emails are measured in their own suite; here the agent only passes one on.
+    draftWorkOrder: () =>
+      Promise.resolve({
+        to: 'service@plumbing.example',
+        subject: 'Room 101: dripping tap',
+        body: 'Hi,\n\nthe bathroom tap in room 101 is dripping. Could you come and fix it this week?\n\nThanks,\nOrbit Demo Lodge',
+      }),
   });
   // Changes from the run come after the history the inn starts with.
   return { repos, tools, auditBefore: repos.state.audit.length };
@@ -411,6 +418,18 @@ export const agentFixtures: AgentFixture[] = [
         ...(hotel.repos.state.pendingActions.length > 0 ? ['proposed instead of acting'] : []),
       ];
     },
+  },
+  {
+    id: 'email-plumber',
+    prompt: 'Email the plumber about the tap in 101.',
+    check: ({ hotel, calls }) => [
+      ...called(calls, 'draftRepairEmail'),
+      ...proposed(hotel, 'send_work_order', {
+        taskId: 'hk_tap',
+        contactId: 'ct_plumbing',
+        subject: 'Room 101: dripping tap',
+      }),
+    ],
   },
   {
     id: 'add-contact',

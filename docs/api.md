@@ -248,7 +248,7 @@ Suppliers and contractors, by name. The body is `contactBodySchema`: `name`, `pe
 
 ### `GET /api/housekeeping/tasks/:id/repair`
 
-A maintenance task as a `Repair`: the task, its room name, `access` (`guestName`, `freeFrom`, `freeUntil`), the contacts for its trade and the contact already asked. 400 for a cleaning task.
+A maintenance task as a `Repair`: the task, its room name, `access` (`guestName`, `freeFrom`, `freeUntil`), the contacts for its trade, the contact already asked, and `emails`, the conversations about it, latest first (`{ inquiryId, subject, name, lastMessageAt, answered, unread }`; `answered` when the contractor wrote last). 400 for a cleaning task.
 
 ### `POST /api/housekeeping/tasks/:id/contact`
 
@@ -257,6 +257,10 @@ A maintenance task as a `Repair`: the task, its room name, `access` (`guestName`
 ### `POST /api/housekeeping/tasks/:id/work-order`
 
 `{ contactId }`. Drafts the email asking the contact to come (Muse Spark Open, falling back to Muse Spark), in the contact's language, signed by the staff member in `x-staff-id`. Returns `{ to, subject, body }`; nothing is sent. 503 without AI, 429 over the demo limit.
+
+### `POST /api/housekeeping/tasks/:id/email`
+
+`{ contactId, subject, body }`. Sends the email from the hotel's mailbox as a new conversation with the contact, linked to the repair (`Inquiry.taskId`), by the staff member in `x-staff-id`, and records the contact as asked in the same transaction. Returns 201 `Inquiry`. 400 when the contact has no email, 409 when the repair is done, 404 for an unknown repair or contact. The contractor's answer arrives in that conversation, which opens the repair.
 
 ## Knock-ons
 

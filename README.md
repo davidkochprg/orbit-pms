@@ -70,7 +70,7 @@ Every AI feature runs on Meta's models through the Vercel AI SDK: Muse Spark on 
 
 | Feature             | Model                                               | What the model does                                                                               | What it never does                                                             |
 | ------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
-| ⌘K agent            | `muse-spark-1.3`                                    | Plans multi-step tool use over 56 typed tools, writes the answer                                  | Computes a price or availability, or changes a booking without a click         |
+| ⌘K agent            | `muse-spark-1.3`                                    | Plans multi-step tool use over 58 typed tools, writes the answer                                  | Computes a price or availability, or changes a booking without a click         |
 | Inbox extraction    | `muse-spark-1.3`                                    | Structured output: kind, language, dates, party, rooms, child ages, wishes                        | Picks rooms or prices                                                          |
 | Reply drafts        | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Writes the reply in the guest's language around the exact quoted totals                           | Runs before staff ask, or sends a reply; a wrong amount is redone or dropped   |
 | Translation         | `muse-spark-open` on Baseten, else `muse-spark-1.3` | Puts drafts and guest messages into the staff member's language and back                          | Changes an amount: such a translation is redone or refused                     |
@@ -107,7 +107,7 @@ More in [docs/ai.md](docs/ai.md).
 | Housekeeping notes  | 10 notes in four languages, including spelled-out room numbers, an unknown room and a vague note                               | 10/10 (100%) |
 | Stay notes          | 12 stays in five languages: dogs, a cot, an allergy, muddy bikes, and notes that aren't for cleaning                           | 12/12 (100%) |
 | ID scans            | 3 synthetic specimen documents: a Czech-style ID card, a German-style passport and a receipt                                   | 3/3 (100%)   |
-| Agent tools         | 21 staff requests run through the real agent and tools, checked by their effect                                                | 21/21 (100%) |
+| Agent tools         | 22 staff requests run through the real agent and tools, checked by their effect                                                | 22/22 (100%) |
 | Reply drafts        | 18 replies with real quotes (one a block of rooms for a group), checked by the price guard                                     | 18/18 (100%) |
 | Translations        | 4 drafts and guest messages between Czech, German, English and Polish, amounts kept                                            | 4/4 (100%)   |
 | Notes before a stay | 5 guests in four languages: snow and a spa, a dog, a family in the rain, a regular, no forecast                                | 5/5 (100%)   |

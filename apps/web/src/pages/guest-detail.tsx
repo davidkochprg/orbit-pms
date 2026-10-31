@@ -1,7 +1,8 @@
-import { CalendarX2, ChevronRight, Mail, Pencil, Plus } from 'lucide-react';
+import { CalendarX2, ChevronRight, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { Link, useParams } from 'react-router';
 import { BookingStatusBadge } from '@/components/booking-status-badge';
+import { ConversationList } from '@/components/conversation-list';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
 import { BookingContextMenu } from '@/components/booking-menu';
@@ -16,14 +17,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useBookings, useGuest, useInbox, useRooms } from '@/lib/api';
-import {
-  formatDateTime,
-  formatMoney,
-  formatParty,
-  formatRange,
-  languageLabels,
-} from '@/lib/format';
-import { conversationsOf, preview } from '@/lib/inbox';
+import { formatMoney, formatParty, formatRange, languageLabels } from '@/lib/format';
+import { conversationsOf } from '@/lib/inbox';
 
 export function GuestDetailPage() {
   const { id = '' } = useParams();
@@ -157,29 +152,7 @@ export function GuestDetailPage() {
 
             {messages.length > 0 && (
               <Section title="Messages" count={messages.length}>
-                <ul className="-mx-2 flex flex-col">
-                  {messages.map((m) => (
-                    <li key={m.id}>
-                      <Link
-                        to={`/inbox/${encodeURIComponent(m.id)}`}
-                        className="flex items-center gap-3 rounded-lg px-2 py-2 hover:bg-accent"
-                      >
-                        <Mail className="size-4 shrink-0 text-muted-foreground" />
-                        <span className="flex min-w-0 flex-1 flex-col">
-                          <span className="truncate font-medium">
-                            {m.subject ?? '(no subject)'}
-                          </span>
-                          <span className="truncate text-xs text-muted-foreground">
-                            {preview(m)}
-                          </span>
-                        </span>
-                        <time className="shrink-0 text-xs text-muted-foreground tabular-nums">
-                          {formatDateTime(m.lastMessageAt)}
-                        </time>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <ConversationList conversations={messages} />
               </Section>
             )}
           </div>

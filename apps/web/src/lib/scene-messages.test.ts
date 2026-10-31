@@ -35,7 +35,14 @@ const brief: DailyBrief = {
   holds: [{ summary: summary('Guest Hold', '409'), expired: false }],
   outOfOrder: [],
   maintenance: [
-    { taskId: 'hk_1', roomId: 'rm_203', roomName: '203', notes: 'Bathroom tap is dripping.' },
+    {
+      taskId: 'hk_1',
+      roomId: 'rm_203',
+      roomName: '203',
+      notes: 'Bathroom tap is dripping.',
+      asked: false,
+      answeredBy: null,
+    },
   ],
   missingIds: [],
   unansweredMessages: 1,

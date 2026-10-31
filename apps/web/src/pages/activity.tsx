@@ -10,7 +10,7 @@ import { Section } from '@/components/section';
 import { Segmented } from '@/components/segmented';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
-import { activityDetail, activityLabel } from '@/lib/activity';
+import { activityDetail, activityLabel, repairOf } from '@/lib/activity';
 import { useActivity } from '@/lib/api';
 import { displayRegion, formatLongDate } from '@/lib/format';
 
@@ -113,7 +113,9 @@ function ActivityRow({ item }: { item: ActivityItem }) {
       <div className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex flex-wrap items-baseline gap-x-1.5">
           <span className="font-medium">{activityLabel(item.action)}</span>
-          {item.subject && <Subject subject={item.subject} />}
+          {item.subject && (
+            <Subject subject={item.subject} repair={repairOf(item.action, item.payload)} />
+          )}
         </span>
         <span className="truncate text-xs text-muted-foreground">
           {[byAgent ? 'Orbit' : (item.byName ?? 'Staff'), detail].filter(Boolean).join(' · ')}
@@ -132,7 +134,14 @@ function ActivityRow({ item }: { item: ActivityItem }) {
 const linkClass =
   'truncate text-muted-foreground underline-offset-2 outline-none hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring';
 
-function Subject({ subject }: { subject: NonNullable<ActivityItem['subject']> }) {
+function Subject({
+  subject,
+  repair,
+}: {
+  subject: NonNullable<ActivityItem['subject']>;
+  /** The repair the entry is about, opened from its room. */
+  repair: string | null;
+}) {
   const { open } = useBookingDrawer();
   switch (subject.kind) {
     case 'booking':
@@ -155,7 +164,10 @@ function Subject({ subject }: { subject: NonNullable<ActivityItem['subject']> })
       );
     case 'room':
       return (
-        <Link to="/housekeeping" className={linkClass}>
+        <Link
+          to={repair ? `/housekeeping?repair=${encodeURIComponent(repair)}` : '/housekeeping'}
+          className={linkClass}
+        >
           {subject.label}
         </Link>
       );

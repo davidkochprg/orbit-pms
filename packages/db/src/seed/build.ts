@@ -34,7 +34,7 @@ import { seedGuests, seedRooms } from './catalog';
 import { buildContacts } from './contacts';
 import { buildConversations } from './conversations';
 import { buildEvents } from './events';
-import { buildMail, type SeedFile } from './mail';
+import { buildMail, repairThread, type SeedFile } from './mail';
 import { regionSeeds, type SeedRegion } from './regions';
 import { rememberRegulars } from './regulars';
 import { buildStayGuests } from './registrations';
@@ -295,6 +295,7 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
       status: 'new',
       bookingId: links.get(f.id) ?? null,
       blockBookingIds: [],
+      taskId: null,
       processedAt: null,
       processingError: null,
     };
@@ -358,6 +359,23 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
   const billing = buildBilling(linked, today, pricing, extras);
   const contacts = buildContacts(region);
   const mail = buildMail(region, contacts, staff, hotelProfile, today, now);
+  // The flickering light was emailed about yesterday, and the electrician has answered.
+  const asked = housekeepingTasks.find((t) => t.type === 'maintenance' && t.contactId);
+  const electrician = contacts.find((c) => c.id === asked?.contactId);
+  const repairMail =
+    asked && electrician?.email
+      ? [
+          repairThread(
+            region,
+            asked,
+            electrician,
+            rooms.find((r) => r.id === asked.roomId)?.name ?? asked.roomId,
+            staff,
+            hotelProfile,
+            now,
+          ),
+        ]
+      : [];
   return {
     roomTypes: seedRoomTypes,
     rooms,
@@ -367,6 +385,7 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
       ...inquiries.map((i) => ({ ...i, ...mail.marks[i.id] })),
       ...buildConversations(linked, guests, staff, hotelProfile, today, now),
       ...mail.inquiries,
+      ...repairMail,
     ],
     housekeepingTasks,
     hotelProfile,

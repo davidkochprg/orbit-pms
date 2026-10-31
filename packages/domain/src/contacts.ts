@@ -7,8 +7,10 @@ import {
   type ContactProposal,
   type Guest,
   type HousekeepingTask,
+  type Inquiry,
   type IsoDate,
   type Repair,
+  type RepairEmail,
   type RoomAccess,
   type Trade,
 } from '@orbit/shared';
@@ -68,6 +70,68 @@ export function roomAccess(
   };
 }
 
+/** The conversations with contractors about a repair, latest first; the trash left out. */
+export function repairEmails(taskId: string, inquiries: Inquiry[]): RepairEmail[] {
+  return inquiries
+    .filter((i) => i.taskId === taskId && !i.trashedAt)
+    .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt))
+    .map((i) => ({
+      inquiryId: i.id,
+      subject: i.subject,
+      name: i.senderName,
+      lastMessageAt: i.lastMessageAt,
+      answered: i.messages.at(-1)?.direction === 'in',
+      unread: i.unread,
+    }));
+}
+
+async function loadRepairTask(tx: Repositories, taskId: string): Promise<HousekeepingTask> {
+  const task = await tx.housekeeping.getTask(taskId);
+  if (!task) throw new DomainError('not_found', `Task ${taskId} not found`);
+  if (task.type !== 'maintenance') {
+    throw new DomainError('invalid_input', 'Only a repair task has someone to fix it');
+  }
+  return task;
+}
+
+async function loadContact(tx: Repositories, id: string): Promise<Contact> {
+  const contact = await tx.contacts.get(id);
+  if (!contact) throw new DomainError('not_found', `Contact ${id} not found`);
+  return contact;
+}
+
+/**
+ * Records, inside the caller's transaction, that a contact was asked to fix a repair, and starts
+ * the task. They come first for the task's trade next time; a task without one takes the
+ * contact's.
+ */
+export async function recordAskedToRepair(
+  tx: Repositories,
+  taskId: string,
+  contactId: string,
+  actor: AuditActor,
+): Promise<{ task: HousekeepingTask; contact: Contact }> {
+  const task = await loadRepairTask(tx, taskId);
+  const contact = await loadContact(tx, contactId);
+  if (task.status === 'done') {
+    throw new DomainError('invalid_transition', 'This repair is already done');
+  }
+  const updated: HousekeepingTask = {
+    ...task,
+    contactId,
+    trade: task.trade ?? contact.trades[0] ?? null,
+    status: 'in_progress',
+  };
+  await tx.housekeeping.updateTask(updated);
+  await tx.audit.append({
+    actor,
+    action: 'task.contact',
+    subjectId: task.roomId,
+    payload: { taskId, contactId, contactName: contact.name, issue: task.notes },
+  });
+  return { task: updated, contact };
+}
+
 /** A proposed contact as it would be saved: the saved one with what the proposal changes. */
 export function contactFromProposal(
   saved: Contact | null,
@@ -107,20 +171,7 @@ export interface ContactDeps {
 
 /** Suppliers and contractors, and asking one of them to fix a repair. Changes are audited. */
 export function createContactService({ repos, clock, newId }: ContactDeps) {
-  async function load(tx: Repositories, id: string): Promise<Contact> {
-    const contact = await tx.contacts.get(id);
-    if (!contact) throw new DomainError('not_found', `Contact ${id} not found`);
-    return contact;
-  }
-
-  async function loadRepairTask(tx: Repositories, taskId: string): Promise<HousekeepingTask> {
-    const task = await tx.housekeeping.getTask(taskId);
-    if (!task) throw new DomainError('not_found', `Task ${taskId} not found`);
-    if (task.type !== 'maintenance') {
-      throw new DomainError('invalid_input', 'Only a repair task has someone to fix it');
-    }
-    return task;
-  }
+  const load = loadContact;
 
   return {
     list: () => repos.contacts.list(),
@@ -169,16 +220,17 @@ export function createContactService({ repos, clock, newId }: ContactDeps) {
       });
     },
 
-    /** Who can fix a repair, who was asked, and when they can get into the room. */
+    /** Who can fix a repair, who was asked, the emails about it, and when they can get in. */
     async repair(taskId: string): Promise<Repair> {
       const task = await loadRepairTask(repos, taskId);
       const now = clock();
-      const [room, contacts, tasks, bookings, guests] = await Promise.all([
+      const [room, contacts, tasks, bookings, guests, inquiries] = await Promise.all([
         repos.rooms.getRoom(task.roomId),
         repos.contacts.list(),
         repos.housekeeping.listTasks(),
         repos.bookings.listBookings({ roomId: task.roomId }),
         repos.guests.listGuests(),
+        repos.inquiries.listInquiries(),
       ]);
       return {
         task,
@@ -186,35 +238,19 @@ export function createContactService({ repos, clock, newId }: ContactDeps) {
         access: roomAccess(task.roomId, bookings, guests, hotelToday(now), now),
         contacts: contactsForTrade(task.trade, contacts, tasks),
         contact: contacts.find((c) => c.id === task.contactId) ?? null,
+        emails: repairEmails(task.id, inquiries),
       };
     },
 
-    /**
-     * Records that a contact was asked to fix a repair, by phone or email, and starts the task.
-     * They come first for the task's trade next time; a task without one takes the contact's.
-     */
-    askToRepair(taskId: string, contactId: string, actor: AuditActor): Promise<HousekeepingTask> {
-      return repos.transaction(async (tx) => {
-        const task = await loadRepairTask(tx, taskId);
-        const contact = await load(tx, contactId);
-        if (task.status === 'done') {
-          throw new DomainError('invalid_transition', 'This repair is already done');
-        }
-        const updated: HousekeepingTask = {
-          ...task,
-          contactId,
-          trade: task.trade ?? contact.trades[0] ?? null,
-          status: 'in_progress',
-        };
-        await tx.housekeeping.updateTask(updated);
-        await tx.audit.append({
-          actor,
-          action: 'task.contact',
-          subjectId: task.roomId,
-          payload: { taskId, contactId, contactName: contact.name, issue: task.notes },
-        });
-        return updated;
-      });
+    /** Records that a contact was asked to fix a repair, by phone or email, and starts the task. */
+    async askToRepair(
+      taskId: string,
+      contactId: string,
+      actor: AuditActor,
+    ): Promise<HousekeepingTask> {
+      return repos.transaction(
+        async (tx) => (await recordAskedToRepair(tx, taskId, contactId, actor)).task,
+      );
     },
   };
 }

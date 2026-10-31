@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { accessLabel, contactName, mailtoHref, telHref } from './repairs';
+import { accessLabel, contactName, repairConversations, telHref } from './repairs';
 
 describe('accessLabel', () => {
   it('says how long an empty room is free', () => {
@@ -30,11 +30,21 @@ describe('links', () => {
     expect(telHref('+420 555 010 142')).toBe('tel:+420555010142');
   });
 
-  it('opens an email with its subject and body, spaces kept as spaces', () => {
-    expect(
-      mailtoHref({ to: 'sam@plumbing.example', subject: 'Tap in 203', body: 'Hi Sam,\nThanks' }),
-    ).toBe('mailto:sam@plumbing.example?subject=Tap%20in%20203&body=Hi%20Sam%2C%0AThanks');
-    expect(mailtoHref({ to: null, subject: 'S', body: 'B' })).toBe('mailto:?subject=S&body=B');
+  it("lists a repair's conversations, latest first, without the trash", () => {
+    const at = (id: string, taskId: string | null, lastMessageAt: string) => ({
+      id,
+      taskId,
+      lastMessageAt,
+      trashedAt: null as string | null,
+    });
+    const inbox = [
+      at('a', 'hk_1', '2026-11-01T09:00:00.000Z'),
+      at('b', 'hk_2', '2026-11-02T09:00:00.000Z'),
+      at('c', 'hk_1', '2026-11-03T09:00:00.000Z'),
+      { ...at('d', 'hk_1', '2026-11-04T09:00:00.000Z'), trashedAt: '2026-11-04T10:00:00.000Z' },
+      at('e', null, '2026-11-05T09:00:00.000Z'),
+    ];
+    expect(repairConversations('hk_1', inbox).map((m) => m.id)).toEqual(['c', 'a']);
   });
 
   it('names a contact with who to ask for', () => {

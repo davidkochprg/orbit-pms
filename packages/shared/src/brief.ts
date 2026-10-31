@@ -58,6 +58,10 @@ export const briefMaintenanceSchema = z.object({
   roomId: z.string(),
   roomName: z.string(),
   notes: z.string().nullable(),
+  /** Someone was asked to fix it. */
+  asked: z.boolean().default(false),
+  /** The contractor who wrote back last about it, when their answer is the latest message. */
+  answeredBy: z.string().nullable().default(null),
 });
 export type BriefMaintenance = z.infer<typeof briefMaintenanceSchema>;
 

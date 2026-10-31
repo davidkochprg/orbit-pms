@@ -225,7 +225,14 @@ describe('buildDailyBrief', () => {
     });
     expect(brief.outOfOrder).toEqual([{ roomId: '101', roomName: '101' }]);
     expect(brief.maintenance).toEqual([
-      { taskId: 'hk_102', roomId: '102', roomName: '102', notes: 'Lamp broken.' },
+      {
+        taskId: 'hk_102',
+        roomId: '102',
+        roomName: '102',
+        notes: 'Lamp broken.',
+        asked: false,
+        answeredBy: null,
+      },
     ]);
     expect(brief.unansweredMessages).toBe(2);
   });

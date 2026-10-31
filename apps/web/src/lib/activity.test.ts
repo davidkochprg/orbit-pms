@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { activityDetail, activityLabel } from './activity';
+import { activityDetail, activityLabel, repairOf } from './activity';
 
 describe('activityLabel', () => {
   it('names known actions and falls back to the raw action', () => {
@@ -54,5 +54,19 @@ describe('activityDetail', () => {
     expect(activityDetail('booking.confirm', { from: 'hold', to: 'confirmed' })).toBeNull();
     expect(activityDetail('booking.update', { total: { from: 1, to: 1 }, changed: [] })).toBeNull();
     expect(activityDetail('guest.create', null)).toBeNull();
+  });
+});
+
+describe('repairOf', () => {
+  it('finds the repair an entry is about', () => {
+    expect(repairOf('task.contact', { taskId: 'hk_2', contactId: 'ct_1' })).toBe('hk_2');
+    expect(repairOf('inquiry.work_order', { taskId: 'hk_2', contactId: 'ct_1' })).toBe('hk_2');
+    expect(repairOf('task.create', { id: 'hk_3', type: 'maintenance' })).toBe('hk_3');
+  });
+
+  it('leaves out cleaning and other entries', () => {
+    expect(repairOf('task.create', { id: 'hk_4', type: 'turnover' })).toBeNull();
+    expect(repairOf('task.status', { taskId: 'hk_4', from: 'open', to: 'done' })).toBeNull();
+    expect(repairOf('booking.create', { taskId: 'hk_4' })).toBeNull();
   });
 });

@@ -31,6 +31,7 @@ import {
   Tag,
   Trash2,
   Undo2,
+  Wrench,
 } from 'lucide-react';
 import { type ReactNode, useEffect, useEffectEvent, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
@@ -43,6 +44,7 @@ import { ReceiveDialog } from '@/components/inbox-dialogs';
 import { LabelChips, LabelMenu } from '@/components/mail-labels';
 import { Panel } from '@/components/panel';
 import { RecipientField } from '@/components/recipient-field';
+import { RepairDialog } from '@/components/repair-panel';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -170,7 +172,7 @@ export function Conversation({ id }: { id: string }) {
   // Before Orbit has read the guest's latest message, preparing is the main step; the empty
   // reply box waits behind "Write it yourself".
   const offerPrepare =
-    m.status !== 'declined' && aiOn && !read && m.messages.at(-1)?.direction === 'in';
+    m.status !== 'declined' && aiOn && !m.taskId && !read && m.messages.at(-1)?.direction === 'in';
 
   return (
     <article className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-6">
@@ -356,6 +358,7 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
   const navigate = useNavigate();
   const [receiving, setReceiving] = useState(false);
   const [purging, setPurging] = useState(false);
+  const [repairOpen, setRepairOpen] = useState(false);
   const { toast } = useToast();
   const archived = m.archivedAt !== null;
   const trashed = m.trashedAt !== null;
@@ -492,7 +495,11 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
           </span>
         </span>
         <span className="ml-auto flex flex-wrap items-center gap-1.5">
-          {m.bookingId ? (
+          {m.taskId ? (
+            <Button variant="outline" size="sm" onClick={() => setRepairOpen(true)}>
+              <Wrench /> Open repair
+            </Button>
+          ) : m.bookingId ? (
             <Button variant="outline" size="sm" onClick={() => open(m.bookingId!)}>
               Open booking
             </Button>
@@ -545,6 +552,12 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
       {trashed && <p className="text-sm text-muted-foreground">In the trash</p>}
       {error && <ErrorNotice message={error.message} />}
       <ReceiveDialog id={m.id} open={receiving} onOpenChange={setReceiving} />
+      {m.taskId && (
+        <RepairDialog
+          taskId={repairOpen ? m.taskId : null}
+          onOpenChange={(open) => !open && setRepairOpen(false)}
+        />
+      )}
       <ConfirmDialog
         open={purging}
         onOpenChange={setPurging}

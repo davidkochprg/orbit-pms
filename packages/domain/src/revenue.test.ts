@@ -266,6 +266,7 @@ function inquiry(overrides: Partial<Inquiry> = {}): Inquiry {
     status: 'new',
     bookingId: null,
     blockBookingIds: [],
+    taskId: null,
     processedAt: null,
     processingError: null,
     ...overrides,

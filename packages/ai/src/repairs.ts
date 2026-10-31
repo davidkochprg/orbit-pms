@@ -1,3 +1,4 @@
+import type { Contact, Repair } from '@orbit/shared';
 import { type Trade, tradeSchema, type WorkOrder } from '@orbit/shared';
 import { generateText, type LanguageModel, Output } from 'ai';
 import { z } from 'zod';
@@ -99,3 +100,39 @@ export function createRepairDesk({ model, modelId, draftModel, usage }: RepairDe
 }
 
 export type RepairDesk = ReturnType<typeof createRepairDesk>;
+
+export interface WorkOrderDrafterDeps {
+  desk: Pick<RepairDesk, 'workOrder'>;
+  repair: (taskId: string) => Promise<Repair>;
+  contact: (contactId: string) => Promise<Contact>;
+  hotel: () => Promise<WorkOrderFacts['hotel']>;
+  today: () => string;
+}
+
+/**
+ * Writes the email asking a contractor to fix a repair, from the repair as it stands: the issue,
+ * the room and when someone can get in. Shared by the repair card and the agent.
+ */
+export function createWorkOrderDrafter({
+  desk,
+  repair,
+  contact,
+  hotel,
+  today,
+}: WorkOrderDrafterDeps) {
+  return async (taskId: string, contactId: string, signer: string | null): Promise<WorkOrder> => {
+    const [r, c, profile] = await Promise.all([repair(taskId), contact(contactId), hotel()]);
+    const draft = await desk.workOrder({
+      hotel: profile,
+      signer,
+      contact: c,
+      roomName: r.roomName,
+      issue: r.task.notes ?? 'Repair',
+      access: r.access,
+      today: today(),
+    });
+    return { to: c.email, ...draft };
+  };
+}
+
+export type WorkOrderDrafter = ReturnType<typeof createWorkOrderDrafter>;

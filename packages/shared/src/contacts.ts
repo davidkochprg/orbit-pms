@@ -81,6 +81,19 @@ export const roomAccessSchema = z.object({
 });
 export type RoomAccess = z.infer<typeof roomAccessSchema>;
 
+/** A conversation with a contractor about a repair, as the repair lists it. */
+export const repairEmailSchema = z.object({
+  inquiryId: z.string(),
+  subject: z.string().nullable(),
+  /** The contractor written to. */
+  name: z.string().nullable(),
+  lastMessageAt: z.iso.datetime(),
+  /** Whether the contractor wrote last, i.e. there is an answer to read. */
+  answered: z.boolean(),
+  unread: z.boolean(),
+});
+export type RepairEmail = z.infer<typeof repairEmailSchema>;
+
 /** A repair with who can fix it and when they can get into the room. */
 export const repairSchema = z.object({
   task: housekeepingTaskSchema,
@@ -90,11 +103,20 @@ export const repairSchema = z.object({
   contacts: z.array(contactSchema),
   /** Who was asked to fix it, once someone was. */
   contact: contactSchema.nullable(),
+  /** The emails about it, latest first. */
+  emails: z.array(repairEmailSchema).default([]),
 });
 export type Repair = z.infer<typeof repairSchema>;
 
 export const repairContactBodySchema = z.object({ contactId: z.string().min(1) });
 export type RepairContactBody = z.infer<typeof repairContactBodySchema>;
+
+/** `POST /api/housekeeping/tasks/:id/email`: the email to a contractor, as staff left it. */
+export const workOrderBodySchema = repairContactBodySchema.extend({
+  subject: z.string().trim().min(1).max(300),
+  body: z.string().trim().min(1).max(20_000),
+});
+export type WorkOrderBody = z.infer<typeof workOrderBodySchema>;
 
 /** An email asking a contractor to come and fix something, for staff to edit and send. */
 export const workOrderSchema = z.object({

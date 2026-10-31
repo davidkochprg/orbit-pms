@@ -10,6 +10,7 @@ import type {
   ApiError,
   Contact,
   HousekeepingTask,
+  Inquiry,
   KnockOn,
   Repair,
   WorkOrder,
@@ -177,6 +178,27 @@ describe('repairs', () => {
     });
     expect(prompts[0]).toContain('Room: 203');
     expect(prompts[0]).toContain('Sign as: Jordan');
+  });
+
+  it('sends the email from the mailbox, linked to the repair, without AI', async () => {
+    const app = appWith({ ai: false });
+    const taskId = tapTask().id;
+    const sent = await call<Inquiry>(app, 'POST', `/api/housekeeping/tasks/${taskId}/email`, {
+      contactId: 'ct_plumbing',
+      subject: 'Tap in room 203',
+      body: 'Hi Sam,\nCould you come and look at it?',
+    });
+    expect(sent.status).toBe(201);
+    expect(sent.body).toMatchObject({
+      taskId,
+      senderAddress: 'dispatch@ridgeline-plumbing.example',
+      messages: [{ direction: 'out', author: 'Jordan Lee' }],
+    });
+    const repair = await call<Repair>(app, 'GET', `/api/housekeeping/tasks/${taskId}/repair`);
+    expect(repair.body.contact?.id).toBe('ct_plumbing');
+    expect(repair.body.emails).toMatchObject([{ inquiryId: sent.body.id, answered: false }]);
+    const inbox = await call<Inquiry[]>(app, 'GET', '/api/inbox');
+    expect(inbox.body.find((m) => m.id === sent.body.id)?.taskId).toBe(taskId);
   });
 
   it('needs AI for a drafted email', async () => {

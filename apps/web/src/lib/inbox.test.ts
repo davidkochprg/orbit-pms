@@ -80,6 +80,7 @@ describe('bookingPrefillFor', () => {
     status: 'quoted',
     bookingId: null,
     blockBookingIds: [],
+    taskId: null,
     parsed: {
       kind: 'booking_request',
       language: 'de',
@@ -124,14 +125,15 @@ describe('bookingPrefillFor', () => {
 
 describe('canDecline', () => {
   it('is false once the message is declined or led to a booking', () => {
-    const m = { status: 'new', bookingId: null, parsed: null } as Inquiry;
+    const m = { status: 'new', bookingId: null, taskId: null, parsed: null } as Inquiry;
     expect(canDecline(m)).toBe(true);
     expect(canDecline({ ...m, status: 'declined' })).toBe(false);
     expect(canDecline({ ...m, bookingId: 'bk_1' })).toBe(false);
+    expect(canDecline({ ...m, taskId: 'hk_1' })).toBe(false);
   });
 
   it('is only offered for booking requests once Orbit has read the message', () => {
-    const m = { status: 'new', bookingId: null } as Inquiry;
+    const m = { status: 'new', bookingId: null, taskId: null } as Inquiry;
     const read = (kind: 'booking_request' | 'question' | 'other') =>
       ({ ...m, parsed: { kind } }) as Inquiry;
     expect(canDecline(read('booking_request'))).toBe(true);
@@ -193,6 +195,7 @@ function conversation(overrides: Partial<Inquiry> & { id: string }): Inquiry {
     status: 'new',
     bookingId: null,
     blockBookingIds: [],
+    taskId: null,
     processedAt: null,
     processingError: null,
     ...overrides,

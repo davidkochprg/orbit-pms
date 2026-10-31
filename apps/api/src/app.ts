@@ -6,6 +6,7 @@ import {
   createStayNotesReader,
   createNoteFiler,
   createRepairDesk,
+  createWorkOrderDrafter,
   createReplyLearner,
   createReportSummaryWriter,
   createRateReviewer,
@@ -215,6 +216,15 @@ export function createApp({
       remembered: async (guestId) => (await remember(guestId)).items.map((i) => i.text),
       today: () => hotelToday(clock()),
     });
+  const draftWorkOrder =
+    desk &&
+    createWorkOrderDrafter({
+      desk,
+      repair: (taskId) => contacts.repair(taskId),
+      contact: (contactId) => contacts.get(contactId),
+      hotel: () => settings.getProfile(),
+      today: () => hotelToday(clock()),
+    });
   const access = createDemoAccess({ code: accessCode, clock });
   const app = new Hono();
   if (log) app.use(logger());
@@ -308,9 +318,8 @@ export function createApp({
     '/api',
     contactRoutes({
       contacts,
-      settings,
-      desk,
-      today: () => hotelToday(clock()),
+      inbox,
+      draftWorkOrder,
       gate,
       identify: (id) => staff.identify(id),
     }),
@@ -340,6 +349,8 @@ export function createApp({
       guestMemory: remember,
       // The agent's drafts are signed by the reception; the confirming staff member sends them.
       draftArrivalNote: draftArrivalNote && ((bookingId) => draftArrivalNote(bookingId, null)),
+      draftWorkOrder:
+        draftWorkOrder && ((taskId, contactId) => draftWorkOrder(taskId, contactId, null)),
       limiter,
       gate,
       clock,

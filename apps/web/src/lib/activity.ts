@@ -27,6 +27,13 @@ export const activityLabels: Record<string, string> = {
   'guest.update': 'Edited a guest',
   'inquiry.decline': 'Declined a message',
   'inquiry.replied': 'Replied to a message',
+  'inquiry.compose': 'Wrote an email',
+  'inquiry.arrival_note': 'Emailed a guest before their stay',
+  'inquiry.work_order': 'Emailed a contractor about a repair',
+  'inquiry.delete': 'Deleted a conversation',
+  'event.create': 'Added a local event',
+  'event.delete': 'Removed a local event',
+  'rates.adjust': 'Adjusted rates',
   'room.status': 'Changed room status',
   'room.create': 'Added a room',
   'room.update': 'Edited a room',
@@ -45,6 +52,19 @@ export const activityLabels: Record<string, string> = {
   'staff.create': 'Added a team member',
   'staff.update': 'Changed a team member',
 };
+
+const repairPayload = z.union([
+  z.object({ taskId: z.string() }),
+  z.object({ id: z.string(), type: z.literal('maintenance') }),
+]);
+
+/** The repair an entry is about, to open it: asking someone, emailing them, or logging it. */
+export function repairOf(action: string, payload: unknown): string | null {
+  if (!['task.contact', 'task.create', 'inquiry.work_order'].includes(action)) return null;
+  const p = repairPayload.safeParse(payload);
+  if (!p.success) return null;
+  return 'taskId' in p.data ? p.data.taskId : p.data.id;
+}
 
 export function activityLabel(action: string): string {
   return activityLabels[action] ?? action;

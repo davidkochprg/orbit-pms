@@ -24,7 +24,8 @@ export interface AttentionItem {
    * `?booking=` opens the booking inspector on the current page; `items` opens into the rows it
    * stands for, when several of one kind would crowd the list.
    */
-  target: { path: string } | { bookingId: string } | { items: AttentionItem[] };
+  target:
+    { path: string } | { bookingId: string } | { taskId: string } | { items: AttentionItem[] };
   /** What a change made worth doing for this item; the row then offers the fix itself. */
   knockOn?: KnockOn;
   /** Guests to write to before they arrive; the row opens the notes to review and send. */
@@ -195,10 +196,16 @@ export function attentionItems(
             knockOn: repair,
           }
         : {
-            title: `Room ${t.roomName} needs a repair`,
-            detail: t.notes ?? 'Maintenance task open',
+            title: t.notes
+              ? `Room ${t.roomName}: ${t.notes.replace(/\.$/, '')}`
+              : `Room ${t.roomName} needs a repair`,
+            detail: t.answeredBy
+              ? `${t.answeredBy} answered`
+              : t.asked
+                ? 'Waiting for the contractor'
+                : 'Nobody asked yet',
           }),
-      target: { path: '/housekeeping' },
+      target: { taskId: t.taskId },
     });
   }
   return items;

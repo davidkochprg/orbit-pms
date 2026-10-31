@@ -85,16 +85,16 @@ export function bookingPrefillFor(m: Inquiry, guests: Guest[]): NewBookingPrefil
   };
 }
 
-/** Whether staff can still decline the message: not once it led to a booking. */
 /**
  * Declining says no booking will come of a request, so it is offered until a booking exists and
- * unless Orbit found the message is a question or something else.
+ * unless Orbit found the message is a question or something else, or it is about a repair.
  */
 export function canDecline(m: Inquiry): boolean {
   return (
     m.status !== 'declined' &&
     m.status !== 'converted' &&
     m.bookingId === null &&
+    m.taskId === null &&
     (m.parsed === null || m.parsed.kind === 'booking_request')
   );
 }

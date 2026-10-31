@@ -176,6 +176,7 @@ function AttentionRow({
       />
     );
   }
+  if ('taskId' in item.target) return <RepairItemRow taskId={item.target.taskId} body={body} />;
   if ('bookingId' in item.target) {
     const { bookingId } = item.target;
     return (
@@ -223,6 +224,19 @@ function KnockOnRow({ knockOn, body }: { knockOn: KnockOn; body: ReactNode }) {
   }
   if (knockOn.kind === 'repair') return <RepairRow knockOn={knockOn} body={body} />;
   return <OpeningRow knockOn={knockOn} body={body} />;
+}
+
+/** Opens a repair someone was asked about: who, the emails, and who else to ask. */
+function RepairItemRow({ taskId, body }: { taskId: string; body: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" onClick={() => setOpen(true)} className={rowClass}>
+        {body}
+      </button>
+      <RepairDialog taskId={open ? taskId : null} onOpenChange={setOpen} />
+    </>
+  );
 }
 
 /** Opens the repair's contacts on the email to the first one, with a call button beside it. */

@@ -576,6 +576,61 @@ describe('agent tools', () => {
     expect(repos.state.contacts.map((c) => c.id)).toEqual(['ct_plumbing']);
   });
 
+  it('drafts the email to a contractor and proposes sending it, linked to the repair', async () => {
+    const { tools, repos, actions } = setup({
+      draftWorkOrder: (taskId, contactId) =>
+        Promise.resolve({
+          to: 'plumbing@example.com',
+          subject: `Tap (${taskId}, ${contactId})`,
+          body: 'Could you come?',
+        }),
+    });
+    repos.state.contacts.push({
+      id: 'ct_plumbing',
+      name: 'Example Plumbing',
+      person: null,
+      trades: ['plumbing'],
+      phone: null,
+      email: 'plumbing@example.com',
+      language: 'cs',
+      notes: null,
+    });
+    const created = await tools.createHousekeepingTask.execute(
+      { roomId: 'rm_104', type: 'maintenance', notes: 'Tap is dripping', trade: 'plumbing' },
+      callOptions,
+    );
+    const taskId = (created as { task: { id: string } }).task.id;
+    const draft = await tools.draftRepairEmail.execute(
+      { taskId, contactId: 'ct_plumbing' },
+      callOptions,
+    );
+    expect(draft).toEqual({
+      taskId,
+      contactId: 'ct_plumbing',
+      to: 'plumbing@example.com',
+      subject: `Tap (${taskId}, ct_plumbing)`,
+      body: 'Could you come?',
+    });
+    const proposed = await tools.sendRepairEmail.execute(
+      { taskId, contactId: 'ct_plumbing', subject: 'Tap in 104', body: 'Could you come?' },
+      callOptions,
+    );
+    expect(proposed).toMatchObject({ status: 'awaiting_confirmation' });
+    expect(repos.state.inquiries).toEqual([]);
+    await actions.confirm((proposed as { pendingActionId: string }).pendingActionId);
+    expect(await tools.getRepair.execute({ taskId }, callOptions)).toMatchObject({
+      contact: { id: 'ct_plumbing' },
+      emails: [{ subject: 'Tap in 104', answered: false }],
+    });
+  });
+
+  it('says when repair emails are not drafted here', async () => {
+    const { tools } = setup();
+    expect(
+      await tools.draftRepairEmail.execute({ taskId: 'hk_1', contactId: 'ct_1' }, callOptions),
+    ).toMatchObject({ error: { code: 'not_configured' } });
+  });
+
   it('files conversations by folder and label, and organizes them', async () => {
     const { tools, repos } = await withConversation();
     repos.state.labels.push({ id: 'lbl_1', name: 'Groups', color: 'blue' });

@@ -95,6 +95,8 @@ export const inquirySchema = z.object({
   bookingId: z.string().nullable(),
   /** Every hold made for a block of rooms; the first is also `bookingId`. */
   blockBookingIds: z.array(z.string()).default([]),
+  /** The repair this conversation is about: an email to the contractor asked to fix it. */
+  taskId: z.string().nullable().default(null),
   processedAt: z.iso.datetime().nullable(),
   processingError: z.string().nullable(),
 });

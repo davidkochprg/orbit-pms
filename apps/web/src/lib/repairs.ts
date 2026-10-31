@@ -1,4 +1,4 @@
-import type { Contact, RoomAccess, WorkOrder } from '@orbit/shared';
+import type { Contact, Inquiry, RoomAccess } from '@orbit/shared';
 import { formatDate } from '@/lib/format';
 
 /** When a contractor can work in the room, e.g. "Free until Sat, Nov 7". */
@@ -19,10 +19,13 @@ export function telHref(phone: string): string {
   return `tel:${phone.replace(/[^\d+]/g, '')}`;
 }
 
-/** Opens the email in the staff member's own mail app, ready to send. */
-export function mailtoHref({ to, subject, body }: WorkOrder): string {
-  const params = new URLSearchParams({ subject, body }).toString().replaceAll('+', '%20');
-  return `mailto:${to ? encodeURIComponent(to).replace('%40', '@') : ''}?${params}`;
+/** The conversations with contractors about a repair, latest first, the trash left out. */
+export function repairConversations<
+  T extends Pick<Inquiry, 'taskId' | 'trashedAt' | 'lastMessageAt'>,
+>(taskId: string, inbox: T[]): T[] {
+  return inbox
+    .filter((m) => m.taskId === taskId && !m.trashedAt)
+    .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
 }
 
 /** "Example Plumbing · Sam", how a contact is named in a list. */

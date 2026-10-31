@@ -19,7 +19,7 @@ import {
   pricingConfig,
 } from '@orbit/domain';
 import { createMemoryRepositories } from '@orbit/domain/testing';
-import type { ArrivalNote, Booking, Inquiry, RoomType } from '@orbit/shared';
+import type { ArrivalNote, Booking, Inquiry, RoomType, WorkOrder } from '@orbit/shared';
 import { createAgentTools } from './tools';
 
 export const now = new Date('2026-05-10T08:00:00Z');
@@ -52,9 +52,11 @@ const base: Omit<Booking, 'id' | 'roomId' | 'checkIn' | 'checkOut'> = {
 export function setup({
   draftReply = null,
   draftArrivalNote = null,
+  draftWorkOrder = null,
 }: {
   draftReply?: ((inquiryId: string) => Promise<Inquiry>) | null;
   draftArrivalNote?: ((bookingId: string) => Promise<ArrivalNote>) | null;
+  draftWorkOrder?: ((taskId: string, contactId: string) => Promise<WorkOrder>) | null;
 } = {}) {
   const repos = createMemoryRepositories(
     {
@@ -143,6 +145,7 @@ export function setup({
     mailLabels: () => repos.mail.listLabels(),
     arrivalNotesDue: (date) => createArrivalNoteService({ repos, clock }).due(date),
     draftArrivalNote,
+    draftWorkOrder,
   });
   return { repos, hotel, billing, actions, tools };
 }

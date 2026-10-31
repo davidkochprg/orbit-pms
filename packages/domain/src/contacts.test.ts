@@ -1,13 +1,19 @@
 import { type Contact, contactProposalSchema, type HousekeepingTask } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
+import { buildDailyBrief } from './brief';
 import {
   contactFromProposal,
   contactsForTrade,
   createContactService,
+  repairEmails,
   roomAccess,
 } from './contacts';
+import { createInboxService } from './inbox-service';
+import { guestBookRulesFor, hotelPolicy } from './policy';
+import { pricingConfig } from './pricing';
+import { createHotelService } from './service';
 import { booking, plumber, room } from './test-fixtures';
-import { createMemoryRepositories } from './testing';
+import { conversation, createMemoryRepositories } from './testing';
 
 const now = new Date('2026-05-10T08:00:00Z');
 const today = '2026-05-10';
@@ -176,6 +182,54 @@ describe('contactFromProposal', () => {
   });
 });
 
+describe('repairEmails', () => {
+  it("lists a repair's conversations, latest first, and whether the contractor answered", () => {
+    const out = (id: string, lastMessageAt: string, overrides = {}) => ({
+      ...conversation({ id, taskId: 'hk_tap', lastMessageAt, senderName: 'Test Plumbing' }),
+      ...overrides,
+    });
+    const asked = out('inq_1', '2026-05-09T08:00:00.000Z');
+    const answered = conversation({
+      id: 'inq_2',
+      taskId: 'hk_tap',
+      lastMessageAt: '2026-05-10T08:00:00.000Z',
+      senderName: 'Test Plumbing',
+      unread: true,
+    });
+    const sentOnly = {
+      ...asked,
+      unread: false,
+      messages: asked.messages.map((m) => ({ ...m, direction: 'out' as const })),
+    };
+    expect(
+      repairEmails('hk_tap', [
+        sentOnly,
+        answered,
+        out('inq_3', '2026-05-10T09:00:00.000Z', { trashedAt: '2026-05-10T09:30:00.000Z' }),
+        conversation({ id: 'inq_4', taskId: 'hk_other' }),
+        conversation({ id: 'inq_5' }),
+      ]),
+    ).toEqual([
+      {
+        inquiryId: 'inq_2',
+        subject: null,
+        name: 'Test Plumbing',
+        lastMessageAt: '2026-05-10T08:00:00.000Z',
+        answered: true,
+        unread: true,
+      },
+      {
+        inquiryId: 'inq_1',
+        subject: null,
+        name: 'Test Plumbing',
+        lastMessageAt: '2026-05-09T08:00:00.000Z',
+        answered: false,
+        unread: false,
+      },
+    ]);
+  });
+});
+
 describe('contact service', () => {
   function setup(tasks: HousekeepingTask[] = [task()]) {
     const repos = createMemoryRepositories(
@@ -202,9 +256,21 @@ describe('contact service', () => {
       () => now,
     );
     let n = 0;
-    const contacts = createContactService({ repos, clock: () => now, newId: (p) => `${p}_${++n}` });
-    return { repos, contacts };
+    const clock = () => now;
+    const newId = (p: string) => `${p}_${++n}`;
+    const contacts = createContactService({ repos, clock, newId });
+    const hotel = createHotelService({
+      repos,
+      pricing: pricingConfig,
+      policy: hotelPolicy,
+      clock,
+      newId,
+    });
+    const inbox = createInboxService({ repos, hotel, clock, newId });
+    return { repos, contacts, inbox };
   }
+
+  const email = { contactId: plumber.id, subject: 'Room 101: tap', body: 'Could you come?' };
 
   it('creates, updates and removes contacts, each in the audit log', async () => {
     const { repos, contacts } = setup();
@@ -238,6 +304,7 @@ describe('contact service', () => {
       access: { guestName: 'Anna Example', freeFrom: '2026-05-12', freeUntil: null },
       contacts: [plumber],
       contact: null,
+      emails: [],
     });
   });
 
@@ -256,6 +323,63 @@ describe('contact service', () => {
       payload: { taskId: 'hk_tap', contactName: 'Test Plumbing' },
     });
     expect((await contacts.repair('hk_tap')).contact).toEqual(plumber);
+  });
+
+  it('emails a contractor from the mailbox, linked to the repair, and counts them as asked', async () => {
+    const { repos, contacts, inbox } = setup();
+    const sent = await inbox.sendWorkOrder('hk_tap', email, 'Front Desk', 'user');
+    expect(sent).toMatchObject({
+      taskId: 'hk_tap',
+      bookingId: null,
+      subject: 'Room 101: tap',
+      senderName: 'Test Plumbing',
+      senderAddress: 'plumbing@example.com',
+      status: 'replied',
+      unread: false,
+      messages: [{ direction: 'out', body: 'Could you come?', author: 'Front Desk' }],
+    });
+    const repair = await contacts.repair('hk_tap');
+    expect(repair.task).toMatchObject({ contactId: plumber.id, status: 'in_progress' });
+    expect(repair.emails).toMatchObject([{ inquiryId: sent.id, answered: false }]);
+    expect(repos.state.audit.map((e) => e.action)).toEqual(['task.contact', 'inquiry.work_order']);
+
+    // The contractor's answer shows on the repair and on the day's brief.
+    await inbox.receive(sent.id, 'Tomorrow at 9 works.');
+    expect((await contacts.repair('hk_tap')).emails[0]).toMatchObject({ answered: true });
+    const brief = buildDailyBrief({
+      date: '2026-05-10',
+      now,
+      rooms: await repos.rooms.listRooms(),
+      guests: [],
+      bookings: [],
+      tasks: await repos.housekeeping.listTasks(),
+      inquiries: await repos.inquiries.listInquiries(),
+      stayGuests: [],
+      rules: guestBookRulesFor('CZ'),
+    });
+    expect(brief.maintenance).toEqual([
+      {
+        taskId: 'hk_tap',
+        roomId: 'rm_1',
+        roomName: '101',
+        notes: 'Tap is dripping.',
+        asked: true,
+        answeredBy: 'Test Plumbing',
+      },
+    ]);
+  });
+
+  it('sends nothing, and asks nobody, when the contractor has no email', async () => {
+    const { repos, contacts, inbox } = setup();
+    await contacts.update(plumber.id, { ...plumber, email: null }, 'user');
+    await expect(inbox.sendWorkOrder('hk_tap', email, null, 'user')).rejects.toThrow(
+      'has no email address',
+    );
+    expect((await contacts.repair('hk_tap')).task.status).toBe('open');
+    expect(await repos.inquiries.listInquiries()).toEqual([]);
+    await expect(
+      inbox.sendWorkOrder('hk_tap', { ...email, contactId: 'ct_x' }, null, 'user'),
+    ).rejects.toThrow('not found');
   });
 
   it('only repairs that are not done have someone to fix them', async () => {

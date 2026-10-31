@@ -11,6 +11,7 @@ import {
 import { type HousekeepingRoom, type HousekeepingTask, type RoomStatus } from '@orbit/shared';
 import { Keyboard, Mic, Plus } from 'lucide-react';
 import { type ComponentProps, type Ref, useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { HousekeepingNoteDialog, type NoteMode } from '@/components/housekeeping-note-dialog';
 import { HousekeepingRoomCard } from '@/components/housekeeping-room-card';
@@ -47,7 +48,18 @@ export function HousekeepingPage() {
   const [noteMode, setNoteMode] = useState<NoteMode>('voice');
   // Undefined: closed. A room ID or null: open, with or without a room chosen.
   const [taskRoom, setTaskRoom] = useState<string | null | undefined>(undefined);
-  const [repairTask, setRepairTask] = useState<string | null>(null);
+  // `?repair=<task>` opens a repair, e.g. from the activity log.
+  const [params, setParams] = useSearchParams();
+  const repairTask = params.get('repair');
+  const setRepairTask = (taskId: string | null) =>
+    setParams(
+      (p) => {
+        if (taskId) p.set('repair', taskId);
+        else p.delete('repair');
+        return p;
+      },
+      { replace: true },
+    );
   const [markedOutOfOrder, setMarkedOutOfOrder] = useState<{ roomId: string; at: number } | null>(
     null,
   );

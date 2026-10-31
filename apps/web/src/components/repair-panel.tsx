@@ -1,7 +1,8 @@
 import { type Contact, type Repair, tradeLabels, type WorkOrder } from '@orbit/shared';
-import { Check, Copy, Mail, Phone, UserPlus } from 'lucide-react';
+import { Check, Mail, Phone, Send, UserPlus } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
+import { ConversationList } from '@/components/conversation-list';
 import { ErrorNotice } from '@/components/error-notice';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -9,8 +10,16 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
-import { useAskToRepair, useContacts, useRepair, useWorkOrder } from '@/lib/api';
-import { accessLabel, contactName, mailtoHref, telHref } from '@/lib/repairs';
+import { useToast } from '@/hooks/use-toast';
+import {
+  useAskToRepair,
+  useContacts,
+  useInbox,
+  useRepair,
+  useSendWorkOrder,
+  useWorkOrder,
+} from '@/lib/api';
+import { accessLabel, contactName, repairConversations, telHref } from '@/lib/repairs';
 import { cn } from '@/lib/utils';
 
 /** A repair's contractors in a dialog, from a room card or Today's list. */
@@ -35,7 +44,11 @@ export function RepairDialog({
         {repair.isError ? (
           <ErrorNotice message={repair.error.message} />
         ) : repair.data ? (
-          <RepairContacts repair={repair.data} writeTo={writeTo} />
+          <RepairContacts
+            repair={repair.data}
+            writeTo={writeTo}
+            onLeave={() => onOpenChange(false)}
+          />
         ) : (
           <Skeleton className="h-24" />
         )}
@@ -55,11 +68,22 @@ export function RepairMeta({ repair, className }: { repair: Repair; className?: 
 }
 
 /**
- * Who can fix a repair, each with a call link and a drafted email. Calling or opening the email
- * records them as asked. Anyone else in the contacts can be picked too.
+ * Who can fix a repair, each with a call link and a drafted email, and the emails about it.
+ * Calling or sending the email records them as asked. Anyone else in the contacts can be picked
+ * too.
  */
-export function RepairContacts({ repair, writeTo }: { repair: Repair; writeTo?: string }) {
+export function RepairContacts({
+  repair,
+  writeTo,
+  onLeave,
+}: {
+  repair: Repair;
+  writeTo?: string;
+  /** Runs when an email is opened in the inbox, e.g. to close the dialog. */
+  onLeave?: () => void;
+}) {
   const all = useContacts();
+  const inbox = useInbox();
   const ask = useAskToRepair(repair.task.id);
   const [picked, setPicked] = useState<string[]>([]);
   const [writing, setWriting] = useState<Contact | null>(
@@ -74,6 +98,7 @@ export function RepairContacts({ repair, writeTo }: { repair: Repair; writeTo?: 
   ].filter((c, i, list) => list.findIndex((o) => o.id === c.id) === i);
   const others = (all.data ?? []).filter((c) => !shown.some((s) => s.id === c.id));
   const asked = (id: string) => repair.contact?.id === id || ask.variables === id;
+  const emails = repairConversations(repair.task.id, inbox.data ?? []);
 
   if (writing) {
     return (
@@ -81,13 +106,14 @@ export function RepairContacts({ repair, writeTo }: { repair: Repair; writeTo?: 
         repair={repair}
         contact={writing}
         onBack={() => setWriting(null)}
-        onSend={() => ask.mutate(writing.id)}
+        onSent={() => setWriting(null)}
       />
     );
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-3">
+      {emails.length > 0 && <ConversationList conversations={emails} onOpen={onLeave} />}
       {shown.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           No {repair.task.trade ? tradeLabels[repair.task.trade].toLowerCase() : ''} contact yet
@@ -160,21 +186,23 @@ export function RepairContacts({ repair, writeTo }: { repair: Repair; writeTo?: 
   );
 }
 
-/** The drafted email, for staff to edit and send from their own mail app. */
+/** The drafted email, for staff to edit and send from the hotel's mailbox. */
 function WorkOrderEditor({
   repair,
   contact,
   onBack,
-  onSend,
+  onSent,
 }: {
   repair: Repair;
   contact: Contact;
   onBack: () => void;
-  onSend: () => void;
+  onSent: () => void;
 }) {
   const draft = useWorkOrder(repair.task.id);
+  const send = useSendWorkOrder(repair.task.id);
+  const navigate = useNavigate();
+  const { toast } = useToast();
   const [email, setEmail] = useState<WorkOrder | null>(null);
-  const [copied, setCopied] = useState(false);
   const { mutate } = draft;
 
   useEffect(() => {
@@ -190,18 +218,28 @@ function WorkOrderEditor({
     });
   }, [mutate, contact.id, contact.email, repair.roomName, repair.task.notes]);
 
-  async function copy() {
+  const submit = () => {
     if (!email) return;
-    try {
-      await navigator.clipboard.writeText(`${email.subject}\n\n${email.body}`);
-      setCopied(true);
-    } catch {
-      // Clipboard blocked: the text is still there to select.
-    }
-  }
+    // Sending can take this row off Today's list, so the toast doesn't wait on it staying open.
+    send
+      .mutateAsync({ contactId: contact.id, subject: email.subject, body: email.body })
+      .then((sent) => {
+        toast({
+          title: `Sent to ${contact.name}`,
+          action: {
+            label: 'Open',
+            run: () => void navigate(`/inbox/${encodeURIComponent(sent.id)}`),
+          },
+        });
+        onSent();
+      })
+      .catch(() => {
+        // Shown below the email while the dialog is open.
+      });
+  };
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-3">
       <p className="text-sm">
         To <span className="font-medium">{contactName(contact)}</span>
         <span className="text-muted-foreground"> · {contact.email}</span>
@@ -227,30 +265,19 @@ function WorkOrderEditor({
           />
         </>
       )}
+      {send.error && <ErrorNotice message={send.error.message} onDismiss={() => send.reset()} />}
       <div className="flex items-center gap-1.5">
         <Button variant="ghost" size="sm" onClick={onBack}>
           Back
         </Button>
         <Button
-          variant="ghost"
           size="sm"
           className="ml-auto"
-          disabled={!email}
-          onClick={() => void copy()}
+          disabled={!email?.subject.trim() || !email.body.trim() || send.isPending}
+          onClick={submit}
         >
-          {copied ? <Check /> : <Copy />} {copied ? 'Copied' : 'Copy'}
+          <Send /> Send
         </Button>
-        {email ? (
-          <Button asChild size="sm">
-            <a href={mailtoHref(email)} onClick={onSend}>
-              <Mail /> Open in Mail
-            </a>
-          </Button>
-        ) : (
-          <Button size="sm" disabled>
-            <Mail /> Open in Mail
-          </Button>
-        )}
       </div>
     </div>
   );

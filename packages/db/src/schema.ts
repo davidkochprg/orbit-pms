@@ -163,6 +163,8 @@ export const inquiries = pgTable('inquiries', {
   bookingId: text('booking_id').references(() => bookings.id),
   /** Every hold made for a block of rooms; the first is also `booking_id`. */
   blockBookingIds: jsonb('block_booking_ids').$type<string[]>().notNull().default([]),
+  /** The repair a contractor was emailed about; tasks are plain IDs here, as in the audit log. */
+  taskId: text('task_id'),
   processedAt: timestamp('processed_at', { withTimezone: true }),
   processingError: text('processing_error'),
 });
