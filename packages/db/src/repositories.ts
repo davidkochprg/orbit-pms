@@ -15,6 +15,7 @@ import type {
   StayReadingRepository,
   LocalEventRepository,
   MailRepository,
+  RateReviewRepository,
   Repositories,
   RoomRepository,
   SettingsRepository,
@@ -34,6 +35,7 @@ import {
   type StayGuest,
   pendingActionSchema,
   pricingConfigSchema,
+  rateSignalSchema,
 } from '@orbit/shared';
 import {
   and,
@@ -65,6 +67,7 @@ import {
   pendingActions,
   pricing,
   idScans,
+  rateReviews,
   stayGuests,
   stayReadings,
   localEvents,
@@ -693,6 +696,28 @@ function localEventRepository(db: Db): LocalEventRepository {
   };
 }
 
+function rateReviewRepository(db: Db): RateReviewRepository {
+  return {
+    async get() {
+      const [row] = await db.select().from(rateReviews).where(eq(rateReviews.id, 'hotel'));
+      return row
+        ? {
+            basis: row.basis,
+            reviewedAt: row.reviewedAt.toISOString(),
+            signals: rateSignalSchema.array().parse(row.signals),
+          }
+        : null;
+    },
+    async save(review) {
+      const row = { ...review, reviewedAt: new Date(review.reviewedAt) };
+      await db
+        .insert(rateReviews)
+        .values({ id: 'hotel', ...row })
+        .onConflictDoUpdate({ target: rateReviews.id, set: row });
+    },
+  };
+}
+
 export function createRepositories(db: Db): Repositories {
   return {
     rooms: roomRepository(db),
@@ -709,6 +734,7 @@ export function createRepositories(db: Db): Repositories {
     idScans: idScanRepository(db),
     stayReadings: stayReadingRepository(db),
     events: localEventRepository(db),
+    rateReview: rateReviewRepository(db),
     contacts: contactRepository(db),
     mail: mailRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),

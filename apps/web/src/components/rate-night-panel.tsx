@@ -1,6 +1,6 @@
 import type { NightOutlook, RateFactor } from '@orbit/shared';
 import { format, parseISO } from 'date-fns';
-import { CalendarDays, Cloud, type LucideIcon, TrendingUp, UserX } from 'lucide-react';
+import { CalendarDays, Cloud, Lightbulb, type LucideIcon, TrendingUp, UserX } from 'lucide-react';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +12,7 @@ import { cn } from '@/lib/utils';
 const factorIcons: Record<Exclude<RateFactor['kind'], 'weather'>, LucideIcon> = {
   demand: TrendingUp,
   event: CalendarDays,
+  insight: Lightbulb,
 };
 
 /**
@@ -57,8 +58,8 @@ export function RateNightPanel({
         {night.factors.length === 0 ? (
           <p className="text-xs text-muted-foreground">Nothing unusual</p>
         ) : (
-          <ul className="flex flex-col gap-1">
-            {night.factors.map((f) => {
+          <ul className="flex flex-col gap-1.5">
+            {night.factors.map((f, i) => {
               const Icon =
                 f.kind === 'weather'
                   ? night.weather
@@ -66,17 +67,24 @@ export function RateNightPanel({
                     : Cloud
                   : factorIcons[f.kind];
               return (
-                <li key={f.label} className="flex items-center gap-2 text-[0.8125rem]">
-                  <Icon className="size-3.5 shrink-0 text-muted-foreground" />
-                  <span className="min-w-0 flex-1 truncate">{f.label}</span>
-                  <span
-                    className={cn(
-                      'font-mono text-xs tabular-nums',
-                      f.percent < 0 ? 'text-muted-foreground' : 'text-foreground',
-                    )}
-                  >
-                    {signed(f.percent)}
+                <li key={i} className="flex flex-col gap-0.5">
+                  <span className="flex items-center gap-2 text-[0.8125rem]">
+                    <Icon className="size-3.5 shrink-0 text-muted-foreground" />
+                    <span className="min-w-0 flex-1 truncate">{f.label}</span>
+                    <span
+                      className={cn(
+                        'font-mono text-xs tabular-nums',
+                        f.percent < 0 ? 'text-muted-foreground' : 'text-foreground',
+                      )}
+                    >
+                      {signed(f.percent)}
+                    </span>
                   </span>
+                  {f.detail && (
+                    <span className="pl-5.5 text-xs leading-snug text-muted-foreground">
+                      {f.detail}
+                    </span>
+                  )}
                 </li>
               );
             })}

@@ -28,6 +28,7 @@ const outlook: RevenueOutlook = {
   events: [],
   arrivalRisks: [],
   weatherAvailable: false,
+  review: { basis: '00000000', reviewedAt: null, current: false },
 };
 
 function writer(replies: string[]) {

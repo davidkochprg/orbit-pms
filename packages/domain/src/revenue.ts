@@ -3,12 +3,16 @@ import type {
   Booking,
   EventImpact,
   Guest,
+  HotelProfile,
+  Inquiry,
   IsoDate,
   LocalEvent,
   NightOutlook,
   Payment,
   PricingConfig,
   RateFactor,
+  RateSignal,
+  RateSignalStrength,
   Room,
   RoomType,
   WeatherDay,
@@ -24,19 +28,29 @@ import { adjustmentFor, nightlyRate } from './pricing/quote';
 export const rateRules = {
   /** Occupancy on the books from which a night counts as almost full. */
   almostFull: { occupancy: 0.9, percent: 20 },
-  /** Ahead of how full this weekday usually ends up, by at least `margin`. */
-  ahead: { margin: 0.15, percent: 10 },
-  /** Behind the usual by `margin`, with at most `withinDays` left to sell it. */
-  quiet: { margin: 0.2, withinDays: 7, percent: -10 },
+  /** Ahead of how full this weekday usually ends up: each `margin` ahead adds `percent`. */
+  ahead: { margin: 0.1, percent: 5, max: 15 },
+  /** Behind the usual with at most `withinDays` left to sell: each `margin` behind takes `percent`. */
+  quiet: { margin: 0.15, withinDays: 10, percent: -5, min: -15 },
   event: { low: 5, medium: 10, high: 15 } satisfies Record<EventImpact, number>,
-  /** Fresh snow brings skiers to a mountain hotel. */
-  snow: { cm: 5, percent: 5 },
+  /** The night before and the night after an event, for guests who come early or stay on. */
+  shoulder: { low: 0, medium: 5, high: 10 } satisfies Record<EventImpact, number>,
+  /** Fresh snow brings skiers to a mountain hotel; `heavyCm` or more brings more. */
+  snow: { cm: 5, percent: 5, heavyCm: 15, heavyPercent: 10 },
   /** Storms, and rain of `mm` or more, keep short-notice guests away. */
   storm: { mm: 20, percent: -5 },
+  /** What a signal from the model's review adds, by its strength; a signal down takes it away. */
+  insight: { slight: 5, moderate: 10, strong: 15 } satisfies Record<RateSignalStrength, number>,
   min: -20,
   max: 30,
   step: 5,
 } as const;
+
+/** Nights the model's review covers, from today. */
+export const REVIEW_DAYS = 60;
+/** Open conversations the review reads, newest first, and how much of each message. */
+const REVIEW_INQUIRIES = 20;
+const REVIEW_MESSAGE_CHARS = 800;
 
 /** Weeks of past nights that set how full a weekday usually ends up. */
 export const TYPICAL_WEEKS = 8;
@@ -87,7 +101,14 @@ export interface NightSignals {
   occupancy: number;
   typical: number | null;
   events: LocalEvent[];
+  /** Events that end the night before or start the night after; only used without `events`. */
+  nearby?: LocalEvent[];
   weather: WeatherDay | null;
+}
+
+/** How many whole `margin`s `gap` is, at most `limit`. */
+function steps(gap: number, margin: number, limit: number): number {
+  return Math.min(Math.floor((gap + EPSILON) / margin), limit);
 }
 
 /** The reasons to change a night's rate, each with what it adds. Empty when nothing stands out. */
@@ -97,6 +118,7 @@ export function rateFactors({
   occupancy,
   typical,
   events,
+  nearby = [],
   weather,
 }: NightSignals): RateFactor[] {
   const factors: RateFactor[] = [];
@@ -105,20 +127,22 @@ export function rateFactors({
   if (occupancy >= rateRules.almostFull.occupancy) {
     factors.push({ kind: 'demand', label: 'Almost full', percent: rateRules.almostFull.percent });
   } else if (typical !== null && occupancy - typical >= rateRules.ahead.margin - EPSILON) {
+    const { margin, percent, max } = rateRules.ahead;
     factors.push({
       kind: 'demand',
       label: `Busier than a usual ${day}`,
-      percent: rateRules.ahead.percent,
+      percent: steps(occupancy - typical, margin, max / percent) * percent,
     });
   } else if (
     typical !== null &&
     daysLeft <= rateRules.quiet.withinDays &&
     typical - occupancy >= rateRules.quiet.margin - EPSILON
   ) {
+    const { margin, percent, min } = rateRules.quiet;
     factors.push({
       kind: 'demand',
       label: `Quiet for a ${day}`,
-      percent: rateRules.quiet.percent,
+      percent: steps(typical - occupancy, margin, min / percent) * percent,
     });
   }
   const biggest = [...events].sort(
@@ -126,8 +150,21 @@ export function rateFactors({
   )[0];
   if (biggest) {
     factors.push({ kind: 'event', label: biggest.name, percent: rateRules.event[biggest.impact] });
+  } else {
+    const near = [...nearby].sort(
+      (a, b) => rateRules.shoulder[b.impact] - rateRules.shoulder[a.impact],
+    )[0];
+    if (near && rateRules.shoulder[near.impact] > 0) {
+      factors.push({
+        kind: 'event',
+        label: `${near.firstNight > date ? 'Night before' : 'Night after'} ${near.name}`,
+        percent: rateRules.shoulder[near.impact],
+      });
+    }
   }
-  if (weather && weather.snowfallCm >= rateRules.snow.cm) {
+  if (weather && weather.snowfallCm >= rateRules.snow.heavyCm) {
+    factors.push({ kind: 'weather', label: 'Heavy snow', percent: rateRules.snow.heavyPercent });
+  } else if (weather && weather.snowfallCm >= rateRules.snow.cm) {
     factors.push({ kind: 'weather', label: 'Fresh snow', percent: rateRules.snow.percent });
   } else if (weather?.kind === 'storm') {
     factors.push({ kind: 'weather', label: 'Storm forecast', percent: rateRules.storm.percent });
@@ -135,6 +172,18 @@ export function rateFactors({
     factors.push({ kind: 'weather', label: 'Heavy rain', percent: rateRules.storm.percent });
   }
   return factors;
+}
+
+/** The signals from the model's review that cover `date`, as factors. */
+export function insightFactors(date: IsoDate, signals: RateSignal[]): RateFactor[] {
+  return signals
+    .filter((s) => s.firstNight <= date && date <= s.lastNight)
+    .map((s) => ({
+      kind: 'insight',
+      label: s.label,
+      detail: s.reason,
+      percent: (s.direction === 'up' ? 1 : -1) * rateRules.insight[s.strength],
+    }));
 }
 
 /**
@@ -198,6 +247,8 @@ export interface OutlookInput {
   pricing: PricingConfig;
   events: LocalEvent[];
   weather: WeatherDay[];
+  /** From the model's latest review; none without one. */
+  signals?: RateSignal[];
 }
 
 /** The next `days` nights from today, and the arrivals in the next `RISK_DAYS` most likely to miss. */
@@ -207,6 +258,7 @@ export function buildOutlook(input: OutlookInput): {
 } {
   const { today, days, rooms, roomTypes, bookings, guests, payments, pricing, events, weather } =
     input;
+  const signals = input.signals ?? [];
   const roomsTotal = rooms.filter((r) => r.status !== 'out_of_order').length;
   // The room types the hotel has rooms of, cheapest first.
   const types = roomTypes
@@ -230,16 +282,23 @@ export function buildOutlook(input: OutlookInput): {
     const date = addDays(today, i);
     const sold = roomsSold(bookings, date);
     const tonight = events.filter((e) => e.firstNight <= date && date <= e.lastNight);
+    const nearby = events.filter(
+      (e) => e.firstNight === addDays(date, 1) || e.lastNight === addDays(date, -1),
+    );
     const forecast = weather.find((w) => w.date === date) ?? null;
     const current = adjustmentFor(date, pricing);
-    const factors = rateFactors({
-      date,
-      today,
-      occupancy: roomsTotal ? sold / roomsTotal : 0,
-      typical: typical[weekday(date)] ?? null,
-      events: tonight,
-      weather: forecast,
-    });
+    const factors = [
+      ...rateFactors({
+        date,
+        today,
+        occupancy: roomsTotal ? sold / roomsTotal : 0,
+        typical: typical[weekday(date)] ?? null,
+        events: tonight,
+        nearby,
+        weather: forecast,
+      }),
+      ...insightFactors(date, signals),
+    ];
     const suggested = suggestedPercent(factors, current);
     const expected = risks
       .filter((r) => r.booking.checkIn === date)
@@ -278,4 +337,103 @@ export function buildOutlook(input: OutlookInput): {
       reasons,
     }));
   return { nights, arrivalRisks };
+}
+
+/** A conversation that may turn into a stay, as the review reads it. */
+export interface OpenInquiry {
+  id: string;
+  receivedAt: string;
+  subject: string | null;
+  /** The guest's latest message, shortened. */
+  message: string;
+  /** From the extraction, when the conversation has been read. */
+  checkIn: IsoDate | null;
+  checkOut: IsoDate | null;
+  adults: number | null;
+}
+
+/**
+ * Conversations still open that ask for a stay, newest first: not archived or in the trash, not
+ * declined or booked, and not about a booking the hotel already has.
+ */
+export function openInquiries(inquiries: Inquiry[]): OpenInquiry[] {
+  return inquiries
+    .filter(
+      (i) =>
+        !i.archivedAt &&
+        !i.trashedAt &&
+        !i.bookingId &&
+        (i.status === 'new' || i.status === 'quoted' || i.status === 'replied') &&
+        (i.parsed === null || i.parsed.kind === 'booking_request'),
+    )
+    .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt))
+    .slice(0, REVIEW_INQUIRIES)
+    .flatMap((i): OpenInquiry[] => {
+      const latest = i.messages.filter((m) => m.direction === 'in').at(-1);
+      if (!latest) return [];
+      return [
+        {
+          id: i.id,
+          receivedAt: latest.sentAt,
+          subject: i.subject,
+          message: latest.body.slice(0, REVIEW_MESSAGE_CHARS),
+          checkIn: i.parsed?.checkIn ?? null,
+          checkOut: i.parsed?.checkOut ?? null,
+          adults: i.parsed?.adults ?? null,
+        },
+      ];
+    });
+}
+
+/** What the model reviews: the outlook by the rules alone, local events and open requests. */
+export interface RateReviewInput {
+  today: IsoDate;
+  hotel: Pick<HotelProfile, 'name' | 'location' | 'country'>;
+  /** `REVIEW_DAYS` nights, without insight factors. */
+  nights: NightOutlook[];
+  events: LocalEvent[];
+  inquiries: OpenInquiry[];
+}
+
+/**
+ * A fingerprint of what a review reads. Rate changes a manager makes leave it alone; bookings,
+ * events, forecasts and messages that change what the rules see, or a new day, change it.
+ */
+export function reviewBasis(input: RateReviewInput): string {
+  const text = JSON.stringify({
+    today: input.today,
+    hotel: input.hotel,
+    nights: input.nights.map((n) => [
+      n.date,
+      n.roomsSold,
+      n.roomsTotal,
+      n.typicalOccupancy,
+      n.factors.map((f) => f.label),
+      n.weather?.kind ?? null,
+    ]),
+    events: input.events,
+    inquiries: input.inquiries,
+  });
+  // FNV-1a, 32 bits: enough to tell one outlook from the next.
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193);
+  }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+
+/**
+ * Signals kept from a review: those with nights in the reviewed window, cut to it. A signal whose
+ * last night is before its first is dropped.
+ */
+export function reviewSignals(signals: RateSignal[], today: IsoDate, days: number): RateSignal[] {
+  const last = addDays(today, days - 1);
+  return signals
+    .filter((s) => s.firstNight <= s.lastNight && s.lastNight >= today && s.firstNight <= last)
+    .map((s) => ({
+      ...s,
+      firstNight: s.firstNight < today ? today : s.firstNight,
+      lastNight: s.lastNight > last ? last : s.lastNight,
+    }));
 }

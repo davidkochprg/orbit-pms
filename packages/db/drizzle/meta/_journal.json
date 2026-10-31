@@ -162,6 +162,13 @@
       "when": 1793364210199,
       "tag": "0022_mailbox",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793444897148,
+      "tag": "0023_rate_reviews",
+      "breakpoints": true
     }
   ]
 }

@@ -13,7 +13,9 @@ export function compactOutlook(outlook: RevenueOutlook) {
         n.typicalOccupancy === null ? null : `${Math.round(n.typicalOccupancy * 100)}%`,
       currentRate: percentText(n.currentPercent),
       suggestedRate: percentText(n.suggestedPercent),
-      reasons: n.factors.map((f) => `${f.label} ${percentText(f.percent)}`),
+      reasons: n.factors.map(
+        (f) => `${f.label} ${percentText(f.percent)}${f.detail ? ` (${f.detail})` : ''}`,
+      ),
       events: n.events,
       weather: n.weather && `${n.weather.kind}, ${n.weather.tempMinC} to ${n.weather.tempMaxC} °C`,
       expectedNoShows: n.expectedNoShows,

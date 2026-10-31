@@ -68,4 +68,41 @@ describe('revenue service', () => {
       ),
     ).rejects.toThrow('Only a manager');
   });
+
+  it('keeps a review until what it read changes, and suggests from its signals', async () => {
+    const { repos, service } = setup();
+    const before = await service.outlook(3, null);
+    expect(before.review).toMatchObject({ reviewedAt: null, current: false });
+
+    const { input, basis, review } = await service.reviewInput(null);
+    expect(review).toBeNull();
+    expect(input.nights).toHaveLength(60);
+    expect(basis).toBe(before.review.basis);
+    const saved = await service.saveReview(input, [
+      {
+        firstNight: '2026-05-10',
+        lastNight: '2026-05-10',
+        direction: 'down',
+        strength: 'slight',
+        label: 'Road closed',
+        reason: 'A guest wrote that the pass road is closed on Sunday.',
+      },
+    ]);
+    expect(saved).toMatchObject({ basis, reviewedAt: now.toISOString() });
+
+    const after = await service.outlook(3, null);
+    expect(after.review).toEqual({ basis, reviewedAt: now.toISOString(), current: true });
+    expect(after.nights[0]!.factors).toEqual([
+      expect.objectContaining({ kind: 'insight', label: 'Road closed', percent: -5 }),
+    ]);
+    expect(after.nights[0]!.suggestedPercent).toBe(-5);
+
+    // A new booking changes what the rules see: the review is kept but no longer current.
+    await repos.bookings.createBooking(
+      booking({ id: 'bk_new', roomId: 'r1', checkIn: '2026-05-20', checkOut: '2026-05-21' }),
+    );
+    const changed = await service.outlook(3, null);
+    expect(changed.review.current).toBe(false);
+    expect(changed.nights[0]!.suggestedPercent).toBe(-5);
+  });
 });

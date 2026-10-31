@@ -1,5 +1,5 @@
 import type { NightOutlook } from '@orbit/shared';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ArrivalRisks } from '@/components/arrival-risks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorNotice } from '@/components/error-notice';
@@ -10,26 +10,44 @@ import { RateNightPanel } from '@/components/rate-night-panel';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
-import { useAdjustRates, useHealth, useRevenueBrief, useRevenueOutlook } from '@/lib/api';
-import { formatDate, formatLongDate } from '@/lib/format';
+import {
+  useAdjustRates,
+  useHealth,
+  useRateReview,
+  useRevenueBrief,
+  useRevenueOutlook,
+} from '@/lib/api';
+import { formatDate, formatLongDate, formatRecent } from '@/lib/format';
 import { signed, suggestions } from '@/lib/revenue';
 
 const DAYS = 60;
 
 /**
- * The next 60 nights: how full each is, the rate suggested from demand, events and the forecast,
- * and why; a manager takes suggestions one night at a time or all at once. Below, the events behind
- * them and this week's arrivals most likely not to come.
+ * The next 60 nights: how full each is, the rate suggested from demand, events, the forecast and
+ * the model's review, and why; a manager takes suggestions one night at a time or all at once.
+ * Below, the events behind them and this week's arrivals most likely not to come. With AI on, the
+ * outlook is reviewed again whenever what the review read has changed.
  */
 export function RateOutlook({ canManage }: { canManage: boolean }) {
   const outlook = useRevenueOutlook(DAYS);
   const adjust = useAdjustRates();
   const brief = useRevenueBrief();
+  const review = useRateReview(DAYS);
   const aiOn = useHealth().data?.ai.configured ?? false;
   const { toast } = useToast();
   const [picked, setPicked] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const nightPanel = useRef<HTMLElement>(null);
+
+  // Each outlook is reviewed once: a failed review isn't retried until the outlook changes.
+  const reviewed = useRef<string | null>(null);
+  const stale = outlook.data && !outlook.data.review.current ? outlook.data.review.basis : null;
+  const { mutate: runReview } = review;
+  useEffect(() => {
+    if (!aiOn || !stale || reviewed.current === stale) return;
+    reviewed.current = stale;
+    runReview();
+  }, [aiOn, stale, runReview]);
 
   if (outlook.isError) return <ErrorNotice message={outlook.error.message} />;
   if (!outlook.data) {
@@ -40,7 +58,14 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
     );
   }
 
-  const { nights, events, arrivalRisks, today, weatherAvailable } = outlook.data;
+  const {
+    nights,
+    events,
+    arrivalRisks,
+    today,
+    weatherAvailable,
+    review: lastReview,
+  } = outlook.data;
   const toApply = suggestions(nights);
   const selected = nights.find((n) => n.date === picked) ?? toApply[0] ?? nights[0] ?? null;
 
@@ -79,14 +104,25 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
       {adjust.error && (
         <ErrorNotice message={adjust.error.message} onDismiss={() => adjust.reset()} />
       )}
+      {review.error && (
+        <ErrorNotice message={review.error.message} onDismiss={() => review.reset()} />
+      )}
 
       <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-stretch">
         <Panel
           title={`Next ${DAYS} nights`}
           actions={
             <>
-              <span className="mr-1 text-xs text-subtle-foreground max-md:hidden">
-                {weatherAvailable ? 'Forecast by Open-Meteo' : 'No forecast'}
+              <span
+                className="mr-1 text-xs text-subtle-foreground max-md:hidden"
+                aria-live="polite"
+              >
+                {review.isPending ? (
+                  <span className="animate-pulse">Reviewing {DAYS} nights…</span>
+                ) : (
+                  lastReview.reviewedAt && `Reviewed ${formatRecent(lastReview.reviewedAt)} · `
+                )}
+                {!review.isPending && (weatherAvailable ? 'Forecast by Open-Meteo' : 'No forecast')}
               </span>
               {aiOn && (
                 <Button

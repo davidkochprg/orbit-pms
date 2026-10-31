@@ -10,6 +10,7 @@ import type {
   IdScan,
   Inquiry,
   LocalEvent,
+  RateReview,
   MailDraft,
   MailLabel,
   PendingAction,
@@ -87,6 +88,7 @@ export interface MemoryState {
   idScans: IdScan[];
   stayReadings: SavedStayReading[];
   events: LocalEvent[];
+  rateReview: RateReview | null;
   contacts: Contact[];
   labels: MailLabel[];
   drafts: MailDraft[];
@@ -132,6 +134,7 @@ export function createMemoryRepositories(
     idScans: [],
     stayReadings: [],
     events: [],
+    rateReview: null,
     contacts: [],
     labels: [],
     drafts: [],
@@ -408,6 +411,13 @@ export function createMemoryRepositories(
       },
       delete: (id) => {
         state.events = state.events.filter((e) => e.id !== id);
+        return Promise.resolve();
+      },
+    },
+    rateReview: {
+      get: () => Promise.resolve(state.rateReview),
+      save: (review) => {
+        state.rateReview = review;
         return Promise.resolve();
       },
     },

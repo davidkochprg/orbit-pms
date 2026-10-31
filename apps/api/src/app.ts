@@ -5,6 +5,7 @@ import {
   createNoteFiler,
   createRepairDesk,
   createReplyLearner,
+  createRateReviewer,
   createRevenueBriefWriter,
   createIdScanReader,
   createInboxPipeline,
@@ -134,13 +135,12 @@ export function createApp({
   });
   const knockOns = createKnockOnService({ repos, hotel, policy: hotelPolicy, clock });
   const staff = createStaffService({ repos, newId });
-  /** The outlook with the forecast at the hotel, when it has coordinates and one loads. */
-  const rateOutlook = async (days: number) => {
+  /** The forecast at the hotel, when it has coordinates and one loads. */
+  const forecast = async () => {
     const { coordinates } = await settings.getProfile();
-    const forecast =
-      weather && coordinates ? await weather.forecast(coordinates, getHotelTimeZone()) : null;
-    return revenue.outlook(days, forecast);
+    return weather && coordinates ? weather.forecast(coordinates, getHotelTimeZone()) : null;
   };
+  const rateOutlook = async (days: number) => revenue.outlook(days, await forecast());
   // Notices whose last day has passed are left out, so the agent no longer mentions them.
   const hotelContext = async (): Promise<HotelContext> => ({
     profile: currentEntries(await settings.getProfile(), hotelToday(clock())),
@@ -302,7 +302,9 @@ export function createApp({
       rates,
       staff,
       outlook: rateOutlook,
+      forecast,
       brief: ai && createRevenueBriefWriter({ model: ai.agent, modelId: ai.agentModelId, usage }),
+      reviewer: ai && createRateReviewer({ model: ai.agent, modelId: ai.agentModelId, usage }),
       gate,
     }),
   );

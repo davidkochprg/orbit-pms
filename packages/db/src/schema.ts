@@ -25,6 +25,7 @@ import {
   type PendingActionDetails,
   type PendingActionInput,
   type PricingConfig,
+  type RateSignal,
   type Recipient,
   type LabelColor,
   type Quote,
@@ -386,6 +387,15 @@ export const localEvents = pgTable('local_events', {
   lastNight: date('last_night', { mode: 'string' }).notNull(),
   impact: text('impact').$type<EventImpact>().notNull(),
   createdAt: createdAt(),
+});
+
+/** The model's latest review of the rate outlook. One row, `id = 'hotel'`. */
+export const rateReviews = pgTable('rate_reviews', {
+  id: text('id').primaryKey(),
+  /** Fingerprint of what the model read; a different one means it needs reviewing again. */
+  basis: text('basis').notNull(),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }).notNull(),
+  signals: jsonb('signals').$type<RateSignal[]>().notNull(),
 });
 
 /** Suppliers and contractors the hotel calls. */

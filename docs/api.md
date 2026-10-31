@@ -279,11 +279,15 @@ Body `{ nights: [{ date, percent }] }` (1 to 120 nights, −50 to +100; 0 goes b
 
 ### `GET /api/revenue/outlook?days=`
 
-`RevenueOutlook` for `days` nights from today (7 to 90, default 60): `today`, `nights` (`{ date, roomsSold, roomsTotal, typicalOccupancy, currentPercent, suggestedPercent, rates: [{ roomType, current, suggested }], factors: [{ kind: 'demand' | 'event' | 'weather', label, percent }], events, weather, expectedNoShows }`), `events` in the period, `arrivalRisks` (`{ bookingId, guestName, roomName, checkIn, source, chance, reasons }`) and `weatherAvailable`. The forecast comes from Open-Meteo for the profile's `coordinates`, cached for three hours; without coordinates, or when it fails within 4 s, the nights have no weather. Reads need no header.
+`RevenueOutlook` for `days` nights from today (7 to 90, default 60): `today`, `nights` (`{ date, roomsSold, roomsTotal, typicalOccupancy, currentPercent, suggestedPercent, rates: [{ roomType, current, suggested }], factors: [{ kind: 'demand' | 'event' | 'weather' | 'insight', label, percent, detail? }], events, weather, expectedNoShows }`), `events` in the period, `arrivalRisks` (`{ bookingId, guestName, roomName, checkIn, source, chance, reasons }`), `weatherAvailable`, and `review` (`{ basis, reviewedAt, current }`: the fingerprint of what a review would read now, when the stored review was made, and whether it read that). The forecast comes from Open-Meteo for the profile's `coordinates`, cached for three hours; without coordinates, or when it fails within 4 s, the nights have no weather. Reads need no header.
 
 ### `POST /api/revenue/brief`
 
 Body `{ days? }`. `{ text }`: a few sentences from Muse Spark on the outlook. 503 `ai_not_configured`, 429 `demo_limit`, 502 `brief_failed` when the text twice stated a percent the outlook doesn't have.
+
+### `POST /api/revenue/review`
+
+Body `{ days? }`. Reviews the outlook with Muse Spark when what it reads changed since the stored review, then returns the `RevenueOutlook` for `days` nights with the review's signals; when nothing changed it returns at once without a model call. Concurrent requests for the same outlook share one review. 503 `ai_not_configured`, 429 `demo_limit`, 502 `review_failed`.
 
 ### `GET /api/events`, `POST /api/events`, `DELETE /api/events/:id`
 

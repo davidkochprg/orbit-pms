@@ -21,6 +21,7 @@ import { readHousekeepingNote } from '../housekeeping';
 import { readIdDocument } from '../id-scan';
 import { fileNote } from '../knowledge';
 import { draftWorkOrder, readTrade } from '../repairs';
+import { createRateReviewer } from '../revenue-review';
 import { readStayNotes } from '../stay-notes';
 import { agentFixtures, buildAgentEvalHotel } from './agent';
 import { evalRoomNames, housekeepingNoteFixtures } from './housekeeping-notes';
@@ -28,6 +29,7 @@ import { idDocumentFixtures } from './id-documents';
 import { buildKnowledgeFixtures, evalNotes, scoreFiledNote } from './knowledge';
 import { buildDraftEvalHotel } from './drafts';
 import { buildInquiryFixtures, type InquiryFixture } from './inquiries';
+import { rateReviewFixtures } from './rates';
 import { buildWorkOrderFixtures, scoreWorkOrder, tradeFixtures } from './repairs';
 import { stayNotesFixtures } from './stay-notes';
 import { translationFixtures } from './translations';
@@ -73,6 +75,7 @@ const suiteKeys = [
   'drafts',
   'repairs',
   'translations',
+  'rates',
 ] as const;
 type SuiteKey = (typeof suiteKeys)[number];
 const only = process.env.EVAL_SUITES?.split(',')
@@ -481,6 +484,43 @@ const translateOk = await suite(
   })),
 );
 
+// The reviewer runs at its configured effort; EVAL_REASONING doesn't reach it.
+const ratesOk = await suite(
+  'rates',
+  'Rate review',
+  reasoningEffort.rateReview,
+  META_MODEL_AGENT,
+  rateReviewFixtures.map((f) => ({
+    id: f.id,
+    run: async () => {
+      const tokens: TokenUsage[] = [];
+      const reviewer = createRateReviewer({
+        model: provider.agent,
+        modelId: META_MODEL_AGENT,
+        usage: {
+          record: (r) => {
+            tokens.push(r.tokens);
+            return Promise.resolve();
+          },
+          monthToDateMicroUsd: () => Promise.resolve(0),
+        },
+      });
+      const signals = await reviewer.review(f.input);
+      const problems = f.check(signals);
+      return {
+        passed: problems.length === 0,
+        label: `${f.about}${problems.length ? `  ${problems.join('; ')}` : ''}`,
+        detail: signals
+          .map(
+            (s) => `      ${s.firstNight}..${s.lastNight} ${s.direction} ${s.strength}  ${s.label}`,
+          )
+          .join('\n'),
+        tokens: tokens[0] ?? { input: 0, cachedInput: 0, output: 0 },
+      };
+    },
+  })),
+);
+
 process.exit(
   inboxOk &&
     notesOk &&
@@ -491,7 +531,8 @@ process.exit(
     agentOk &&
     draftsOk &&
     repairsOk &&
-    translateOk
+    translateOk &&
+    ratesOk
     ? 0
     : 1,
 );

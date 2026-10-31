@@ -209,7 +209,11 @@ function NightCell({
           </span>
         </span>
         {changes ? (
-          <span className="shrink-0 self-start rounded-[5px] bg-primary-soft px-1 font-mono sm:self-auto text-[0.6875rem] leading-4 font-medium text-primary-text">
+          // Keyed by the percent, so a suggestion that changes, e.g. after a review, pops in anew.
+          <span
+            key={night.suggestedPercent}
+            className="shrink-0 self-start rounded-[5px] bg-primary-soft px-1 font-mono sm:self-auto text-[0.6875rem] leading-4 font-medium text-primary-text animate-in fade-in zoom-in-75 duration-300 ease-snap"
+          >
             {signed(night.suggestedPercent)}
           </span>
         ) : night.currentPercent !== 0 ? (

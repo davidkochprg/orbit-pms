@@ -42,7 +42,7 @@ The booking panel keeps the guest book per person. "Scan ID" shows a QR code: a 
 
 ### Rates that read the weeks ahead
 
-Rates opens on the next 60 nights: how full each night is against what's usual for that weekday, local events, and the weather forecast for the hotel (Open-Meteo). The domain suggests a change per night from small, labelled rules ("Busier than a usual Friday +10%, Ski area opening weekend +15%"), and a manager takes it, sets another percent, or applies them all, with Undo. Muse Spark summarises the outlook in a few sentences, checked so it states no number the outlook doesn't, and the agent can read it and propose changes ("raise next weekend by the suggested amount"). The same page lists this week's arrivals most likely not to come, from how they booked and the guest's own history, never from who the guest is.
+Rates opens on the next 60 nights: how full each night is against what's usual for that weekday, local events, and the weather forecast for the hotel (Open-Meteo). The domain suggests a change per night from small, labelled rules ("Busier than a usual Friday +10%, Ski area opening weekend +15%"), and a manager takes it, sets another percent, or applies them all, with Undo. Whenever bookings, events, the forecast or the inbox change, Muse Spark reviews the 60 nights at high reasoning for what the rules can't see: a team asking for eight rooms in an email, Thanksgiving week, several requests for the same weekend. It grades each as a slight, moderate or strong signal with its reason, and the domain turns the grade into a percent, so the suggestions move with the hotel while the model never sets a number. Muse Spark summarises the outlook in a few sentences, checked so it states no number the outlook doesn't, and the agent can read it and propose changes ("raise next weekend by the suggested amount"). The same page lists this week's arrivals most likely not to come, from how they booked and the guest's own history, never from who the guest is.
 
 ### A tape chart that follows the day
 
@@ -70,8 +70,9 @@ Every AI feature runs on Meta's models through the Vercel AI SDK: Muse Spark on 
 | ID scans           | `muse-spark-1.3` (vision)                           | Reads a phone photo of an ID card or passport into guest-book fields       | Saves them: staff review every value; the photo is never stored              |
 | Stay notes         | `muse-spark-1.3`                                    | Reads booking notes and guest messages for pets, mess and things to set up | Decides the cleaning order: the domain scores it                             |
 | Rate summary       | `muse-spark-1.3`                                    | Writes two or three sentences of advice on the coming nights               | Works out a rate: every percent must be one the domain computed              |
+| Rate review        | `muse-spark-1.3`                                    | Finds holidays, group requests and patterns, graded with their reasons     | Sets a percent: the domain turns each grade into one                         |
 
-Muse Spark always reasons before answering, so the reasoning effort is set per feature to the lowest level that keeps quality, measured with the evals and live runs: `minimal` for extraction, drafts, notes, the rate summary and ID scans, `low` for the agent, which plans multi-step tool use.
+Muse Spark always reasons before answering, so the reasoning effort is set per feature to the lowest level that keeps quality, measured with the evals and live runs: `minimal` for extraction, drafts, notes, the rate summary and ID scans, `low` for the agent, which plans multi-step tool use, and `high` for the rate review, which weighs sixty nights, the inbox and the country's holidays together and runs only when the outlook changes.
 
 **Guardrails**
 
@@ -97,8 +98,9 @@ More in [docs/ai.md](docs/ai.md).
 | Agent tools        | 12 staff requests run through the real agent and tools, checked by their effect                      | 12/12 (100%) |
 | Reply drafts       | 17 replies with real quotes, checked by the price guard                                              | 16/17, 17/17 |
 | Translations       | 4 drafts and guest messages between Czech, German, English and Polish, amounts kept                  | 4/4 (100%)   |
+| Rate review        | 3 outlooks: a block of rooms (and a single request to ignore), Thanksgiving, an ordinary fortnight   | 3/3 (100%)   |
 
-Measured on 2026-10-30 with `muse-spark-1.3`, and Muse Spark Open on Baseten for drafts and translations, at `minimal` reasoning effort except the agent (`low`). Drafts ran twice: the one miss was an empty answer from Baseten, which now goes to Muse Spark on the Meta API instead. An inbox message takes about 3 s to read; the whole suite costs about $0.70.
+Measured on 2026-10-30 with `muse-spark-1.3`, and Muse Spark Open on Baseten for drafts and translations, at `minimal` reasoning effort except the agent (`low`) and the rate review (`high`, measured 2026-10-31: about 6 s and $0.008 a case). Drafts ran twice: the one miss was an empty answer from Baseten, which now goes to Muse Spark on the Meta API instead. An inbox message takes about 3 s to read; the whole suite costs about $0.70.
 
 ## Architecture
 

@@ -1,5 +1,6 @@
 import { applySeed, buildSeed, createDb, createRepositories, createUsageStore } from '@orbit/db';
 import type { LocalEvent, PricingConfig, Quote, RevenueOutlook, WeatherDay } from '@orbit/shared';
+import { MockLanguageModelV4 } from 'ai/test';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from './app';
 import type { WeatherSource } from './weather';
@@ -35,6 +36,56 @@ const app = createApp({
   weather,
 });
 
+/** Reviews every outlook the same way: a group asking for rooms on Friday Oct 30. */
+let reviews = 0;
+const model = new MockLanguageModelV4({
+  doGenerate: () => {
+    reviews++;
+    return Promise.resolve({
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            signals: [
+              {
+                firstNight: '2026-10-30',
+                lastNight: '2026-10-30',
+                direction: 'up',
+                strength: 'moderate',
+                label: 'Group asking for six rooms',
+                reason: 'A planner asked for a block of six rooms on Friday.',
+              },
+            ],
+          }),
+        },
+      ],
+      finishReason: { unified: 'stop', raw: undefined },
+      usage: {
+        inputTokens: { total: 5000, noCache: 5000, cacheRead: undefined, cacheWrite: undefined },
+        outputTokens: { total: 2000, text: 200, reasoning: 1800 },
+      },
+      warnings: [],
+    });
+  },
+});
+const withAi = createApp({
+  repos: createRepositories(handle.db),
+  ai: {
+    agent: model,
+    agentModelId: 'muse-spark-1.3',
+    translate: model,
+    translateModelId: 'muse-spark-1.3',
+    draft: model,
+    draftModelId: 'muse-spark-1.3',
+    vision: null,
+    visionModelId: null,
+    transcription: null,
+  },
+  usage: createUsageStore(handle.db),
+  clock: () => now,
+  weather,
+});
+
 beforeAll(() => handle.migrate(), DB_SETUP_TIMEOUT);
 beforeEach(() => applySeed(handle.db, seed), DB_SETUP_TIMEOUT);
 afterAll(() => handle.close());
@@ -64,8 +115,8 @@ describe('revenue outlook', () => {
     expect(asked).toContainEqual(seed.hotelProfile.coordinates);
     expect(body.nights[1]!.factors).toContainEqual({
       kind: 'weather',
-      label: 'Fresh snow',
-      percent: 5,
+      label: 'Heavy snow',
+      percent: 10,
     });
     // The seeded big event weekend is nearly sold out and suggested higher.
     const big = seed.events.find((e) => e.impact === 'high')!;
@@ -77,6 +128,47 @@ describe('revenue outlook', () => {
 
   it('rejects an out-of-range number of days', async () => {
     expect((await call('GET', '/api/revenue/outlook?days=400')).status).toBe(400);
+  });
+});
+
+describe('rate review', () => {
+  async function review() {
+    const res = await withAi.request('/api/revenue/review', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ days: 30 }),
+    });
+    return { status: res.status, body: (await res.json()) as RevenueOutlook };
+  }
+
+  it("reviews a changed outlook once and suggests from the model's signals", async () => {
+    reviews = 0;
+    const before = await call<RevenueOutlook>('GET', '/api/revenue/outlook?days=30');
+    expect(before.body.review).toMatchObject({ reviewedAt: null, current: false });
+
+    const { status, body } = await review();
+    expect(status).toBe(200);
+    expect(reviews).toBe(1);
+    expect(body.review).toEqual({
+      basis: before.body.review.basis,
+      reviewedAt: now.toISOString(),
+      current: true,
+    });
+    const friday = body.nights.find((n) => n.date === '2026-10-30')!;
+    expect(friday.factors).toContainEqual({
+      kind: 'insight',
+      label: 'Group asking for six rooms',
+      detail: 'A planner asked for a block of six rooms on Friday.',
+      percent: 10,
+    });
+
+    // Nothing changed: no second model call.
+    await review();
+    expect(reviews).toBe(1);
+  });
+
+  it('needs AI configured', async () => {
+    expect((await call('POST', '/api/revenue/review', { days: 30 })).status).toBe(503);
   });
 });
 

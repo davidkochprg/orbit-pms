@@ -950,6 +950,18 @@ export function useDeleteEvent() {
 }
 
 /** A few sentences from Muse Spark on the outlook. */
+/**
+ * Has the model review the outlook when what it reads changed since the last review, and puts
+ * the outlook it returns, with the review's signals, in place of the cached one.
+ */
+export function useRateReview(days = 60) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiPost('/api/revenue/review', { days }, revenueOutlookSchema),
+    onSuccess: (outlook) => queryClient.setQueryData(['revenue-outlook', days], outlook),
+  });
+}
+
 export function useRevenueBrief() {
   return useMutation({
     mutationFn: (days: number) => apiPost('/api/revenue/brief', { days }, revenueBriefSchema),

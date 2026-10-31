@@ -48,7 +48,8 @@ export const weatherDaySchema = z.object({
 });
 export type WeatherDay = z.infer<typeof weatherDaySchema>;
 
-export const rateFactorKinds = ['demand', 'event', 'weather'] as const;
+/** `insight` is a signal from the model's review that the rules can't see, e.g. a group request. */
+export const rateFactorKinds = ['demand', 'event', 'weather', 'insight'] as const;
 
 /** One reason behind a suggested rate, with what it adds. */
 export const rateFactorSchema = z.object({
@@ -56,8 +57,53 @@ export const rateFactorSchema = z.object({
   /** E.g. "Almost full" or "Ski opening weekend". */
   label: z.string(),
   percent: z.number().int(),
+  /** The evidence behind an insight, in a sentence. */
+  detail: z.string().optional(),
 });
 export type RateFactor = z.infer<typeof rateFactorSchema>;
+
+export const rateSignalStrengths = ['slight', 'moderate', 'strong'] as const;
+export type RateSignalStrength = (typeof rateSignalStrengths)[number];
+
+/**
+ * Something the rules can't see that moves demand on a run of nights, from the model's review.
+ * The model grades it; the domain turns the grade into a percent.
+ */
+export const rateSignalSchema = z.object({
+  firstNight: isoDateSchema.describe('First night it affects, YYYY-MM-DD.'),
+  lastNight: isoDateSchema.describe('Last night it affects, included, YYYY-MM-DD.'),
+  direction: z.enum(['up', 'down']).describe('up: more demand than the rules assume. down: less.'),
+  strength: z
+    .enum(rateSignalStrengths)
+    .describe('strong only with clear evidence, e.g. a block of rooms or a major holiday.'),
+  label: z
+    .string()
+    .trim()
+    .min(1)
+    .max(60)
+    .describe('A few words for a list, e.g. "Thanksgiving weekend". No percent or price.'),
+  reason: z
+    .string()
+    .trim()
+    .min(1)
+    .max(240)
+    .describe('One sentence with the evidence. No percent or price.'),
+});
+export type RateSignal = z.infer<typeof rateSignalSchema>;
+
+/** What the model returns from a review of the outlook. */
+export const rateReviewOutputSchema = z.object({
+  signals: z.array(rateSignalSchema).max(8),
+});
+
+/** The latest review, kept until the outlook it read changes. */
+export const rateReviewSchema = z.object({
+  /** A fingerprint of what the model read; a different one means it needs reviewing again. */
+  basis: z.string(),
+  reviewedAt: z.iso.datetime(),
+  signals: z.array(rateSignalSchema),
+});
+export type RateReview = z.infer<typeof rateReviewSchema>;
 
 /** A confirmed arrival that may not come, and why. */
 export const arrivalRiskSchema = z.object({
@@ -111,6 +157,15 @@ export const revenueOutlookSchema = z.object({
   arrivalRisks: z.array(arrivalRiskSchema),
   /** False when no forecast could be loaded. */
   weatherAvailable: z.boolean(),
+  /** The model's review behind `insight` factors. */
+  review: z.object({
+    /** Fingerprint of what a review would read now. */
+    basis: z.string(),
+    /** Null before the first review. */
+    reviewedAt: z.iso.datetime().nullable(),
+    /** True when the stored review read what the outlook shows now. */
+    current: z.boolean(),
+  }),
 });
 export type RevenueOutlook = z.infer<typeof revenueOutlookSchema>;
 

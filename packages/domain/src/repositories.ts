@@ -20,6 +20,7 @@ import type {
   PendingAction,
   Payment,
   PricingConfig,
+  RateReview,
   Room,
   RoomStatus,
   RoomType,
@@ -209,6 +210,14 @@ export interface LocalEventRepository {
   delete(id: string): Promise<void>;
 }
 
+/** The model's latest review of the rate outlook; one per hotel. */
+export interface RateReviewRepository {
+  /** Null before the first review. */
+  get(): Promise<RateReview | null>;
+  /** Replaces the review. */
+  save(review: RateReview): Promise<void>;
+}
+
 /** What the model read from stays' notes for housekeeping, one per booking. */
 export interface StayReadingRepository {
   list(bookingIds: string[]): Promise<SavedStayReading[]>;
@@ -241,6 +250,7 @@ export interface Repositories {
   idScans: IdScanRepository;
   stayReadings: StayReadingRepository;
   events: LocalEventRepository;
+  rateReview: RateReviewRepository;
   contacts: ContactRepository;
   mail: MailRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */

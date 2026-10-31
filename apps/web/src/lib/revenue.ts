@@ -112,4 +112,5 @@ export const factorKindLabels: Record<RateFactor['kind'], string> = {
   demand: 'Demand',
   event: 'Event',
   weather: 'Weather',
+  insight: 'Insight',
 };

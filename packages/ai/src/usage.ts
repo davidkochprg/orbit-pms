@@ -10,6 +10,7 @@ export const aiFeatures = [
   'brief',
   'stay_notes',
   'rate_brief',
+  'rate_review',
   'learn',
   'knowledge',
   'repairs',
