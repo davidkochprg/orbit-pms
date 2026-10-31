@@ -322,9 +322,13 @@ Body: `{ "messages": UIMessage[] }`, the chat so far in AI SDK UI message format
 | 429    | `demo_limit`                       | Per-IP hourly limit or daily token budget reached; `message` is ready to show |
 | 503    | `ai_not_configured`                | `META_API_KEY` or `META_MODEL_AGENT` not set                                  |
 
+### `POST /api/agent/transcribe`
+
+A question asked out loud, as the multipart field `audio`: a WAV recording (mono 16-bit PCM, 16 kHz, at most 5 MB). Returns `{ text }`, transcribed by Meta's speech-to-text listening for the names of guests staying from yesterday to two weeks out and room names that aren't plain numbers. The app sends the text to `POST /api/agent` as a typed question. 400 `invalid_input` for a missing file or one that isn't WAV, 413 `too_large`, 429 `demo_limit`, 502 `transcription_failed`, 503 `ai_not_configured` without `META_MODEL_VOICE`.
+
 ### `GET /api/pending-actions/:id`
 
-`PendingAction`: `id`, `kind` (`create_hold`, `confirm_booking`, `cancel_booking`, `check_in`, `check_out`, `move_booking`, `change_dates`, `update_booking`, `add_charge`, `record_payment`, `update_charge`, `remove_charge`, `add_stay_guest`, `update_stay_guest`, `remove_stay_guest`, `update_guest`, `adjust_rates`, `save_hotel_info`, `remove_hotel_info`, `send_reply`, `hold_inquiry`, `decline_inquiry`, `add_local_event`, `remove_local_event`, `update_room`), `input` (the stored arguments), `summary`, `details` (`changes`: `{ label, before, after }` where each side is `{ text }`, `{ checkIn, checkOut }` or null; `amount`: `{ label, before, after }` or null; `note`; null for actions proposed before details were recorded), `status` (`pending`, `confirmed`, `rejected`, `failed`), `bookingId`, `error`, `createdAt`, `resolvedAt`.
+`PendingAction`: `id`, `kind` (`create_hold`, `confirm_booking`, `cancel_booking`, `check_in`, `check_out`, `move_booking`, `change_dates`, `update_booking`, `add_charge`, `record_payment`, `update_charge`, `remove_charge`, `add_stay_guest`, `update_stay_guest`, `remove_stay_guest`, `update_guest`, `adjust_rates`, `save_hotel_info`, `remove_hotel_info`, `send_reply`, `hold_inquiry`, `hold_block`, `decline_inquiry`, `add_local_event`, `remove_local_event`, `update_room`), `input` (the stored arguments), `summary`, `details` (`changes`: `{ label, before, after }` where each side is `{ text }`, `{ checkIn, checkOut }` or null; `amount`: `{ label, before, after }` or null; `note`; null for actions proposed before details were recorded), `status` (`pending`, `confirmed`, `rejected`, `failed`), `bookingId`, `error`, `createdAt`, `resolvedAt`.
 
 ### `POST /api/pending-actions/:id/confirm`
 

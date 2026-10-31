@@ -3,14 +3,18 @@ import {
   buildSystemPrompt,
   contextNote,
   createAgentTools,
+  createSpeechInput,
   type HotelContext,
   hotelFacts,
   type MetaProvider,
   runAgent,
+  speechKeywords,
   tokenCostMicroUsd,
+  TranscriptionError,
   type UsageStore,
 } from '@orbit/ai';
 import {
+  addDays,
   type ActivityService,
   type BillingService,
   type ContactService,
@@ -44,6 +48,7 @@ import {
   validateUIMessages,
 } from 'ai';
 import { Hono } from 'hono';
+import { readRecording } from '../audio';
 import { errorBody } from '../http';
 import type { AiGate } from '../ai-gate';
 import type { AiLimiter } from '../limits';
@@ -192,62 +197,102 @@ export function agentRoutes({
     );
   }
 
-  return new Hono().post('/agent', validate('json', agentRequestSchema), async (c) => {
-    if (!ai) {
-      return c.json(
-        errorBody('ai_not_configured', 'The AI agent is not configured on this server.'),
-        503,
-      );
-    }
-    const blocked = await gate(c.req.header('x-forwarded-for'));
-    if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
+  const speech = ai?.transcription
+    ? createSpeechInput({ transcription: ai.transcription, usage })
+    : null;
 
-    let messages: UIMessage<AgentMessageMetadata>[];
-    try {
-      messages = await validateUIMessages<UIMessage<AgentMessageMetadata>>({
-        messages: c.req.valid('json').messages,
-        tools,
-        metadataSchema: agentMessageMetadataSchema.optional(),
-      });
-    } catch (err) {
-      return c.json(
-        errorBody('invalid_messages', err instanceof Error ? err.message : 'Invalid messages'),
-        400,
-      );
-    }
+  /** Guests staying from yesterday to two weeks out and the rooms, to listen for by name. */
+  async function keywords(): Promise<string[]> {
+    const today = hotelToday(clock());
+    const [bookings, guests, rooms] = await Promise.all([
+      repos.bookings.listBookings({ from: addDays(today, -1), to: addDays(today, 14) }),
+      repos.guests.listGuests(),
+      repos.rooms.listRooms(),
+    ]);
+    const staying = new Set(bookings.filter((b) => b.status !== 'cancelled').map((b) => b.guestId));
+    return speechKeywords(
+      guests.filter((g) => staying.has(g.id)).map((g) => g.name),
+      rooms.map((r) => r.name),
+    );
+  }
 
-    const result = runAgent({
-      model: ai.agent,
-      system: buildSystemPrompt({
-        hotel: await hotelContext(),
-        today: hotelToday(clock()),
-        timezone: getHotelTimeZone(),
-        endedNotices: await endedNotices(),
-      }),
-      messages: await convertToModelMessages(await withContext(messages.slice(-MAX_HISTORY)), {
-        tools,
-      }),
-      tools,
-      abortSignal: c.req.raw.signal,
-      onUsage: async (tokens) => {
-        limiter.recordTokens(tokens.input + tokens.output);
-        await usage.record({
-          feature: 'agent',
-          model: ai.agentModelId,
-          tokens,
-          audioSeconds: 0,
-          costMicroUsd: tokenCostMicroUsd(tokens),
+  return new Hono()
+    .post('/agent/transcribe', async (c) => {
+      if (!speech) {
+        return c.json(errorBody('ai_not_configured', 'Voice input is not configured.'), 503);
+      }
+      const recording = await readRecording(c);
+      if ('error' in recording) return recording.error;
+      const blocked = await gate(c.req.header('x-forwarded-for'));
+      if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
+      try {
+        return c.json({ text: await speech.transcribe(recording.wav, await keywords()) });
+      } catch (err) {
+        if (err instanceof TranscriptionError) {
+          return c.json(
+            errorBody('transcription_failed', `Transcription failed: ${err.message}`),
+            502,
+          );
+        }
+        throw err;
+      }
+    })
+    .post('/agent', validate('json', agentRequestSchema), async (c) => {
+      if (!ai) {
+        return c.json(
+          errorBody('ai_not_configured', 'The AI agent is not configured on this server.'),
+          503,
+        );
+      }
+      const blocked = await gate(c.req.header('x-forwarded-for'));
+      if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
+
+      let messages: UIMessage<AgentMessageMetadata>[];
+      try {
+        messages = await validateUIMessages<UIMessage<AgentMessageMetadata>>({
+          messages: c.req.valid('json').messages,
+          tools,
+          metadataSchema: agentMessageMetadataSchema.optional(),
         });
-      },
-    });
+      } catch (err) {
+        return c.json(
+          errorBody('invalid_messages', err instanceof Error ? err.message : 'Invalid messages'),
+          400,
+        );
+      }
 
-    return createUIMessageStreamResponse({
-      stream: toUIMessageStream({
-        stream: result.stream,
+      const result = runAgent({
+        model: ai.agent,
+        system: buildSystemPrompt({
+          hotel: await hotelContext(),
+          today: hotelToday(clock()),
+          timezone: getHotelTimeZone(),
+          endedNotices: await endedNotices(),
+        }),
+        messages: await convertToModelMessages(await withContext(messages.slice(-MAX_HISTORY)), {
+          tools,
+        }),
         tools,
-        originalMessages: messages,
-        onError: () => 'The agent hit an error. Please try again.',
-      }),
+        abortSignal: c.req.raw.signal,
+        onUsage: async (tokens) => {
+          limiter.recordTokens(tokens.input + tokens.output);
+          await usage.record({
+            feature: 'agent',
+            model: ai.agentModelId,
+            tokens,
+            audioSeconds: 0,
+            costMicroUsd: tokenCostMicroUsd(tokens),
+          });
+        },
+      });
+
+      return createUIMessageStreamResponse({
+        stream: toUIMessageStream({
+          stream: result.stream,
+          tools,
+          originalMessages: messages,
+          onError: () => 'The agent hit an error. Please try again.',
+        }),
+      });
     });
-  });
 }

@@ -7,6 +7,7 @@ export const aiFeatures = [
   'translate',
   'id_scan',
   'voice',
+  'agent_voice',
   'brief',
   'stay_notes',
   'rate_brief',

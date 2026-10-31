@@ -300,3 +300,37 @@ describe('reading stays for the board', () => {
     expect(status).toBe(503);
   });
 });
+
+describe('asking the agent out loud', () => {
+  async function ask(app: ReturnType<typeof createApp>, file: Blob) {
+    const form = new FormData();
+    form.append('audio', file, 'question.wav');
+    const res = await app.request('/api/agent/transcribe', { method: 'POST', body: form });
+    return { status: res.status, body: (await res.json()) as { text: string } & ApiError };
+  }
+
+  it('transcribes a question, listening for the names of guests staying around now', async () => {
+    const fetch = vi.fn((_url: string, _init: RequestInit) =>
+      Response.json({ transcript: 'Who is in 102?,', audioDurationMs: 2000, turns: [] }),
+    );
+    vi.stubGlobal('fetch', fetch);
+    const { status, body } = await ask(appWith(), new Blob([wav()], { type: 'audio/wav' }));
+    expect(status).toBe(200);
+    expect(body.text).toBe('Who is in 102?');
+    const sent = fetch.mock.calls[0]?.[1]?.body as FormData;
+    const request = JSON.parse(await (sent.get('request') as Blob).text()) as {
+      keywords: string[];
+    };
+    const staying = seed.bookings.find((b) => b.checkIn <= today && b.checkOut > today);
+    const name = seed.guests.find((g) => g.id === staying?.guestId)?.name;
+    expect(request.keywords).toContain(name);
+    expect(request.keywords.length).toBeLessThanOrEqual(100);
+    const spend = await usageStore.monthToDateMicroUsd(now);
+    expect(spend).toBeGreaterThan(0);
+  });
+
+  it('refuses without a voice model, and anything but a WAV', async () => {
+    expect((await ask(appWith({ voice: false }), new Blob([wav()]))).status).toBe(503);
+    expect((await ask(appWith(), new Blob(['hello'], { type: 'audio/webm' }))).status).toBe(400);
+  });
+});

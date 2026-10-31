@@ -13,11 +13,9 @@ import {
 } from '@orbit/shared';
 import { Hono } from 'hono';
 import type { AiGate } from '../ai-gate';
+import { readRecording } from '../audio';
 import { errorBody } from '../http';
 import { validate } from '../validate';
-
-/** About 2.5 minutes of 16 kHz mono 16-bit WAV. */
-export const MAX_VOICE_NOTE_BYTES = 5 * 1024 * 1024;
 
 export interface HousekeepingRouteDeps {
   housekeeping: HousekeepingService;
@@ -28,11 +26,6 @@ export interface HousekeepingRouteDeps {
   /** Works out who fixes a repair added by hand; null when AI is not configured. */
   desk: RepairDesk | null;
   gate: AiGate;
-}
-
-function isWav(bytes: Uint8Array): boolean {
-  const tag = (from: number) => String.fromCharCode(...bytes.subarray(from, from + 4));
-  return bytes.length > 44 && tag(0) === 'RIFF' && tag(8) === 'WAVE';
 }
 
 /**
@@ -99,25 +92,12 @@ export function housekeepingRoutes({
       if (!notes?.canTranscribe) {
         return c.json(errorBody('ai_not_configured', 'Voice notes are not configured.'), 503);
       }
-      if (Number(c.req.header('content-length') ?? 0) > MAX_VOICE_NOTE_BYTES) {
-        return c.json(errorBody('too_large', 'The recording is too long.'), 413);
-      }
-      const form = await c.req.formData().catch(() => null);
-      const audio = form?.get('audio');
-      if (!(audio instanceof File)) {
-        return c.json(errorBody('invalid_input', 'Send the recording as an "audio" file.'), 400);
-      }
-      const bytes = new Uint8Array(await audio.arrayBuffer());
-      if (bytes.length > MAX_VOICE_NOTE_BYTES) {
-        return c.json(errorBody('too_large', 'The recording is too long.'), 413);
-      }
-      if (!isWav(bytes)) {
-        return c.json(errorBody('invalid_input', 'The recording must be a WAV file.'), 400);
-      }
+      const recording = await readRecording(c);
+      if ('error' in recording) return recording.error;
       const blocked = await gate(c.req.header('x-forwarded-for'));
       if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
       try {
-        return c.json(await notes.fromAudio(bytes));
+        return c.json(await notes.fromAudio(recording.wav));
       } catch (err) {
         if (err instanceof TranscriptionError) {
           return c.json(

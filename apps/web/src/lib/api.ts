@@ -550,6 +550,17 @@ export function useInboxHold(id: string) {
   });
 }
 
+/** A spoken question as text, from Meta's speech-to-text, biased toward guests' names. */
+export function useTranscribeQuestion() {
+  return useMutation({
+    mutationFn: (wav: Blob) => {
+      const form = new FormData();
+      form.append('audio', wav, 'question.wav');
+      return apiPostForm('/api/agent/transcribe', form, z.object({ text: z.string() }));
+    },
+  });
+}
+
 /** Holds every room of a conversation's block for the guest, all or none. */
 export function useInboxHoldBlock(id: string) {
   const queryClient = useQueryClient();

@@ -54,6 +54,7 @@ import {
 } from '@/hooks/use-command-palette';
 import { useDarkMode } from '@/hooks/use-dark-mode';
 import { useSession } from '@/hooks/use-session';
+import { canRecord, useVoiceQuestion, type VoiceQuestion } from '@/hooks/use-voice-question';
 import { agentErrorMessage, proposalIds, suggestedQuestions, toolResults } from '@/lib/agent';
 import { contextFromLocation } from '@/lib/agent-context';
 import {
@@ -81,6 +82,7 @@ import { folderIcons, noteHref } from '@/lib/knowledge';
 import { navItems } from '@/lib/nav';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
+import { MicButton, VoiceStatus } from '@/components/voice-question';
 
 const transport = new DefaultChatTransport({ api: '/api/agent' });
 const ASK = '__ask__';
@@ -202,6 +204,13 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
 
   const closePalette = useCallback(() => setOpen(false), []);
 
+  // A question asked out loud goes where a typed one would.
+  const voice = useVoiceQuestion((q) => (mode === 'agent' ? ask(q) : askNew(q)));
+  const { cancel: cancelVoice } = voice;
+  useEffect(() => {
+    if (!open) cancelVoice();
+  }, [open, cancelVoice]);
+
   // A booking opened from the conversation brings the conversation back when its inspector closes.
   const { open: openDrawer } = useBookingDrawer();
   const [params] = useSearchParams();
@@ -240,6 +249,12 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
             mode === 'agent' ? 'sm:max-w-[760px]' : 'sm:max-w-[640px]',
           )}
           onEscapeKeyDown={(e) => {
+            // Escape drops a question being recorded before anything else.
+            if (voice.state === 'recording') {
+              e.preventDefault();
+              voice.cancel();
+              return;
+            }
             // Like Raycast: Escape steps back from the agent to search before it closes.
             if (mode === 'agent') {
               e.preventDefault();
@@ -268,6 +283,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                   text={text}
                   onTextChange={setText}
                   onAsk={askNew}
+                  voice={voice}
                   recent={recent}
                   onOpenConversation={openConversation}
                   close={() => setOpen(false)}
@@ -280,6 +296,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
                   text={text}
                   onTextChange={setText}
                   onAsk={ask}
+                  voice={voice}
                   onBack={() => setMode('search')}
                   onNew={() => openConversation()}
                 />
@@ -297,6 +314,7 @@ function SearchView({
   text,
   onTextChange,
   onAsk,
+  voice,
   recent,
   onOpenConversation,
   close,
@@ -306,6 +324,7 @@ function SearchView({
   onTextChange: (text: string) => void;
   /** Asks in a new conversation. */
   onAsk: (question: string) => void;
+  voice: VoiceQuestion;
   recent: StoredConversation[];
   /** Opens a recent conversation, or a new one when none is given. */
   onOpenConversation: (conversation?: StoredConversation) => void;
@@ -323,6 +342,7 @@ function SearchView({
   const board = useHousekeeping();
   const stays = useMemo(() => day.data && stayByRoom(day.data), [day.data]);
   const aiOn = health.data?.ai.configured ?? false;
+  const voiceOn = (health.data?.ai.voice ?? false) && canRecord();
   const query = text.trim();
 
   const run = (fn: () => void) => () => {
@@ -347,14 +367,22 @@ function SearchView({
       className="flex min-h-0 flex-col"
     >
       <InputRow icon={<Search className="size-[18px]" />}>
-        <CommandPrimitive.Input
-          autoFocus
-          value={text}
-          onValueChange={onTextChange}
-          placeholder={aiOn ? 'Ask Orbit or search…' : 'Search guests, rooms, notes and contacts…'}
-          className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-subtle-foreground"
-        />
+        {voice.state === 'idle' ? (
+          <CommandPrimitive.Input
+            autoFocus
+            value={text}
+            onValueChange={onTextChange}
+            placeholder={
+              aiOn ? 'Ask Orbit or search…' : 'Search guests, rooms, notes and contacts…'
+            }
+            className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-subtle-foreground"
+          />
+        ) : (
+          <VoiceStatus voice={voice} />
+        )}
+        {voiceOn && <MicButton voice={voice} />}
       </InputRow>
+      {voice.error && <p className="border-b px-5 py-2 text-xs text-destructive">{voice.error}</p>}
 
       <CommandPrimitive.List className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-subtle-foreground">
         <CommandPrimitive.Empty className="py-10 text-center text-sm text-muted-foreground">
@@ -569,6 +597,7 @@ function AgentView({
   text,
   onTextChange,
   onAsk,
+  voice,
   onBack,
   onNew,
 }: {
@@ -578,11 +607,13 @@ function AgentView({
   text: string;
   onTextChange: (text: string) => void;
   onAsk: (question: string) => void;
+  voice: VoiceQuestion;
   onBack: () => void;
   onNew: () => void;
 }) {
   const health = useHealth();
   const aiOn = health.data?.ai.configured ?? false;
+  const voiceOn = (health.data?.ai.voice ?? false) && canRecord();
   const busy = chat.status === 'submitted' || chat.status === 'streaming';
   const scroller = useRef<HTMLDivElement>(null);
   const [viewHeight, setViewHeight] = useState(0);
@@ -714,17 +745,23 @@ function AgentView({
       {resolve.isError && (
         <p className="border-t px-5 py-2 text-xs text-destructive">{resolve.error.message}</p>
       )}
+      {voice.error && <p className="border-t px-5 py-2 text-xs text-destructive">{voice.error}</p>}
       <InputRow icon={<LogoMark className="size-[18px] text-primary-text" />} placement="bottom">
         {context && <AgentContextChip context={context} onRemove={onClearContext} />}
-        <input
-          autoFocus
-          value={text}
-          onChange={(e) => onTextChange(e.target.value)}
-          onKeyDown={onKeyDown}
-          disabled={!aiOn}
-          placeholder={chat.messages.length > 0 ? 'Ask a follow-up…' : 'Ask Orbit…'}
-          className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-subtle-foreground"
-        />
+        {voice.state === 'idle' ? (
+          <input
+            autoFocus
+            value={text}
+            onChange={(e) => onTextChange(e.target.value)}
+            onKeyDown={onKeyDown}
+            disabled={!aiOn}
+            placeholder={chat.messages.length > 0 ? 'Ask a follow-up…' : 'Ask Orbit…'}
+            className="h-full flex-1 bg-transparent text-base outline-none placeholder:text-subtle-foreground"
+          />
+        ) : (
+          <VoiceStatus voice={voice} />
+        )}
+        {voiceOn && aiOn && !busy && <MicButton voice={voice} />}
       </InputRow>
 
       <Footer>

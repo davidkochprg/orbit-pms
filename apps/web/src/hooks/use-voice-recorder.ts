@@ -5,12 +5,12 @@ export type RecorderState = 'idle' | 'recording' | 'converting';
 
 function micError(err: unknown): string {
   if (err instanceof DOMException && err.name === 'NotAllowedError') {
-    return 'Microphone access is blocked. Allow it for this site, or type the note instead.';
+    return 'Microphone access is blocked. Allow it for this site, or type instead.';
   }
   if (err instanceof DOMException && err.name === 'NotFoundError') {
-    return 'No microphone found. Type the note instead.';
+    return 'No microphone found. Type instead.';
   }
-  return 'Recording is not available in this browser. Type the note instead.';
+  return 'Recording is not available in this browser. Type instead.';
 }
 
 /**
