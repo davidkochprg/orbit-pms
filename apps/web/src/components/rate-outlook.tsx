@@ -133,10 +133,10 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
           <RateCalendar
             nights={nights}
             selected={selected?.date ?? null}
-            onSelect={(date) => {
+            onSelect={(date, via) => {
               setPicked(date);
-              // Below the calendar on narrower screens: bring the night into view.
-              if (!window.matchMedia('(min-width: 80rem)').matches) {
+              // Below the calendar on narrower screens: bring a clicked night into view.
+              if (via === 'click' && !window.matchMedia('(min-width: 80rem)').matches) {
                 nightPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
               }
             }}
