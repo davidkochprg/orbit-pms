@@ -33,6 +33,7 @@ import { PageHeader } from '@/components/page-header';
 import { RoomStatusDot } from '@/components/room-status-dot';
 import { StatusDot } from '@/components/status-dot';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -232,12 +233,13 @@ function TapeChart({ today }: { today: string }) {
         actions={
           <>
             {busy && <LoaderCircle className="size-4 animate-spin text-muted-foreground" />}
-            <input
-              type="date"
+            <DatePicker
+              variant="action"
               aria-label="Jump to date"
               value={start}
-              onChange={(e) => isIsoDate(e.target.value) && goTo(e.target.value)}
-              className="relative hidden h-8 rounded-control fill-action px-3 text-[0.8125rem] text-muted-foreground tabular-nums shadow-action stroke-lit outline-none focus-visible:ring-2 focus-visible:ring-ring sm:block"
+              display={formatDate}
+              onChange={(v) => isIsoDate(v) && goTo(v)}
+              className="max-sm:hidden"
             />
             <div className="relative flex items-center rounded-control fill-action shadow-action stroke-lit">
               <Button

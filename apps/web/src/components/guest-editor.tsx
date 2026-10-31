@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useCreateGuest, useHotelProfile, useUpdateGuest } from '@/lib/api';
 import { languageLabels } from '@/lib/format';
@@ -81,17 +81,17 @@ function GuestForm({ guest, onDone }: { guest: Guest | undefined; onDone: () => 
           />
         </FormField>
         <FormField label="Language" htmlFor="ge-language">
-          <NativeSelect
+          <Select
             id="ge-language"
             value={language}
-            onChange={(e) => setLanguage(e.target.value as Language)}
+            onValueChange={(value) => setLanguage(value as Language)}
           >
             {languages.map((l) => (
               <option key={l} value={l}>
                 {languageLabels[l]}
               </option>
             ))}
-          </NativeSelect>
+          </Select>
         </FormField>
         <FormField label="Email" htmlFor="ge-email">
           <Input

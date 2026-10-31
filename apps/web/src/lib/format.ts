@@ -38,6 +38,11 @@ export function displayRegion(): DisplayRegion {
   return region;
 }
 
+/** Today in the hotel's time zone, as YYYY-MM-DD. */
+export function hotelTodayIso(now: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: region.timeZone }).format(now);
+}
+
 export function formatDate(date: string): string {
   return format(parseISO(date), region.usDates ? 'EEE, MMM d' : 'EEE d MMM');
 }

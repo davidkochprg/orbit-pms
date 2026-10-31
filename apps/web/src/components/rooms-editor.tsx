@@ -16,7 +16,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -354,12 +354,7 @@ function RoomForm({
         </FormField>
       </div>
       <FormField label="Room type" htmlFor="room-type">
-        <NativeSelect
-          id="room-type"
-          required
-          value={roomTypeId}
-          onChange={(e) => setRoomTypeId(e.target.value)}
-        >
+        <Select id="room-type" value={roomTypeId} onValueChange={(value) => setRoomTypeId(value)}>
           <option value="" disabled>
             Choose a room type
           </option>
@@ -368,7 +363,7 @@ function RoomForm({
               {t.name}
             </option>
           ))}
-        </NativeSelect>
+        </Select>
       </FormField>
       <Segmented label="Kind" value={kind} options={kinds} onChange={setKind} />
       {save.error && <ErrorNotice message={save.error.message} />}

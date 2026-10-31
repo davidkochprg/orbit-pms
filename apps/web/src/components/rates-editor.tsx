@@ -13,7 +13,7 @@ import { Section } from '@/components/section';
 import { Segmented } from '@/components/segmented';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { currencyMark } from '@/lib/format';
 import { fromPercent, fromSurcharge, newSeason, toPercent, toSurcharge } from '@/lib/settings';
 import { cn } from '@/lib/utils';
@@ -37,18 +37,18 @@ export function RatesEditor({ pricing, onChange, readOnly }: Props) {
       <Section title="Currency and taxes">
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Currency" htmlFor="currency">
-            <NativeSelect
+            <Select
               id="currency"
               value={pricing.currency}
               disabled={readOnly}
-              onChange={(e) => set('currency', e.target.value as Currency)}
+              onValueChange={(value) => set('currency', value as Currency)}
             >
               {currencies.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
               ))}
-            </NativeSelect>
+            </Select>
           </FormField>
           <div className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">Base prices are</span>

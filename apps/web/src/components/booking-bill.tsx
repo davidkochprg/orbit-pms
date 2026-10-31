@@ -22,7 +22,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   useAddCharge,
@@ -397,10 +397,10 @@ function ExtraEditor({
         />
       </div>
       <div className="flex flex-wrap items-center gap-2">
-        <NativeSelect
+        <Select
           aria-label="Tax"
           value={vatBracket}
-          onChange={(e) => setVatBracket(e.target.value as VatBracket)}
+          onValueChange={(value) => setVatBracket(value as VatBracket)}
           className="h-8 w-44"
         >
           {bracketOptions(rates).map((o) => (
@@ -408,7 +408,7 @@ function ExtraEditor({
               {o.label}
             </option>
           ))}
-        </NativeSelect>
+        </Select>
         <span className="text-xs text-muted-foreground tabular-nums">
           {valid && `= ${formatMoney(qty * price)}`}
         </span>

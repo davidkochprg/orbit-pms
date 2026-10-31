@@ -7,7 +7,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { PageBody, PageHeader } from '@/components/page-header';
 import { Panel } from '@/components/panel';
 import { Segmented } from '@/components/segmented';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
@@ -69,10 +69,10 @@ export function ReportsPage() {
             />
             {/* NativeSelect wraps itself in a div, so hide the wrapper. */}
             <div className="md:hidden">
-              <NativeSelect
+              <Select
                 aria-label="Period"
                 value={period}
-                onChange={(e) => isReportPeriod(e.target.value) && choose(e.target.value)}
+                onValueChange={(value) => isReportPeriod(value) && choose(value)}
                 className="h-8 w-40"
               >
                 {reportPeriods.map((p) => (
@@ -80,7 +80,7 @@ export function ReportsPage() {
                     {p.label}
                   </option>
                 ))}
-              </NativeSelect>
+              </Select>
             </div>
           </>
         }

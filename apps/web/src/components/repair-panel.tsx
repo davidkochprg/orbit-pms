@@ -6,7 +6,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useAskToRepair, useContacts, useRepair, useWorkOrder } from '@/lib/api';
@@ -131,10 +131,10 @@ export function RepairContacts({ repair, writeTo }: { repair: Repair; writeTo?: 
       <div className="flex items-center gap-2 border-t pt-3">
         {others.length > 0 && (
           <div className="min-w-0 flex-1">
-            <NativeSelect
+            <Select
               aria-label="Someone else"
               value=""
-              onChange={(e) => setPicked((p) => [...p, e.target.value])}
+              onValueChange={(value) => setPicked((p) => [...p, value])}
               className="h-8"
             >
               <option value="" disabled>
@@ -145,7 +145,7 @@ export function RepairContacts({ repair, writeTo }: { repair: Repair; writeTo?: 
                   {c.name} ({c.trades.map((t) => tradeLabels[t]).join(', ')})
                 </option>
               ))}
-            </NativeSelect>
+            </Select>
           </div>
         )}
         <Button asChild variant="ghost" size="sm" className="ml-auto">

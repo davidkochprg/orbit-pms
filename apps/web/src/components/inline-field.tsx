@@ -1,7 +1,9 @@
 import { Check, LoaderCircle, Pencil } from 'lucide-react';
-import { type KeyboardEvent, type ReactNode, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useRef, useState } from 'react';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
+import { type Suggestion, SuggestInput } from '@/components/ui/suggest-input';
 import { Textarea } from '@/components/ui/textarea';
 import { INLINE_EDITOR } from '@/lib/inline-edit';
 import { cn } from '@/lib/utils';
@@ -21,11 +23,13 @@ interface InlineTextProps extends InlineBaseProps {
   value: string | null;
   /** Resolves when saved; a rejection keeps the editor open. */
   onSave: (value: string) => Promise<unknown>;
-  type?: 'text' | 'date' | 'email' | 'tel';
+  type?: 'text' | 'email' | 'tel';
   /** A textarea: Enter saves, Shift+Enter starts a new line. */
   multiline?: boolean;
   inputProps?: Omit<React.ComponentProps<'input'>, 'value' | 'onChange' | 'type'>;
   transform?: (value: string) => string;
+  /** Offered in a list as the value is typed; any text is still accepted. */
+  suggestions?: Suggestion[];
 }
 
 function Display({
@@ -78,20 +82,21 @@ export function InlineText({
   inputProps,
   transform,
   multiline = false,
+  suggestions,
   ...base
 }: InlineTextProps) {
   const [draft, setDraft] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  async function commit() {
-    if (draft === null) return;
-    if (draft.trim() === (value ?? '')) {
+  async function commit(next = draft) {
+    if (next === null) return;
+    if (next.trim() === (value ?? '')) {
       setDraft(null);
       return;
     }
     setSaving(true);
     try {
-      await onSave(draft.trim());
+      await onSave(next.trim());
       setDraft(null);
     } catch {
       // The caller shows the error; keep the draft so it can be fixed.
@@ -137,20 +142,38 @@ export function InlineText({
       </div>
     );
   }
+  const shape = (v: string) => (transform ? transform(v) : v);
   return (
     <div {...{ [INLINE_EDITOR]: '' }} className={cn('relative -mx-1.5', base.className)}>
-      <Input
-        autoFocus
-        type={type}
-        aria-label={base.label}
-        value={draft}
-        disabled={saving}
-        onChange={(e) => setDraft(transform ? transform(e.target.value) : e.target.value)}
-        onBlur={() => void commit()}
-        onKeyDown={onKeyDown}
-        className="h-7 px-1.5 pr-7"
-        {...inputProps}
-      />
+      {suggestions ? (
+        <SuggestInput
+          autoFocus
+          type={type}
+          aria-label={base.label}
+          value={draft}
+          disabled={saving}
+          suggestions={suggestions}
+          onValueChange={(v) => setDraft(shape(v))}
+          onPick={(v) => void commit(shape(v))}
+          onBlur={() => void commit()}
+          onKeyDown={onKeyDown}
+          className="h-7 px-1.5 pr-7"
+          {...inputProps}
+        />
+      ) : (
+        <Input
+          autoFocus
+          type={type}
+          aria-label={base.label}
+          value={draft}
+          disabled={saving}
+          onChange={(e) => setDraft(shape(e.target.value))}
+          onBlur={() => void commit()}
+          onKeyDown={onKeyDown}
+          className="h-7 px-1.5 pr-7"
+          {...inputProps}
+        />
+      )}
       <span className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground">
         {saving ? (
           <LoaderCircle className="size-3.5 animate-spin" />
@@ -158,6 +181,53 @@ export function InlineText({
           <Check className="size-3.5" />
         )}
       </span>
+    </div>
+  );
+}
+
+interface InlineDateProps extends InlineBaseProps {
+  value: string | null;
+  /** Resolves when saved; '' clears the date. */
+  onSave: (value: string) => Promise<unknown>;
+  min?: string;
+  max?: string;
+}
+
+/** A date that opens a calendar on click and saves the day picked. */
+export function InlineDate({ value, onSave, min, max, ...base }: InlineDateProps) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  // Picking closes the calendar in the same tick; the editor stays until the save is done.
+  const savingNow = useRef(false);
+
+  if (!editing) {
+    return <Display {...base} display={base.display ?? value} onEdit={() => setEditing(true)} />;
+  }
+  return (
+    <div {...{ [INLINE_EDITOR]: '' }} className={cn('-mx-1.5', base.className)}>
+      <DatePicker
+        aria-label={base.label}
+        value={value ?? ''}
+        min={min}
+        max={max}
+        clearable
+        defaultOpen
+        disabled={saving}
+        onOpenChange={(open) => !open && !savingNow.current && setEditing(false)}
+        onChange={(next) => {
+          if (next === (value ?? '')) return;
+          savingNow.current = true;
+          setSaving(true);
+          onSave(next)
+            .catch(() => undefined)
+            .finally(() => {
+              savingNow.current = false;
+              setSaving(false);
+              setEditing(false);
+            });
+        }}
+        className="h-7 px-1.5"
+      />
     </div>
   );
 }
@@ -177,6 +247,8 @@ export function InlineSelect<T extends string>({
 }: InlineSelectProps<T>) {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
+  // Picking closes the list in the same tick; the editor stays until the save is done.
+  const savingNow = useRef(false);
   const current = options.find((o) => o.value === value);
 
   if (!editing) {
@@ -186,24 +258,22 @@ export function InlineSelect<T extends string>({
   }
   return (
     <div {...{ [INLINE_EDITOR]: '' }} className={cn('-mx-1.5', base.className)}>
-      <NativeSelect
-        autoFocus
+      <Select
         aria-label={base.label}
         value={value ?? ''}
         disabled={saving}
-        onBlur={() => setEditing(false)}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') {
-            e.stopPropagation();
-            setEditing(false);
-          }
-        }}
-        onChange={(e) => {
+        defaultOpen
+        onOpenChange={(open) => !open && !savingNow.current && setEditing(false)}
+        onValueChange={(next) => {
+          savingNow.current = true;
           setSaving(true);
-          onSave(e.target.value as T)
-            .then(() => setEditing(false))
+          onSave(next as T)
             .catch(() => undefined)
-            .finally(() => setSaving(false));
+            .finally(() => {
+              savingNow.current = false;
+              setSaving(false);
+              setEditing(false);
+            });
         }}
         className="h-7 pl-1.5"
       >
@@ -213,7 +283,7 @@ export function InlineSelect<T extends string>({
             {o.label}
           </option>
         ))}
-      </NativeSelect>
+      </Select>
     </div>
   );
 }

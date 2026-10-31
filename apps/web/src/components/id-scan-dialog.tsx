@@ -5,6 +5,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { FormField } from '@/components/form-field';
 import { QrCode } from '@/components/qr-code';
 import { Segmented } from '@/components/segmented';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -24,8 +25,10 @@ import {
   useUpdateStayGuest,
   useUploadIdPhoto,
 } from '@/lib/api';
+import { hotelTodayIso } from '@/lib/format';
 import { prepareIdPhoto } from '@/lib/photo';
-import { countryOptions, documentTypeLabels, needsAddress } from '@/lib/registration';
+import { countrySuggestions, documentTypeLabels, needsAddress } from '@/lib/registration';
+import { SuggestInput } from '@/components/ui/suggest-input';
 import { isLocalOnly, scanUrl } from '@/lib/scan';
 
 interface Props {
@@ -319,29 +322,23 @@ function ReviewForm({
       )}
       <div className="grid grid-cols-2 gap-4">
         <FormField label="Nationality" htmlFor="scan-nationality">
-          <Input
+          <SuggestInput
             id="scan-nationality"
             maxLength={2}
-            list="scan-countries"
-            autoComplete="off"
             value={nationality}
-            onChange={(e) => setNationality(e.target.value.toUpperCase())}
+            suggestions={countrySuggestions}
+            onValueChange={(v) => setNationality(v.toUpperCase())}
             className="uppercase"
           />
-          <datalist id="scan-countries">
-            {countryOptions.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.name}
-              </option>
-            ))}
-          </datalist>
         </FormField>
         <FormField label="Date of birth" htmlFor="scan-birth">
-          <Input
+          <DatePicker
             id="scan-birth"
-            type="date"
             value={dateOfBirth}
-            onChange={(e) => setDateOfBirth(e.target.value)}
+            min="1900-01-01"
+            max={hotelTodayIso()}
+            clearable
+            onChange={setDateOfBirth}
           />
         </FormField>
       </div>

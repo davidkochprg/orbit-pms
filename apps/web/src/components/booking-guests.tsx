@@ -5,7 +5,7 @@ import { Link } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { IdScanDialog } from '@/components/id-scan-dialog';
-import { InlineSelect, InlineText } from '@/components/inline-field';
+import { InlineDate, InlineSelect, InlineText } from '@/components/inline-field';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,10 +16,10 @@ import {
   useUpdateGuest,
   useUpdateStayGuest,
 } from '@/lib/api';
-import { formatFullDate } from '@/lib/format';
+import { formatFullDate, hotelTodayIso } from '@/lib/format';
 import {
   countryName,
-  countryOptions,
+  countrySuggestions,
   documentTypeLabels,
   missingSummary,
   unaddedStillNeeded,
@@ -229,22 +229,17 @@ function StayGuestCard({
               missing={has('nationality')}
               disabled={!editable}
               transform={(v) => v.toUpperCase().slice(0, 2)}
-              inputProps={{ list: `countries-${guest.id}`, placeholder: 'CZ' }}
+              inputProps={{ placeholder: 'CZ' }}
+              suggestions={countrySuggestions}
               onSave={(v) => save({ nationality: v || null })}
             />
-            <datalist id={`countries-${guest.id}`}>
-              {countryOptions.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {c.name}
-                </option>
-              ))}
-            </datalist>
           </Field>
           <Field label="Born">
-            <InlineText
+            <InlineDate
               label="Date of birth"
-              type="date"
               value={guest.dateOfBirth}
+              min="1900-01-01"
+              max={hotelTodayIso()}
               display={guest.dateOfBirth && formatFullDate(guest.dateOfBirth)}
               missing={has('dateOfBirth')}
               disabled={!editable}

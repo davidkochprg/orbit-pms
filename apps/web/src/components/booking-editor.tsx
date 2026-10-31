@@ -13,6 +13,7 @@ import { FormField } from '@/components/form-field';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { Segmented } from '@/components/segmented';
 import { Stepper } from '@/components/stepper';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -23,7 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
@@ -338,24 +339,20 @@ function StayFields({
           htmlFor="be-check-in"
           hint={lockCheckIn ? 'The guest has checked in.' : undefined}
         >
-          <Input
+          <DatePicker
             id="be-check-in"
-            type="date"
-            required
             disabled={disabled || lockCheckIn}
             value={form.checkIn}
-            onChange={(e) => set({ checkIn: e.target.value })}
+            onChange={(v) => set({ checkIn: v })}
           />
         </FormField>
         <FormField label="Departure" htmlFor="be-check-out">
-          <Input
+          <DatePicker
             id="be-check-out"
-            type="date"
-            required
             disabled={disabled}
-            min={form.checkIn}
+            min={form.checkIn || undefined}
             value={form.checkOut}
-            onChange={(e) => set({ checkOut: e.target.value })}
+            onChange={(v) => set({ checkOut: v })}
           />
         </FormField>
         {/* Date fields follow the computer's locale; this line is in the hotel's own style. */}
@@ -401,13 +398,12 @@ function StayFields({
               </span>
             ))}
             {/* Picking an age adds the child: there is no age chosen in advance. */}
-            <NativeSelect
+            <Select
               aria-label="Add a child, by age"
               value=""
               disabled={disabled}
-              onChange={(e) =>
-                e.target.value !== '' &&
-                set({ childAges: [...form.childAges, Number(e.target.value)] })
+              onValueChange={(value) =>
+                value !== '' && set({ childAges: [...form.childAges, Number(value)] })
               }
               className="w-36"
             >
@@ -419,7 +415,7 @@ function StayFields({
                   {age === 0 ? 'Baby (under 1)' : `${age} ${age === 1 ? 'year' : 'years'} old`}
                 </option>
               ))}
-            </NativeSelect>
+            </Select>
           </div>
         </div>
       </div>
@@ -653,17 +649,17 @@ function GuestFields({
             />
           </FormField>
           <FormField label="Language" htmlFor="be-guest-language">
-            <NativeSelect
+            <Select
               id="be-guest-language"
               value={guest.language}
-              onChange={(e) => onChange({ ...guest, language: e.target.value as Language })}
+              onValueChange={(value) => onChange({ ...guest, language: value as Language })}
             >
               {languages.map((l) => (
                 <option key={l} value={l}>
                   {languageLabels[l]}
                 </option>
               ))}
-            </NativeSelect>
+            </Select>
           </FormField>
           <FormField label="Email" htmlFor="be-guest-email">
             <Input
@@ -702,18 +698,18 @@ function DetailFields({
     <Group title="Details">
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <FormField label="Source" htmlFor="be-source" className="w-40">
-          <NativeSelect
+          <Select
             id="be-source"
             value={form.source}
             disabled={notesOnly}
-            onChange={(e) => onChange({ ...form, source: e.target.value as BookingForm['source'] })}
+            onValueChange={(value) => onChange({ ...form, source: value as BookingForm['source'] })}
           >
             {bookingSources.map((s) => (
               <option key={s} value={s}>
                 {sourceLabels[s]}
               </option>
             ))}
-          </NativeSelect>
+          </Select>
         </FormField>
         {showStatus && (
           <div className="flex flex-col gap-1.5">

@@ -2,9 +2,9 @@ import { type HotelProfile, type Language, languages } from '@orbit/shared';
 import { FormField } from '@/components/form-field';
 import { Section } from '@/components/section';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { languageLabels } from '@/lib/format';
+import { formatTimeOfDay, languageLabels } from '@/lib/format';
 import { countryOptions } from '@/lib/registration';
 
 interface Props {
@@ -13,6 +13,15 @@ interface Props {
 }
 
 /** Name, description, country and language, contact details and check-in/out times. */
+/** Every half hour of the day, plus `current` when it falls between. */
+function timeOptions(current: string): string[] {
+  const slots = Array.from(
+    { length: 48 },
+    (_, i) => `${String(Math.floor(i / 2)).padStart(2, '0')}:${i % 2 ? '30' : '00'}`,
+  );
+  return slots.includes(current) ? slots : [...slots, current].sort();
+}
+
 export function PropertySettings({ profile, onChange }: Props) {
   const set = <K extends keyof HotelProfile>(key: K, value: HotelProfile[K]) =>
     onChange({ ...profile, [key]: value });
@@ -82,30 +91,30 @@ export function PropertySettings({ profile, onChange }: Props) {
       <Section title="Country and language">
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Country" htmlFor="country">
-            <NativeSelect
+            <Select
               id="country"
               value={profile.country}
-              onChange={(e) => set('country', e.target.value)}
+              onValueChange={(value) => set('country', value)}
             >
               {countryOptions.map((c) => (
                 <option key={c.code} value={c.code}>
                   {c.name}
                 </option>
               ))}
-            </NativeSelect>
+            </Select>
           </FormField>
           <FormField label="Working language" htmlFor="language">
-            <NativeSelect
+            <Select
               id="language"
               value={profile.language}
-              onChange={(e) => set('language', e.target.value as Language)}
+              onValueChange={(value) => set('language', value as Language)}
             >
               {languages.map((l) => (
                 <option key={l} value={l}>
                   {languageLabels[l]}
                 </option>
               ))}
-            </NativeSelect>
+            </Select>
           </FormField>
         </div>
       </Section>
@@ -113,20 +122,30 @@ export function PropertySettings({ profile, onChange }: Props) {
       <Section title="Arrival and departure">
         <div className="grid gap-4 sm:grid-cols-2">
           <FormField label="Check-in from" htmlFor="check-in">
-            <Input
+            <Select
               id="check-in"
-              type="time"
               value={profile.checkInFrom}
-              onChange={(e) => set('checkInFrom', e.target.value)}
-            />
+              onValueChange={(value) => set('checkInFrom', value)}
+            >
+              {timeOptions(profile.checkInFrom).map((t) => (
+                <option key={t} value={t}>
+                  {formatTimeOfDay(t)}
+                </option>
+              ))}
+            </Select>
           </FormField>
           <FormField label="Check-out by" htmlFor="check-out">
-            <Input
+            <Select
               id="check-out"
-              type="time"
               value={profile.checkOutBy}
-              onChange={(e) => set('checkOutBy', e.target.value)}
-            />
+              onValueChange={(value) => set('checkOutBy', value)}
+            >
+              {timeOptions(profile.checkOutBy).map((t) => (
+                <option key={t} value={t}>
+                  {formatTimeOfDay(t)}
+                </option>
+              ))}
+            </Select>
           </FormField>
         </div>
       </Section>

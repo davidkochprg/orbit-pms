@@ -19,7 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useHotelProfile, useRemoveContact, useSaveContact } from '@/lib/api';
 import { languageLabels } from '@/lib/format';
@@ -135,17 +135,17 @@ function ContactForm({
           />
         </FormField>
         <FormField label="Write in" htmlFor="ct-language">
-          <NativeSelect
+          <Select
             id="ct-language"
             value={language}
-            onChange={(e) => setLanguage(e.target.value as Language)}
+            onValueChange={(value) => setLanguage(value as Language)}
           >
             {languages.map((l) => (
               <option key={l} value={l}>
                 {languageLabels[l]}
               </option>
             ))}
-          </NativeSelect>
+          </Select>
         </FormField>
         <FormField label="Notes" htmlFor="ct-notes" className="sm:col-span-2">
           <Textarea

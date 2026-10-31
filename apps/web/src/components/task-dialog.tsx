@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useCreateTask, useRooms } from '@/lib/api';
 
@@ -58,12 +58,7 @@ function TaskForm({ roomId, onDone }: { roomId: string | undefined; onDone: () =
         <DialogTitle>New task</DialogTitle>
       </DialogHeader>
       <FormField label="Room" htmlFor="task-room">
-        <NativeSelect
-          id="task-room"
-          required
-          value={room}
-          onChange={(e) => setRoom(e.target.value)}
-        >
+        <Select id="task-room" value={room} onValueChange={(value) => setRoom(value)}>
           <option value="" disabled>
             Choose a room
           </option>
@@ -72,7 +67,7 @@ function TaskForm({ roomId, onDone }: { roomId: string | undefined; onDone: () =
               {r.name}
             </option>
           ))}
-        </NativeSelect>
+        </Select>
       </FormField>
       <Segmented label="Task type" value={type} options={taskTypes} onChange={setType} />
       <FormField label={needsNotes ? 'What needs fixing' : 'Notes'} htmlFor="task-notes">

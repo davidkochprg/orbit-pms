@@ -22,6 +22,9 @@ export const countryOptions: { code: string; name: string }[] = [
   { code: 'AU', name: 'Australia' },
 ];
 
+/** The same countries as suggestions for a field: the code, labelled with the name. */
+export const countrySuggestions = countryOptions.map((c) => ({ value: c.code, label: c.name }));
+
 /**
  * Whether a guest of this nationality gives a home address: guests from abroad do, except in the
  * US, where the guest book doesn't record it (the domain's guest-book rules decide; this is the

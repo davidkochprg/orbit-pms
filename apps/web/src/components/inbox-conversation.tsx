@@ -43,7 +43,7 @@ import { LabelChips, LabelMenu } from '@/components/mail-labels';
 import { Panel } from '@/components/panel';
 import { RecipientField } from '@/components/recipient-field';
 import { Button } from '@/components/ui/button';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
@@ -991,9 +991,9 @@ function ReplyEditor({
         {aiOn && (
           <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
             Guest writes
-            <NativeSelect
+            <Select
               value={theirLanguage}
-              onChange={(e) => setTheirLanguage(e.target.value as Language)}
+              onValueChange={(value) => setTheirLanguage(value as Language)}
               className="h-7 w-32 text-xs"
             >
               {languages.map((l) => (
@@ -1001,7 +1001,7 @@ function ReplyEditor({
                   {languageLabels[l]}
                 </option>
               ))}
-            </NativeSelect>
+            </Select>
           </label>
         )}
       </div>

@@ -2,9 +2,10 @@ import { type EventImpact, eventImpacts, type LocalEvent } from '@orbit/shared';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ErrorNotice } from '@/components/error-notice';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { useCreateEvent, useDeleteEvent } from '@/lib/api';
 import { formatDate } from '@/lib/format';
 import { impactLabels } from '@/lib/revenue';
@@ -103,29 +104,29 @@ export function LocalEvents({
               className="col-span-2 h-8 text-[0.8125rem]"
               autoFocus
             />
-            <Input
-              type="date"
+            <DatePicker
               aria-label="First night"
               value={firstNight}
               min={today}
-              onChange={(e) => {
-                setFirstNight(e.target.value);
-                if (lastNight < e.target.value) setLastNight(e.target.value);
+              display={formatDate}
+              onChange={(v) => {
+                setFirstNight(v);
+                if (lastNight < v) setLastNight(v);
               }}
               className="h-8 text-[0.8125rem]"
             />
-            <Input
-              type="date"
+            <DatePicker
               aria-label="Last night"
               value={lastNight}
               min={firstNight}
-              onChange={(e) => setLastNight(e.target.value)}
+              display={formatDate}
+              onChange={setLastNight}
               className="h-8 text-[0.8125rem]"
             />
-            <NativeSelect
+            <Select
               aria-label="How much it brings"
               value={impact}
-              onChange={(e) => setImpact(e.target.value as EventImpact)}
+              onValueChange={(value) => setImpact(value as EventImpact)}
               className="h-8 text-[0.8125rem]"
             >
               {eventImpacts.map((i) => (
@@ -133,7 +134,7 @@ export function LocalEvents({
                   {impactLabels[i]} event
                 </option>
               ))}
-            </NativeSelect>
+            </Select>
             <div className="flex justify-end gap-1">
               <Button type="button" variant="ghost" size="sm" onClick={() => setAdding(false)}>
                 Cancel

@@ -8,9 +8,10 @@ import { type FormEvent, type KeyboardEvent, useState } from 'react';
 import { ErrorNotice } from '@/components/error-notice';
 import { FormField } from '@/components/form-field';
 import { BackToVault, NoteLayout } from '@/components/knowledge-note';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { NativeSelect } from '@/components/ui/native-select';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useSaveEntry } from '@/lib/api';
 import { parseTags } from '@/lib/knowledge';
@@ -59,10 +60,10 @@ export function NoteEditor({
           <>
             <BackToVault />
             <h2 className="sr-only">{id ? 'Edit note' : 'New note'}</h2>
-            <NativeSelect
+            <Select
               aria-label="Folder"
               value={category}
-              onChange={(e) => setCategory(e.target.value as HotelInfoDraft['category'])}
+              onValueChange={(value) => setCategory(value as HotelInfoDraft['category'])}
               className="h-8 w-44 text-[0.8125rem]"
             >
               {hotelInfoCategories.map((c) => (
@@ -70,7 +71,7 @@ export function NoteEditor({
                   {hotelInfoCategoryLabels[c]}
                 </option>
               ))}
-            </NativeSelect>
+            </Select>
             <span className="ml-auto flex items-center gap-1">
               <Button type="button" variant="ghost" size="sm" onClick={onCancel}>
                 Cancel
@@ -102,11 +103,12 @@ export function NoteEditor({
             />
           </FormField>
           <FormField label="Until" htmlFor="note-until" className="w-44">
-            <Input
+            <DatePicker
               id="note-until"
-              type="date"
               value={until}
-              onChange={(e) => setUntil(e.target.value)}
+              placeholder="No end"
+              clearable
+              onChange={setUntil}
             />
           </FormField>
         </div>
