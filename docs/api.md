@@ -161,6 +161,10 @@ Takes `{ kind?: 'payment' | 'refund', method: 'cash' | 'card' | 'bank_transfer',
 
 The hotel-wide audit log, newest first: `ActivityItem[]`, each an audit entry plus `subject` (`{ kind, id, label }` or `null`) and `byName` (the staff member who made the change, when recorded). `actor` is `user` or `agent`; `subjectId` keeps only changes to one booking, guest, room or conversation; `limit` 1–200, default 100. See [domain.md](domain.md#activity).
 
+### `POST /api/reports/summary`
+
+Body `{ from, to }` as for the report. Returns `{ text }`: three sentences on the period against the same number of nights before it, every number checked against the figures the server worked out ([ai.md](ai.md#report-summary)). 422 `summary_failed`, 429 `demo_limit`, 503 `ai_not_configured`.
+
 ### `GET /api/reports?from=&to=`
 
 A `Report` for the nights `[from, to)` (at most 366): `occupancy`, `adr`, `revpar`, `roomRevenue`, `addonRevenue`, `extrasRevenue`, `cityTax`, room nights, guest nights, `arrivals`, `averageStay`, `cancellations`, `bySource`, `byRoomType`, `payments` by method, `unpaidDepartures` and a daily series `days`. A reversed or missing period is `400`. See [domain.md](domain.md#reports).

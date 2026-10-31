@@ -13,6 +13,7 @@ export * from './prompts/inbox';
 export * from './prompts/system';
 export * from './provider';
 export * from './repairs';
+export * from './report-summary';
 export * from './revenue-brief';
 export * from './revenue-review';
 export * from './speech';

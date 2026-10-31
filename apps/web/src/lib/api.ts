@@ -784,6 +784,14 @@ export function useKnockOns() {
   });
 }
 
+/** A few sentences on a report against the same number of nights before. */
+export function useReportSummary() {
+  return useMutation({
+    mutationFn: (range: ReportQuery) =>
+      apiPost('/api/reports/summary', range, z.object({ text: z.string() })),
+  });
+}
+
 /** Tomorrow's guests who haven't heard from the hotel before their stay. */
 export function useArrivalNotes(enabled = true) {
   return useQuery({

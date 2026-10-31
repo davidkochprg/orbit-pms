@@ -15,6 +15,7 @@ export const reasoningEffort = {
   housekeeping: 'minimal',
   stayNotes: 'minimal',
   revenueBrief: 'minimal',
+  reportSummary: 'minimal',
   rateReview: 'high',
   idScan: 'minimal',
   translate: 'minimal',

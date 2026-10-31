@@ -11,7 +11,8 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger, Tip } from '@/components/ui/tooltip';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
-import { useDayOverview, usePricing, useReport } from '@/lib/api';
+import { useDayOverview, useHealth, usePricing, useReport, useReportSummary } from '@/lib/api';
+import { Button } from '@/components/ui/button';
 import {
   formatCount,
   formatMoney,
@@ -50,7 +51,13 @@ export function ReportsPage() {
   const previousRange = useMemo(() => range && comparisonRange(range), [range]);
   const report = useReport(range);
   const previous = useReport(previousRange);
-  const choose = (p: ReportPeriod) => setParams({ period: p }, { replace: true });
+  const summary = useReportSummary();
+  const aiOn = useHealth().data?.ai.configured ?? false;
+  const choose = (p: ReportPeriod) => {
+    // A summary is about the period it was written for.
+    summary.reset();
+    setParams({ period: p }, { replace: true });
+  };
 
   return (
     <>
@@ -82,11 +89,32 @@ export function ReportsPage() {
                 ))}
               </Select>
             </div>
+            {aiOn && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!range || summary.isPending}
+                onClick={() => range && summary.mutate(range)}
+              >
+                {summary.isPending ? 'Reading the report…' : 'Summarize'}
+              </Button>
+            )}
           </>
         }
       />
       <PageBody>
         <div className="flex flex-col gap-5">
+          {(summary.data || summary.isError) && (
+            <Panel title="Summary">
+              {summary.isError ? (
+                <ErrorNotice message={summary.error.message} className="m-2" />
+              ) : (
+                <p className="max-w-3xl px-3 py-2.5 text-[0.8125rem] leading-relaxed">
+                  {summary.data?.text}
+                </p>
+              )}
+            </Panel>
+          )}
           {report.isError ? (
             <ErrorNotice message={report.error.message} />
           ) : !report.data ? (

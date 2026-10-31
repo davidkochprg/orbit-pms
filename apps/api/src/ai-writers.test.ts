@@ -124,3 +124,44 @@ describe('arrival notes', () => {
     ).toBe(400);
   });
 });
+
+describe('report summary', () => {
+  it('summarizes a period against the one before, and needs AI', async () => {
+    const summarizing = new MockLanguageModelV4({
+      doGenerate: () =>
+        Promise.resolve({
+          content: [{ type: 'text', text: 'Occupancy held up. Push the quiet weekdays.' }],
+          finishReason: { unified: 'stop', raw: undefined },
+          usage: {
+            inputTokens: { total: 600, noCache: 600, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: 20, text: 20, reasoning: undefined },
+          },
+          warnings: [],
+        }),
+    });
+    const app = createApp({
+      repos,
+      ai: {
+        agent: summarizing,
+        agentModelId: 'muse-spark-1.3',
+        translate: summarizing,
+        translateModelId: 'muse-spark-1.3',
+        draft: summarizing,
+        draftModelId: 'muse-spark-1.3',
+        vision: null,
+        visionModelId: null,
+        transcription: null,
+      },
+      usage,
+      clock: () => now,
+    });
+    const period = { from: '2026-10-20', to: '2026-10-27' };
+    expect(await call<{ text: string }>(app, 'POST', '/api/reports/summary', period)).toEqual({
+      status: 200,
+      body: { text: 'Occupancy held up. Push the quiet weekdays.' },
+    });
+    expect(
+      (await call<ApiError>(appWith({ ai: false }), 'POST', '/api/reports/summary', period)).status,
+    ).toBe(503);
+  });
+});

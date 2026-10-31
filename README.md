@@ -76,6 +76,7 @@ Every AI feature runs on Meta's models through the Vercel AI SDK: Muse Spark on 
 | ID scans            | `muse-spark-1.3` (vision)                           | Reads a phone photo of an ID card or passport into guest-book fields                              | Saves them: staff review every value; the photo is never stored                |
 | Stay notes          | `muse-spark-1.3`                                    | Reads booking notes and guest messages for pets, mess and things to set up                        | Decides the cleaning order: the domain scores it                               |
 | Rate summary        | `muse-spark-1.3`                                    | Writes two or three sentences of advice on the coming nights                                      | Works out a rate: every percent must be one the domain computed                |
+| Report summary      | `muse-spark-1.3`                                    | Three sentences on a period against the one before: what moved, why, what to do                   | Works out a figure: every number must be one the domain computed               |
 | Rate review         | `muse-spark-1.3`                                    | Finds holidays, group requests and patterns, graded with their reasons                            | Sets a percent: the domain turns each grade into one                           |
 
 Muse Spark always reasons before answering, so the reasoning effort is set per feature to the lowest level that keeps quality, measured with the evals and live runs: `minimal` for extraction, drafts, notes, the rate summary and ID scans, `low` for the agent, which plans multi-step tool use, and `high` for the rate review, which weighs sixty nights, the inbox and the country's holidays together and runs only when the outlook changes.
@@ -95,18 +96,19 @@ More in [docs/ai.md](docs/ai.md).
 
 `pnpm eval` runs the real models against synthetic fixtures and prints a pass rate, cost and latency per item.
 
-| Suite              | Fixtures                                                                                             | Pass rate    |
-| ------------------ | ---------------------------------------------------------------------------------------------------- | ------------ |
-| Inbox extraction   | 14 messages in Czech, German, English and Polish, including Booking.com questions about a stay       | 14/14 (100%) |
-| Housekeeping notes | 10 notes in four languages, including spelled-out room numbers, an unknown room and a vague note     | 10/10 (100%) |
-| Stay notes         | 12 stays in five languages: dogs, a cot, an allergy, muddy bikes, and notes that aren't for cleaning | 12/12 (100%) |
-| ID scans           | 3 synthetic specimen documents: a Czech-style ID card, a German-style passport and a receipt         | 3/3 (100%)   |
-| Agent tools        | 12 staff requests run through the real agent and tools, checked by their effect                      | 12/12 (100%) |
-| Reply drafts       | 17 replies with real quotes, checked by the price guard                                              | 16/17, 17/17 |
-| Translations       | 4 drafts and guest messages between Czech, German, English and Polish, amounts kept                  | 4/4 (100%)   |
-| Rate review        | 3 outlooks: a block of rooms (and a single request to ignore), Thanksgiving, an ordinary fortnight   | 3/3 (100%)   |
+| Suite               | Fixtures                                                                                                                       | Pass rate    |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| Inbox extraction    | 15 messages in Czech, German, English and Polish, including Booking.com questions about a stay and a team asking for six rooms | 15/15 (100%) |
+| Housekeeping notes  | 10 notes in four languages, including spelled-out room numbers, an unknown room and a vague note                               | 10/10 (100%) |
+| Stay notes          | 12 stays in five languages: dogs, a cot, an allergy, muddy bikes, and notes that aren't for cleaning                           | 12/12 (100%) |
+| ID scans            | 3 synthetic specimen documents: a Czech-style ID card, a German-style passport and a receipt                                   | 3/3 (100%)   |
+| Agent tools         | 21 staff requests run through the real agent and tools, checked by their effect                                                | 21/21 (100%) |
+| Reply drafts        | 18 replies with real quotes (one a block of rooms for a group), checked by the price guard                                     | 18/18 (100%) |
+| Translations        | 4 drafts and guest messages between Czech, German, English and Polish, amounts kept                                            | 4/4 (100%)   |
+| Notes before a stay | 4 guests in four languages: snow and a spa, a dog, a family in the rain, no forecast                                           | 4/4 (100%)   |
+| Rate review         | 3 outlooks: a block of rooms (and a single request to ignore), Thanksgiving, an ordinary fortnight                             | 3/3 (100%)   |
 
-Measured on 2026-10-30 with `muse-spark-1.3`, and Muse Spark Open on Baseten for drafts and translations, at `minimal` reasoning effort except the agent (`low`) and the rate review (`high`, measured 2026-10-31: about 6 s and $0.008 a case). Drafts ran twice: the one miss was an empty answer from Baseten, which now goes to Muse Spark on the Meta API instead. An inbox message takes about 3 s to read; the whole suite costs about $0.70.
+Measured on 2026-10-30 and 2026-10-31 with `muse-spark-1.3`, and Muse Spark Open on Baseten for drafts and translations, at `minimal` reasoning effort except the agent (`low`) and the rate review (`high`, measured 2026-10-31: about 6 s and $0.008 a case). An empty answer from Baseten goes to Muse Spark on the Meta API instead. An inbox message takes about 2 s to read; the whole suite costs about $1.80, most of it the agent.
 
 ## Architecture
 

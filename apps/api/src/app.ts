@@ -6,6 +6,7 @@ import {
   createNoteFiler,
   createRepairDesk,
   createReplyLearner,
+  createReportSummaryWriter,
   createRateReviewer,
   createRevenueBriefWriter,
   createIdScanReader,
@@ -222,7 +223,17 @@ export function createApp({
   app.route('/api', roomRoutes(repos));
   app.route('/api', bookingRoutes(repos, hotel));
   app.route('/api', billingRoutes(billing));
-  app.route('/api', reportRoutes(reports));
+  app.route(
+    '/api',
+    reportRoutes({
+      reports,
+      summary:
+        ai && createReportSummaryWriter({ model: ai.agent, modelId: ai.agentModelId, usage }),
+      currency: async () => (await rates.getPricing()).currency,
+      today: () => hotelToday(clock()),
+      gate,
+    }),
+  );
   app.route('/api', registrationRoutes(registrations));
   app.route(
     '/api',
