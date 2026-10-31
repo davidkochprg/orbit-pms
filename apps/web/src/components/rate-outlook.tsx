@@ -4,7 +4,7 @@ import { ArrivalRisks } from '@/components/arrival-risks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorNotice } from '@/components/error-notice';
 import { LocalEvents } from '@/components/local-events';
-import { Panel } from '@/components/panel';
+import { Panel, ScrollBox } from '@/components/panel';
 import { RateCalendar } from '@/components/rate-calendar';
 import { RateNightPanel } from '@/components/rate-night-panel';
 import { Button } from '@/components/ui/button';
@@ -12,11 +12,9 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { useAdjustRates, useHealth, useRevenueBrief, useRevenueOutlook } from '@/lib/api';
 import { formatDate, formatLongDate } from '@/lib/format';
-import { occupancy, signed, suggestions } from '@/lib/revenue';
+import { signed, suggestions } from '@/lib/revenue';
 
 const DAYS = 60;
-/** Nights the summary row averages over. */
-const WEEK = 7;
 
 /**
  * The next 60 nights: how full each is, the rate suggested from demand, events and the forecast,
@@ -37,7 +35,6 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
   if (!outlook.data) {
     return (
       <div className="flex flex-col gap-4">
-        <Skeleton className="h-20 rounded-card" />
         <Skeleton className="h-[34rem] rounded-card" />
       </div>
     );
@@ -46,9 +43,6 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
   const { nights, events, arrivalRisks, today, weatherAvailable } = outlook.data;
   const toApply = suggestions(nights);
   const selected = nights.find((n) => n.date === picked) ?? toApply[0] ?? nights[0] ?? null;
-  const week = nights.slice(0, WEEK);
-  const weekShare = week.reduce((sum, n) => sum + occupancy(n), 0) / Math.max(week.length, 1);
-  const weekNoShows = week.reduce((sum, n) => sum + n.expectedNoShows, 0);
 
   /** Sets nights and says so, with Undo back to what they were. */
   function set(changes: NightOutlook[], percent: (n: NightOutlook) => number) {
@@ -70,24 +64,6 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <Stat
-          label="Nights to review"
-          value={String(toApply.length)}
-          note="Suggested rate differs"
-        />
-        <Stat
-          label="Next 7 nights"
-          value={`${Math.round(weekShare * 100)}%`}
-          note="Booked on average"
-        />
-        <Stat
-          label="Likely no-shows"
-          value={String(Math.round(weekNoShows))}
-          note="Rooms, next 7 nights"
-        />
-      </div>
-
       {(brief.data || brief.isError) && (
         <Panel title="Summary">
           {brief.isError ? (
@@ -104,7 +80,7 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
         <ErrorNotice message={adjust.error.message} onDismiss={() => adjust.reset()} />
       )}
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
+      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-stretch">
         <Panel
           title={`Next ${DAYS} nights`}
           actions={
@@ -146,15 +122,19 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
           <Panel
             ref={nightPanel}
             title={formatLongDate(selected.date)}
-            className="scroll-mt-4 xl:sticky xl:top-0"
+            className="scroll-mt-4"
+            contentClassName="p-0"
           >
-            <RateNightPanel
-              key={selected.date}
-              night={selected}
-              canManage={canManage}
-              busy={adjust.isPending}
-              onSet={(percent) => set([selected], () => percent)}
-            />
+            {/* As tall as the calendar beside it; scrolls when the night needs more. */}
+            <ScrollBox className="xl:absolute xl:inset-0">
+              <RateNightPanel
+                key={selected.date}
+                night={selected}
+                canManage={canManage}
+                busy={adjust.isPending}
+                onSet={(percent) => set([selected], () => percent)}
+              />
+            </ScrollBox>
           </Panel>
         )}
       </div>
@@ -192,16 +172,6 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
           setConfirmAll(false);
         }}
       />
-    </div>
-  );
-}
-
-function Stat({ label, value, note }: { label: string; value: string; note: string }) {
-  return (
-    <div className="flex min-w-0 flex-col gap-1 rounded-card bg-surface-sunken p-3 ring-1 ring-ink/5 ring-inset sm:p-4">
-      <span className="truncate text-xs text-muted-foreground sm:text-[0.8125rem]">{label}</span>
-      <span className="text-xl font-medium tracking-tight tabular-nums sm:text-2xl">{value}</span>
-      <span className="truncate text-xs text-subtle-foreground max-sm:hidden">{note}</span>
     </div>
   );
 }
