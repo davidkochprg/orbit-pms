@@ -1,4 +1,4 @@
-import type { DailyBrief } from '@orbit/shared';
+import type { DailyBrief, KnockOn } from '@orbit/shared';
 import {
   BrushCleaning,
   CalendarCheck,
@@ -9,30 +9,43 @@ import {
   Inbox,
   type LucideIcon,
   OctagonAlert,
+  Phone,
   ScanLine,
   Wrench,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { EmptyState } from '@/components/empty-state';
+import { ErrorNotice } from '@/components/error-notice';
 import { Panel, ScrollBox } from '@/components/panel';
+import { RelocateDialog } from '@/components/relocate-dialog';
+import { RepairDialog } from '@/components/repair-panel';
+import { Button } from '@/components/ui/button';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { useAskToRepair, useKnockOns, useRefreshInboxRooms } from '@/lib/api';
 import { type AttentionItem, type AttentionKind, attentionItems, gapItems } from '@/lib/brief';
+import { contactName, telHref } from '@/lib/repairs';
 import { cn } from '@/lib/utils';
 
 const kindIcons: Record<AttentionKind, { icon: LucideIcon; className: string }> = {
   prepare: { icon: BrushCleaning, className: 'text-warning' },
   ids: { icon: ScanLine, className: 'text-warning' },
   hold: { icon: Clock, className: 'text-status-hold' },
+  opening: { icon: CalendarCheck, className: 'text-primary-text' },
   messages: { icon: Inbox, className: 'text-primary-text' },
   out_of_order: { icon: OctagonAlert, className: 'text-destructive' },
   maintenance: { icon: Wrench, className: 'text-muted-foreground' },
   gap: { icon: CalendarX2, className: 'text-muted-foreground' },
 };
 
-/** What needs attention today, most urgent first, each linking to where it is handled. */
+/**
+ * What needs attention today, most urgent first, each linking to where it is handled. What a
+ * change made worth doing (stays to move, who to ask for a repair, a room free for a request) is
+ * fixed from the row itself.
+ */
 export function AttentionPanel({ brief, className }: { brief: DailyBrief; className?: string }) {
-  const items = attentionItems(brief);
+  const knockOns = useKnockOns();
+  const items = attentionItems(brief, knockOns.data);
   return (
     <Panel
       title="Needs attention"
@@ -137,6 +150,7 @@ function AttentionRow({
       <ChevronRight className="size-4 shrink-0 text-subtle-foreground opacity-0 transition-[opacity,transform] duration-150 ease-snap group-hover:translate-x-0.5 group-hover:opacity-100 group-focus-visible:opacity-100" />
     </>
   );
+  if (item.knockOn) return <KnockOnRow knockOn={item.knockOn} body={body} />;
   if ('items' in item.target) {
     return (
       <AttentionGroup
@@ -164,6 +178,90 @@ function AttentionRow({
     <Link to={item.target.path} onClick={onOpen} className={rowClass}>
       {body}
     </Link>
+  );
+}
+
+/** A row whose click is the fix: the moves to confirm, the repair's contacts, or the request. */
+function KnockOnRow({ knockOn, body }: { knockOn: KnockOn; body: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  if (knockOn.kind === 'relocate') {
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)} className={rowClass}>
+          {body}
+        </button>
+        <RelocateDialog knockOn={knockOn} open={open} onOpenChange={setOpen} />
+      </>
+    );
+  }
+  if (knockOn.kind === 'repair') return <RepairRow knockOn={knockOn} body={body} />;
+  return <OpeningRow knockOn={knockOn} body={body} />;
+}
+
+/** Opens the repair's contacts on the email to the first one, with a call button beside it. */
+function RepairRow({
+  knockOn,
+  body,
+}: {
+  knockOn: Extract<KnockOn, { kind: 'repair' }>;
+  body: ReactNode;
+}) {
+  const [writing, setWriting] = useState(false);
+  const ask = useAskToRepair(knockOn.taskId);
+  const { contact } = knockOn;
+  return (
+    <span className="flex items-center gap-1 pr-2">
+      <button type="button" onClick={() => setWriting(true)} className={cn(rowClass, 'flex-1')}>
+        {body}
+      </button>
+      {contact.phone && (
+        <Button
+          asChild
+          variant="outline"
+          size="icon-sm"
+          aria-label={`Call ${contactName(contact)}`}
+          title={`Call ${contact.phone}`}
+        >
+          <a href={telHref(contact.phone)} onClick={() => ask.mutate(contact.id)}>
+            <Phone />
+          </a>
+        </Button>
+      )}
+      <RepairDialog
+        taskId={writing ? knockOn.taskId : null}
+        writeTo={contact.email ? contact.id : undefined}
+        onOpenChange={setWriting}
+      />
+    </span>
+  );
+}
+
+/** Looks for rooms again for the request, then opens the conversation to offer one. */
+function OpeningRow({
+  knockOn,
+  body,
+}: {
+  knockOn: Extract<KnockOn, { kind: 'opening' }>;
+  body: ReactNode;
+}) {
+  const refresh = useRefreshInboxRooms();
+  const navigate = useNavigate();
+  return (
+    <>
+      <button
+        type="button"
+        disabled={refresh.isPending}
+        onClick={() =>
+          refresh.mutate(knockOn.inquiryId, {
+            onSuccess: () => void navigate(`/inbox/${knockOn.inquiryId}`),
+          })
+        }
+        className={rowClass}
+      >
+        {body}
+      </button>
+      {refresh.error && <ErrorNotice message={refresh.error.message} className="mx-2" />}
+    </>
   );
 }
 

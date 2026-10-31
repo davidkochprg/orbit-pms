@@ -1,4 +1,4 @@
-import type { Booking, BookingSummary, DailyBrief } from '@orbit/shared';
+import type { Booking, BookingSummary, DailyBrief, KnockOn } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { attentionItems, doneOf, gapItems, occupancyPercent } from './brief';
 
@@ -122,6 +122,77 @@ describe('attentionItems', () => {
       title: 'Hold for Guest B lapsed',
       detail: 'Room 201, arrives Fri, Oct 30',
     });
+  });
+});
+
+describe('attentionItems with knock-ons', () => {
+  const knockOns: KnockOn[] = [
+    {
+      kind: 'relocate',
+      id: 'relocate:rm_203',
+      roomId: 'rm_203',
+      roomName: '203',
+      moves: [
+        {
+          bookingId: 'bk_9',
+          guestName: 'Guest D',
+          checkIn: '2026-10-28',
+          checkOut: '2026-10-30',
+          status: 'confirmed',
+          toRoomId: 'rm_207',
+          toRoomName: '207',
+          sameType: true,
+        },
+      ],
+    },
+    {
+      kind: 'repair',
+      id: 'repair:hk_1',
+      taskId: 'hk_1',
+      roomId: 'rm_203',
+      roomName: '203',
+      issue: 'Tap is dripping.',
+      trade: 'plumbing',
+      contact: {
+        id: 'ct_1',
+        name: 'Example Plumbing',
+        person: 'Sam',
+        trades: ['plumbing'],
+        phone: '+1 555 0100',
+        email: null,
+        language: 'en',
+        notes: null,
+      },
+    },
+    {
+      kind: 'opening',
+      id: 'opening:inq_1',
+      inquiryId: 'inq_1',
+      guestName: 'Guest E',
+      checkIn: '2026-11-02',
+      checkOut: '2026-11-04',
+      rooms: 2,
+      fromTotal: 318,
+    },
+  ];
+
+  it('joins stays to move and who to ask to their rows, and lists a freed room for a request', () => {
+    const items = attentionItems(brief, knockOns);
+    expect(items.map((i) => [i.kind, i.title, i.detail, i.knockOn?.kind])).toEqual([
+      ['prepare', 'Room 104 is dirty', 'Guest A arrives today', undefined],
+      ['ids', 'Room 102: 2 IDs missing', 'Guest C is in house', undefined],
+      ['hold', 'Hold for Guest B not confirmed', expect.any(String), undefined],
+      ['opening', 'A room is free for Guest E', expect.stringContaining('from'), 'opening'],
+      ['messages', '1 message waiting for a reply', undefined, undefined],
+      ['out_of_order', 'Room 203 is out of order', '1 stay to move', 'relocate'],
+      ['maintenance', 'Room 203: Tap is dripping', 'Ask Example Plumbing · Sam', 'repair'],
+    ]);
+  });
+
+  it('leaves rows as they are when their knock-on is gone', () => {
+    expect(attentionItems(brief, []).map((i) => i.knockOn)).toEqual(
+      attentionItems(brief).map(() => undefined),
+    );
   });
 });
 

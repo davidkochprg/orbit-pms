@@ -1,9 +1,10 @@
-import type { BookingSummary, DailyBrief } from '@orbit/shared';
-import { formatDate, formatDateTime } from '@/lib/format';
+import type { BookingSummary, DailyBrief, KnockOn } from '@orbit/shared';
+import { formatDate, formatDateTime, formatMoney, formatRange } from '@/lib/format';
+import { contactName } from '@/lib/repairs';
 import { roomStatusLabels } from '@/lib/status';
 
 export type AttentionKind =
-  'prepare' | 'ids' | 'hold' | 'messages' | 'out_of_order' | 'maintenance' | 'gap';
+  'prepare' | 'ids' | 'hold' | 'opening' | 'messages' | 'out_of_order' | 'maintenance' | 'gap';
 
 /** One line in the brief's "needs attention" list, with where to go to deal with it. */
 export interface AttentionItem {
@@ -16,6 +17,8 @@ export interface AttentionItem {
    * stands for, when several of one kind would crowd the list.
    */
   target: { path: string } | { bookingId: string } | { items: AttentionItem[] };
+  /** What a change made worth doing for this item; the row then offers the fix itself. */
+  knockOn?: KnockOn;
 }
 
 /** From this many items of one kind they share a row that opens into them. */
@@ -57,8 +60,12 @@ export function doneOf(rows: BookingSummary[], done: 'checked_in' | 'checked_out
   return `${finished} of ${rows.length}`;
 }
 
-/** The brief's action items, most urgent first: rooms to get ready, IDs, decisions, repairs. */
-export function attentionItems(brief: DailyBrief): AttentionItem[] {
+/**
+ * The brief's action items, most urgent first: rooms to get ready, IDs, decisions, repairs. A
+ * knock-on joins the row it is about (stays to move out of an out-of-order room, who to ask for a
+ * repair), or, for a room free again for a request, gets a row of its own.
+ */
+export function attentionItems(brief: DailyBrief, knockOns: KnockOn[] = []): AttentionItem[] {
   const items: AttentionItem[] = [];
   for (const r of brief.roomsToPrepare) {
     items.push({
@@ -112,6 +119,17 @@ export function attentionItems(brief: DailyBrief): AttentionItem[] {
       brief.holds.map((h) => h.summary.roomName),
     ),
   );
+  for (const k of knockOns) {
+    if (k.kind !== 'opening') continue;
+    items.push({
+      id: k.id,
+      kind: 'opening',
+      title: `A room is free for ${k.guestName}`,
+      detail: `${formatRange(k.checkIn, k.checkOut)}, from ${formatMoney(k.fromTotal)}`,
+      target: { path: `/inbox/${k.inquiryId}` },
+      knockOn: k,
+    });
+  }
   if (brief.unansweredMessages > 0) {
     items.push({
       id: 'messages',
@@ -121,19 +139,33 @@ export function attentionItems(brief: DailyBrief): AttentionItem[] {
     });
   }
   for (const r of brief.outOfOrder) {
+    const relocate = knockOns.find((k) => k.kind === 'relocate' && k.roomId === r.roomId);
     items.push({
       id: `ooo:${r.roomId}`,
       kind: 'out_of_order',
       title: `Room ${r.roomName} is out of order`,
+      ...(relocate?.kind === 'relocate' && {
+        detail: `${plural(relocate.moves.length, 'stay')} to move`,
+        knockOn: relocate,
+      }),
       target: { path: '/housekeeping' },
     });
   }
   for (const t of brief.maintenance) {
+    const repair = knockOns.find((k) => k.kind === 'repair' && k.taskId === t.taskId);
     items.push({
       id: `task:${t.taskId}`,
       kind: 'maintenance',
-      title: `Room ${t.roomName} needs a repair`,
-      detail: t.notes ?? 'Maintenance task open',
+      ...(repair?.kind === 'repair'
+        ? {
+            title: `Room ${t.roomName}: ${repair.issue.replace(/\.$/, '')}`,
+            detail: `Ask ${contactName(repair.contact)}`,
+            knockOn: repair,
+          }
+        : {
+            title: `Room ${t.roomName} needs a repair`,
+            detail: t.notes ?? 'Maintenance task open',
+          }),
       target: { path: '/housekeeping' },
     });
   }

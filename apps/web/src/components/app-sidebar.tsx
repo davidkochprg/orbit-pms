@@ -18,7 +18,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useCommandPalette } from '@/hooks/use-command-palette';
-import { useHotelProfile, useInbox } from '@/lib/api';
+import { useHotelProfile, useInbox, useKnockOns } from '@/lib/api';
 import { folderCounts } from '@/lib/inbox';
 import { type NavGroup, navItemFor, navItems } from '@/lib/nav';
 import { cn, labelCaps } from '@/lib/utils';
@@ -36,6 +36,9 @@ export function AppSidebar() {
   const inbox = useInbox();
   const hotel = useHotelProfile();
   const unread = inbox.data ? folderCounts(inbox.data).unread : 0;
+  // Things a change made worth doing; Today lists them under "Needs attention".
+  const knockOns = useKnockOns().data?.length ?? 0;
+  const badges: Record<string, number> = { '/': knockOns, '/inbox': unread };
 
   return (
     <Sidebar collapsible="icon" variant="inset">
@@ -85,9 +88,9 @@ export function AppSidebar() {
                           <span>{item.label}</span>
                         </NavLink>
                       </SidebarMenuButton>
-                      {item.path === '/inbox' && unread > 0 && (
+                      {(badges[item.path] ?? 0) > 0 && (
                         <SidebarMenuBadge className="top-1.5! rounded-full bg-primary-soft px-1.5 font-mono text-[0.6875rem] text-primary-text">
-                          {unread}
+                          {badges[item.path]}
                         </SidebarMenuBadge>
                       )}
                     </SidebarMenuItem>

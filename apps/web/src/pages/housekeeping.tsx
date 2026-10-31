@@ -15,12 +15,20 @@ import {
   roomStatuses,
 } from '@orbit/shared';
 import { CalendarRange, Keyboard, Mic, Plus } from 'lucide-react';
-import { type ComponentProps, type ReactElement, type Ref, useEffect, useState } from 'react';
+import {
+  type ComponentProps,
+  type ReactElement,
+  type Ref,
+  useCallback,
+  useEffect,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { HousekeepingNoteDialog, type NoteMode } from '@/components/housekeeping-note-dialog';
 import { HousekeepingRoomCard } from '@/components/housekeeping-room-card';
 import { PageHeader } from '@/components/page-header';
+import { RelocateAfterMarking } from '@/components/relocate-dialog';
 import { RepairDialog } from '@/components/repair-panel';
 import { Count } from '@/components/panel';
 import { StatusDot } from '@/components/status-dot';
@@ -60,6 +68,10 @@ export function HousekeepingPage() {
   // Undefined: closed. A room ID or null: open, with or without a room chosen.
   const [taskRoom, setTaskRoom] = useState<string | null | undefined>(undefined);
   const [repairTask, setRepairTask] = useState<string | null>(null);
+  const [markedOutOfOrder, setMarkedOutOfOrder] = useState<{ roomId: string; at: number } | null>(
+    null,
+  );
+  const clearMarked = useCallback(() => setMarkedOutOfOrder(null), []);
   const contacts = useContacts();
   const repairs: RepairLinks = {
     open: (task) => setRepairTask(task.id),
@@ -96,10 +108,14 @@ export function HousekeepingPage() {
         (status === 'clean' || status === 'inspected') &&
         (t.type === 'turnover' || t.type === 'stayover'),
     );
+    // Knock-ons refetch before onSuccess runs, so the time is taken before the change.
+    const at = Date.now();
     setStatus.mutate(
       { roomId, status },
       {
-        onSuccess: () =>
+        onSuccess: () => {
+          // Stays booked into it are offered a move once the knock-ons are worked out again.
+          if (status === 'out_of_order') setMarkedOutOfOrder({ roomId, at });
           toast({
             title: `Room ${item.room.name} marked ${roomStatusLabels[status].toLowerCase()}`,
             action: {
@@ -114,7 +130,8 @@ export function HousekeepingPage() {
                   },
                 ),
             },
-          }),
+          });
+        },
       },
     );
   }
@@ -248,6 +265,7 @@ export function HousekeepingPage() {
         roomId={taskRoom ?? undefined}
       />
       <RepairDialog taskId={repairTask} onOpenChange={(open) => !open && setRepairTask(null)} />
+      <RelocateAfterMarking marked={markedOutOfOrder} onDone={clearMarked} />
     </>
   );
 }

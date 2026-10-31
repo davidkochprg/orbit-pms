@@ -13,7 +13,7 @@ import { useAskToRepair, useContacts, useRepair, useWorkOrder } from '@/lib/api'
 import { accessLabel, contactName, mailtoHref, telHref } from '@/lib/repairs';
 import { cn } from '@/lib/utils';
 
-/** A repair's contractors in a dialog, from a room card or a corner card. */
+/** A repair's contractors in a dialog, from a room card or Today's list. */
 export function RepairDialog({
   taskId,
   writeTo,
