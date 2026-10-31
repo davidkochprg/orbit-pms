@@ -47,4 +47,35 @@ function TooltipContent({
   );
 }
 
-export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };
+/**
+ * The app's tooltip around one element, in place of a native `title`: it shows after a short
+ * hover or on keyboard focus. The child must take a ref and pointer events (a button, link or
+ * span).
+ */
+function Tip({
+  label,
+  side = 'top',
+  children,
+  ...rest
+}: {
+  label: React.ReactNode;
+  side?: React.ComponentProps<typeof TooltipPrimitive.Content>['side'];
+  children: React.ReactElement;
+} & Omit<React.ComponentProps<typeof TooltipPrimitive.Trigger>, 'children' | 'asChild'>) {
+  // Props from an outer trigger (a context menu's, say) pass through to the child.
+  if (label === undefined || label === null || label === '') {
+    return React.cloneElement(children, rest);
+  }
+  return (
+    <Tooltip delayDuration={400}>
+      <TooltipTrigger asChild {...rest}>
+        {children}
+      </TooltipTrigger>
+      <TooltipContent side={side} sideOffset={4}>
+        {label}
+      </TooltipContent>
+    </Tooltip>
+  );
+}
+
+export { Tip, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger };

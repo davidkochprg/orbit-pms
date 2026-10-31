@@ -13,6 +13,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/hooks/use-session';
 import { staffRoleLabels } from '@/lib/session';
+import { Tip } from '@/components/ui/tooltip';
 
 /** The signed-in staff member at the bottom of the sidebar; opens a menu to switch user. */
 export function UserCard() {
@@ -25,19 +26,18 @@ export function UserCard() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger
-        title={`${current.name}, ${staffRoleLabels[current.role]}`}
-        className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:px-0"
-      >
-        <GuestAvatar name={current.name} size="md" />
-        <span className="flex min-w-0 flex-1 flex-col leading-tight group-data-[collapsible=icon]:hidden">
-          <span className="truncate text-sm font-medium">{current.name}</span>
-          <span className="truncate text-xs text-muted-foreground">
-            {staffRoleLabels[current.role]}
+      <Tip label={`${current.name}, ${staffRoleLabels[current.role]}`}>
+        <DropdownMenuTrigger className="flex min-w-0 flex-1 items-center gap-2.5 rounded-lg px-1 py-1 text-left outline-none hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-ring group-data-[collapsible=icon]:flex-none group-data-[collapsible=icon]:px-0">
+          <GuestAvatar name={current.name} size="md" />
+          <span className="flex min-w-0 flex-1 flex-col leading-tight group-data-[collapsible=icon]:hidden">
+            <span className="truncate text-sm font-medium">{current.name}</span>
+            <span className="truncate text-xs text-muted-foreground">
+              {staffRoleLabels[current.role]}
+            </span>
           </span>
-        </span>
-        <ChevronsUpDown className="size-3.5 shrink-0 text-subtle-foreground group-data-[collapsible=icon]:hidden" />
-      </DropdownMenuTrigger>
+          <ChevronsUpDown className="size-3.5 shrink-0 text-subtle-foreground group-data-[collapsible=icon]:hidden" />
+        </DropdownMenuTrigger>
+      </Tip>
       <DropdownMenuContent side="top" align="start" className="w-64">
         <DropdownMenuGroup>
           <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">

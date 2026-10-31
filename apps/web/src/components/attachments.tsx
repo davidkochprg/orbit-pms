@@ -92,7 +92,7 @@ export function AttachButton({
         size="sm"
         disabled={disabled || upload.isPending}
         onClick={() => input.current?.click()}
-        title={upload.error?.message}
+        tooltip={upload.error?.message}
         className={cn(upload.error && 'text-destructive')}
       >
         <Paperclip /> {upload.isPending ? 'Attaching…' : 'Attach'}

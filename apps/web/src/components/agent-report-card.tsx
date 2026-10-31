@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import { formatDate, formatMoney, formatRange } from '@/lib/format';
 import { type Change, percent, pointChange, relativeChange } from '@/lib/reports';
+import { Tip } from '@/components/ui/tooltip';
 
 /**
  * A report the agent ran: occupancy, ADR, RevPAR and room revenue, a bar per night, and, when it
@@ -86,12 +87,12 @@ function NightBars({ days }: { days: Report['days'] }) {
         className="flex h-12 items-end gap-px border-b border-border"
       >
         {days.map((d) => (
-          <span
-            key={d.date}
-            title={`${formatDate(d.date)}: ${percent(d.occupancy)}%`}
-            className="min-w-0 flex-1 rounded-t-[3px] bg-linear-to-b from-primary to-accent-violet/70 opacity-75"
-            style={{ height: `${Math.max(percent(d.occupancy), d.roomsSold > 0 ? 2 : 0)}%` }}
-          />
+          <Tip key={d.date} label={`${formatDate(d.date)}: ${percent(d.occupancy)}%`}>
+            <span
+              className="min-w-0 flex-1 rounded-t-[3px] bg-linear-to-b from-primary to-accent-violet/70 opacity-75"
+              style={{ height: `${Math.max(percent(d.occupancy), d.roomsSold > 0 ? 2 : 0)}%` }}
+            />
+          </Tip>
         ))}
       </div>
       <figcaption className="flex justify-between text-[10px] text-subtle-foreground">

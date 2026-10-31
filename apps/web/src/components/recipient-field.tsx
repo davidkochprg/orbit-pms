@@ -9,6 +9,7 @@ import {
   uniqueRecipients,
 } from '@/lib/mail';
 import { cn } from '@/lib/utils';
+import { Tip } from '@/components/ui/tooltip';
 
 interface RecipientFieldProps {
   label: string;
@@ -95,21 +96,19 @@ export function RecipientField({
       </label>
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1 py-1.5">
         {value.map((r) => (
-          <span
-            key={r.address}
-            title={r.address}
-            className="flex h-6 max-w-64 items-center gap-1 rounded-full bg-ink/5 pr-1 pl-2.5 text-xs"
-          >
-            <span className="truncate">{recipientLabel(r)}</span>
-            <button
-              type="button"
-              aria-label={`Remove ${recipientLabel(r)}`}
-              onClick={() => onChange(value.filter((x) => x !== r))}
-              className="grid size-4 place-items-center rounded-full text-muted-foreground hover:bg-ink/10 hover:text-foreground"
-            >
-              <X className="size-3" />
-            </button>
-          </span>
+          <Tip key={r.address} label={r.address}>
+            <span className="flex h-6 max-w-64 items-center gap-1 rounded-full bg-ink/5 pr-1 pl-2.5 text-xs">
+              <span className="truncate">{recipientLabel(r)}</span>
+              <button
+                type="button"
+                aria-label={`Remove ${recipientLabel(r)}`}
+                onClick={() => onChange(value.filter((x) => x !== r))}
+                className="grid size-4 place-items-center rounded-full text-muted-foreground hover:bg-ink/10 hover:text-foreground"
+              >
+                <X className="size-3" />
+              </button>
+            </span>
+          </Tip>
         ))}
         <input
           id={id}

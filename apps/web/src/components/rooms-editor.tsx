@@ -33,6 +33,7 @@ import { occupancyLabels } from '@/lib/housekeeping';
 import { periodRange } from '@/lib/reports';
 import { roomStatusColor, roomStatusLabels } from '@/lib/status';
 import { cn } from '@/lib/utils';
+import { Tip } from '@/components/ui/tooltip';
 
 interface Props {
   readOnly: boolean;
@@ -176,24 +177,29 @@ export function RoomsEditor({ readOnly }: Props) {
                     const occupancy = tonight.get(r.id);
                     return (
                       <li key={r.id}>
-                        <button
-                          type="button"
-                          disabled={readOnly}
-                          onClick={() => setEditingRoom({ item: r })}
-                          title={`${roomStatusLabels[r.status]}${occupancy ? ` · ${occupancyLabels[occupancy]}` : ''}`}
-                          className="flex w-full flex-col items-start gap-0.5 rounded-[10px] bg-background px-2.5 py-2 text-left ring-1 ring-ink/6 outline-none ring-inset hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
+                        <Tip
+                          label={`${roomStatusLabels[r.status]}${occupancy ? ` · ${occupancyLabels[occupancy]}` : ''}`}
                         >
-                          <span className="flex w-full items-center gap-1.5">
-                            <span className="font-mono text-[0.8125rem] font-medium">{r.name}</span>
-                            <StatusDot className={cn('ml-auto', roomStatusColor[r.status])} />
-                          </span>
-                          <span className="w-full truncate text-[0.6875rem] text-muted-foreground">
-                            {typeName.get(r.roomTypeId) ?? r.roomTypeId}
-                          </span>
-                          <span className="text-[0.6875rem] text-subtle-foreground">
-                            {occupancy ? occupancyLabels[occupancy] : '\u00a0'}
-                          </span>
-                        </button>
+                          <button
+                            type="button"
+                            disabled={readOnly}
+                            onClick={() => setEditingRoom({ item: r })}
+                            className="flex w-full flex-col items-start gap-0.5 rounded-[10px] bg-background px-2.5 py-2 text-left ring-1 ring-ink/6 outline-none ring-inset hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
+                          >
+                            <span className="flex w-full items-center gap-1.5">
+                              <span className="font-mono text-[0.8125rem] font-medium">
+                                {r.name}
+                              </span>
+                              <StatusDot className={cn('ml-auto', roomStatusColor[r.status])} />
+                            </span>
+                            <span className="w-full truncate text-[0.6875rem] text-muted-foreground">
+                              {typeName.get(r.roomTypeId) ?? r.roomTypeId}
+                            </span>
+                            <span className="text-[0.6875rem] text-subtle-foreground">
+                              {occupancy ? occupancyLabels[occupancy] : '\u00a0'}
+                            </span>
+                          </button>
+                        </Tip>
                       </li>
                     );
                   })}

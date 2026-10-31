@@ -274,7 +274,7 @@ export function InboxPage() {
               variant="ghost"
               size="icon-sm"
               aria-label="Keyboard shortcuts"
-              title="Keyboard shortcuts (?)"
+              tooltip="Keyboard shortcuts (?)"
               onClick={() => setHelp(true)}
               className="max-md:hidden"
             >
@@ -284,7 +284,7 @@ export function InboxPage() {
               variant="outline"
               size="sm"
               aria-label="Add a guest message"
-              title="Add a guest message"
+              tooltip="Add a guest message"
               onClick={() => setAdding(true)}
             >
               <Plus /> <span className="hidden sm:inline">Add a guest message</span>
@@ -320,7 +320,7 @@ export function InboxPage() {
               variant="ghost"
               size="icon-xs"
               aria-label="New label"
-              title="New label"
+              tooltip="New label"
               onClick={() => setLabelEditing(null)}
             >
               <Plus />
@@ -453,7 +453,7 @@ export function InboxPage() {
                         }
                         onToggle={(l, on) => act(on ? 'label' : 'unlabel', l)}
                       >
-                        <Button variant="ghost" size="icon-sm" aria-label="Label" title="Label">
+                        <Button variant="ghost" size="icon-sm" aria-label="Label" tooltip="Label">
                           <Tag />
                         </Button>
                       </LabelMenu>
@@ -704,7 +704,7 @@ function ToolButton({
   children: ReactNode;
 }) {
   return (
-    <Button variant="ghost" size="icon-sm" aria-label={label} title={label} onClick={onClick}>
+    <Button variant="ghost" size="icon-sm" aria-label={label} tooltip={label} onClick={onClick}>
       {children}
     </Button>
   );

@@ -14,6 +14,7 @@ import { useCommandPalette } from '@/hooks/use-command-palette';
 import { useSetRoomStatus, useSetTaskStatus } from '@/lib/api';
 import { taskLabel, taskStatusLabels } from '@/lib/housekeeping';
 import { roomStatusColor, roomStatusLabels } from '@/lib/status';
+import { Tip } from '@/components/ui/tooltip';
 
 /** A housekeeping change the agent made straight away, without a confirm card. */
 export type HousekeepingChangeResult =
@@ -107,9 +108,9 @@ function SetBack({
   return (
     <span className="flex shrink-0 items-center gap-2">
       {state.error && (
-        <span className="max-w-48 truncate text-xs text-destructive" title={state.error.message}>
-          {state.error.message}
-        </span>
+        <Tip label={state.error.message}>
+          <span className="max-w-48 truncate text-xs text-destructive">{state.error.message}</span>
+        </Tip>
       )}
       <Button variant="ghost" size="xs" disabled={state.isPending} onClick={run}>
         Set back to {label.toLowerCase()}

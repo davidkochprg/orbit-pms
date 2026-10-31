@@ -27,6 +27,7 @@ import { senderLabel } from '@/lib/inbox';
 import { formatParty, formatRange, statusLabels } from '@/lib/format';
 import { bookingStatusColor, roomStatusColor, roomStatusLabels } from '@/lib/status';
 import { cn } from '@/lib/utils';
+import { Tip } from '@/components/ui/tooltip';
 
 const chip =
   'inline-flex h-6 max-w-full items-center gap-1.5 rounded-full bg-ink/5 py-0 pr-2 pl-0.5 align-middle text-[0.8125rem] leading-none text-foreground outline-none transition-colors hover:bg-ink/9 focus-visible:ring-2 focus-visible:ring-ring';
@@ -66,20 +67,19 @@ function BookingChip({ id }: { id: string }) {
   const openBooking = useOpenBooking();
   return (
     <BookingContextMenu bookingId={id}>
-      <button
-        type="button"
-        onClick={() => openBooking(id)}
-        title={
+      <Tip
+        label={
           b.checkIn && b.checkOut
             ? `${formatRange(b.checkIn, b.checkOut)}${b.status ? ` · ${statusLabels[b.status]}` : ''}`
             : undefined
         }
-        className={chip}
       >
-        <GuestAvatar name={b.guestName ?? '?'} className="size-5 text-[8px]" />
-        <span className="truncate">{b.guestName ?? 'Booking'}</span>
-        {b.roomName && <RoomBadge name={b.roomName} />}
-      </button>
+        <button type="button" onClick={() => openBooking(id)} className={chip}>
+          <GuestAvatar name={b.guestName ?? '?'} className="size-5 text-[8px]" />
+          <span className="truncate">{b.guestName ?? 'Booking'}</span>
+          {b.roomName && <RoomBadge name={b.roomName} />}
+        </button>
+      </Tip>
     </BookingContextMenu>
   );
 }
@@ -138,14 +138,12 @@ function RoomChip({ id }: { id: string }) {
   const { room, name } = useRoom(id);
   return (
     <RoomMenu id={id}>
-      <button
-        type="button"
-        title={room ? roomStatusLabels[room.status] : undefined}
-        className={cn(chip, 'pl-2')}
-      >
-        {room && <StatusDot className={roomStatusColor[room.status]} />}
-        Room <span className="font-mono">{name}</span>
-      </button>
+      <Tip label={room ? roomStatusLabels[room.status] : undefined}>
+        <button type="button" className={cn(chip, 'pl-2')}>
+          {room && <StatusDot className={roomStatusColor[room.status]} />}
+          Room <span className="font-mono">{name}</span>
+        </button>
+      </Tip>
     </RoomMenu>
   );
 }
@@ -232,9 +230,11 @@ export function BookingRow({ id, children }: { id: string; children?: ReactNode 
         <span className="flex shrink-0 flex-col items-end gap-1">
           <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
             {b.status && (
-              <span title={statusLabels[b.status]} className="flex">
-                <StatusDot className={bookingStatusColor[b.status]} />
-              </span>
+              <Tip label={statusLabels[b.status]}>
+                <span className="flex">
+                  <StatusDot className={bookingStatusColor[b.status]} />
+                </span>
+              </Tip>
             )}
             {b.roomName && <RoomBadge name={b.roomName} />}
           </span>

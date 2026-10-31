@@ -15,6 +15,7 @@ import { Panel } from '@/components/panel';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
 import { useFileNote, useHealth, useSaveEntry } from '@/lib/api';
+import { Tip } from '@/components/ui/tooltip';
 
 /**
  * A new note: staff describe it in their own words and Orbit titles, files, tags and links it, or
@@ -74,9 +75,11 @@ export function NewNote({
             {target ? `Update ${target.title}` : 'New note'}
           </h2>
           <Button variant="ghost" size="icon-sm" asChild className="max-lg:hidden">
-            <Link to="/knowledge" aria-label="Discard" title="Discard">
-              <X />
-            </Link>
+            <Tip label="Discard">
+              <Link to="/knowledge" aria-label="Discard">
+                <X />
+              </Link>
+            </Tip>
           </Button>
         </>
       }

@@ -105,6 +105,7 @@ import {
   replyAllCc,
 } from '@/lib/mail';
 import { cn } from '@/lib/utils';
+import { Tip } from '@/components/ui/tooltip';
 
 /**
  * One conversation: its history, Orbit's help when asked for, and the reply. Preparing reads the
@@ -380,7 +381,7 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
             size="icon-sm"
             aria-label={m.starred ? 'Unstar' : 'Star'}
             aria-pressed={m.starred}
-            title={m.starred ? 'Unstar (s)' : 'Star (s)'}
+            tooltip={m.starred ? 'Unstar (s)' : 'Star (s)'}
             onClick={() => setStarred.mutate(!m.starred)}
             className={m.starred ? 'text-warning' : 'text-muted-foreground'}
           >
@@ -396,7 +397,7 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
               variant="ghost"
               size="icon-sm"
               aria-label="Labels"
-              title="Labels"
+              tooltip="Labels"
               className="text-muted-foreground"
             >
               <Tag />
@@ -406,7 +407,7 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
             variant="ghost"
             size="icon-sm"
             aria-label="Forward"
-            title="Forward (f)"
+            tooltip="Forward (f)"
             asChild
             className="text-muted-foreground"
           >
@@ -566,7 +567,7 @@ function IconButton({
       variant="ghost"
       size="icon-sm"
       aria-label={label}
-      title={label}
+      tooltip={label}
       onClick={onClick}
       className="text-muted-foreground"
     >
@@ -681,10 +682,12 @@ function Addressees({ message }: { message: InboxMessage }) {
           {i > 0 && ' · '}
           {kind}{' '}
           {list.map((r, j) => (
-            <span key={r.address} title={formatRecipient(r)}>
-              {j > 0 && ', '}
-              {recipientLabel(r)}
-            </span>
+            <Tip key={r.address} label={formatRecipient(r)}>
+              <span>
+                {j > 0 && ', '}
+                {recipientLabel(r)}
+              </span>
+            </Tip>
           ))}
         </span>
       ))}
@@ -1115,7 +1118,7 @@ function ReplyEditor({
           <Button
             size="sm"
             disabled={!theirs.trim() || send.isPending || behind || translating || busy}
-            title={behind ? `Translate your ${myName} changes first` : undefined}
+            tooltip={behind ? `Translate your ${myName} changes first` : undefined}
             onClick={sendNow}
           >
             <Send /> {sendLabel(m)}
@@ -1177,7 +1180,7 @@ function ReplyEditor({
                 variant="ghost"
                 size="icon-xs"
                 aria-label="Discard draft"
-                title="Discard draft"
+                tooltip="Discard draft"
                 onClick={discardDraft}
               >
                 <Trash2 />

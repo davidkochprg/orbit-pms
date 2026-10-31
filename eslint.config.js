@@ -39,6 +39,15 @@ export default tseslint.config(
     rules: {
       ...reactHooks.configs.recommended.rules,
       'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
+      // The OS tooltip looks foreign in the app: use <Tip> or Button's `tooltip` instead.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            "JSXOpeningElement[name.name=/^([a-z]|Link$|NavLink$|Input$|Textarea$)/] > JSXAttribute[name.name='title']",
+          message: "Use <Tip label> or Button's `tooltip` instead of a native title.",
+        },
+      ],
     },
   },
   {

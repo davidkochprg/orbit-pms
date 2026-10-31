@@ -220,7 +220,7 @@ function RepairRow({
           variant="outline"
           size="icon-sm"
           aria-label={`Call ${contactName(contact)}`}
-          title={`Call ${contact.phone}`}
+          tooltip={`Call ${contact.phone}`}
         >
           <a href={telHref(contact.phone)} onClick={() => ask.mutate(contact.id)}>
             <Phone />

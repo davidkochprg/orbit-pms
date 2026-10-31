@@ -34,6 +34,7 @@ import { RoomStatusDot } from '@/components/room-status-dot';
 import { StatusDot } from '@/components/status-dot';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Tip } from '@/components/ui/tooltip';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -385,12 +386,11 @@ function DayHeader({
               )}
             >
               {weekday}
-              <span
-                className="text-subtle-foreground tabular-nums"
-                title={`${occupied(day)} of ${total} rooms occupied`}
-              >
-                {total > 0 ? Math.round((occupied(day) / total) * 100) : 0}%
-              </span>
+              <Tip label={`${occupied(day)} of ${total} rooms occupied`}>
+                <span className="text-subtle-foreground tabular-nums">
+                  {total > 0 ? Math.round((occupied(day) / total) * 100) : 0}%
+                </span>
+              </Tip>
             </span>
             <span
               className={cn(
@@ -435,13 +435,14 @@ function RoomGroupBlock({
         style={{ width: TAPE_ROOM_COLUMN }}
       >
         <div className="flex w-7 shrink-0 items-center justify-center border-r border-grid-line">
-          <span
-            title={group.label}
-            className="rotate-180 truncate text-xs font-medium text-subtle-foreground [writing-mode:vertical-rl]"
-            style={{ maxHeight: group.rooms.length * TAPE_ROW_HEIGHT - 12 }}
-          >
-            {group.label}
-          </span>
+          <Tip label={group.label} side="right">
+            <span
+              className="rotate-180 truncate text-xs font-medium text-subtle-foreground [writing-mode:vertical-rl]"
+              style={{ maxHeight: group.rooms.length * TAPE_ROW_HEIGHT - 12 }}
+            >
+              {group.label}
+            </span>
+          </Tip>
         </div>
         <div className="flex min-w-0 flex-1 flex-col">
           {group.rooms.map((room) => (
@@ -507,11 +508,6 @@ function RoomLane({
             <div
               key={day}
               data-day={day}
-              title={
-                bookable(day)
-                  ? `New booking in room ${room.name} from ${formatDate(day)}`
-                  : undefined
-              }
               onClick={() => !disabled && bookable(day) && onNew(room.id, day)}
               className={cn(
                 'h-full shrink-0 border-r border-grid-line last:border-r-0',
@@ -523,7 +519,7 @@ function RoomLane({
             />
           ))}
           {room.status === 'out_of_order' && (
-            <div className="bg-hatch pointer-events-none absolute inset-0" title="Out of order" />
+            <div className="bg-hatch pointer-events-none absolute inset-0" />
           )}
           {preview?.mode === 'move' && preview.roomId === room.id && (
             <LandingGhost target={preview} start={start} dayWidth={dayWidth} />
@@ -658,59 +654,60 @@ function BookingBar({
   return (
     <>
       <BookingContextMenu bookingId={booking.id}>
-        <button
-          ref={moveRef}
-          type="button"
-          title={label}
-          aria-label={label}
-          onClick={() => onOpen(booking.id)}
-          // The bar has its own menu; keep the lane's "new booking" menu from opening too.
-          onContextMenu={(e) => e.stopPropagation()}
-          {...moveListeners}
-          {...moveAttributes}
-          className={cn(
-            'absolute top-[6px] bottom-[6px] flex items-center gap-1.5 overflow-hidden rounded-lg pr-2 pl-3.5 text-left text-sm outline-none',
-            'transition-[box-shadow,filter] duration-150 ease-snap hover:shadow-floating focus-visible:ring-2 focus-visible:ring-ring',
-            barStyles[booking.status],
-            place.continuesBefore && 'rounded-l-none',
-            place.continuesAfter && 'rounded-r-none',
-            canDrag && 'cursor-grab active:cursor-grabbing',
-            dragging && 'z-30 shadow-floating',
-            saving && 'opacity-70',
-          )}
-          style={{
-            left,
-            width,
-            transform: moveTransform
-              ? `translate3d(${moveTransform.x}px, ${moveTransform.y}px, 0)`
-              : undefined,
-          }}
-        >
-          <span
-            aria-hidden
+        <Tip label={label}>
+          <button
+            ref={moveRef}
+            type="button"
+            aria-label={label}
+            onClick={() => onOpen(booking.id)}
+            // The bar has its own menu; keep the lane's "new booking" menu from opening too.
+            onContextMenu={(e) => e.stopPropagation()}
+            {...moveListeners}
+            {...moveAttributes}
             className={cn(
-              'absolute top-1.5 bottom-1.5 left-1.5 w-[3px] rounded-full',
-              bookingStatusColor[booking.status],
+              'absolute top-[6px] bottom-[6px] flex items-center gap-1.5 overflow-hidden rounded-lg pr-2 pl-3.5 text-left text-sm outline-none',
+              'transition-[box-shadow,filter] duration-150 ease-snap hover:shadow-floating focus-visible:ring-2 focus-visible:ring-ring',
+              barStyles[booking.status],
+              place.continuesBefore && 'rounded-l-none',
+              place.continuesAfter && 'rounded-r-none',
+              canDrag && 'cursor-grab active:cursor-grabbing',
+              dragging && 'z-30 shadow-floating',
+              saving && 'opacity-70',
             )}
-          />
-          {width >= LABEL_MIN_WIDTH && place.continuesBefore && (
-            <ChevronLeft className="-ml-1 size-3.5 shrink-0 text-muted-foreground" />
-          )}
-          {width >= LABEL_MIN_WIDTH && <span className="truncate">{name}</span>}
-          {resizeTo ? (
-            <span className="ml-auto shrink-0 pl-1 text-xs text-primary-text">
-              to {formatDate(resizeTo)}
-            </span>
-          ) : (
-            icons.length > 0 && (
-              <span className="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
-                {icons.map(({ icon: Icon, label: iconLabel }) => (
-                  <Icon key={iconLabel} aria-label={iconLabel} className="size-3.5" />
-                ))}
+            style={{
+              left,
+              width,
+              transform: moveTransform
+                ? `translate3d(${moveTransform.x}px, ${moveTransform.y}px, 0)`
+                : undefined,
+            }}
+          >
+            <span
+              aria-hidden
+              className={cn(
+                'absolute top-1.5 bottom-1.5 left-1.5 w-[3px] rounded-full',
+                bookingStatusColor[booking.status],
+              )}
+            />
+            {width >= LABEL_MIN_WIDTH && place.continuesBefore && (
+              <ChevronLeft className="-ml-1 size-3.5 shrink-0 text-muted-foreground" />
+            )}
+            {width >= LABEL_MIN_WIDTH && <span className="truncate">{name}</span>}
+            {resizeTo ? (
+              <span className="ml-auto shrink-0 pl-1 text-xs text-primary-text">
+                to {formatDate(resizeTo)}
               </span>
-            )
-          )}
-        </button>
+            ) : (
+              icons.length > 0 && (
+                <span className="ml-auto flex shrink-0 items-center gap-1.5 text-muted-foreground">
+                  {icons.map(({ icon: Icon, label: iconLabel }) => (
+                    <Icon key={iconLabel} aria-label={iconLabel} className="size-3.5" />
+                  ))}
+                </span>
+              )
+            )}
+          </button>
+        </Tip>
       </BookingContextMenu>
       {canDrag && !place.continuesAfter && !moving && (
         <span

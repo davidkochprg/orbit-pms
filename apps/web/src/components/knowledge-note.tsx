@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { formatDate, formatRecent } from '@/lib/format';
 import { findNote, folderIcons, noteBlocks, noteHref, tagHref } from '@/lib/knowledge';
 import { cn } from '@/lib/utils';
+import { Tip } from '@/components/ui/tooltip';
 
 const sourceLabels: Record<HotelInfoSource, string> = {
   staff: 'Edited',
@@ -134,13 +135,11 @@ function Runs({ runs, notes }: { runs: NoteRun[]; notes: HotelInfoEntry[] }) {
         {run.link}
       </Link>
     ) : (
-      <span
-        key={i}
-        title="No note with this title"
-        className="text-muted-foreground underline decoration-ink/25 decoration-dotted underline-offset-[3px]"
-      >
-        {run.link}
-      </span>
+      <Tip key={i} label="No note with this title">
+        <span className="text-muted-foreground underline decoration-ink/25 decoration-dotted underline-offset-[3px]">
+          {run.link}
+        </span>
+      </Tip>
     );
   });
 }
@@ -176,7 +175,7 @@ export function NoteView({
               variant="ghost"
               size="icon-sm"
               aria-label="Delete"
-              title="Delete"
+              tooltip="Delete"
               onClick={onDelete}
             >
               <Trash2 />

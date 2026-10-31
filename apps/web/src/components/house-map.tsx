@@ -1,6 +1,7 @@
 import type { HousekeepingRoom } from '@orbit/shared';
 import { type HouseRoomState, houseFloors, houseStateLabels, houseStates } from '@/lib/house-map';
 import { cn } from '@/lib/utils';
+import { Tip } from '@/components/ui/tooltip';
 
 /** Fill per state: taken tonight in the accent, empty rooms as unlit windows. */
 const stateClass: Record<HouseRoomState, string> = {
@@ -71,27 +72,27 @@ export function HouseMap({
                   </>
                 );
                 return (
-                  <li
-                    key={room.id}
-                    title={room.label}
-                    style={{ animationDelay: `${index++ * 8}ms` }}
-                    className="flex min-w-0 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-90 motion-safe:fill-mode-backwards motion-safe:animation-duration-300"
-                  >
-                    {action ? (
-                      <button
-                        type="button"
-                        onClick={action}
-                        className={cn(
-                          tile,
-                          'cursor-pointer transition-[filter,translate] duration-150 ease-snap outline-none hover:brightness-[1.08] focus-visible:ring-2 focus-visible:ring-ring active:translate-y-px dark:hover:brightness-125',
-                        )}
-                      >
-                        {name}
-                      </button>
-                    ) : (
-                      <span className={tile}>{name}</span>
-                    )}
-                  </li>
+                  <Tip key={room.id} label={room.label}>
+                    <li
+                      style={{ animationDelay: `${index++ * 8}ms` }}
+                      className="flex min-w-0 motion-safe:animate-in motion-safe:fade-in motion-safe:zoom-in-90 motion-safe:fill-mode-backwards motion-safe:animation-duration-300"
+                    >
+                      {action ? (
+                        <button
+                          type="button"
+                          onClick={action}
+                          className={cn(
+                            tile,
+                            'cursor-pointer transition-[filter,translate] duration-150 ease-snap outline-none hover:brightness-[1.08] focus-visible:ring-2 focus-visible:ring-ring active:translate-y-px dark:hover:brightness-125',
+                          )}
+                        >
+                          {name}
+                        </button>
+                      ) : (
+                        <span className={tile}>{name}</span>
+                      )}
+                    </li>
+                  </Tip>
                 );
               })}
             </ul>

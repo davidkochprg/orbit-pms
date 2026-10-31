@@ -7,6 +7,7 @@ import { StatusDot } from '@/components/status-dot';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { formatParty, statusLabels } from '@/lib/format';
 import { bookingStatusColor } from '@/lib/status';
+import { Tip } from '@/components/ui/tooltip';
 
 /** A compact list of bookings; a row opens the booking inspector. */
 export function BookingList({
@@ -44,15 +45,14 @@ export function BookingList({
                     {detail ? detail(row) : formatParty(booking.adults, booking.childAges)}
                   </span>
                 </span>
-                <span
-                  className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground"
-                  title={statusLabels[booking.status]}
-                >
-                  <StatusDot className={bookingStatusColor[booking.status]} />
-                  <span className="min-w-10 rounded-md border border-ink/7 bg-background px-1.5 py-0.5 text-center font-mono text-[0.75rem] text-foreground">
-                    {roomName}
+                <Tip label={statusLabels[booking.status]}>
+                  <span className="flex shrink-0 items-center gap-1.5 text-xs text-muted-foreground">
+                    <StatusDot className={bookingStatusColor[booking.status]} />
+                    <span className="min-w-10 rounded-md border border-ink/7 bg-background px-1.5 py-0.5 text-center font-mono text-[0.75rem] text-foreground">
+                      {roomName}
+                    </span>
                   </span>
-                </span>
+                </Tip>
               </button>
             </BookingContextMenu>
           </li>

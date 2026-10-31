@@ -11,6 +11,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useAddressBook } from '@/hooks/use-address-book';
 import { useAutosave } from '@/hooks/use-autosave';
 import { useComposeMessage, useDeleteDraft, useSaveDraft } from '@/lib/api';
+import { Tip } from '@/components/ui/tooltip';
 
 export interface ComposerStart {
   draftId: string;
@@ -88,9 +89,11 @@ export function MailComposer({ start, back }: { start: ComposerStart; back: stri
           {subject.trim() || (start.forwardOf ? 'Forward' : 'New email')}
         </h2>
         <Button variant="ghost" size="icon-sm" asChild className="max-lg:hidden">
-          <Link to={back} aria-label="Close" title="Close">
-            <X />
-          </Link>
+          <Tip label="Close">
+            <Link to={back} aria-label="Close">
+              <X />
+            </Link>
+          </Tip>
         </Button>
       </header>
 
@@ -169,7 +172,7 @@ export function MailComposer({ start, back }: { start: ComposerStart; back: stri
               variant="ghost"
               size="icon-sm"
               aria-label="Discard draft"
-              title="Discard draft"
+              tooltip="Discard draft"
               onClick={discard}
             >
               <Trash2 />

@@ -9,7 +9,7 @@ import { Panel } from '@/components/panel';
 import { Segmented } from '@/components/segmented';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipTrigger, Tip } from '@/components/ui/tooltip';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useDayOverview, usePricing, useReport } from '@/lib/api';
 import {
@@ -242,7 +242,9 @@ function Kpi({
   return (
     <div className="flex flex-col gap-2 border-border p-5 max-lg:odd:border-r max-lg:nth-[-n+2]:border-b lg:not-last:border-r">
       <dt className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-        <span title={hint}>{label}</span>
+        <Tip label={hint}>
+          <span>{label}</span>
+        </Tip>
         {change && <ChangeBadge change={change} vs={vs} />}
       </dt>
       <dd className="flex flex-col gap-0.5">
