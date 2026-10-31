@@ -1,4 +1,4 @@
-import type { Contact, Inquiry, RoomAccess } from '@orbit/shared';
+import type { Contact, HousekeepingRoom, Inquiry, RoomAccess } from '@orbit/shared';
 import { formatDate } from '@/lib/format';
 
 /** When a contractor can work in the room, e.g. "Free until Sat, Nov 7". */
@@ -31,4 +31,30 @@ export function repairConversations<
 /** "Example Plumbing · Sam", how a contact is named in a list. */
 export function contactName(contact: Pick<Contact, 'name' | 'person'>): string {
   return contact.person ? `${contact.name} · ${contact.person}` : contact.name;
+}
+
+/**
+ * What a contact is doing for the hotel: the open repairs they were asked to fix, and the emails
+ * with them, from their address or about one of those repairs. Latest email first.
+ */
+export function contactWork(
+  contact: Pick<Contact, 'id' | 'email'>,
+  rooms: Pick<HousekeepingRoom, 'room' | 'openTasks'>[],
+  inbox: Inquiry[],
+) {
+  const repairs = rooms.flatMap(({ room, openTasks }) =>
+    openTasks
+      .filter((t) => t.type === 'maintenance' && t.contactId === contact.id)
+      .map((t) => ({ taskId: t.id, roomName: room.name, notes: t.notes })),
+  );
+  const address = contact.email?.toLowerCase() ?? null;
+  const emails = inbox
+    .filter(
+      (m) =>
+        !m.trashedAt &&
+        ((address !== null && m.senderAddress?.toLowerCase() === address) ||
+          repairs.some((r) => r.taskId === m.taskId)),
+    )
+    .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
+  return { repairs, emails };
 }

@@ -6,6 +6,7 @@ import {
   bookingPrefillFor,
   canDecline,
   channelLabel,
+  contactOf,
   channelsOf,
   conversationsOf,
   filterConversations,
@@ -142,6 +143,18 @@ describe('canDecline', () => {
   });
 });
 
+describe('contactOf', () => {
+  it('finds the supplier or contractor by email address, in any case', () => {
+    const contacts = [
+      { id: 'ct_1', email: 'Orders@Bakery.example' },
+      { id: 'ct_2', email: null },
+    ];
+    expect(contactOf({ senderAddress: 'orders@bakery.example' }, contacts)?.id).toBe('ct_1');
+    expect(contactOf({ senderAddress: 'guest@example.com' }, contacts)).toBeNull();
+    expect(contactOf({ senderAddress: null }, contacts)).toBeNull();
+  });
+});
+
 describe('conversationsOf', () => {
   it("finds a guest's conversations by their booking or email, latest first", () => {
     const all = [
@@ -158,6 +171,14 @@ describe('conversationsOf', () => {
       'a',
     ]);
     expect(conversationsOf(all, { email: null }, []).map((m) => m.id)).toEqual([]);
+  });
+
+  it("includes a group's block the stay is in, and leaves out the trash", () => {
+    const all = [
+      conversation({ id: 'block', bookingId: 'bk_1', blockBookingIds: ['bk_1', 'bk_2'] }),
+      conversation({ id: 'gone', bookingId: 'bk_2', trashedAt: '2026-10-28T10:00:00.000Z' }),
+    ];
+    expect(conversationsOf(all, { email: null }, ['bk_2']).map((m) => m.id)).toEqual(['block']);
   });
 });
 

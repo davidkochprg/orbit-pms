@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { accessLabel, contactName, repairConversations, telHref } from './repairs';
+import type { HousekeepingRoom, Inquiry } from '@orbit/shared';
+import { accessLabel, contactName, contactWork, repairConversations, telHref } from './repairs';
 
 describe('accessLabel', () => {
   it('says how long an empty room is free', () => {
@@ -50,5 +51,45 @@ describe('links', () => {
   it('names a contact with who to ask for', () => {
     expect(contactName({ name: 'Example Plumbing', person: 'Sam' })).toBe('Example Plumbing · Sam');
     expect(contactName({ name: 'Example Plumbing', person: null })).toBe('Example Plumbing');
+  });
+});
+
+describe('contactWork', () => {
+  const task = (id: string, contactId: string | null, type = 'maintenance') => ({
+    id,
+    roomId: 'rm_1',
+    type,
+    status: 'in_progress',
+    notes: `Task ${id}`,
+    trade: null,
+    contactId,
+    createdAt: '2026-11-01T08:00:00.000Z',
+  });
+  const rooms = [
+    { room: { name: '305' }, openTasks: [task('hk_1', 'ct_1'), task('hk_2', 'ct_2')] },
+    { room: { name: '101' }, openTasks: [task('hk_3', 'ct_1', 'turnover')] },
+  ] as unknown as HousekeepingRoom[];
+  const mail = (id: string, overrides: Partial<Inquiry>) =>
+    ({
+      id,
+      senderAddress: 'someone@example.com',
+      taskId: null,
+      trashedAt: null,
+      lastMessageAt: '2026-11-01T08:00:00.000Z',
+      ...overrides,
+    }) as Inquiry;
+
+  it('lists their open repairs and the emails from them or about those repairs', () => {
+    const work = contactWork({ id: 'ct_1', email: 'Service@Electric.example' }, rooms, [
+      mail('order', { senderAddress: 'service@electric.example' }),
+      mail('repair', { taskId: 'hk_1', lastMessageAt: '2026-11-02T08:00:00.000Z' }),
+      mail('other', { taskId: 'hk_2' }),
+      mail('trashed', {
+        senderAddress: 'service@electric.example',
+        trashedAt: '2026-11-02T09:00:00.000Z',
+      }),
+    ]);
+    expect(work.repairs).toEqual([{ taskId: 'hk_1', roomName: '305', notes: 'Task hk_1' }]);
+    expect(work.emails.map((m) => m.id)).toEqual(['repair', 'order']);
   });
 });

@@ -19,6 +19,7 @@ import {
   BookOpenText,
   CalendarPlus,
   Check,
+  Contact as ContactIcon,
   Copy,
   Forward,
   Languages,
@@ -67,6 +68,7 @@ import {
   useSetLabels,
   useSetStarred,
   useSetTrashed,
+  useContacts,
   useGuests,
   useHealth,
   useDraftInquiry,
@@ -94,6 +96,7 @@ import {
   analysisFacts,
   bookingPrefillFor,
   canDecline,
+  contactOf,
   channelLabel,
   guestLanguage,
   isRead,
@@ -120,6 +123,7 @@ import { Tip } from '@/components/ui/tooltip';
 export function Conversation({ id }: { id: string }) {
   const inquiry = useInquiry(id);
   const health = useHealth();
+  const contacts = useContacts();
   const { current } = useSession();
   const setUnread = useSetUnread(id);
   const reading = useReadInquiry(id);
@@ -174,8 +178,13 @@ export function Conversation({ id }: { id: string }) {
   const busy = reading.isPending || drafting.isPending;
   // Before Orbit has read the guest's latest message, preparing is the main step; the empty
   // reply box waits behind "Write it yourself".
+  // A supplier's mail isn't a request to read; a repair's is answered with the repair in hand.
   const offerPrepare =
-    m.status !== 'declined' && aiOn && !read && m.messages.at(-1)?.direction === 'in';
+    m.status !== 'declined' &&
+    aiOn &&
+    !read &&
+    (m.taskId !== null || !contactOf(m, contacts.data ?? [])) &&
+    m.messages.at(-1)?.direction === 'in';
 
   return (
     <article className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-6">
@@ -349,6 +358,8 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
   const { openNew } = useBookingEditor();
   const { open } = useBookingDrawer();
   const guests = useGuests();
+  // Mail with a supplier or contractor opens them, not a booking.
+  const contact = contactOf(m, useContacts().data ?? []);
   const setUnread = useSetUnread(m.id);
   const setArchived = useSetArchived(m.id);
   const setStarred = useSetStarred(m.id);
@@ -502,6 +513,12 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
             <Button variant="outline" size="sm" onClick={() => setRepairOpen(true)}>
               <Wrench /> Open repair
             </Button>
+          ) : contact && !m.bookingId ? (
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/contacts?contact=${encodeURIComponent(contact.id)}`}>
+                <ContactIcon /> Open contact
+              </Link>
+            </Button>
           ) : m.bookingId ? (
             <Button variant="outline" size="sm" onClick={() => open(m.bookingId!)}>
               Open booking
@@ -516,7 +533,7 @@ function Header({ inquiry: m }: { inquiry: Inquiry }) {
               <CalendarPlus /> Create booking
             </Button>
           )}
-          {canDecline(m) && (
+          {canDecline(m) && !contact && (
             <Button
               variant="ghost"
               size="sm"
@@ -967,6 +984,7 @@ function ReplyEditor({
   const [touched, setTouched] = useState(savedDraft !== undefined);
   const [sent, setSent] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
+  const contacts = useContacts();
   const [theirLanguage, setTheirLanguage] = useState<Language>(guestLanguage(m) ?? myLanguage);
   const [theirs, setTheirs] = useState(savedDraft?.body ?? suggestion?.draft ?? '');
   const replyAll = canReplyAll(m, hotelAddress);
@@ -1104,7 +1122,7 @@ function ReplyEditor({
         )}
         {aiOn && (
           <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-            {m.taskId ? 'Writes' : 'Guest writes'}
+            {m.taskId || contactOf(m, contacts.data ?? []) ? 'Writes' : 'Guest writes'}
             <Select
               value={theirLanguage}
               onValueChange={(value) => setTheirLanguage(value as Language)}

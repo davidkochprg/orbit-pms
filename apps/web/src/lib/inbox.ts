@@ -1,4 +1,5 @@
 import {
+  type Contact,
   type Guest,
   type Inquiry,
   type InquiryExtraction,
@@ -83,6 +84,15 @@ export function bookingPrefillFor(m: Inquiry, guests: Guest[]): NewBookingPrefil
     }),
     ...(a?.question && { notes: a.question }),
   };
+}
+
+/** The supplier or contractor a conversation is with, by their email address. */
+export function contactOf<C extends Pick<Contact, 'email'>>(
+  m: Pick<Inquiry, 'senderAddress'>,
+  contacts: C[],
+): C | null {
+  const address = m.senderAddress?.toLowerCase();
+  return (address && contacts.find((c) => c.email?.toLowerCase() === address)) || null;
 }
 
 /**
@@ -235,8 +245,8 @@ export function isRead(m: Inquiry): boolean {
 }
 
 /**
- * A guest's conversations: those about one of their bookings, or from their email address.
- * Latest message first.
+ * A guest's conversations: those about one of their bookings (or a block of rooms one of them
+ * is in), or from their email address. The trash left out, latest message first.
  */
 export function conversationsOf(
   all: Inquiry[],
@@ -247,8 +257,10 @@ export function conversationsOf(
   return all
     .filter(
       (m) =>
-        (m.bookingId !== null && bookingIds.includes(m.bookingId)) ||
-        (email !== null && m.senderAddress?.toLowerCase() === email),
+        !m.trashedAt &&
+        ((m.bookingId !== null && bookingIds.includes(m.bookingId)) ||
+          m.blockBookingIds.some((id) => bookingIds.includes(id)) ||
+          (email !== null && m.senderAddress?.toLowerCase() === email)),
     )
     .sort((a, b) => b.lastMessageAt.localeCompare(a.lastMessageAt));
 }

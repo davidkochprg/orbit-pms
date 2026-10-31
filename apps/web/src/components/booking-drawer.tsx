@@ -20,6 +20,7 @@ import { InlineSelect, InlineText } from '@/components/inline-field';
 import { Property, PropertyList } from '@/components/property-list';
 import { GuestMemorySection } from '@/components/guest-memory';
 import { Section } from '@/components/section';
+import { ConversationList } from '@/components/conversation-list';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -47,9 +48,11 @@ import {
   useBookingDetail,
   useFolio,
   useGuestBook,
+  useInbox,
   useUpdateBooking,
   useUpdateGuest,
 } from '@/lib/api';
+import { conversationsOf } from '@/lib/inbox';
 import {
   actionLabels,
   formatMoney,
@@ -201,6 +204,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
             <StaySection detail={detail} onEditStay={() => openEdit(booking.id)} />
             <GuestMemorySection guestId={detail.guest.id} />
             <ContactSection detail={detail} />
+            <EmailsSection detail={detail} />
           </TabsContent>
           <TabsContent value="guests" className="flex flex-col gap-3 p-5">
             <GuestsTab detail={detail} />
@@ -334,6 +338,18 @@ function StaySection({ detail, onEditStay }: { detail: BookingDetail; onEditStay
       {update.error && (
         <ErrorNotice message={update.error.message} onDismiss={() => update.reset()} />
       )}
+    </Section>
+  );
+}
+
+/** The emails with the guest: about this stay, the group's block it is in, or from them. */
+function EmailsSection({ detail }: { detail: BookingDetail }) {
+  const inbox = useInbox();
+  const emails = conversationsOf(inbox.data ?? [], detail.guest, [detail.booking.id]);
+  if (emails.length === 0) return null;
+  return (
+    <Section title="Emails" count={emails.length}>
+      <ConversationList conversations={emails} />
     </Section>
   );
 }

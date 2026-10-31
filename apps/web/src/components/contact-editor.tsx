@@ -6,8 +6,11 @@ import {
   tradeLabels,
   trades,
 } from '@orbit/shared';
+import { Wrench } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
+import { Link } from 'react-router';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ConversationList } from '@/components/conversation-list';
 import { ErrorNotice } from '@/components/error-notice';
 import { FormField } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
@@ -21,8 +24,15 @@ import {
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { useHotelProfile, useRemoveContact, useSaveContact } from '@/lib/api';
+import {
+  useHotelProfile,
+  useHousekeeping,
+  useInbox,
+  useRemoveContact,
+  useSaveContact,
+} from '@/lib/api';
 import { languageLabels } from '@/lib/format';
+import { contactWork } from '@/lib/repairs';
 import { cn } from '@/lib/utils';
 
 interface ContactEditorProps {
@@ -82,7 +92,7 @@ function ContactForm({
   }
 
   return (
-    <form onSubmit={submit} className="flex flex-col gap-4">
+    <form onSubmit={submit} className="flex min-w-0 flex-col gap-4">
       <DialogHeader>
         <DialogTitle>{contact ? contact.name : 'New contact'}</DialogTitle>
       </DialogHeader>
@@ -156,6 +166,7 @@ function ContactForm({
           />
         </FormField>
       </div>
+      {contact && <ContactWork contact={contact} />}
       {error && <ErrorNotice message={error.message} />}
       <DialogFooter>
         {contact && (
@@ -188,5 +199,35 @@ function ContactForm({
         />
       )}
     </form>
+  );
+}
+
+/** The repairs a contact was asked to fix and the emails with them, each opening where it lives. */
+function ContactWork({ contact }: { contact: Contact }) {
+  const rooms = useHousekeeping().data?.rooms ?? [];
+  const inbox = useInbox().data ?? [];
+  const { repairs, emails } = contactWork(contact, rooms, inbox);
+  if (repairs.length === 0 && emails.length === 0) return null;
+  return (
+    <div className="flex min-w-0 flex-col gap-1 border-t pt-3">
+      {repairs.length > 0 && (
+        <ul className="-mx-2 flex flex-col">
+          {repairs.map((r) => (
+            <li key={r.taskId}>
+              <Link
+                to={`/housekeeping?repair=${encodeURIComponent(r.taskId)}`}
+                className="flex items-center gap-3 rounded-lg px-2 py-2 text-sm hover:bg-accent"
+              >
+                <Wrench className="size-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate">
+                  Room {r.roomName}: {r.notes ?? 'Repair'}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+      {emails.length > 0 && <ConversationList conversations={emails.slice(0, 5)} />}
+    </div>
   );
 }
