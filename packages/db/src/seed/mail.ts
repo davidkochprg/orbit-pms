@@ -1,8 +1,10 @@
+import { addDays } from '@orbit/domain';
 import type {
   Attachment,
   Contact,
   HotelProfile,
   Inquiry,
+  IsoDate,
   MailDraft,
   MailLabel,
   StaffMember,
@@ -19,7 +21,7 @@ export interface SeedFile {
 
 export interface SeedMail {
   labels: MailLabel[];
-  /** Conversations besides the guest requests: a group enquiry, a supplier order, spam. */
+  /** Conversations besides the guest requests: group enquiries, a supplier order, spam. */
   inquiries: Inquiry[];
   drafts: MailDraft[];
   files: SeedFile[];
@@ -57,16 +59,28 @@ function file(id: string, name: string, contentType: string, bytes: Uint8Array):
   return { attachment: { id, name, contentType, size: bytes.length }, bytes };
 }
 
+/** "Tuesday, November 17". */
+function longDate(date: IsoDate): string {
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${date}T12:00:00Z`));
+}
+
 /**
  * The mailbox around the guest requests, so it reads like a working hotel inbox: labels, a
- * starred group enquiry with copies and a guest list, a supplier order with a PDF, a newsletter
- * in the trash, and two drafts. All synthetic: example.com addresses and made-up names.
+ * starred group enquiry with copies and a guest list, a team offsite asking for a block of rooms
+ * on quiet midweek nights (which the rate review picks up), a supplier order with a PDF, a
+ * newsletter in the trash, and two drafts. All synthetic: example.com addresses and made-up names.
  */
 export function buildMail(
   region: SeedRegion,
   contacts: Contact[],
   team: StaffMember[],
   profile: HotelProfile,
+  today: IsoDate,
   now: Date,
 ): SeedMail {
   const at = (hoursAgo: number) => new Date(now.getTime() - hoursAgo * HOUR).toISOString();
@@ -126,7 +140,40 @@ export function buildMail(
     },
   );
 
-  const inquiries: Inquiry[] = [wedding];
+  // The first Tuesday at least two weeks out: two midweek nights, away from the seeded events.
+  let arrive = addDays(today, 15);
+  while (new Date(`${arrive}T12:00:00Z`).getUTCDay() !== 2) arrive = addDays(arrive, 1);
+  const offsite = thread(
+    'inq_seed_offsite',
+    now,
+    [
+      {
+        direction: 'in',
+        hoursAgo: 6,
+        body: `Hi,
+
+we're planning a two-day offsite for our product team, nine people, and ${profile.name} looks perfect. We would need eight rooms (two colleagues can share), arriving ${longDate(arrive)} and leaving ${longDate(addDays(arrive, 2))}, plus somewhere quiet to work on the Wednesday.
+
+Could you hold the rooms for a few days and send a group rate?
+
+Thanks,
+Sam Placeholder
+Ops lead, Example Labs`,
+      },
+    ],
+    {
+      channel: 'email',
+      partner: null,
+      subject: 'Team offsite: 8 rooms',
+      senderName: 'Sam Placeholder',
+      senderAddress: 'sam@labs.example',
+      status: 'new',
+      unread: true,
+      labelIds: ['lbl_groups'],
+    },
+  );
+
+  const inquiries: Inquiry[] = [wedding, offsite];
   const files: SeedFile[] = [guestList];
   const supplier = contacts.find((c) => c.trades.includes('supplies') && c.email);
   if (supplier) {

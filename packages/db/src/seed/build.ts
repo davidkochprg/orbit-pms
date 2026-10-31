@@ -356,7 +356,7 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
 
   const billing = buildBilling(linked, today, pricing, extras);
   const contacts = buildContacts(region);
-  const mail = buildMail(region, contacts, staff, hotelProfile, now);
+  const mail = buildMail(region, contacts, staff, hotelProfile, today, now);
   return {
     roomTypes: seedRoomTypes,
     rooms,
