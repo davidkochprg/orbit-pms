@@ -10,10 +10,11 @@ import type {
   PricingConfig,
   RateFactor,
   Room,
+  RoomType,
   WeatherDay,
 } from '@orbit/shared';
 import { addDays } from './dates';
-import { adjustmentFor } from './pricing/quote';
+import { adjustmentFor, nightlyRate } from './pricing/quote';
 
 /**
  * How suggested rates are built. Illustrative rules for the demo, not tuned on a real hotel: a
@@ -189,6 +190,7 @@ export interface OutlookInput {
   today: IsoDate;
   days: number;
   rooms: Room[];
+  roomTypes: RoomType[];
   /** Every booking from `TYPICAL_WEEKS` before today on, and the guests' earlier ones. */
   bookings: Booking[];
   guests: Guest[];
@@ -203,8 +205,13 @@ export function buildOutlook(input: OutlookInput): {
   nights: NightOutlook[];
   arrivalRisks: ArrivalRisk[];
 } {
-  const { today, days, rooms, bookings, guests, payments, pricing, events, weather } = input;
+  const { today, days, rooms, roomTypes, bookings, guests, payments, pricing, events, weather } =
+    input;
   const roomsTotal = rooms.filter((r) => r.status !== 'out_of_order').length;
+  // The room types the hotel has rooms of, cheapest first.
+  const types = roomTypes
+    .filter((t) => rooms.some((r) => r.roomTypeId === t.id))
+    .sort((a, b) => a.basePrice - b.basePrice);
   const typical = typicalOccupancy(bookings, rooms.length, today);
 
   const arriving = bookings.filter(
@@ -233,6 +240,7 @@ export function buildOutlook(input: OutlookInput): {
       events: tonight,
       weather: forecast,
     });
+    const suggested = suggestedPercent(factors, current);
     const expected = risks
       .filter((r) => r.booking.checkIn === date)
       .reduce((sum, r) => sum + r.chance, 0);
@@ -243,7 +251,12 @@ export function buildOutlook(input: OutlookInput): {
       typicalOccupancy:
         typical[weekday(date)] === null ? null : Math.round(typical[weekday(date)]! * 100) / 100,
       currentPercent: current,
-      suggestedPercent: suggestedPercent(factors, current),
+      suggestedPercent: suggested,
+      rates: types.map((t) => ({
+        roomType: t.name,
+        current: nightlyRate(date, t.basePrice, pricing, current),
+        suggested: nightlyRate(date, t.basePrice, pricing, suggested),
+      })),
       factors,
       events: tonight.map((e) => e.name),
       weather: forecast,

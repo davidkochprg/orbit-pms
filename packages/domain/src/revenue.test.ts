@@ -9,7 +9,7 @@ import {
   suggestedPercent,
   typicalOccupancy,
 } from './revenue';
-import { booking, room } from './test-fixtures';
+import { apartment, booking, double, room } from './test-fixtures';
 
 // A Sunday.
 const today = '2026-05-10';
@@ -212,6 +212,7 @@ describe('buildOutlook', () => {
     today,
     days: 3,
     rooms,
+    roomTypes: [double, apartment],
     bookings,
     guests: [
       { id: 'gst_test', name: 'Test Guest', email: null, phone: null, language: 'en', notes: null },
@@ -241,6 +242,15 @@ describe('buildOutlook', () => {
     expect(outlook.nights[1]!.events).toEqual(['Trail race']);
     expect(outlook.nights[0]!.weather?.kind).toBe('clear');
     expect(outlook.nights[2]!.weather).toBeNull();
+  });
+
+  it('prices the room types it has rooms of, now and with the suggestion', () => {
+    // Only doubles are in the house: the apartment type has no rooms.
+    expect(outlook.nights.map((n) => n.rates)).toEqual([
+      [{ roomType: 'Double', current: 1000, suggested: 1100 }],
+      [{ roomType: 'Double', current: 1000, suggested: 1300 }],
+      [{ roomType: 'Double', current: 1100, suggested: 1100 }],
+    ]);
   });
 
   it('expects no-shows on arrival nights and lists the riskiest arrivals', () => {

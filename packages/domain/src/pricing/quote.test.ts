@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DomainError } from '../errors';
 import { apartment, double } from '../test-fixtures';
 import { pricingConfig, type PricingConfig } from './config';
-import { childTier, quote, seasonFor } from './quote';
+import { childTier, nightlyRate, quote, seasonFor } from './quote';
 
 // Fixed test config so tests don't depend on the placeholder values in config.ts.
 const config: PricingConfig = {
@@ -215,6 +215,21 @@ describe('quote', () => {
     );
     for (const l of q.lines) expect(Number.isInteger(l.amount)).toBe(true);
     expect(q.total).toBe(q.lines.reduce((s, l) => s + l.amount, 0));
+  });
+});
+
+describe('nightlyRate', () => {
+  const adjusted = { ...config, adjustments: [{ date: '2026-12-22', percent: 10 }] };
+
+  it("applies the season and the night's own adjustment", () => {
+    expect(nightlyRate('2026-05-10', 1000, adjusted)).toBe(1000);
+    expect(nightlyRate('2026-12-21', 1000, adjusted)).toBe(1500);
+    expect(nightlyRate('2026-12-22', 1000, adjusted)).toBe(1650);
+  });
+
+  it("prices another percent in place of the night's own", () => {
+    expect(nightlyRate('2026-12-22', 1000, adjusted, 0)).toBe(1500);
+    expect(nightlyRate('2026-05-10', 999, adjusted, -15)).toBe(849);
   });
 });
 

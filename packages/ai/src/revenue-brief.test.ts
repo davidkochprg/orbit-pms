@@ -12,6 +12,7 @@ const night = (overrides: Partial<NightOutlook>): NightOutlook => ({
   typicalOccupancy: 0.52,
   currentPercent: 0,
   suggestedPercent: 30,
+  rates: [{ roomType: 'Queen', current: 189, suggested: 246 }],
   factors: [
     { kind: 'demand', label: 'Almost full', percent: 20 },
     { kind: 'event', label: 'Ski area opening weekend', percent: 15 },

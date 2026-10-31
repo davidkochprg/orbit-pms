@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { isoDateSchema } from './dates';
 import { bookingSourceSchema } from './enums';
+import { moneySchema } from './quote';
 import { rateAdjustmentSchema } from './rates';
 
 /** How much a local event lifts demand. */
@@ -71,6 +72,15 @@ export const arrivalRiskSchema = z.object({
 });
 export type ArrivalRisk = z.infer<typeof arrivalRiskSchema>;
 
+/** One room type's rate for a night, now and with the suggestion taken. */
+export const nightRateSchema = z.object({
+  roomType: z.string(),
+  /** Per room, or per adult with `per_person` rates. */
+  current: moneySchema,
+  suggested: moneySchema,
+});
+export type NightRate = z.infer<typeof nightRateSchema>;
+
 /** One night ahead: what is booked, what usually is, and the suggested rate. */
 export const nightOutlookSchema = z.object({
   date: isoDateSchema,
@@ -83,6 +93,8 @@ export const nightOutlookSchema = z.object({
   currentPercent: z.number().int(),
   /** What the suggestion would set it to; equal to `currentPercent` when nothing changes. */
   suggestedPercent: z.number().int(),
+  /** Each room type the hotel has rooms of, cheapest first. */
+  rates: z.array(nightRateSchema),
   factors: z.array(rateFactorSchema),
   events: z.array(z.string()),
   weather: weatherDaySchema.nullable(),

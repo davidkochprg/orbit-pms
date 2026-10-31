@@ -279,7 +279,7 @@ Body `{ nights: [{ date, percent }] }` (1 to 120 nights, −50 to +100; 0 goes b
 
 ### `GET /api/revenue/outlook?days=`
 
-`RevenueOutlook` for `days` nights from today (7 to 90, default 60): `today`, `nights` (`{ date, roomsSold, roomsTotal, typicalOccupancy, currentPercent, suggestedPercent, factors: [{ kind: 'demand' | 'event' | 'weather', label, percent }], events, weather, expectedNoShows }`), `events` in the period, `arrivalRisks` (`{ bookingId, guestName, roomName, checkIn, source, chance, reasons }`) and `weatherAvailable`. The forecast comes from Open-Meteo for the profile's `coordinates`, cached for three hours; without coordinates, or when it fails within 4 s, the nights have no weather. Reads need no header.
+`RevenueOutlook` for `days` nights from today (7 to 90, default 60): `today`, `nights` (`{ date, roomsSold, roomsTotal, typicalOccupancy, currentPercent, suggestedPercent, rates: [{ roomType, current, suggested }], factors: [{ kind: 'demand' | 'event' | 'weather', label, percent }], events, weather, expectedNoShows }`), `events` in the period, `arrivalRisks` (`{ bookingId, guestName, roomName, checkIn, source, chance, reasons }`) and `weatherAvailable`. The forecast comes from Open-Meteo for the profile's `coordinates`, cached for three hours; without coordinates, or when it fails within 4 s, the nights have no weather. Reads need no header.
 
 ### `POST /api/revenue/brief`
 

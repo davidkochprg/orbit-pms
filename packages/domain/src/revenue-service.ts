@@ -31,8 +31,9 @@ export function createRevenueService({ repos, defaults, clock, newId }: RevenueD
      */
     async outlook(days: number, weather: WeatherDay[] | null): Promise<RevenueOutlook> {
       const today = hotelToday(clock());
-      const [rooms, bookings, guests, payments, pricing, events] = await Promise.all([
+      const [rooms, roomTypes, bookings, guests, payments, pricing, events] = await Promise.all([
         repos.rooms.listRooms(),
+        repos.rooms.listRoomTypes(),
         repos.bookings.listBookings(),
         repos.guests.listGuests(),
         repos.billing.listPayments(),
@@ -44,6 +45,7 @@ export function createRevenueService({ repos, defaults, clock, newId }: RevenueD
         today,
         days,
         rooms,
+        roomTypes,
         bookings,
         guests,
         payments,

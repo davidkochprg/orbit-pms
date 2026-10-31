@@ -9,6 +9,7 @@ const night = (date: string, overrides: Partial<NightOutlook> = {}): NightOutloo
   typicalOccupancy: null,
   currentPercent: 0,
   suggestedPercent: 0,
+  rates: [],
   factors: [],
   events: [],
   weather: null,

@@ -54,6 +54,19 @@ export function adjustmentFor(night: IsoDate, config: PricingConfig): number {
   return config.adjustments.find((a) => a.date === night)?.percent ?? 0;
 }
 
+/**
+ * One night's rate for a room type: its base price, the night's season multiplier and `percent`
+ * on top, which is the night's own adjustment unless another is given.
+ */
+export function nightlyRate(
+  night: IsoDate,
+  basePrice: number,
+  config: PricingConfig,
+  percent = adjustmentFor(night, config),
+): number {
+  return Math.round(basePrice * (seasonFor(night, config)?.multiplier ?? 1) * (1 + percent / 100));
+}
+
 function signedPercent(n: number): string {
   return `${n > 0 ? '+' : ''}${n}%`;
 }
@@ -68,7 +81,7 @@ function groupNightsBySeason(range: DateRange, basePrice: number, config: Pricin
     const key = `${name}|${adjustment}`;
     const group = groups.get(key) ?? {
       label: name.replaceAll('_', ' ') + (adjustment ? `, ${signedPercent(adjustment)}` : ''),
-      rate: Math.round(basePrice * (season?.multiplier ?? 1) * (1 + adjustment / 100)),
+      rate: nightlyRate(night, basePrice, config, adjustment),
       nights: 0,
     };
     group.nights += 1;
