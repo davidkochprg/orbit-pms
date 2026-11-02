@@ -31,7 +31,7 @@ import { AgentContextChip } from '@/components/agent-context-chip';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { BookingRow, Mention, RoomRow } from '@/components/agent-mention';
 import { ResultCards } from '@/components/agent-result-cards';
-import { ConfirmAllButton, PendingActionCard } from '@/components/pending-action-card';
+import { PendingActionBatch, PendingActionCard } from '@/components/pending-action-card';
 import { AgentEntitiesContext } from '@/hooks/use-agent-entities';
 import { useSession } from '@/hooks/use-session';
 import {
@@ -112,13 +112,13 @@ export function AgentThread({
   messages,
   status,
   lastTurnMinHeight = 0,
-  targetActionId = null,
+  targetActionIds = [],
 }: {
   messages: UIMessage[];
   status: 'submitted' | 'streaming' | 'ready' | 'error';
   lastTurnMinHeight?: number;
-  /** The proposed change the keyboard shortcuts confirm or reject. */
-  targetActionId?: string | null;
+  /** The proposed changes the keyboard shortcuts confirm or reject. */
+  targetActionIds?: string[];
 }) {
   const entities = useMemo(
     () =>
@@ -149,7 +149,7 @@ export function AgentThread({
                   key={m.id}
                   message={m}
                   working={m === last && (status === 'streaming' || status === 'submitted')}
-                  targetActionId={targetActionId}
+                  targetActionIds={targetActionIds}
                 />
               ))}
               {isLast && waiting && (
@@ -202,11 +202,11 @@ function toTurns(messages: UIMessage[]): Turn[] {
 function AssistantMessage({
   message,
   working,
-  targetActionId,
+  targetActionIds,
 }: {
   message: UIMessage;
   working: boolean;
-  targetActionId: string | null;
+  targetActionIds: string[];
 }) {
   const tools = message.parts.filter(isToolUIPart) as ToolPart[];
   // Text before the last tool step is the agent narrating its progress; only the rest is the answer.
@@ -263,16 +263,20 @@ function AssistantMessage({
             }
             results={toolResults(message)}
           />
-          {proposals.map((p) => (
-            <PendingActionCard
-              key={p.pendingActionId}
-              id={p.pendingActionId}
-              summary={p.summary}
-              targeted={p.pendingActionId === targetActionId}
+          {proposals.length > 1 ? (
+            <PendingActionBatch
+              proposals={proposals}
+              targeted={proposals.some((p) => targetActionIds.includes(p.pendingActionId))}
             />
-          ))}
-          {proposals.length > 1 && (
-            <ConfirmAllButton ids={proposals.map((p) => p.pendingActionId)} />
+          ) : (
+            proposals.map((p) => (
+              <PendingActionCard
+                key={p.pendingActionId}
+                id={p.pendingActionId}
+                summary={p.summary}
+                targeted={targetActionIds.includes(p.pendingActionId)}
+              />
+            ))
           )}
         </div>
       )}

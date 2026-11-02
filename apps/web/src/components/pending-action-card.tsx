@@ -1,21 +1,23 @@
 import type { PendingAction, PendingActionDetails, PendingValue } from '@orbit/shared';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import { ArrowRight, Check, CircleAlert, X } from 'lucide-react';
+import { ArrowRight, Check, CircleAlert, LoaderCircle, X } from 'lucide-react';
 import { Link } from 'react-router';
 import { BookingRow } from '@/components/agent-mention';
+import { Count } from '@/components/panel';
 import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
+import { Tip } from '@/components/ui/tooltip';
 import { useCommandPalette } from '@/hooks/use-command-palette';
 import {
-  useConfirmPendingActions,
   usePendingAction,
   usePendingActions,
   useResolvePendingAction,
+  useResolvePendingActions,
 } from '@/lib/api';
 import { formatMoney, formatRange } from '@/lib/format';
+import { modShortcut } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 
-import { modShortcut } from '@/lib/platform';
 const outcome = {
   confirmed: { icon: Check, text: 'Done', className: 'text-success' },
   rejected: { icon: X, text: 'Rejected', className: 'text-muted-foreground' },
@@ -261,23 +263,197 @@ function Details({ details }: { details: PendingActionDetails }) {
   );
 }
 
-/** "Confirm all 3" for an answer that proposed several changes; shown while any still wait. */
-export function ConfirmAllButton({ ids }: { ids: string[] }) {
-  const actions = usePendingActions(ids);
-  const confirm = useConfirmPendingActions();
-  const pending = ids.filter((_, i) => actions[i]?.data?.status === 'pending');
-  if (pending.length < 2) return null;
+/** One line for a change in a batch: the money it moves, or its first change. */
+function changeLine(action: PendingAction): string | null {
+  const details = action.details;
+  if (!details) return null;
+  if (details.amount) return `${details.amount.label} ${formatMoney(details.amount.after)}`;
+  const first = details.changes[0];
+  if (!first) return null;
+  const value = first.after ?? first.before;
+  if (!value) return first.label;
+  const text = 'text' in value ? value.text : formatRange(value.checkIn, value.checkOut);
+  return first.after ? `${first.label}: ${text}` : `${first.label}: removed`;
+}
+
+/**
+ * Several changes proposed in one answer, e.g. ten cancellations: one card with a row for each
+ * and one confirm for all of them, instead of a card per change to scroll through. Each row can
+ * still be confirmed or rejected on its own.
+ */
+export function PendingActionBatch({
+  proposals,
+  targeted = false,
+}: {
+  proposals: { pendingActionId: string; summary: string }[];
+  /** Ctrl/⌘ ↵ confirms and Ctrl/⌘ ⌫ rejects every change still waiting. */
+  targeted?: boolean;
+}) {
+  const ids = proposals.map((p) => p.pendingActionId);
+  const queries = usePendingActions(ids);
+  const resolveAll = useResolvePendingActions();
+  const actions = queries.map((q) => q.data);
+  const pending = ids.filter((_, i) => actions[i]?.status === 'pending');
+  const kinds = new Set(actions.map((a) => a?.kind));
+  const kind = kinds.size === 1 ? actions[0]?.kind : undefined;
+  const done = actions.filter((a) => a?.status === 'confirmed').length;
+  const failed = actions.filter((a) => a?.status === 'failed').length;
+  const rejected = actions.filter((a) => a?.status === 'rejected').length;
+  const busy = resolveAll.isPending;
+
   return (
-    <div className="flex items-center gap-2">
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={confirm.isPending}
-        onClick={() => confirm.mutate(pending)}
-      >
-        Confirm all {pending.length}
-      </Button>
-      {confirm.isError && <span className="text-xs text-destructive">{confirm.error.message}</span>}
+    <div
+      className={cn(
+        'relative flex flex-col rounded-control fill-panel shadow-[0_1px_2px_var(--shadow-soft),0_10px_30px_-18px_var(--shadow-deep)] stroke-lit',
+        targeted && pending.length > 0 && 'ring-2 ring-ring/40',
+      )}
+    >
+      <div className="flex flex-wrap items-center gap-2 border-b px-3.5 py-2.5">
+        <p className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+          {kind ? titles[kind] : 'Changes'}
+          <Count value={ids.length} />
+        </p>
+        <div className="ml-auto flex items-center gap-1.5">
+          {pending.length > 0 ? (
+            <>
+              <Button
+                size="sm"
+                variant="ghost"
+                disabled={busy}
+                onClick={() => resolveAll.mutate({ ids: pending, decision: 'reject' })}
+              >
+                Reject all
+                {targeted && <Kbd className="ml-1">{modShortcut('⌫')}</Kbd>}
+              </Button>
+              <Button
+                size="sm"
+                disabled={busy}
+                onClick={() => resolveAll.mutate({ ids: pending, decision: 'confirm' })}
+              >
+                {busy && <LoaderCircle className="animate-spin" />}
+                {pending.length === ids.length
+                  ? `Confirm all ${ids.length}`
+                  : `Confirm ${pending.length} left`}
+                {targeted && (
+                  <Kbd className="ml-1 bg-white/15 text-inherit">{modShortcut('↵')}</Kbd>
+                )}
+              </Button>
+            </>
+          ) : (
+            actions.every(Boolean) && (
+              <span className="text-xs text-muted-foreground">
+                {[
+                  done > 0 && `${done} done`,
+                  rejected > 0 && `${rejected} rejected`,
+                  failed > 0 && `${failed} could not be applied`,
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
+              </span>
+            )
+          )}
+        </div>
+      </div>
+      <ul className="scroll-fade flex max-h-[min(24rem,45vh)] flex-col overflow-y-auto p-1">
+        {proposals.map((p, i) => (
+          <BatchRow
+            key={p.pendingActionId}
+            id={p.pendingActionId}
+            summary={p.summary}
+            action={actions[i]}
+            showKind={!kind}
+            locked={busy}
+          />
+        ))}
+      </ul>
+      {resolveAll.isError && (
+        <p className="border-t px-3.5 py-2 text-xs text-destructive">{resolveAll.error.message}</p>
+      )}
     </div>
+  );
+}
+
+function BatchRow({
+  id,
+  summary,
+  action,
+  showKind,
+  locked,
+}: {
+  id: string;
+  summary: string;
+  action: PendingAction | undefined;
+  /** Name the kind of change on the row, when the batch mixes kinds. */
+  showKind: boolean;
+  locked: boolean;
+}) {
+  const resolve = useResolvePendingAction(id);
+  const current = resolve.data ?? action;
+  const result = current && current.status !== 'pending' ? outcome[current.status] : null;
+  const bookingId =
+    current && (current.kind !== 'create_hold' || current.status === 'confirmed')
+      ? current.bookingId
+      : null;
+  const line = current ? changeLine(current) : null;
+  const detail = [showKind && current ? titles[current.kind] : null, line]
+    .filter(Boolean)
+    .join(' · ');
+
+  return (
+    <li className={cn('flex items-center gap-1', current?.status === 'rejected' && 'opacity-60')}>
+      <div className="min-w-0 flex-1">
+        {bookingId ? (
+          <BookingRow id={bookingId}>{detail || undefined}</BookingRow>
+        ) : (
+          <p className="px-2.5 py-2 text-sm">
+            {current?.summary ?? summary}
+            {detail && <span className="block text-xs text-muted-foreground">{detail}</span>}
+          </p>
+        )}
+      </div>
+      <div className="flex w-16 shrink-0 items-center justify-end gap-0.5 pr-1.5">
+        {current?.status === 'pending' ? (
+          <>
+            {current.details?.note && (
+              <Tip label={current.details.note}>
+                <span className="mr-1 flex">
+                  <CircleAlert className="size-3.5 text-warning" />
+                </span>
+              </Tip>
+            )}
+            <Tip label="Reject">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Reject"
+                disabled={locked || resolve.isPending}
+                onClick={() => resolve.mutate('reject')}
+              >
+                <X />
+              </Button>
+            </Tip>
+            <Tip label="Confirm">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label="Confirm"
+                disabled={locked || resolve.isPending}
+                onClick={() => resolve.mutate('confirm')}
+              >
+                <Check />
+              </Button>
+            </Tip>
+          </>
+        ) : result && current ? (
+          <Tip label={current.error ? `${result.text}: ${current.error}` : result.text}>
+            <span className="flex px-2">
+              <result.icon className={cn('size-4', result.className)} aria-label={result.text} />
+            </span>
+          </Tip>
+        ) : (
+          <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
+        )}
+      </div>
+    </li>
   );
 }

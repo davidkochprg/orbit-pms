@@ -454,23 +454,21 @@ export function useResolvePendingAction(id: string) {
   });
 }
 
-/** Confirms or rejects whichever proposed change it is given, e.g. from a keyboard shortcut. */
-export function useResolveAnyPendingAction() {
+/**
+ * Confirms or rejects several proposed changes one after another, in the order the agent
+ * proposed them, e.g. from "Confirm all" or a keyboard shortcut. A change that fails comes back
+ * as "failed" and the rest still go ahead.
+ */
+export function useResolvePendingActions() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, decision }: { id: string; decision: 'confirm' | 'reject' }) =>
-      resolvePendingAction(id, decision),
-    onSettled: () => queryClient.invalidateQueries(),
-  });
-}
-
-/** Confirms several proposed changes one after another, in the order the agent proposed them. */
-export function useConfirmPendingActions() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: async (ids: string[]) => {
+    mutationFn: async ({ ids, decision }: { ids: string[]; decision: 'confirm' | 'reject' }) => {
       const results = [];
-      for (const id of ids) results.push(await resolvePendingAction(id, 'confirm'));
+      for (const id of ids) {
+        const action = await resolvePendingAction(id, decision);
+        queryClient.setQueryData(['pending-action', id], action);
+        results.push(action);
+      }
       return results;
     },
     onSettled: () => queryClient.invalidateQueries(),

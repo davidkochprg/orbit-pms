@@ -15,14 +15,18 @@ export function asProposal(output: unknown): Proposal | null {
   return parsed.success ? parsed.data : null;
 }
 
-/** The changes the agent proposed in a conversation, oldest first. */
-export function proposalIds(messages: UIMessage[]): string[] {
-  return messages.flatMap((m) =>
-    m.parts.filter(isToolUIPart).flatMap((p) => {
+/**
+ * The changes the agent proposed in a conversation, oldest first, one group per answer: the
+ * changes of one answer are confirmed together.
+ */
+export function proposalGroups(messages: UIMessage[]): string[][] {
+  return messages.flatMap((m) => {
+    const ids = m.parts.filter(isToolUIPart).flatMap((p) => {
       const proposal = asProposal(p.state === 'output-available' ? p.output : undefined);
       return proposal ? [proposal.pendingActionId] : [];
-    }),
-  );
+    });
+    return ids.length > 0 ? [ids] : [];
+  });
 }
 
 /** A finished tool step: what the agent asked for and what came back. */

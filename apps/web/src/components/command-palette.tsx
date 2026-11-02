@@ -56,7 +56,7 @@ import {
 import { useDarkMode } from '@/hooks/use-dark-mode';
 import { useSession } from '@/hooks/use-session';
 import { canRecord, useVoiceQuestion, type VoiceQuestion } from '@/hooks/use-voice-question';
-import { agentErrorMessage, proposalIds, suggestedQuestions, toolResults } from '@/lib/agent';
+import { agentErrorMessage, proposalGroups, suggestedQuestions, toolResults } from '@/lib/agent';
 import { contextFromLocation } from '@/lib/agent-context';
 import {
   recentConversations,
@@ -75,7 +75,7 @@ import {
   useHotelInfo,
   useHousekeeping,
   usePendingActions,
-  useResolveAnyPendingAction,
+  useResolvePendingActions,
 } from '@/lib/api';
 import { formatRecent } from '@/lib/format';
 import { houseRoomState, houseStateLabels, stayByRoom } from '@/lib/house-map';
@@ -84,6 +84,7 @@ import { navItems } from '@/lib/nav';
 import { useTheme } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 import { MicButton, VoiceStatus } from '@/components/voice-question';
+import { modShortcut } from '@/lib/platform';
 
 const transport = new DefaultChatTransport({ api: '/api/agent' });
 const ASK = '__ask__';
@@ -652,13 +653,20 @@ function AgentView({
   const scroller = useRef<HTMLDivElement>(null);
   const [viewHeight, setViewHeight] = useState(0);
   const lastQuestion = chat.messages.findLast((m) => m.role === 'user')?.id;
-  const proposals = useMemo(() => proposalIds(chat.messages), [chat.messages]);
+  const groups = useMemo(() => proposalGroups(chat.messages), [chat.messages]);
+  const proposals = useMemo(() => groups.flat(), [groups]);
   const statuses = usePendingActions(proposals);
-  // The shortcuts act on the newest change still waiting, the one just proposed, once its card shows.
-  const target = busy
-    ? null
-    : (proposals.findLast((_, i) => statuses[i]?.data?.status === 'pending') ?? null);
-  const resolve = useResolveAnyPendingAction();
+  const waiting = (id: string) => statuses[proposals.indexOf(id)]?.data?.status === 'pending';
+  // The shortcuts act on the newest answer's changes still waiting, once their card shows: one
+  // change, or all of a batch.
+  const targetKey = busy
+    ? ''
+    : (groups
+        .findLast((g) => g.some(waiting))
+        ?.filter(waiting)
+        .join(' ') ?? '');
+  const target = useMemo(() => (targetKey ? targetKey.split(' ') : []), [targetKey]);
+  const resolve = useResolvePendingActions();
   const navigate = useNavigate();
   const { closePalette } = useCommandPalette();
   // Next steps come from what the latest answer showed, once it is finished.
@@ -673,14 +681,14 @@ function AgentView({
 
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
-      if (!target || resolve.isPending || !(e.metaKey || e.ctrlKey)) return;
+      if (target.length === 0 || resolve.isPending || !(e.metaKey || e.ctrlKey)) return;
       const typing = e.target instanceof HTMLInputElement && e.target.value !== '';
       if (e.key === 'Enter') {
         e.preventDefault();
-        resolve.mutate({ id: target, decision: 'confirm' });
+        resolve.mutate({ ids: target, decision: 'confirm' });
       } else if (e.key === 'Backspace' && !typing) {
         e.preventDefault();
-        resolve.mutate({ id: target, decision: 'reject' });
+        resolve.mutate({ ids: target, decision: 'reject' });
       }
     };
     window.addEventListener('keydown', onKey);
@@ -746,7 +754,7 @@ function AgentView({
           messages={chat.messages}
           status={chat.status}
           lastTurnMinHeight={Math.max(0, viewHeight - TURN_GAP * 2)}
-          targetActionId={target}
+          targetActionIds={target}
         />
         {chat.error && <ErrorNotice message={agentErrorMessage(chat.error)} className="mt-3" />}
       </div>
@@ -805,9 +813,9 @@ function AgentView({
             Stop
           </button>
         )}
-        {target && (
+        {target.length > 0 && (
           <span className="flex items-center gap-1.5">
-            <Kbd>⌘↵</Kbd> Confirm
+            <Kbd>{modShortcut('↵')}</Kbd> {target.length > 1 ? 'Confirm all' : 'Confirm'}
           </span>
         )}
         <span className="flex items-center gap-1.5">

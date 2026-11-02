@@ -3,7 +3,7 @@ import {
   agentErrorMessage,
   asProposal,
   asToolError,
-  proposalIds,
+  proposalGroups,
   orbStateFor,
   toolLabel,
   toolResultSummary,
@@ -68,8 +68,8 @@ describe('agent helpers', () => {
   });
 });
 
-describe('proposalIds', () => {
-  it('lists the changes the agent proposed, oldest first, skipping other tool results', () => {
+describe('proposalGroups', () => {
+  it('groups the changes the agent proposed by answer, oldest first, skipping other results', () => {
     const proposal = (id: string) => ({
       type: 'tool-addCharge' as const,
       toolCallId: `call_${id}`,
@@ -95,6 +95,12 @@ describe('proposalIds', () => {
         ],
       },
     ];
-    expect(proposalIds(messages)).toEqual(['act_1', 'act_2']);
+    expect(proposalGroups(messages)).toEqual([['act_1', 'act_2']]);
+    const later = {
+      id: 'a2',
+      role: 'assistant' as const,
+      parts: [proposal('act_3')],
+    };
+    expect(proposalGroups([...messages, later])).toEqual([['act_1', 'act_2'], ['act_3']]);
   });
 });
