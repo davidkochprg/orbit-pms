@@ -245,9 +245,9 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
           showCloseButton={false}
           // A transparent shell: the panel is inside the beam, so its glow isn't clipped.
           className={cn(
-            'top-[12vh] block translate-y-0 gap-0 rounded-card border-0 bg-transparent p-0 shadow-none ring-0 transition-[max-width] duration-200 ease-snap',
-            // The conversation gets more room: cards with four figures need it.
-            mode === 'agent' ? 'sm:max-w-[760px]' : 'sm:max-w-[640px]',
+            // One size for search and the agent, in rem so it grows with the type on a big screen:
+            // switching modes or typing doesn't resize the bar.
+            'top-[max(1rem,calc(50vh-min(21rem,39vh)))] block translate-y-0 gap-0 rounded-card border-0 bg-transparent p-0 shadow-none ring-0 sm:max-w-[min(47.5rem,calc(100vw-2rem))]',
           )}
           onEscapeKeyDown={(e) => {
             // Escape drops a question being recorded before anything else.
@@ -277,7 +277,7 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
             borderRadius={14}
             className="rounded-card"
           >
-            <div className="relative flex max-h-[76vh] flex-col overflow-hidden rounded-card bg-popover shadow-floating backdrop-blur-2xl stroke-lit">
+            <div className="relative flex h-[min(42rem,78vh)] flex-col overflow-hidden rounded-card bg-popover shadow-floating backdrop-blur-2xl stroke-lit">
               {mode === 'search' ? (
                 <SearchView
                   context={context}
@@ -365,9 +365,9 @@ function SearchView({
       filter={(value, search, keywords) =>
         value === ASK ? 1 : paletteMatch(value, search, keywords)
       }
-      className="flex min-h-0 flex-col"
+      className="flex h-full min-h-0 flex-col"
     >
-      <InputRow icon={<Search className="size-[18px]" />}>
+      <InputRow icon={<Search className="size-4.5" />}>
         {voice.state === 'idle' ? (
           <CommandPrimitive.Input
             autoFocus
@@ -385,7 +385,7 @@ function SearchView({
       </InputRow>
       {voice.error && <p className="border-b px-5 py-2 text-xs text-destructive">{voice.error}</p>}
 
-      <CommandPrimitive.List className="scrollbar-thin min-h-0 flex-1 overflow-y-auto p-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-subtle-foreground">
+      <CommandPrimitive.List className="scroll-fade min-h-0 flex-1 overflow-y-auto p-2 [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:pt-2 [&_[cmdk-group-heading]]:pb-1 [&_[cmdk-group-heading]]:text-xs [&_[cmdk-group-heading]]:font-medium [&_[cmdk-group-heading]]:text-subtle-foreground">
         <CommandPrimitive.Empty className="py-10 text-center text-sm text-muted-foreground">
           Nothing matches “{query}”.
         </CommandPrimitive.Empty>
@@ -712,7 +712,7 @@ function AgentView({
   }
 
   return (
-    <div className="flex h-[min(46rem,76vh)] min-h-0 flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex h-11 shrink-0 items-center gap-2 border-b px-3 text-sm text-muted-foreground">
         <button
           type="button"
@@ -736,10 +736,7 @@ function AgentView({
         )}
       </div>
 
-      <div
-        ref={scroller}
-        className="scrollbar-thin relative min-h-0 flex-1 overflow-y-auto px-5 py-4"
-      >
+      <div ref={scroller} className="scroll-fade relative min-h-0 flex-1 overflow-y-auto px-5 py-4">
         {!aiOn && (
           <p className="text-muted-foreground">
             The agent is not configured on this server. Set the Meta API variables to use it.
@@ -780,7 +777,7 @@ function AgentView({
         <p className="border-t px-5 py-2 text-xs text-destructive">{resolve.error.message}</p>
       )}
       {voice.error && <p className="border-t px-5 py-2 text-xs text-destructive">{voice.error}</p>}
-      <InputRow icon={<LogoMark className="size-[18px] text-primary-text" />} placement="bottom">
+      <InputRow icon={<LogoMark className="size-4.5 text-primary-text" />} placement="bottom">
         {context && <AgentContextChip context={context} onRemove={onClearContext} />}
         {voice.state === 'idle' ? (
           <input

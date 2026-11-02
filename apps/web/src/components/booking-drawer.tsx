@@ -92,7 +92,7 @@ export function BookingDrawer() {
     <Sheet open={bookingId !== null} onOpenChange={(open) => !open && close()}>
       <SheetContent
         onEscapeKeyDown={keepOpenWhileEditing}
-        className="inset-y-2! right-2! h-auto! w-[calc(100%-1rem)] gap-0 overflow-hidden rounded-card border-0! bg-background shadow-floating sm:max-w-[600px]!"
+        className="inset-y-2! right-2! h-auto! w-[calc(100%-1rem)] gap-0 overflow-hidden rounded-card border-0! bg-background shadow-floating sm:max-w-[37.5rem]!"
       >
         {detail.data ? (
           <BookingDetailView key={detail.data.booking.id} detail={detail.data} />
@@ -187,7 +187,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
           <TabsTrigger value="bill">Bill</TabsTrigger>
           <TabsTrigger value="activity">Activity</TabsTrigger>
         </TabsList>
-        <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           <TabsContent value="overview" className="flex flex-col gap-6 p-5">
             {flagIds && (
               <div className="flex items-center gap-3 rounded-stage bg-warning/10 px-3 py-2.5">

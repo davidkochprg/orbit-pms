@@ -506,6 +506,12 @@
     @apply border-border outline-ring/50;
   }
   html {
+    /*
+     * The type scale is laptop-dense, which reads small on a desk monitor further away. Past a
+     * 1600px-wide window, rem (and with it every size and gap) grows with the window, reaching
+     * 120% at 2560px. Code that measures in px reads the scale back with `useRemScale`.
+     */
+    font-size: clamp(100%, calc(100% + (100vw - 1600px) / 300), 120%);
     @apply font-sans;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -635,8 +641,86 @@
   .bg-hatch {
     background-image: repeating-linear-gradient(-45deg, var(--border) 0 1px, transparent 1px 7px);
   }
-  .scrollbar-thin {
+  .no-scrollbar {
+    scrollbar-width: none;
+    &::-webkit-scrollbar {
+      display: none;
+    }
+  }
+  /*
+   * A list that scrolls fades out at the edge where more is hidden: the bottom until it is
+   * scrolled to the end, the top once it has scrolled. Driven by the scroll position, so it
+   * costs no script; browsers without scroll timelines show only the scrollbar.
+   */
+  @supports (animation-timeline: scroll()) {
+    .scroll-fade {
+      --fade: 1.75rem;
+      mask-image: linear-gradient(
+        to bottom,
+        transparent,
+        #000 var(--fade-start),
+        #000 calc(100% - var(--fade-end)),
+        transparent
+      );
+      animation: scroll-fade linear both;
+      animation-timeline: scroll(self block);
+    }
+  }
+}
+
+@property --fade-start {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+@property --fade-end {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0px;
+}
+/* Content that doesn't overflow has no scroll timeline, so it keeps the 0px initial values. */
+@keyframes scroll-fade {
+  0% {
+    --fade-start: 0px;
+    --fade-end: var(--fade);
+  }
+  8% {
+    --fade-start: var(--fade);
+  }
+  92% {
+    --fade-end: var(--fade);
+  }
+  100% {
+    --fade-start: var(--fade);
+    --fade-end: 0px;
+  }
+}
+
+/*
+ * Scrollbars everywhere: a slim rounded thumb on a clear track, so Windows shows the same quiet
+ * bar as a Mac and a box that scrolls still says so. Chrome ignores the ::-webkit-scrollbar rules
+ * once scrollbar-width or scrollbar-color is set, so those are only for browsers without them.
+ */
+::-webkit-scrollbar {
+  width: 0.625rem;
+  height: 0.625rem;
+}
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  border: 0.1875rem solid transparent;
+  border-radius: 9999px;
+  background-color: color-mix(in oklab, var(--ink) 16%, transparent);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklab, var(--ink) 30%, transparent);
+}
+@supports not selector(::-webkit-scrollbar) {
+  * {
     scrollbar-width: thin;
-    scrollbar-color: var(--border-strong) transparent;
+    scrollbar-color: color-mix(in oklab, var(--ink) 18%, transparent) transparent;
   }
 }

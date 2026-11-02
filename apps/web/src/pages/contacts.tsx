@@ -68,7 +68,7 @@ export function ContactsPage() {
           </>
         }
       />
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         {contacts.isError ? (
           <ErrorNotice message={contacts.error.message} className="m-6" />
         ) : !contacts.data ? (

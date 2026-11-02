@@ -52,7 +52,7 @@ function ErrorBody() {
             {message}
           </summary>
           {stack && (
-            <pre className="scrollbar-thin overflow-auto border-t px-3 py-2 font-mono text-muted-foreground">
+            <pre className="overflow-auto border-t px-3 py-2 font-mono text-muted-foreground">
               {stack}
             </pre>
           )}

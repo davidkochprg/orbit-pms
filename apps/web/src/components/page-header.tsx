@@ -37,8 +37,6 @@ export function PageHeader({ title, meta, actions }: PageHeaderProps) {
 /** The scrollable area under a page header. */
 export function PageBody({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className={className ?? 'scrollbar-thin min-h-0 flex-1 overflow-auto px-4 py-6 md:px-6'}>
-      {children}
-    </div>
+    <div className={className ?? 'min-h-0 flex-1 overflow-auto px-4 py-6 md:px-6'}>{children}</div>
   );
 }

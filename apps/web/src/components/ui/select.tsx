@@ -91,7 +91,7 @@ function Select({
           sideOffset={4}
           className="z-50 max-h-(--radix-select-content-available-height) min-w-(--radix-select-trigger-width) origin-(--radix-select-content-transform-origin) overflow-hidden rounded-xl bg-popover text-popover-foreground shadow-floating backdrop-blur-2xl data-[side=bottom]:slide-in-from-top-2 data-[side=top]:slide-in-from-bottom-2 data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
         >
-          <SelectPrimitive.Viewport className="scrollbar-thin max-h-72 p-1.5">
+          <SelectPrimitive.Viewport className="max-h-72 p-1.5">
             {options.map((o) => (
               <SelectPrimitive.Item
                 key={o.value || BLANK}

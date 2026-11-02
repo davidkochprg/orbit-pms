@@ -76,5 +76,5 @@ export function Count({ value }: { value: number }) {
  * its lit edge, which would scroll away with the content if the box itself scrolled.
  */
 export function ScrollBox({ children, className }: { children: ReactNode; className?: string }) {
-  return <div className={cn('scrollbar-thin overflow-y-auto p-1', className)}>{children}</div>;
+  return <div className={cn('scroll-fade overflow-y-auto p-1', className)}>{children}</div>;
 }

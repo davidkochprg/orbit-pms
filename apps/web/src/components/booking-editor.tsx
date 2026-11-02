@@ -290,9 +290,7 @@ function EditorShell({
         <DialogTitle>{title}</DialogTitle>
         {description && <DialogDescription>{description}</DialogDescription>}
       </DialogHeader>
-      <div className="scrollbar-thin flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5">
-        {children}
-      </div>
+      <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5">{children}</div>
       {error && <ErrorNotice message={error} className="mx-5 mb-3" />}
       <DialogFooter className="m-0 flex-row items-center gap-2 p-4">{footer}</DialogFooter>
     </form>
@@ -502,7 +500,7 @@ function RoomPicker({
           role="radiogroup"
           aria-label="Room"
           className={cn(
-            'scrollbar-thin relative flex max-h-56 flex-col overflow-y-auto rounded-control border',
+            'scroll-fade relative flex max-h-56 flex-col overflow-y-auto rounded-control border',
             loading && 'opacity-60',
           )}
         >

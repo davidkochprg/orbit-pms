@@ -207,7 +207,7 @@ export function HousekeepingPage() {
         />
       )}
 
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-auto px-4 py-6 md:px-6">
+      <div className="min-h-0 flex-1 overflow-auto px-4 py-6 md:px-6">
         {board.isError ? (
           <ErrorNotice message={board.error.message} />
         ) : !board.data ? (

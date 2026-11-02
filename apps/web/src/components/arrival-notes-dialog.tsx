@@ -112,7 +112,7 @@ export function ArrivalNotesDialog({
             </Button>
           )}
         </DialogHeader>
-        <ul className="scrollbar-thin -mx-6 flex max-h-[60vh] flex-col overflow-y-auto px-6">
+        <ul className="scroll-fade -mx-6 flex max-h-[60vh] flex-col overflow-y-auto px-6">
           {notes.due.map((d) => (
             <NoteRow
               key={d.bookingId}

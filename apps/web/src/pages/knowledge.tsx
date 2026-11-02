@@ -94,7 +94,7 @@ export function KnowledgePage() {
               </Link>
             )}
           </div>
-          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+          <div className="scroll-fade min-h-0 flex-1 overflow-y-auto">
             {info.isError && <ErrorNotice message={info.error.message} className="m-3" />}
             {!info.data && !info.isError && <Skeleton className="m-3 h-64" />}
             {info.data && (
@@ -112,12 +112,7 @@ export function KnowledgePage() {
           </div>
         </aside>
 
-        <section
-          className={cn(
-            'scrollbar-thin min-w-0 flex-1 overflow-y-auto',
-            !paneOpen && 'hidden lg:block',
-          )}
-        >
+        <section className={cn('min-w-0 flex-1 overflow-y-auto', !paneOpen && 'hidden lg:block')}>
           {adding ? (
             <NewNote
               notes={notes}

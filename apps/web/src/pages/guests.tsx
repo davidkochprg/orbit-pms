@@ -108,7 +108,7 @@ export function GuestsPage() {
           </>
         }
       />
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         {guests.isError ? (
           <ErrorNotice message={guests.error.message} className="m-6" />
         ) : !guests.data ? (

@@ -224,7 +224,7 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
         onOpenChange={setConfirmAll}
         title={`Apply ${toApply.length} suggested rate${toApply.length === 1 ? '' : 's'}?`}
         description={
-          <ul className="flex max-h-60 flex-col gap-0.5 overflow-auto">
+          <ul className="scroll-fade flex max-h-60 flex-col gap-0.5 overflow-auto">
             {toApply.map((n) => (
               <li key={n.date} className="flex justify-between gap-4 text-[0.8125rem]">
                 <span>{formatDate(n.date)}</span>

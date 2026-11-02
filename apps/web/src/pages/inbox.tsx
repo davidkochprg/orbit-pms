@@ -312,7 +312,7 @@ export function InboxPage() {
       <div className="flex min-h-0 flex-1">
         <nav
           aria-label="Folders"
-          className="scrollbar-thin hidden w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r px-3.5 py-3 xl:flex"
+          className="hidden w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r px-3.5 py-3 xl:flex"
         >
           {folders.map((f) => (
             <RailItem
@@ -475,7 +475,7 @@ export function InboxPage() {
               )}
             </div>
           )}
-          <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto">
+          <div className="scroll-fade min-h-0 flex-1 overflow-y-auto">
             {(inbox.error ?? bulk.error ?? remove.error) && (
               <ErrorNotice
                 message={(inbox.error ?? bulk.error ?? remove.error)!.message}
@@ -541,9 +541,7 @@ export function InboxPage() {
           </div>
         </aside>
 
-        <section
-          className={cn('scrollbar-thin min-w-0 flex-1 overflow-y-auto', !id && 'hidden lg:block')}
-        >
+        <section className={cn('min-w-0 flex-1 overflow-y-auto', !id && 'hidden lg:block')}>
           {composing ? (
             <ComposePane
               key={params.get('draft') ?? 'new'}

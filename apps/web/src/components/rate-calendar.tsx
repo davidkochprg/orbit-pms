@@ -101,7 +101,7 @@ export function RateCalendar({
       </div>
       {/* Phones get a narrower week, with the badge under the bar, rather than a sideways scroll
           that hides the weekend. */}
-      <div className="scrollbar-thin overflow-x-auto">
+      <div className="overflow-x-auto">
         <div ref={grid} className="grid grid-cols-7 gap-1 sm:min-w-[36rem]">
           {weekdays.map((d) => (
             <div

@@ -59,7 +59,7 @@ export function SettingsPage() {
         </nav>
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="scrollbar-thin min-h-0 flex-1 overflow-auto px-4 py-6 md:px-6">
+          <div className="min-h-0 flex-1 overflow-auto px-4 py-6 md:px-6">
             <div className="flex max-w-3xl flex-col gap-6">
               <ReadOnlyNotice what="settings" />
               {section === 'team' ? (

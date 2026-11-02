@@ -111,7 +111,7 @@ function Flow({ detail, onDone }: { detail: BookingDetail; onDone: () => void })
         </ol>
       </DialogHeader>
 
-      <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto bg-surface-sunken p-5">
+      <div className="min-h-0 flex-1 overflow-y-auto bg-surface-sunken p-5">
         {step === 'Guests & IDs' && (
           <div className="flex flex-col gap-3">
             <BookingGuests bookingId={booking.id} editable compact />

@@ -390,7 +390,7 @@ function Step({ part }: { part: ToolPart }) {
         </button>
       </div>
       {raw && (
-        <pre className="scrollbar-thin mt-1 max-h-48 overflow-auto rounded-md bg-muted p-2 text-[11px] leading-snug">
+        <pre className="mt-1 max-h-48 overflow-auto rounded-md bg-muted p-2 text-[11px] leading-snug">
           {JSON.stringify({ input: part.input, output: output ?? part.errorText }, null, 2)}
         </pre>
       )}
