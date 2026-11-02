@@ -6,6 +6,7 @@ import {
   type HotelService,
   type HousekeepingService,
   type InboxService,
+  normalizeText,
   type PendingActionService,
   type RegistrationService,
   type ReportService,
@@ -32,6 +33,7 @@ import {
   currencySchema,
   type Guest,
   type GuestBook,
+  emailProposalSchema,
   guestPatchSchema,
   type HousekeepingBoard,
   housekeepingTaskStatusSchema,
@@ -44,6 +46,7 @@ import {
   mailFolders,
   type MailLabel,
   newChargeBodySchema,
+  newGuestBodySchema,
   newPaymentBodySchema,
   newStayGuestBodySchema,
   newTaskBodySchema,
@@ -97,6 +100,8 @@ export interface ToolDeps {
   draftReply: ((inquiryId: string) => Promise<Inquiry>) | null;
   activity: Pick<ActivityService, 'list'>;
   getGuest: (guestId: string) => Promise<Guest | null>;
+  /** Every guest record, for finding one by name, email or phone. */
+  listGuests: () => Promise<Guest[]>;
   /** Every booking of one guest. */
   guestBookings: (guestId: string) => Promise<Booking[]>;
   listEvents: () => Promise<LocalEvent[]>;
@@ -325,10 +330,12 @@ export const proposalToolNames = [
   'updateGuestBook',
   'removeFromGuestBook',
   'updateGuestProfile',
+  'createGuest',
   'adjustRates',
   'saveHotelInfo',
   'removeHotelInfo',
   'sendReply',
+  'sendEmail',
   'sendArrivalNote',
   'holdFromConversation',
   'declineConversation',
@@ -383,6 +390,7 @@ export function createAgentTools({
   guestMemory,
   activity,
   getGuest,
+  listGuests,
   guestBookings,
   listEvents,
   statedAmounts,
@@ -714,6 +722,27 @@ export function createAgentTools({
           return propose({ kind: 'send_arrival_note', input });
         }),
     }),
+    sendEmail: tool({
+      description:
+        "Propose a new email that starts its own conversation in the inbox: to a guest (address from searchGuests or getGuest), a contact (from listContacts) or an address the staff member gave, with each recipient's name. Write it in the recipient's language, signed by the hotel. To answer an existing conversation use sendReply; for a repair already logged on the board use draftRepairEmail, but anything else to a contact (an order, a service visit, a question) is a sendEmail. Don't state prices or amounts the hotel information doesn't; for a stay's price, quote it and offer a hold instead. The confirm card shows the email, so don't repeat it in your answer. The user must confirm.",
+      inputSchema: emailProposalSchema,
+      execute: (input) =>
+        safely(async () => {
+          const stated = await statedAmounts();
+          const unknown = amountsInText(`${input.subject}\n${input.body}`).filter(
+            (a) => !stated.includes(a),
+          );
+          if (unknown.length > 0) {
+            return {
+              error: {
+                code: 'unquoted_price',
+                message: `The email states amounts the hotel information doesn't (${[...new Set(unknown)].join(', ')}). Leave prices out.`,
+              },
+            };
+          }
+          return propose({ kind: 'send_email', input });
+        }),
+    }),
     declineConversation: tool({
       description:
         "Propose marking a conversation's request as declined, e.g. spam or a stay the hotel can't offer. It sends nothing to the guest. The user must confirm.",
@@ -739,6 +768,42 @@ export function createAgentTools({
             details: item.payload,
           })),
         ),
+    }),
+    searchGuests: tool({
+      description:
+        'Find guest records by part of a name (accents ignored), email or phone, including guests with no booking yet: guestId, name, email, phone, language and notes. Use getGuest for their stays.',
+      inputSchema: z.object({
+        query: z.string().trim().min(1).max(200).describe('A name, email or phone number.'),
+      }),
+      execute: ({ query }) =>
+        safely(async () => {
+          const words = normalizeText(query).split(/\s+/).filter(Boolean);
+          const digits = query.replace(/\D/g, '');
+          return (await listGuests())
+            .filter((g) => {
+              const text = normalizeText(`${g.name} ${g.email ?? ''}`);
+              const phone = (g.phone ?? '').replace(/\D/g, '');
+              return (
+                words.every((w) => text.includes(w)) ||
+                (digits.length >= 4 && phone.includes(digits))
+              );
+            })
+            .slice(0, 10)
+            .map((g) => ({
+              guestId: g.id,
+              name: g.name,
+              email: g.email,
+              phone: g.phone,
+              language: g.language,
+              notes: g.notes,
+            }));
+        }),
+    }),
+    createGuest: tool({
+      description:
+        'Propose adding a guest record without a booking, e.g. a caller to keep on file: name and language (cs, de, en, pl) are required; email, phone and notes only as the staff member gave them. Check with searchGuests first that they are not on file. To book a stay for a new guest, use createHold instead, which adds them. The user must confirm.',
+      inputSchema: newGuestBodySchema,
+      execute: (input) => propose({ kind: 'create_guest', input }),
     }),
     getGuest: tool({
       description:

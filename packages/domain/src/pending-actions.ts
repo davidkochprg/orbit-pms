@@ -27,7 +27,7 @@ import { changedBookingFields } from './bookings';
 import { contactFromProposal, type ContactService } from './contacts';
 import { hotelToday, nightsBetween } from './dates';
 import { DomainError } from './errors';
-import type { GuestService } from './guests';
+import { assertUniqueGuestEmail, type GuestService } from './guests';
 import type { InboxService } from './inbox-service';
 import { adjustmentChanges, applyAdjustments, type RatesService } from './rates';
 import type { RegistrationService } from './registration';
@@ -55,6 +55,7 @@ export interface PendingActionDeps {
     | 'previewBlock'
     | 'holdBlock'
     | 'send'
+    | 'compose'
     | 'sendArrivalNote'
     | 'sendWorkOrder'
     | 'decline'
@@ -646,6 +647,20 @@ export function createPendingActionService({
           details: details([added('Reply', text(action.input.body.trim()))]),
         };
       }
+      case 'send_email': {
+        const { to, subject } = action.input;
+        const names = to.map((r) => r.name ?? r.address);
+        return {
+          summary: `Email ${names.join(', ')}: "${excerpt(subject)}"`,
+          details: details([
+            added(
+              'To',
+              text(to.map((r) => (r.name ? `${r.name} <${r.address}>` : r.address)).join(', ')),
+            ),
+            added('Subject', text(subject.trim())),
+          ]),
+        };
+      }
       case 'send_arrival_note': {
         const { booking, guest } = await hotel.getBookingDetail(action.input.bookingId);
         if (!guest.email) throw new DomainError('invalid_input', 'The guest has no email address');
@@ -798,6 +813,14 @@ export function createPendingActionService({
           ),
         };
       }
+      case 'create_guest': {
+        const guest = action.input;
+        assertUniqueGuestEmail(await repos.guests.listGuests(), guest.email);
+        const rows = (['name', 'email', 'phone', 'language', 'notes'] as const).flatMap((key) =>
+          guest[key] ? [added(profileLabels[key], text(String(guest[key])))] : [],
+        );
+        return { summary: `Add the guest ${guest.name}`, details: details(rows) };
+      }
       case 'update_guest': {
         const { guestId, ...patch } = action.input;
         const { guest } = await guests.previewUpdate(guestId, patch);
@@ -878,6 +901,9 @@ export function createPendingActionService({
         await registrations.removeGuest(bookingId, stayGuestId, 'agent');
         return bookingId;
       }
+      case 'create_guest':
+        await guests.create(action.input, 'agent');
+        return null;
       case 'update_guest': {
         const { guestId, ...patch } = action.input;
         await guests.update(guestId, patch, 'agent');
@@ -896,6 +922,13 @@ export function createPendingActionService({
         const { inquiryId, body } = action.input;
         return (await inbox.send(inquiryId, { body }, by?.name ?? null, 'agent')).bookingId;
       }
+      case 'send_email':
+        await inbox.compose(
+          { ...action.input, cc: [], bcc: [], attachmentIds: [], forwardOf: null, draftId: null },
+          by?.name ?? null,
+          'agent',
+        );
+        return null;
       case 'send_arrival_note': {
         const { bookingId, subject, body } = action.input;
         await inbox.sendArrivalNote(bookingId, { subject, body }, by?.name ?? null, 'agent');

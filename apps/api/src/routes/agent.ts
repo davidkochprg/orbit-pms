@@ -135,6 +135,7 @@ export function agentRoutes({
     draftReply,
     activity,
     getGuest: (id) => repos.guests.getGuest(id),
+    listGuests: () => repos.guests.listGuests(),
     guestBookings: (guestId) => repos.bookings.listBookings({ guestId }),
     listEvents: () => events.listEvents(),
     // Fees the profile states may be repeated in a reply, as in the inbox's own drafts.

@@ -1,11 +1,16 @@
 import { z } from 'zod';
 import { chargePatchSchema, newChargeBodySchema, newPaymentBodySchema } from './billing';
-import { replyProposalSchema } from './api';
+import { emailProposalSchema, replyProposalSchema } from './api';
 import { arrivalNoteSchema } from './arrival-notes';
 import { contactProposalSchema, workOrderBodySchema } from './contacts';
 import { isoDateSchema } from './dates';
 import { hotelInfoProposalSchema } from './hotel';
-import { bookingPatchSchema, createHoldInputSchema, guestPatchSchema } from './operations';
+import {
+  bookingPatchSchema,
+  createHoldInputSchema,
+  guestPatchSchema,
+  newGuestBodySchema,
+} from './operations';
 import { moneySchema } from './quote';
 import { newStayGuestBodySchema, stayGuestPatchSchema } from './registration';
 import { roomBodySchema } from './rates';
@@ -59,10 +64,12 @@ export const pendingActionInputSchema = z.discriminatedUnion('kind', [
     kind: z.literal('update_guest'),
     input: guestPatchSchema.extend({ guestId: z.string() }),
   }),
+  z.object({ kind: z.literal('create_guest'), input: newGuestBodySchema }),
   z.object({ kind: z.literal('adjust_rates'), input: adjustRatesBodySchema }),
   z.object({ kind: z.literal('save_hotel_info'), input: hotelInfoProposalSchema }),
   z.object({ kind: z.literal('remove_hotel_info'), input: z.object({ title: z.string() }) }),
   z.object({ kind: z.literal('send_reply'), input: replyProposalSchema }),
+  z.object({ kind: z.literal('send_email'), input: emailProposalSchema }),
   z.object({
     kind: z.literal('send_arrival_note'),
     input: arrivalNoteSchema.extend({ bookingId: z.string() }),

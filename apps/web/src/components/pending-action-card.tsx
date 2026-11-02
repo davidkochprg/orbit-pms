@@ -41,10 +41,12 @@ const titles: Record<PendingAction['kind'], string> = {
   update_stay_guest: 'Update the guest book',
   remove_stay_guest: 'Remove from the guest book',
   update_guest: 'Edit the guest profile',
+  create_guest: 'Add a guest',
   adjust_rates: 'Change rates',
   save_hotel_info: 'Save to Knowledge',
   remove_hotel_info: 'Delete from Knowledge',
   send_reply: 'Send a reply',
+  send_email: 'New email',
   send_arrival_note: 'Email before the stay',
   send_work_order: 'Email about a repair',
   hold_inquiry: 'Hold a room for the request',
@@ -116,9 +118,16 @@ export function PendingActionCard({
             <p className="rounded-lg bg-ink/4 px-3 py-2 text-sm leading-6 whitespace-pre-line">
               {current.input.body}
             </p>
-          ) : current.kind === 'send_arrival_note' || current.kind === 'send_work_order' ? (
+          ) : current.kind === 'send_arrival_note' ||
+            current.kind === 'send_work_order' ||
+            current.kind === 'send_email' ? (
             <>
               {current.kind === 'send_work_order' && <Details details={details} />}
+              {current.kind === 'send_email' && (
+                <Details
+                  details={{ ...details, changes: details.changes.filter((c) => c.label === 'To') }}
+                />
+              )}
               <div className="rounded-lg bg-ink/4 px-3 py-2 text-sm leading-6">
                 <p className="font-medium">{current.input.subject}</p>
                 <p className="whitespace-pre-line">{current.input.body}</p>

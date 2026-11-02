@@ -477,6 +477,47 @@ describe('agent tools', () => {
     });
   });
 
+  it('finds guests by name, email or phone, and proposes a new one', async () => {
+    const { tools, repos, actions } = setup();
+    repos.state.guests[0] = { ...repos.state.guests[0]!, phone: '+420 601 234 567' };
+    const found = [{ guestId: 'gst_1', name: 'Tomáš Novák' }];
+    expect(await tools.searchGuests.execute({ query: 'tomas novak' }, callOptions)).toMatchObject(
+      found,
+    );
+    expect(await tools.searchGuests.execute({ query: '601234567' }, callOptions)).toMatchObject(
+      found,
+    );
+    expect(await tools.searchGuests.execute({ query: 'nobody' }, callOptions)).toEqual([]);
+    const proposed = await tools.createGuest.execute(
+      { name: 'Demo Caller', email: null, phone: '+1 555 0100', language: 'en', notes: null },
+      callOptions,
+    );
+    expect(proposed).toMatchObject({ status: 'awaiting_confirmation' });
+    expect(repos.state.guests).toHaveLength(1);
+    await actions.confirm((proposed as { pendingActionId: string }).pendingActionId);
+    expect(repos.state.guests.at(-1)).toMatchObject({ name: 'Demo Caller', language: 'en' });
+  });
+
+  it('proposes a new email without unstated prices, starting a conversation on confirm', async () => {
+    const { tools, repos, actions } = setup();
+    const to = [{ name: 'Demo Bakery', address: 'bakery@example.com' }];
+    const priced = await tools.sendEmail.execute(
+      { to, subject: 'Order', body: 'We pay 2 000 Kč a week.' },
+      callOptions,
+    );
+    expect(priced).toMatchObject({ error: { code: 'unquoted_price' } });
+    const proposed = await tools.sendEmail.execute(
+      { to, subject: 'Order', body: 'Thirty rolls on Saturday, please.' },
+      callOptions,
+    );
+    expect(proposed).toMatchObject({ status: 'awaiting_confirmation' });
+    expect(repos.state.inquiries).toEqual([]);
+    await actions.confirm((proposed as { pendingActionId: string }).pendingActionId);
+    expect(repos.state.inquiries).toEqual([
+      expect.objectContaining({ subject: 'Order', senderAddress: 'bakery@example.com' }),
+    ]);
+  });
+
   it('drafts a reply through the inbox pipeline, when there is one', async () => {
     const drafted = (i: Inquiry): Inquiry => ({
       ...i,

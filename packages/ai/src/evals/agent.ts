@@ -108,6 +108,15 @@ export function buildAgentEvalHotel(today: IsoDate) {
           language: 'cs',
           notes: null,
         },
+        // On file from an earlier call, with no booking.
+        {
+          id: 'gst_lena',
+          name: 'Lena Example',
+          email: 'lena@example.com',
+          phone: '(530) 555-0177',
+          language: 'en',
+          notes: null,
+        },
       ],
       bookings: [
         {
@@ -285,6 +294,7 @@ export function buildAgentEvalHotel(today: IsoDate) {
     draftReply: null,
     activity: createActivityService({ repos }),
     getGuest: (id) => repos.guests.getGuest(id),
+    listGuests: () => repos.guests.listGuests(),
     guestBookings: (guestId) => repos.bookings.listBookings({ guestId }),
     listEvents: () => revenue.listEvents(),
     statedAmounts: () => Promise.resolve([]),
@@ -430,6 +440,37 @@ export const agentFixtures: AgentFixture[] = [
         subject: 'Room 101: dripping tap',
       }),
     ],
+  },
+  {
+    id: 'find-guest-by-phone',
+    prompt: 'Do we have anyone on file with the phone number 555-0177?',
+    check: ({ hotel, calls, answer }) => [
+      ...readOnly(hotel),
+      ...called(calls, 'searchGuests'),
+      ...mentions(answer, ['Lena Example', '[[gst_lena]]']),
+    ],
+  },
+  {
+    id: 'add-guest',
+    prompt:
+      'Keep Max Caller on file as a guest, no booking yet. He speaks English, phone (530) 555-0199.',
+    check: ({ hotel }) =>
+      proposed(hotel, 'create_guest', {
+        name: 'Max Caller',
+        language: 'en',
+        phone: '(530) 555-0199',
+      }),
+  },
+  {
+    id: 'email-contact',
+    prompt: 'Email Example Plumbing to ask if they can service the boiler next week.',
+    check: ({ hotel }) => {
+      const problems = proposed(hotel, 'send_email', {});
+      const to = (hotel.repos.state.pendingActions[0]?.input as { to?: { address: string }[] })?.to;
+      return to?.some((r) => r.address === 'service@plumbing.example')
+        ? problems
+        : [...problems, `to ${JSON.stringify(to)}`];
+    },
   },
   {
     id: 'add-contact',

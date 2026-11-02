@@ -7,7 +7,7 @@ import {
   inquiryChannelSchema,
   languageSchema,
 } from './enums';
-import { MAX_ATTACHMENTS, recipientsSchema } from './mail';
+import { MAX_ATTACHMENTS, recipientSchema, recipientsSchema } from './mail';
 
 /** Query string for `GET /api/bookings`. `status` is comma-separated. */
 export const bookingListQuerySchema = z.object({
@@ -142,6 +142,14 @@ export const composeBodySchema = z.object({
   draftId: z.string().nullable().default(null),
 });
 export type ComposeBody = z.infer<typeof composeBodySchema>;
+
+/** A new email the agent proposes: to a guest, a contact or an address the staff member gave. */
+export const emailProposalSchema = z.object({
+  to: z.array(recipientSchema).min(1).max(5),
+  subject: z.string().trim().min(1).max(300),
+  body: messageText,
+});
+export type EmailProposal = z.infer<typeof emailProposalSchema>;
 
 /** `POST /api/inbox/:id/receive`: the guest writing again. */
 export const messageBodySchema = z.object({ body: messageText });

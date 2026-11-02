@@ -584,6 +584,68 @@ describe('pending actions', () => {
     ).rejects.toMatchObject({ code: 'invalid_input' });
   });
 
+  it('proposes a new guest, refusing an email another guest has, and adds them on confirm', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'create_guest',
+      input: {
+        name: 'Demo Walker',
+        email: 'walker@example.com',
+        phone: null,
+        language: 'de',
+        notes: null,
+      },
+    });
+    expect(proposed.summary).toBe('Add the guest Demo Walker');
+    expect(proposed.details?.changes.map((c) => c.label)).toEqual(['Name', 'Email', 'Language']);
+    expect(repos.state.guests).toHaveLength(1);
+    await actions.confirm(proposed.id);
+    expect(repos.state.guests.at(-1)).toMatchObject({ name: 'Demo Walker', language: 'de' });
+    expect(repos.state.audit.at(-1)).toMatchObject({ actor: 'agent', action: 'guest.create' });
+    await expect(
+      actions.propose({
+        kind: 'create_guest',
+        input: {
+          name: 'Someone Else',
+          email: 'walker@example.com',
+          phone: null,
+          language: 'en',
+          notes: null,
+        },
+      }),
+    ).rejects.toMatchObject({ code: 'conflict' });
+  });
+
+  it('proposes a new email and starts a conversation with it, signed by whoever confirms', async () => {
+    const { repos, actions } = setup();
+    const proposed = await actions.propose({
+      kind: 'send_email',
+      input: {
+        to: [{ name: 'Demo Supplier', address: 'supplier@example.com' }],
+        subject: 'Linen order',
+        body: 'Please send 20 more bath towels.',
+      },
+    });
+    expect(proposed.summary).toBe('Email Demo Supplier: "Linen order"');
+    expect(proposed.details?.changes).toEqual([
+      { label: 'To', before: null, after: { text: 'Demo Supplier <supplier@example.com>' } },
+      { label: 'Subject', before: null, after: { text: 'Linen order' } },
+    ]);
+    const before = repos.state.inquiries.length;
+    await actions.confirm(proposed.id, receptionist);
+    expect(repos.state.inquiries).toHaveLength(before + 1);
+    expect(repos.state.inquiries.at(-1)).toMatchObject({
+      subject: 'Linen order',
+      senderAddress: 'supplier@example.com',
+    });
+    expect(repos.state.inquiries.at(-1)?.messages[0]).toMatchObject({
+      direction: 'out',
+      author: 'Test Desk',
+      body: 'Please send 20 more bath towels.',
+    });
+    expect(repos.state.audit.at(-1)).toMatchObject({ actor: 'agent', action: 'inquiry.compose' });
+  });
+
   it('proposes saving a fact for guests, and saves it only on confirm', async () => {
     const { repos, actions } = setup();
     const proposed = await actions.propose({

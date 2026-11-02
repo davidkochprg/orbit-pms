@@ -138,6 +138,7 @@ export function setup({
     draftReply,
     activity: createActivityService({ repos }),
     getGuest: (id) => repos.guests.getGuest(id),
+    listGuests: () => repos.guests.listGuests(),
     guestBookings: (guestId) => repos.bookings.listBookings({ guestId }),
     listEvents: () => revenue.listEvents(),
     statedAmounts: () => Promise.resolve([]),
