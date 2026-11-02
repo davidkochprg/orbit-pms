@@ -1,7 +1,7 @@
 import { type Contact, type Trade, tradeLabels, tradeSchema } from '@orbit/shared';
 import { Contact as ContactIcon, Mail, Pencil, Phone, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ActionMenu } from '@/components/action-menu';
 import { ContactEditorDialog } from '@/components/contact-editor';
 import { EmptyState } from '@/components/empty-state';
@@ -12,12 +12,14 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useContacts } from '@/lib/api';
 import { contactMatches } from '@/lib/contacts';
+import { composeLink } from '@/lib/mail';
 import { telHref } from '@/lib/repairs';
 import { cn, labelCaps } from '@/lib/utils';
 
 /** Suppliers and contractors: who to call when something breaks or runs out. */
 export function ContactsPage() {
   const contacts = useContacts();
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   // `?new=contact&trade=plumbing` opens the form, e.g. from a repair with nobody to ask;
   // `?contact=<id>` opens a contact, e.g. from the command bar.
@@ -52,7 +54,7 @@ export function ContactsPage() {
     <>
       <PageHeader
         title="Contacts"
-        meta={contacts.data && `${shown.length}`}
+        meta={contacts.data && `${shown.length} ${shown.length === 1 ? 'contact' : 'contacts'}`}
         actions={
           <>
             <SearchField
@@ -70,9 +72,9 @@ export function ContactsPage() {
       />
       <div className="min-h-0 flex-1 overflow-auto">
         {contacts.isError ? (
-          <ErrorNotice message={contacts.error.message} className="m-6" />
+          <ErrorNotice message={contacts.error.message} className="m-4 md:m-6" />
         ) : !contacts.data ? (
-          <Skeleton className="m-6 h-64" />
+          <Skeleton className="m-4 h-64 md:m-6" />
         ) : shown.length === 0 ? (
           <EmptyState
             icon={ContactIcon}
@@ -105,7 +107,12 @@ export function ContactsPage() {
                   label={c.name}
                   actions={[
                     c.phone && { label: `Call ${c.phone}`, icon: Phone, href: telHref(c.phone) },
-                    c.email && { label: 'Email', icon: Mail, href: `mailto:${c.email}` },
+                    c.email && {
+                      label: 'Email',
+                      icon: Mail,
+                      onSelect: () =>
+                        void navigate(composeLink({ name: c.name, address: c.email! })),
+                    },
                     { label: 'Edit…', icon: Pencil, onSelect: () => setEditing(c), group: true },
                   ]}
                 >
@@ -141,13 +148,13 @@ export function ContactsPage() {
                     </td>
                     <td className="px-4 max-md:hidden">
                       {c.email ? (
-                        <a
-                          href={`mailto:${c.email}`}
+                        <Link
+                          to={composeLink({ name: c.name, address: c.email })}
                           onClick={(e) => e.stopPropagation()}
                           className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-foreground"
                         >
                           <Mail className="size-3.5" /> {c.email}
-                        </a>
+                        </Link>
                       ) : (
                         <span className="text-muted-foreground">–</span>
                       )}

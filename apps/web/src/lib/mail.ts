@@ -193,8 +193,14 @@ export function stripCompose(search: string): string {
   const p = new URLSearchParams(search);
   p.delete('draft');
   p.delete('forward');
+  p.delete('to');
   const s = p.toString();
   return s ? `?${s}` : '';
+}
+
+/** A new email to someone, e.g. a contact, written in the inbox. */
+export function composeLink(to: Recipient): string {
+  return `/inbox/new?${new URLSearchParams({ to: formatRecipient(to) }).toString()}`;
 }
 
 /** Where a forward of a conversation is written, keeping the list's folder. */

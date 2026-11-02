@@ -2,6 +2,7 @@ import type { Inquiry } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import {
   addressBook,
+  composeLink,
   conversationFiles,
   formatBytes,
   formatRecipient,
@@ -10,6 +11,7 @@ import {
   newDraftId,
   parseRecipients,
   replyAllCc,
+  stripCompose,
   suggestAddresses,
   uniqueRecipients,
 } from './mail';
@@ -122,5 +124,17 @@ describe('formatting', () => {
     expect(formatBytes(312 * 1024)).toBe('312 KB');
     expect(formatBytes(1.4 * 1024 * 1024)).toBe('1.4 MB');
     expect(newDraftId()).toMatch(/^drf_[a-f0-9]{16}$/);
+  });
+});
+
+describe('compose links', () => {
+  it('opens a new email to someone and keeps them out of the list query', () => {
+    const link = composeLink({ name: 'Ada Plumbing', address: 'ada@example.com' });
+    const search = link.slice(link.indexOf('?'));
+    expect(link.startsWith('/inbox/new?')).toBe(true);
+    expect(parseRecipients(new URLSearchParams(search).get('to')!).recipients).toEqual([
+      { name: 'Ada Plumbing', address: 'ada@example.com' },
+    ]);
+    expect(stripCompose(`${search}&folder=sent`)).toBe('?folder=sent');
   });
 });

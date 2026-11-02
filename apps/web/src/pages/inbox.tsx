@@ -81,6 +81,7 @@ import {
   forwardLink,
   forwardSubject,
   newDraftId,
+  parseRecipients,
   recipientLabel,
   REPLY_EVENT,
   stripCompose,
@@ -628,7 +629,7 @@ function ComposePane({ back }: { back: string }) {
       : {
           draftId,
           forwardOf: null,
-          to: [],
+          to: parseRecipients(params.get('to') ?? '').recipients,
           cc: [],
           bcc: [],
           subject: '',

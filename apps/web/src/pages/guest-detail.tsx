@@ -19,6 +19,8 @@ import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useBookings, useGuest, useInbox, useRooms } from '@/lib/api';
 import { formatMoney, formatParty, formatRange, languageLabels } from '@/lib/format';
 import { conversationsOf } from '@/lib/inbox';
+import { composeLink } from '@/lib/mail';
+import { telHref } from '@/lib/repairs';
 
 export function GuestDetailPage() {
   const { id = '' } = useParams();
@@ -106,8 +108,27 @@ export function GuestDetailPage() {
 
             <PropertyList>
               <Property label="Language">{languageLabels[g.language]}</Property>
-              <Property label="Email">{g.email ?? '–'}</Property>
-              <Property label="Phone">{g.phone ?? '–'}</Property>
+              <Property label="Email">
+                {g.email ? (
+                  <Link
+                    to={composeLink({ name: g.name, address: g.email })}
+                    className="hover:underline"
+                  >
+                    {g.email}
+                  </Link>
+                ) : (
+                  '–'
+                )}
+              </Property>
+              <Property label="Phone">
+                {g.phone ? (
+                  <a href={telHref(g.phone)} className="hover:underline">
+                    {g.phone}
+                  </a>
+                ) : (
+                  '–'
+                )}
+              </Property>
               <Property label="Notes">
                 {g.notes ?? (
                   <button
@@ -138,7 +159,7 @@ export function GuestDetailPage() {
                           <span className="hidden truncate text-muted-foreground sm:inline">
                             Room {roomName(b.roomId)}, {formatParty(b.adults, b.childAges)}
                           </span>
-                          <span className="hidden tabular-nums sm:inline">
+                          <span className="hidden font-mono tabular-nums sm:inline">
                             {b.priceSnapshot ? formatMoney(b.priceSnapshot.total) : '–'}
                           </span>
                           <BookingStatusBadge status={b.status} />
