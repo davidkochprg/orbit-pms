@@ -58,10 +58,6 @@ The Mews-style tape chart groups rooms by type. Stays run from midday of the arr
 
 ![The tape chart: two weeks of bookings by room, with occupancy per night, holds dashed and checked-in stays in green](docs/images/tape-chart.png)
 
-The optional daylight theme turns the app light at 06:30 and dark at 19:30, with a soft glow that follows the sky: pink dawn, pale midday, orange-violet sunset, then moonlight.
-
-![The tape chart at dawn, midday, sunset and night in the daylight theme](docs/images/daylight.jpg)
-
 All guests, bookings and messages in the demo and the screenshots are synthetic. Prices are placeholders.
 
 ## How it uses Meta's models

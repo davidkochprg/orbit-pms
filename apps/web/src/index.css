@@ -16,287 +16,76 @@
  * Depth comes from three layers (canvas, main panel, wells), hairlines that are lit from above
  * (.stroke-lit) and soft drop shadows, not from borders.
  */
-@property --night {
-  syntax: '<number>';
-  inherits: true;
-  initial-value: 0;
-}
-
 :root {
   --accent-hue: 275;
   --accent-chroma: 0.2;
 
-  /*
-   * 0 = day palette, 1 = night palette. Light and dark set 0 and 1, and so does the daylight
-   * theme by time of day (lib/daylight.ts). --night is a registered number (see @property above),
-   * so a change fades instead of snapping.
-   */
-  --night: 0;
-  --night-mix: calc(var(--night) * 100%);
-  /* Light under the app's surface; only the daylight theme sets it. */
-  --glow: transparent;
-
-  /* Day palette: a cool gray canvas, one white main panel on it, pale wells inside the panel. */
+  /* Light: a cool gray canvas, one white main panel on it, pale wells inside the panel. */
   /* Surfaces: canvas (sidebar) < main panel < well (cards inside the panel). */
-  --sidebar-day: #f1f1f4;
-  --background-day: #ffffff;
-  --surface-sunken-day: #f7f7f9;
-  --surface-raised-day: #ffffff;
-  --card-day: #ffffff;
-  --popover-day: rgb(255 255 255 / 92%);
-  --muted-day: #ececf1;
+  --sidebar: #f1f1f4;
+  --background: #ffffff;
+  --surface-sunken: #f7f7f9;
+  --surface-raised: #ffffff;
+  --card: #ffffff;
+  --popover: rgb(255 255 255 / 92%);
+  --muted: #ececf1;
 
   /* Ink: the text color, used thinly for hover fills, hairlines and lit strokes. */
-  --ink-day: #111118;
+  --ink: #111118;
 
   /* Text. */
-  --foreground-day: #0d0d12;
-  --muted-foreground-day: #696977;
-  --subtle-foreground-day: #9d9daa;
-  --primary-text-day: oklch(0.5 var(--accent-chroma) var(--accent-hue));
+  --foreground: #0d0d12;
+  --muted-foreground: #696977;
+  --subtle-foreground: #9d9daa;
+  --primary-text: oklch(0.5 var(--accent-chroma) var(--accent-hue));
 
   /* Lines. */
-  --border-day: #e4e4e9;
-  --border-strong-day: #d3d3db;
-  --grid-line-day: #ededf1;
-  --input-day: #e4e4e9;
+  --border: #e4e4e9;
+  --border-strong: #d3d3db;
+  --grid-line: #ededf1;
+  --input: #e4e4e9;
 
   /* Accent. */
-  --primary-day: oklch(0.552 var(--accent-chroma) var(--accent-hue));
-  --primary-soft-day: oklch(0.552 var(--accent-chroma) var(--accent-hue) / 9%);
-  --ring-day: oklch(0.552 var(--accent-chroma) var(--accent-hue) / 45%);
+  --primary: oklch(0.552 var(--accent-chroma) var(--accent-hue));
+  --primary-soft: oklch(0.552 var(--accent-chroma) var(--accent-hue) / 9%);
+  --ring: oklch(0.552 var(--accent-chroma) var(--accent-hue) / 45%);
   /* The second stop of accent gradients (orbs, the agent's ring). */
-  --accent-violet-day: #7c56e8;
-  --accent-peach-day: #b25c15;
+  --accent-violet: #7c56e8;
+  --accent-peach: #b25c15;
 
   /* Feedback. */
-  --destructive-day: #c22b2b;
-  --success-day: #0a7d55;
-  --warning-day: #b25c15;
+  --destructive: #c22b2b;
+  --success: #0a7d55;
+  --warning: #b25c15;
 
   /* Booking status: the stripe on tape chart bars and the dot in status pills. */
-  --status-hold-day: #d98a2b;
-  --status-checked-in-day: #0f9a6a;
-  --status-checked-out-day: #a3a3ae;
-  --status-cancelled-day: #c22b2b;
+  --status-hold: #d98a2b;
+  --status-checked-in: #0f9a6a;
+  --status-checked-out: #a3a3ae;
+  --status-cancelled: #c22b2b;
 
   /* Room housekeeping status. */
-  --room-inspected-day: #0f9a6a;
-  --room-clean-day: #3a6fd8;
-  --room-dirty-day: #d98a2b;
-  --room-out-of-order-day: #c22b2b;
+  --room-inspected: #0f9a6a;
+  --room-clean: #3a6fd8;
+  --room-dirty: #d98a2b;
+  --room-out-of-order: #c22b2b;
 
   /* Shadow colors; the shadows below are built from them. */
-  --shadow-ring-day: rgb(17 17 24 / 8%);
-  --shadow-soft-day: rgb(17 17 24 / 5%);
-  --shadow-deep-day: rgb(17 17 24 / 18%);
-  --highlight-day: rgb(255 255 255 / 0%);
+  --shadow-ring: rgb(17 17 24 / 8%);
+  --shadow-soft: rgb(17 17 24 / 5%);
+  --shadow-deep: rgb(17 17 24 / 18%);
+  /* Top-edge light on raised surfaces; only visible in dark mode, where shadows don't read. */
+  --highlight: rgb(255 255 255 / 0%);
+  /* Added to the black of button drops; dark mode needs them stronger to read. */
+  --drop-boost: 0%;
 
-  /* Night palette: near-black and neutral, frames barely lifted off the canvas. */
-  --sidebar-night: #000000;
-  --background-night: #0d0d0d;
-  --surface-sunken-night: #090909;
-  --surface-raised-night: #161616;
-  --card-night: #0d0d0d;
-  --popover-night: rgb(22 22 22 / 92%);
-  --muted-night: #1f1f1f;
-
-  --ink-night: #ffffff;
-
-  /* Text. */
-  --foreground-night: #f5f5f5;
-  --muted-foreground-night: #8f8f8f;
-  --subtle-foreground-night: #5c5c5c;
-  --primary-text-night: oklch(0.74 calc(var(--accent-chroma) * 0.8) var(--accent-hue));
-
-  /* Lines. */
-  --border-night: #1c1c1c;
-  --border-strong-night: #2a2a2a;
-  --grid-line-night: #161616;
-  --input-night: #262626;
-
-  /* Accent. */
-  --primary-night: oklch(0.65 calc(var(--accent-chroma) * 0.95) var(--accent-hue));
-  --primary-soft-night: oklch(0.65 var(--accent-chroma) var(--accent-hue) / 15%);
-  --ring-night: oklch(0.65 var(--accent-chroma) var(--accent-hue) / 55%);
-  --accent-violet-night: #9a7bff;
-  --accent-peach-night: #ffb37a;
-
-  /* Feedback. */
-  --destructive-night: #f87171;
-  --success-night: #34d399;
-  --warning-night: #ffb37a;
-
-  /* Booking status: the stripe on tape chart bars and the dot in status pills. */
-  --status-hold-night: #ffb37a;
-  --status-checked-in-night: #34d399;
-  --status-checked-out-night: #5c5c5c;
-  --status-cancelled-night: #f87171;
-
-  /* Room housekeeping status. */
-  --room-inspected-night: #34d399;
-  --room-clean-night: #5b8dee;
-  --room-dirty-night: #ffb37a;
-  --room-out-of-order-night: #f87171;
-
-  /* Shadow colors; the shadows below are built from them. */
-  --shadow-ring-night: rgb(255 255 255 / 8%);
-  --shadow-soft-night: rgb(0 0 0 / 40%);
-  --shadow-deep-night: rgb(0 0 0 / 60%);
-  --highlight-night: rgb(255 255 255 / 6%);
-
-  /* Tokens used by components: the day and night palettes blended. */
-  /* Surfaces: window chrome (sidebar) < content panel < raised (bars, popovers). */
-  --sidebar: color-mix(in oklab, var(--sidebar-day), var(--sidebar-night) var(--night-mix));
-  --background: color-mix(
-    in oklab,
-    var(--background-day),
-    var(--background-night) var(--night-mix)
-  );
-  --surface-sunken: color-mix(
-    in oklab,
-    var(--surface-sunken-day),
-    var(--surface-sunken-night) var(--night-mix)
-  );
-  --surface-raised: color-mix(
-    in oklab,
-    var(--surface-raised-day),
-    var(--surface-raised-night) var(--night-mix)
-  );
-  --card: color-mix(in oklab, var(--card-day), var(--card-night) var(--night-mix));
-  --popover: color-mix(in oklab, var(--popover-day), var(--popover-night) var(--night-mix));
-  --muted: color-mix(in oklab, var(--muted-day), var(--muted-night) var(--night-mix));
+  /* Tape chart bars: the status color washed into the frame, a touch stronger in dark mode. */
+  --bar-tint: 9%;
 
   /* shadcn's "accent" is the hover/selected fill, not the brand color: a thin wash of ink. */
   --accent: color-mix(in oklab, var(--ink) 4.5%, transparent);
   --sidebar-accent: color-mix(in oklab, var(--ink) 6.5%, transparent);
 
-  /* Text. */
-  --foreground: color-mix(
-    in oklab,
-    var(--foreground-day),
-    var(--foreground-night) var(--night-mix)
-  );
-
-  --primary-text: color-mix(
-    in oklab,
-    var(--primary-text-day),
-    var(--primary-text-night) var(--night-mix)
-  );
-
-  /* Lines. */
-  --border: color-mix(in oklab, var(--border-day), var(--border-night) var(--night-mix));
-  --border-strong: color-mix(
-    in oklab,
-    var(--border-strong-day),
-    var(--border-strong-night) var(--night-mix)
-  );
-  --grid-line: color-mix(in oklab, var(--grid-line-day), var(--grid-line-night) var(--night-mix));
-  --input: color-mix(in oklab, var(--input-day), var(--input-night) var(--night-mix));
-
-  /* Accent. */
-  --primary: color-mix(in oklab, var(--primary-day), var(--primary-night) var(--night-mix));
-  --primary-soft: color-mix(
-    in oklab,
-    var(--primary-soft-day),
-    var(--primary-soft-night) var(--night-mix)
-  );
-  --ring: color-mix(in oklab, var(--ring-day), var(--ring-night) var(--night-mix));
-
-  /* Feedback. */
-  --destructive: color-mix(
-    in oklab,
-    var(--destructive-day),
-    var(--destructive-night) var(--night-mix)
-  );
-  --success: color-mix(in oklab, var(--success-day), var(--success-night) var(--night-mix));
-  --warning: color-mix(in oklab, var(--warning-day), var(--warning-night) var(--night-mix));
-
-  /* Booking status: the stripe on tape chart bars and the dot in status pills. */
-  --status-hold: color-mix(
-    in oklab,
-    var(--status-hold-day),
-    var(--status-hold-night) var(--night-mix)
-  );
-  --status-checked-in: color-mix(
-    in oklab,
-    var(--status-checked-in-day),
-    var(--status-checked-in-night) var(--night-mix)
-  );
-  --status-checked-out: color-mix(
-    in oklab,
-    var(--status-checked-out-day),
-    var(--status-checked-out-night) var(--night-mix)
-  );
-  --status-cancelled: color-mix(
-    in oklab,
-    var(--status-cancelled-day),
-    var(--status-cancelled-night) var(--night-mix)
-  );
-
-  /* Room housekeeping status. */
-  --room-inspected: color-mix(
-    in oklab,
-    var(--room-inspected-day),
-    var(--room-inspected-night) var(--night-mix)
-  );
-  --room-clean: color-mix(
-    in oklab,
-    var(--room-clean-day),
-    var(--room-clean-night) var(--night-mix)
-  );
-  --room-dirty: color-mix(
-    in oklab,
-    var(--room-dirty-day),
-    var(--room-dirty-night) var(--night-mix)
-  );
-  --room-out-of-order: color-mix(
-    in oklab,
-    var(--room-out-of-order-day),
-    var(--room-out-of-order-night) var(--night-mix)
-  );
-
-  /* Shadow colors; the shadows below are built from them. */
-  --shadow-ring: color-mix(
-    in oklab,
-    var(--shadow-ring-day),
-    var(--shadow-ring-night) var(--night-mix)
-  );
-  --shadow-soft: color-mix(
-    in oklab,
-    var(--shadow-soft-day),
-    var(--shadow-soft-night) var(--night-mix)
-  );
-  --shadow-deep: color-mix(
-    in oklab,
-    var(--shadow-deep-day),
-    var(--shadow-deep-night) var(--night-mix)
-  );
-  /* Top-edge light on raised surfaces; only visible at night, where shadows don't read. */
-  --highlight: color-mix(in oklab, var(--highlight-day), var(--highlight-night) var(--night-mix));
-
-  /* Secondary text is the text color pulled toward the background, so it tracks the theme. */
-  --muted-foreground: color-mix(
-    in oklab,
-    var(--muted-foreground-day),
-    var(--muted-foreground-night) var(--night-mix)
-  );
-  --subtle-foreground: color-mix(
-    in oklab,
-    var(--subtle-foreground-day),
-    var(--subtle-foreground-night) var(--night-mix)
-  );
-  --ink: color-mix(in oklab, var(--ink-day), var(--ink-night) var(--night-mix));
-  --accent-violet: color-mix(
-    in oklab,
-    var(--accent-violet-day),
-    var(--accent-violet-night) var(--night-mix)
-  );
-  --accent-peach: color-mix(
-    in oklab,
-    var(--accent-peach-day),
-    var(--accent-peach-night) var(--night-mix)
-  );
   --card-foreground: var(--foreground);
   --popover-foreground: var(--foreground);
   --secondary: var(--muted);
@@ -304,15 +93,9 @@
   --accent-foreground: var(--foreground);
   --primary-foreground: oklch(0.99 0 0);
   /* Ink buttons: text color as a fill, background color as the label. */
-  --ink-foreground: color-mix(
-    in oklab,
-    var(--background-day),
-    var(--background-night) var(--night-mix)
-  );
+  --ink-foreground: var(--background);
   --status-confirmed: var(--primary);
 
-  /* Tape chart bars: the status color washed into the frame, a touch stronger at night. */
-  --bar-tint: calc(9% + var(--night) * 9%);
   --bar-confirmed: color-mix(in oklab, var(--primary) var(--bar-tint), var(--background));
   --bar-checked-in: color-mix(
     in oklab,
@@ -330,19 +113,17 @@
   --shadow-floating:
     inset 0 1px 0 var(--highlight), 0 0 0 1px var(--shadow-ring),
     0 25px 50px -12px var(--shadow-deep), 0 4px 10px -2px var(--shadow-soft);
-  --shadow-panel:
-    0 0 0 1px var(--shadow-ring), 0 1px 3px var(--shadow-soft),
-    0 0 48px -8px color-mix(in oklab, var(--glow), transparent 40%);
+  --shadow-panel: 0 0 0 1px var(--shadow-ring), 0 1px 3px var(--shadow-soft);
   /* Raised white buttons: a lit top edge and a short, tight drop, just off the surface. */
   --shadow-action:
     inset 0 1px 0 color-mix(in oklab, var(--ink) 7%, transparent),
-    0 1px 2px color-mix(in oklab, black calc(8% + var(--night) * 30%), transparent),
-    0 2px 5px -3px color-mix(in oklab, black calc(14% + var(--night) * 30%), transparent);
+    0 1px 2px color-mix(in oklab, black calc(8% + var(--drop-boost)), transparent),
+    0 2px 5px -3px color-mix(in oklab, black calc(14% + var(--drop-boost)), transparent);
   /* Ink buttons and the brand mark: lit from above, with a short drop. */
   --shadow-button:
     inset 0 1px 0 rgb(255 255 255 / 18%), inset 0 -1px 0 rgb(0 0 0 / 20%),
-    0 1px 2px color-mix(in oklab, black calc(14% + var(--night) * 30%), transparent),
-    0 2px 6px -3px color-mix(in oklab, black calc(22% + var(--night) * 30%), transparent);
+    0 1px 2px color-mix(in oklab, black calc(14% + var(--drop-boost)), transparent),
+    0 2px 6px -3px color-mix(in oklab, black calc(22% + var(--drop-boost)), transparent);
 
   --radius: 0.5rem;
 
@@ -381,9 +162,64 @@
   --sidebar-ring: var(--ring);
 }
 
+/* Dark: near-black and neutral, frames barely lifted off the canvas. */
 .dark {
   color-scheme: dark;
-  --night: 1;
+
+  --sidebar: #000000;
+  --background: #0d0d0d;
+  --surface-sunken: #090909;
+  --surface-raised: #161616;
+  --card: #0d0d0d;
+  --popover: rgb(22 22 22 / 92%);
+  --muted: #1f1f1f;
+
+  --ink: #ffffff;
+
+  /* Text. */
+  --foreground: #f5f5f5;
+  --muted-foreground: #8f8f8f;
+  --subtle-foreground: #5c5c5c;
+  --primary-text: oklch(0.74 calc(var(--accent-chroma) * 0.8) var(--accent-hue));
+
+  /* Lines. */
+  --border: #1c1c1c;
+  --border-strong: #2a2a2a;
+  --grid-line: #161616;
+  --input: #262626;
+
+  /* Accent. */
+  --primary: oklch(0.65 calc(var(--accent-chroma) * 0.95) var(--accent-hue));
+  --primary-soft: oklch(0.65 var(--accent-chroma) var(--accent-hue) / 15%);
+  --ring: oklch(0.65 var(--accent-chroma) var(--accent-hue) / 55%);
+  --accent-violet: #9a7bff;
+  --accent-peach: #ffb37a;
+
+  /* Feedback. */
+  --destructive: #f87171;
+  --success: #34d399;
+  --warning: #ffb37a;
+
+  /* Booking status. */
+  --status-hold: #ffb37a;
+  --status-checked-in: #34d399;
+  --status-checked-out: #5c5c5c;
+  --status-cancelled: #f87171;
+
+  /* Room housekeeping status. */
+  --room-inspected: #34d399;
+  --room-clean: #5b8dee;
+  --room-dirty: #ffb37a;
+  --room-out-of-order: #f87171;
+
+  /* Shadows. */
+  --shadow-ring: rgb(255 255 255 / 8%);
+  --shadow-soft: rgb(0 0 0 / 40%);
+  --shadow-deep: rgb(0 0 0 / 60%);
+  --highlight: rgb(255 255 255 / 6%);
+  --drop-boost: 30%;
+
+  --bar-tint: 18%;
 }
 
 @theme inline {
@@ -494,14 +330,6 @@
 }
 
 @layer base {
-  html {
-    transition: --night 700ms ease-in-out;
-  }
-  @media (prefers-reduced-motion: reduce) {
-    html {
-      transition: none;
-    }
-  }
   * {
     @apply border-border outline-ring/50;
   }
@@ -528,42 +356,6 @@
   ::selection {
     background: var(--primary-soft);
   }
-}
-
-/*
- * Daylight glow: soft light behind the content panel that also falls on the workspace. --glow is
- * transparent unless the daylight theme is on, so these rules are invisible in light and dark.
- * The workspace layer blends like light on a surface: multiply tints light surfaces and leaves
- * dark text alone; screen lifts dark surfaces and leaves light text alone.
- */
-[data-slot='sidebar-wrapper'] {
-  background-image: radial-gradient(
-    85% 95% at 58% 50%,
-    color-mix(in oklab, var(--glow), transparent 50%),
-    transparent 80%
-  );
-}
-.daylight-wash {
-  --wash: radial-gradient(
-    90% 85% at 50% 45%,
-    color-mix(in oklab, var(--glow), transparent 55%),
-    color-mix(in oklab, var(--glow), transparent 85%) 75%,
-    transparent 100%
-  );
-  mix-blend-mode: multiply;
-  background-image: var(--wash);
-}
-/* A faint grain dithers the gradient so it shows no banding. */
-[data-theme='daylight'] .daylight-wash {
-  background-image:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E"),
-    var(--wash);
-}
-.dark .daylight-wash {
-  mix-blend-mode: screen;
-}
-[data-variant='inset'] [data-slot='sidebar-inner'] {
-  background-color: transparent;
 }
 
 @layer utilities {

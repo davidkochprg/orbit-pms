@@ -20,7 +20,6 @@ import {
   Moon,
   Search,
   Sun,
-  Sunrise,
   UserPlus,
   Wrench,
 } from 'lucide-react';
@@ -593,7 +592,6 @@ function SearchView({
             [
               ['light', 'Light', Sun],
               ['dark', 'Dark', Moon],
-              ['daylight', 'Daylight', Sunrise],
               ['system', 'Match system', Monitor],
             ] as const
           ).map(([theme, label, Icon]) => (

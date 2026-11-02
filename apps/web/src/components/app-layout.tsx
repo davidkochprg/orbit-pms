@@ -29,11 +29,6 @@ export function AppLayout() {
             <AppSidebar />
             <SidebarInset className="min-h-0 min-w-0 overflow-hidden stroke-lit md:peer-data-[variant=inset]:rounded-card md:peer-data-[variant=inset]:shadow-card">
               <Outlet />
-              {/* Daylight glow shining through the workspace; transparent in other themes. */}
-              <div
-                aria-hidden
-                className="daylight-wash pointer-events-none absolute inset-0 z-40"
-              />
             </SidebarInset>
             <BookingDrawer />
           </SidebarProvider>

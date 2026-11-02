@@ -8,7 +8,7 @@ function subscribe(onChange: () => void) {
 
 const isDark = () => document.documentElement.classList.contains('dark');
 
-/** Whether the page is dark right now, whichever theme put it there (daylight flips at dusk). */
+/** Whether the page is dark right now, whether chosen or following the system. */
 export function useDarkMode(): boolean {
   return useSyncExternalStore(subscribe, isDark, () => false);
 }
