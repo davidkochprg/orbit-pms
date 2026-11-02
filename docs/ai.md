@@ -157,6 +157,10 @@ The pipeline records `inbox_extract`, `inbox_draft` and `translate` usage separa
 
 `createTranslator` (`packages/ai/src/translate.ts`) translates guest messages into the reader's language and reply texts both ways, only when staff ask. It runs on Muse Spark Open when Baseten is configured, otherwise on `META_MODEL_TRANSLATE` (the agent model when unset; Meta has no cheaper Standard-tier text model yet), at `minimal` reasoning. The prompt keeps names, dates, room numbers and every amount with its currency as written; `sameAmounts` checks that the translation states the same amounts as the source, and one that doesn't is redone once and otherwise refused (`translation_failed`). A guest message's translation is stored with the message. A translation costs about $0.002.
 
+## A booking from a message
+
+The new-booking form has "Fill in from a message" when AI is configured: staff paste a guest's email from elsewhere or type notes from a call, and `POST /api/bookings/read-request` reads it with the inbox's extraction (`createRequestReader` in `packages/ai/src/inbox.ts`, the same system prompt and schema as [Extract](#inbox-pipeline), recorded as `inbox_extract`). The form takes the stay, the party, a dog or wellness, and a new guest's name and language (`formFromRequest` in `lib/booking-editor.ts`); what the message leaves out stays as it was, and a changed stay drops the room picked before. Staff check the fields and pick the room from the free rooms with their prices, as when they type it; the model only reads.
+
 ## Housekeeping notes
 
 A housekeeper records a voice note ("room 104 done, the bedside lamp is broken") or types one. `createHousekeepingNotePipeline` (`packages/ai/src/housekeeping.ts`):

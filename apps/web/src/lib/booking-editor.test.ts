@@ -4,6 +4,7 @@ import {
   bookingPatch,
   createBookingInput,
   editBookingForm,
+  formFromRequest,
   newBookingForm,
   roomOptionsQuery,
 } from './booking-editor';
@@ -97,6 +98,57 @@ describe('createBookingInput', () => {
       roomId: 'rm_201',
       status: 'confirmed',
       notes: null,
+    });
+  });
+});
+
+describe('formFromRequest', () => {
+  const reading = {
+    kind: 'booking_request' as const,
+    language: 'de' as const,
+    guestName: 'Demo Gast',
+    checkIn: '2026-11-06',
+    checkOut: '2026-11-08',
+    adults: 2,
+    rooms: null,
+    childAges: [6],
+    wishes: { wellness: false, dog: true, apartment: false },
+    question: null,
+  };
+
+  it('fills the stay, party, dog and a new guest, dropping a room that may not be free', () => {
+    const form = { ...newBookingForm('2026-10-27'), roomId: 'rm_104' };
+    expect(formFromRequest(form, reading)).toMatchObject({
+      checkIn: '2026-11-06',
+      checkOut: '2026-11-08',
+      adults: 2,
+      childAges: [6],
+      addons: { wellness: false, dogs: 1, extraBeds: 0 },
+      roomId: null,
+      guest: { mode: 'new', name: 'Demo Gast', language: 'de' },
+    });
+  });
+
+  it('keeps what the message leaves out, a name already typed and an existing guest', () => {
+    const typed = newBookingForm('2026-10-27');
+    const named = { ...typed, guest: { ...typed.guest, name: 'Typed Name' } as typeof typed.guest };
+    const vague = {
+      ...reading,
+      checkIn: null,
+      checkOut: null,
+      adults: null,
+      childAges: [],
+      wishes: { wellness: false, dog: false, apartment: false },
+    };
+    expect(formFromRequest(named, vague)).toMatchObject({
+      checkIn: typed.checkIn,
+      adults: 2,
+      guest: { name: 'Typed Name', language: 'de' },
+    });
+    const existing = newBookingForm('2026-10-27', { guestId: 'gst_1', roomId: 'rm_104' });
+    expect(formFromRequest(existing, vague)).toMatchObject({
+      guest: { mode: 'existing', guestId: 'gst_1' },
+      roomId: 'rm_104',
     });
   });
 });

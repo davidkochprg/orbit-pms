@@ -9,7 +9,7 @@ import { createMemoryRepositories } from '@orbit/domain/testing';
 import type { InquiryExtraction, Room } from '@orbit/shared';
 import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
-import { createInboxPipeline, type InboxPipelineDeps } from './inbox';
+import { createInboxPipeline, createRequestReader, type InboxPipelineDeps } from './inbox';
 import { createTranslator } from './translate';
 import type { UsageRecord } from './usage';
 
@@ -438,5 +438,52 @@ describe('inbox pipeline', () => {
     expect(calls[0]).toContain('na kdy přesně');
     expect(calls[1]).toContain('Od 12. do 14. května.');
     expect(calls[1]).toContain("Reply to the guest's latest message");
+  });
+});
+
+describe('createRequestReader', () => {
+  it("reads a pasted request with the inbox's extraction and records it", async () => {
+    const reading: InquiryExtraction = {
+      kind: 'booking_request',
+      language: 'de',
+      guestName: 'Demo Gast',
+      checkIn: '2026-05-14',
+      checkOut: '2026-05-17',
+      adults: 2,
+      rooms: null,
+      childAges: [6],
+      wishes: { wellness: false, dog: true, apartment: false },
+      question: null,
+    };
+    const prompts: string[] = [];
+    const model = new MockLanguageModelV4({
+      doGenerate: (options) => {
+        prompts.push(JSON.stringify(options.prompt));
+        return Promise.resolve({
+          content: [{ type: 'text', text: JSON.stringify(reading) }],
+          finishReason: { unified: 'stop', raw: undefined },
+          usage: usageTokens,
+          warnings: [],
+        });
+      },
+    });
+    const records: UsageRecord[] = [];
+    const reader = createRequestReader({
+      model,
+      modelId: 'muse-spark-1.3',
+      usage: {
+        record: (r) => {
+          records.push(r);
+          return Promise.resolve();
+        },
+        monthToDateMicroUsd: () => Promise.resolve(0),
+      },
+    });
+    expect(
+      await reader.read('Zimmer vom 14. bis 17. Mai, 2 Erw., Kind 6, Hund', '2026-05-10'),
+    ).toEqual(reading);
+    expect(prompts[0]).toContain('Today is 2026-05-10.');
+    expect(prompts[0]).toContain('Hund');
+    expect(records).toEqual([expect.objectContaining({ feature: 'inbox_extract' })]);
   });
 });

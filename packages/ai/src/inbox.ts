@@ -20,6 +20,7 @@ import {
   extractionPrompt,
   extractionSystemPrompt,
   holdExpiry,
+  requestPrompt,
 } from './prompts/inbox';
 import type { Translator } from './translate';
 import type { AiFeature, UsageStore } from './usage';
@@ -76,6 +77,46 @@ export async function extractMessage(
   });
   return { analysis: result.output, tokens: fromSdkUsage(result.usage) };
 }
+
+/**
+ * Reads a request staff paste or type into the new-booking form (an email from elsewhere, notes
+ * from a call) with the inbox's extraction: the stay, the party and the wishes. Recorded as
+ * `inbox_extract`, which it is.
+ */
+export function createRequestReader({
+  model,
+  modelId,
+  usage,
+}: {
+  model: LanguageModel;
+  modelId: string;
+  usage: UsageStore;
+}) {
+  return {
+    async read(text: string, today: IsoDate): Promise<InquiryExtraction> {
+      const result = await generateText({
+        model,
+        system: extractionSystemPrompt,
+        prompt: requestPrompt(text, today),
+        output: Output.object({ schema: inquiryExtractionSchema }),
+        temperature: 0,
+        reasoning: reasoningEffort.extraction,
+        providerOptions: { meta: { strictJsonSchema: false } },
+      });
+      const tokens = fromSdkUsage(result.usage);
+      await usage.record({
+        feature: 'inbox_extract',
+        model: modelId,
+        tokens,
+        audioSeconds: 0,
+        costMicroUsd: tokenCostMicroUsd(tokens),
+      });
+      return result.output;
+    },
+  };
+}
+
+export type RequestReader = ReturnType<typeof createRequestReader>;
 
 export async function draftReply(
   model: LanguageModel,

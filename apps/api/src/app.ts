@@ -14,6 +14,7 @@ import {
   createRevenueBriefWriter,
   createIdScanReader,
   createInboxPipeline,
+  createRequestReader,
   createTranslator,
   type HotelContext,
   type MetaProvider,
@@ -245,7 +246,16 @@ export function createApp({
   );
   app.route('/api', access.routes);
   app.route('/api', roomRoutes(repos));
-  app.route('/api', bookingRoutes(repos, hotel));
+  const requestReader =
+    ai && createRequestReader({ model: ai.agent, modelId: ai.agentModelId, usage });
+  app.route(
+    '/api',
+    bookingRoutes(
+      repos,
+      hotel,
+      requestReader && ((text) => requestReader.read(text, hotelToday(clock()))),
+    ),
+  );
   app.route('/api', billingRoutes(billing));
   app.route(
     '/api',

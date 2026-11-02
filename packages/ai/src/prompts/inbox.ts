@@ -54,6 +54,15 @@ The conversation, oldest first. Extract what the guest wants as of their latest 
 ${transcript(inquiry)}`;
 }
 
+/** A message pasted into the new-booking form, or notes from a phone call, to read the same way. */
+export function requestPrompt(text: string, today: string): string {
+  return `Today is ${today}.
+
+A guest's message, pasted by staff, or their notes from a call. Extract what the guest wants.
+
+${text.trim()}`;
+}
+
 export function draftSystemPrompt(hotel: HotelContext): string {
   const { name } = hotel.profile;
   return `You write replies to guests for the reception of ${name}. Warm, short, professional.

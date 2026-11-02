@@ -3,6 +3,7 @@ import type {
   BookingPatch,
   BookingSource,
   CreateBookingInput,
+  InquiryExtraction,
   Language,
   QuoteAddons,
   RoomOptionsQuery,
@@ -78,6 +79,45 @@ export function newBookingForm(
         : { mode: 'new', name: '', email: '', phone: '', language },
     inquiryId: prefill.inquiryId ?? null,
   };
+}
+
+/**
+ * The form with what a guest's message or call notes asked for: the stay, the party, a dog or
+ * wellness, and a new guest's name and language. What the message leaves out stays as it was;
+ * a changed stay drops the room, which may no longer be free.
+ */
+export function formFromRequest(form: BookingForm, reading: InquiryExtraction): BookingForm {
+  const stay =
+    reading.checkIn && reading.checkOut && reading.checkOut > reading.checkIn
+      ? { checkIn: reading.checkIn, checkOut: reading.checkOut }
+      : {};
+  const next: BookingForm = {
+    ...form,
+    ...stay,
+    adults: reading.adults ?? form.adults,
+    childAges:
+      reading.adults !== null || reading.childAges.length > 0 ? reading.childAges : form.childAges,
+    addons: {
+      ...form.addons,
+      wellness: form.addons.wellness || reading.wishes.wellness,
+      dogs: reading.wishes.dog ? Math.max(form.addons.dogs, 1) : form.addons.dogs,
+    },
+    guest:
+      form.guest.mode === 'new'
+        ? {
+            ...form.guest,
+            name: form.guest.name.trim() || reading.guestName?.trim() || '',
+            language: reading.language,
+          }
+        : form.guest,
+  };
+  const staySame =
+    next.checkIn === form.checkIn &&
+    next.checkOut === form.checkOut &&
+    next.adults === form.adults &&
+    JSON.stringify(next.childAges) === JSON.stringify(form.childAges) &&
+    JSON.stringify(next.addons) === JSON.stringify(form.addons);
+  return staySame ? next : { ...next, roomId: null };
 }
 
 export function editBookingForm(booking: Booking): BookingForm {

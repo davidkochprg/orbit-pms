@@ -7,16 +7,32 @@ import {
   changeDatesBodySchema,
   createBookingInputSchema,
   moveBookingBodySchema,
+  type InquiryExtraction,
   quoteInputSchema,
+  readRequestBodySchema,
   rescheduleBodySchema,
   roomOptionsQuerySchema,
 } from '@orbit/shared';
 import { Hono } from 'hono';
+import { errorBody } from '../http';
 import { validate } from '../validate';
 
-/** Booking reads and mutations. REST callers act as `user`; the agent goes through its own tools. */
-export function bookingRoutes(repos: Repositories, service: HotelService) {
+/**
+ * Booking reads and mutations. REST callers act as `user`; the agent goes through its own tools.
+ * `readRequest` reads a pasted message for the new-booking form; null when AI is not configured.
+ */
+export function bookingRoutes(
+  repos: Repositories,
+  service: HotelService,
+  readRequest: ((text: string) => Promise<InquiryExtraction>) | null = null,
+) {
   return new Hono()
+    .post('/bookings/read-request', validate('json', readRequestBodySchema), async (c) => {
+      if (!readRequest) {
+        return c.json(errorBody('ai_not_configured', 'The AI agent is not configured.'), 503);
+      }
+      return c.json(await readRequest(c.req.valid('json').text));
+    })
     .get('/bookings', validate('query', bookingListQuerySchema), async (c) => {
       const { from, to, status, guestId, roomId } = c.req.valid('query');
       return c.json(

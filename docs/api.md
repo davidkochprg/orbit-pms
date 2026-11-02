@@ -110,6 +110,8 @@ A body that fails validation returns 400 `invalid_json`; malformed JSON returns 
 
 `POST /api/bookings/:id/preview` takes the same body as `PATCH` and returns `{ booking, room }` as they would be after the edit, including the new price, without saving.
 
+`POST /api/bookings/read-request` takes `{ "text": "…" }` (1 to 5,000 characters), a guest's message or notes from a call, and returns what it asks for as an `InquiryExtraction` (`kind`, `language`, `guestName`, `checkIn`, `checkOut`, `adults`, `rooms`, `childAges`, `wishes`, `question`), read by the model for the new-booking form. 503 `ai_not_configured` without AI.
+
 ### `GET /api/bookings/:id/guests`, `POST`, `PATCH /api/bookings/:id/guests/:stayGuestId`, `DELETE`
 
 The stay's guest book (`GuestBook`): `guests` (each a `StayGuest` with `primary` and `missing`, the guest-book fields it still needs), `partySize`, `missing` (people without a complete entry, counting ones not added yet), `extra` (people listed beyond the party size) and `previous` (the main guest's details from an earlier stay, or `null`). Every call returns it.

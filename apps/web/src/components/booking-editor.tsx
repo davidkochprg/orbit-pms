@@ -2,6 +2,7 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 import {
   type BookingDetail,
   bookingSources,
+  type InquiryExtraction,
   type Language,
   languages,
   type RoomOption,
@@ -35,7 +36,9 @@ import {
   useCreateBooking,
   useDayOverview,
   useGuests,
+  useHealth,
   useHotelProfile,
+  useReadRequest,
   useRoomOptions,
   useUpdateBooking,
 } from '@/lib/api';
@@ -44,6 +47,7 @@ import {
   bookingPatch,
   createBookingInput,
   editBookingForm,
+  formFromRequest,
   type GuestChoice,
   type NewBookingPrefill,
   newBookingForm,
@@ -51,6 +55,7 @@ import {
   sourceLabels,
 } from '@/lib/booking-editor';
 import { formatMoney, formatPrice, formatRange, languageLabels } from '@/lib/format';
+import { modShortcut } from '@/lib/platform';
 import { isIsoDate } from '@/lib/tape-chart';
 import { cn } from '@/lib/utils';
 
@@ -123,6 +128,8 @@ function NewBookingForm({ initial, onDone }: { initial: BookingForm; onDone: () 
   const options = useRoomOptions(roomOptionsQuery(form));
   const input = createBookingInput(form);
   const chosen = options.data?.find((o) => o.roomId === form.roomId);
+  const aiOn = useHealth().data?.ai.configured ?? false;
+  const [pasting, setPasting] = useState(false);
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -138,6 +145,14 @@ function NewBookingForm({ initial, onDone }: { initial: BookingForm; onDone: () 
   return (
     <EditorShell
       title="New booking"
+      action={
+        aiOn &&
+        !pasting && (
+          <Button type="button" variant="ghost" size="sm" onClick={() => setPasting(true)}>
+            Fill in from a message
+          </Button>
+        )
+      }
       onSubmit={submit}
       footer={
         <>
@@ -158,6 +173,12 @@ function NewBookingForm({ initial, onDone }: { initial: BookingForm; onDone: () 
       }
       error={create.error?.message}
     >
+      {pasting && (
+        <RequestPaste
+          onRead={(reading) => setForm((f) => formFromRequest(f, reading))}
+          onClose={() => setPasting(false)}
+        />
+      )}
       <StayFields form={form} onChange={setForm} />
       <RoomPicker
         form={form}
@@ -269,9 +290,68 @@ function EditBookingForm({ detail, onDone }: { detail: BookingDetail; onDone: ()
   );
 }
 
+/**
+ * A guest's message or notes from a call, read into the form: the stay, the party, a dog or
+ * wellness, and a new guest's name and language. Staff check the fields and pick the room.
+ */
+function RequestPaste({
+  onRead,
+  onClose,
+}: {
+  onRead: (reading: InquiryExtraction) => void;
+  onClose: () => void;
+}) {
+  const read = useReadRequest();
+  const [text, setText] = useState('');
+  const fill = () => {
+    if (!text.trim() || read.isPending) return;
+    read.mutate(text, {
+      onSuccess: (reading) => {
+        onRead(reading);
+        onClose();
+      },
+    });
+  };
+  return (
+    <div className="flex flex-col gap-2">
+      <Textarea
+        autoFocus
+        aria-label="Guest's message"
+        placeholder="Paste the guest's email or type notes from the call"
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+            e.preventDefault();
+            fill();
+          }
+        }}
+        className="max-h-48 min-h-20"
+      />
+      {read.error && <ErrorNotice message={read.error.message} />}
+      <div className="flex justify-end gap-1.5">
+        <Button type="button" variant="ghost" size="sm" onClick={onClose}>
+          Cancel
+        </Button>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          tooltip={modShortcut('Enter')}
+          disabled={!text.trim() || read.isPending}
+          onClick={fill}
+        >
+          {read.isPending ? 'Reading…' : 'Fill in'}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function EditorShell({
   title,
   description,
+  action,
   onSubmit,
   footer,
   error,
@@ -279,6 +359,8 @@ function EditorShell({
 }: {
   title: string;
   description?: string;
+  /** A control at the right of the title. */
+  action?: ReactNode;
   onSubmit: (e: FormEvent) => void;
   footer: ReactNode;
   error: string | undefined;
@@ -287,7 +369,10 @@ function EditorShell({
   return (
     <form onSubmit={onSubmit} className="flex min-h-0 flex-col">
       <DialogHeader className="border-b p-5">
-        <DialogTitle>{title}</DialogTitle>
+        <div className="flex min-h-6 items-center gap-3 pr-8">
+          <DialogTitle className="flex-1">{title}</DialogTitle>
+          {action}
+        </div>
         {description && <DialogDescription>{description}</DialogDescription>}
       </DialogHeader>
       <div className="flex min-h-0 flex-1 flex-col gap-6 overflow-y-auto p-5">{children}</div>

@@ -106,6 +106,10 @@ export const newGuestBodySchema = z.object({
 });
 export type NewGuestBody = z.infer<typeof newGuestBodySchema>;
 
+/** `POST /api/bookings/read-request`: a guest's message or call notes, to fill a new booking from. */
+export const readRequestBodySchema = z.object({ text: z.string().trim().min(1).max(5000) });
+export type ReadRequestBody = z.infer<typeof readRequestBodySchema>;
+
 export const guestPatchSchema = z
   .object({
     name: z.string().trim().min(1).max(200),

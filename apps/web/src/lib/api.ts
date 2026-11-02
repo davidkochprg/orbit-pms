@@ -46,6 +46,7 @@ import {
   type HotelInfoDraft,
   type HotelProfile,
   inquiryListSchema,
+  inquiryExtractionSchema,
   inquirySchema,
   type Inquiry,
   type Language,
@@ -807,6 +808,14 @@ export function useReportSummary() {
   return useMutation({
     mutationFn: (range: ReportQuery) =>
       apiPost('/api/reports/summary', range, z.object({ text: z.string() })),
+  });
+}
+
+/** Reads a guest's message or call notes into a stay, party and wishes, for the new-booking form. */
+export function useReadRequest() {
+  return useMutation({
+    mutationFn: (text: string) =>
+      apiPost('/api/bookings/read-request', { text }, inquiryExtractionSchema),
   });
 }
 

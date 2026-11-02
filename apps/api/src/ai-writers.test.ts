@@ -166,6 +166,46 @@ describe('report summary', () => {
   });
 });
 
+describe('reading a request for a new booking', () => {
+  it('reads pasted text with the inbox extraction, and needs AI', async () => {
+    const reading = {
+      kind: 'booking_request',
+      language: 'en',
+      guestName: 'Demo Caller',
+      checkIn: '2026-11-06',
+      checkOut: '2026-11-08',
+      adults: 2,
+      rooms: null,
+      childAges: [],
+      wishes: { wellness: true, dog: false, apartment: false },
+      question: null,
+    };
+    const reader = new MockLanguageModelV4({
+      doGenerate: () =>
+        Promise.resolve({
+          content: [{ type: 'text', text: JSON.stringify(reading) }],
+          finishReason: { unified: 'stop', raw: undefined },
+          usage: {
+            inputTokens: { total: 400, noCache: 400, cacheRead: undefined, cacheWrite: undefined },
+            outputTokens: { total: 60, text: 60, reasoning: undefined },
+          },
+          warnings: [],
+        }),
+    });
+    const app = appWith({ with: reader });
+    const text = { text: 'Couple, Fri 6 to Sun 8 Nov, would like the sauna. Demo Caller' };
+    expect(await call(app, 'POST', '/api/bookings/read-request', text)).toEqual({
+      status: 200,
+      body: reading,
+    });
+    expect((await call(app, 'POST', '/api/bookings/read-request', { text: ' ' })).status).toBe(400);
+    expect(
+      (await call<ApiError>(appWith({ ai: false }), 'POST', '/api/bookings/read-request', text))
+        .status,
+    ).toBe(503);
+  });
+});
+
 describe('guest memory', () => {
   it('reads a returning guest once, then serves the reading for free', async () => {
     const regular = seed.bookings.find(
