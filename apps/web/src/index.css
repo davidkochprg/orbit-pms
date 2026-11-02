@@ -509,9 +509,9 @@
     /*
      * The type scale is laptop-dense, which reads small on a desk monitor further away. Past a
      * 1600px-wide window, rem (and with it every size and gap) grows with the window, reaching
-     * 120% at 2560px. Code that measures in px reads the scale back with `useRemScale`.
+     * 110% at 2560px. Code that measures in px reads the scale back with `useRemScale`.
      */
-    font-size: clamp(100%, calc(100% + (100vw - 1600px) / 300), 120%);
+    font-size: clamp(100%, calc(100% + (100vw - 1600px) / 600), 110%);
     @apply font-sans;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
