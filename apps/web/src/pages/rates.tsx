@@ -27,6 +27,12 @@ export function RatesPage() {
   const [params, setParams] = useSearchParams();
   const view: RatesView = params.get('view') === 'rules' ? 'rules' : 'outlook';
   const { canManage } = useSession();
+  const pricing = usePricing();
+  const save = useSavePricing();
+  // Kept here, so a look at the outlook doesn't throw away edits to the rules.
+  const [draft, setDraft] = useState<PricingConfig | null>(null);
+  const current = draft ?? pricing.data;
+  const dirty = draft !== null && pricing.data !== undefined && !sameSettings(draft, pricing.data);
 
   return (
     <>
@@ -42,46 +48,30 @@ export function RatesPage() {
           />
         }
       />
-      {view === 'outlook' ? (
-        <PageBody>
-          <RateOutlook canManage={canManage} />
-        </PageBody>
-      ) : (
-        <RateRules canManage={canManage} />
-      )}
-    </>
-  );
-}
-
-function RateRules({ canManage }: { canManage: boolean }) {
-  const pricing = usePricing();
-  const save = useSavePricing();
-  const [draft, setDraft] = useState<PricingConfig | null>(null);
-  const current = draft ?? pricing.data;
-  const dirty = draft !== null && pricing.data !== undefined && !sameSettings(draft, pricing.data);
-
-  return (
-    <>
       <PageBody>
-        <div className="flex max-w-3xl flex-col gap-6">
-          <ReadOnlyNotice what="the rates" />
-          {pricing.isError ? (
-            <ErrorNotice message={pricing.error.message} />
-          ) : !current ? (
-            <Skeleton className="h-80" />
-          ) : (
-            <fieldset disabled={!canManage} className="min-w-0">
-              <RatesEditor
-                pricing={current}
-                onChange={(next) => {
-                  save.reset();
-                  setDraft(next);
-                }}
-                readOnly={!canManage}
-              />
-            </fieldset>
-          )}
-        </div>
+        {view === 'outlook' ? (
+          <RateOutlook canManage={canManage} />
+        ) : (
+          <div className="flex max-w-3xl flex-col gap-6">
+            <ReadOnlyNotice what="the rates" />
+            {pricing.isError ? (
+              <ErrorNotice message={pricing.error.message} />
+            ) : !current ? (
+              <Skeleton className="h-80" />
+            ) : (
+              <fieldset disabled={!canManage} className="min-w-0">
+                <RatesEditor
+                  pricing={current}
+                  onChange={(next) => {
+                    save.reset();
+                    setDraft(next);
+                  }}
+                  readOnly={!canManage}
+                />
+              </fieldset>
+            )}
+          </div>
+        )}
       </PageBody>
       <SaveBar
         save={save}
