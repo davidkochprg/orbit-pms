@@ -48,6 +48,7 @@ import {
   useBookingDetail,
   useFolio,
   useGuestBook,
+  useHealth,
   useInbox,
   useUpdateBooking,
   useUpdateGuest,
@@ -126,6 +127,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
   const { intent, clearIntent } = useBookingDrawer();
   const navigate = useNavigate();
   const folio = useFolio(booking.id);
+  const aiOn = useHealth().data?.ai.configured ?? false;
   const [tab, setTab] = useState<Tab>('overview');
   // A context menu's "Check in…" opens the inspector straight into the flow.
   const [checkingIn, setCheckingIn] = useState(
@@ -230,7 +232,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
           <Pencil /> Edit
         </Button>
         <BookingDropdownMenu bookingId={booking.id} inInspector>
-          <Button variant="ghost" size="icon-sm" aria-label="More actions">
+          <Button variant="ghost" size="icon-sm" aria-label="More actions" tooltip="More actions">
             <MoreHorizontal />
           </Button>
         </BookingDropdownMenu>
@@ -246,16 +248,18 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
             <CalendarRange />
           </Button>
         )}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="ml-auto"
-          onClick={() =>
-            openPalette({ mode: 'agent', context: { kind: 'booking', id: booking.id } })
-          }
-        >
-          <LogoMark className="text-primary-text" /> Ask Orbit
-        </Button>
+        {aiOn && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            onClick={() =>
+              openPalette({ mode: 'agent', context: { kind: 'booking', id: booking.id } })
+            }
+          >
+            <LogoMark className="text-primary-text" /> Ask Orbit
+          </Button>
+        )}
       </footer>
       <CheckInDialog detail={detail} open={checkingIn} onOpenChange={setCheckingIn} />
     </>
@@ -273,9 +277,10 @@ function Chip({
 }) {
   const className = cn(
     'inline-flex h-6 items-center gap-1 rounded-full bg-ink/5 px-2 text-muted-foreground',
-    tone === 'warning' && 'bg-warning/12 text-warning',
     onClick &&
       'outline-none transition-colors hover:bg-ink/8 focus-visible:ring-2 focus-visible:ring-ring',
+    // After the hover above, so a warning stays amber under the pointer.
+    tone === 'warning' && 'bg-warning/12 text-warning hover:bg-warning/18',
   );
   return onClick ? (
     <button type="button" onClick={onClick} className={className}>
@@ -568,7 +573,7 @@ function Activity({ bookingId }: { bookingId: string }) {
   const log = useAuditLog(bookingId);
   if (log.isError) return <ErrorNotice message={log.error.message} />;
   if (!log.data) return <Skeleton className="h-32" />;
-  if (log.data.length === 0) return <p className="text-muted-foreground">Nothing yet.</p>;
+  if (log.data.length === 0) return <p className="text-muted-foreground">No activity yet</p>;
   return (
     <ol className="flex flex-col">
       {log.data.map((entry) => (

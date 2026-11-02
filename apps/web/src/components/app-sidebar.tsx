@@ -18,7 +18,7 @@ import {
   SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { useCommandPalette } from '@/hooks/use-command-palette';
-import { useHotelProfile, useInbox, useKnockOns } from '@/lib/api';
+import { useHealth, useHotelProfile, useInbox, useKnockOns } from '@/lib/api';
 import { folderCounts } from '@/lib/inbox';
 import { type NavGroup, navItemFor, navItems } from '@/lib/nav';
 import { cn, labelCaps } from '@/lib/utils';
@@ -36,6 +36,7 @@ export function AppSidebar() {
   const { openPalette } = useCommandPalette();
   const inbox = useInbox();
   const hotel = useHotelProfile();
+  const aiOn = useHealth().data?.ai.configured ?? false;
   const unread = inbox.data ? folderCounts(inbox.data).unread : 0;
   // Things a change made worth doing; Today lists them under "Needs attention".
   const knockOns = useKnockOns().data?.length ?? 0;
@@ -54,12 +55,12 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              tooltip={`Ask Orbit or search (${modShortcut('K')})`}
+              tooltip={`${aiOn ? 'Ask Orbit or search' : 'Search'} (${modShortcut('K')})`}
               onClick={() => openPalette()}
               className="relative h-9 rounded-control bg-background/70 pl-3 text-muted-foreground shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit hover:bg-background hover:text-foreground group-data-[collapsible=icon]:rounded-control"
             >
               <Search />
-              <span>Ask or search…</span>
+              <span>{aiOn ? 'Ask or search…' : 'Search…'}</span>
               <Kbd className="ml-auto">{modShortcut('K')}</Kbd>
             </SidebarMenuButton>
           </SidebarMenuItem>

@@ -21,7 +21,7 @@ import {
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useCommandPalette } from '@/hooks/use-command-palette';
-import { useBookingAction, useBookingDetail } from '@/lib/api';
+import { useBookingAction, useBookingDetail, useHealth } from '@/lib/api';
 import { actionLabels, formatRange } from '@/lib/format';
 
 /** The parts a menu is built from, so one item list serves context and dropdown menus. */
@@ -40,7 +40,7 @@ const dropdownKit: MenuKit = { Item: DropdownMenuItem, Separator: DropdownMenuSe
 
 interface BookingMenuProps {
   bookingId: string;
-  /** Leave out "Open details", e.g. inside the booking inspector itself. */
+  /** Leave out "Open booking", e.g. inside the booking inspector itself. */
   inInspector?: boolean;
 }
 
@@ -104,6 +104,7 @@ function BookingMenuItems({
   const { open } = useBookingDrawer();
   const { openEdit } = useBookingEditor();
   const { openPalette } = useCommandPalette();
+  const aiOn = useHealth().data?.ai.configured ?? false;
   const navigate = useNavigate();
   const d = detail.data;
   const steps =
@@ -113,7 +114,7 @@ function BookingMenuItems({
     <>
       {!inInspector && (
         <Item onSelect={() => open(bookingId)}>
-          <ExternalLink /> Open details
+          <ExternalLink /> Open booking
         </Item>
       )}
       <Item onSelect={() => openEdit(bookingId)}>
@@ -148,10 +149,10 @@ function BookingMenuItems({
       <Separator />
       {d && (
         <Item onSelect={() => void navigate(`/guests/${d.guest.id}`)}>
-          <User /> Guest profile
+          <User /> Open guest profile
         </Item>
       )}
-      {d && (
+      {d && aiOn && (
         <Item
           onSelect={() =>
             openPalette({ mode: 'agent', context: { kind: 'booking', id: d.booking.id } })
