@@ -9,7 +9,7 @@
   },
   "scripts": {
     "dev": "pnpm --parallel --filter @orbit/api --filter @orbit/web dev",
-    "dev:lan": "ORBIT_LAN=1 pnpm dev",
+    "dev:lan": "pnpm --parallel --filter @orbit/api --filter @orbit/web dev:lan",
     "build": "pnpm -r --if-present build",
     "build:vercel": "pnpm --filter @orbit/web build && pnpm --filter @orbit/api build:vercel",
     "typecheck": "pnpm -r --if-present typecheck",

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../../.env src/index.ts",
+    "dev:lan": "pnpm run dev",
     "start": "tsx --env-file-if-exists=../../.env src/index.ts",
     "typecheck": "tsc --noEmit",
     "build:vercel": "tsx scripts/build-vercel.ts"

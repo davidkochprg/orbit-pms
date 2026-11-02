@@ -13,8 +13,7 @@ export default defineConfig(({ mode }) => {
       alias: { '@': path.resolve(import.meta.dirname, './src') },
     },
     server: {
-      // `pnpm dev:lan` opens the dev server to the local network, so a phone can open ID scan links.
-      host: process.env.ORBIT_LAN === '1' ? true : undefined,
+      // `pnpm dev:lan` adds --host, opening the dev server to the local network for phone ID scans.
       proxy: {
         '/api': apiTarget,
         '/health': apiTarget,
