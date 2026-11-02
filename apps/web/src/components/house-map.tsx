@@ -36,7 +36,8 @@ export function HouseMap({
   menu?: (roomId: string, tile: ReactElement) => ReactElement;
 }) {
   const floors = houseFloors(rooms);
-  // One column per room on the widest floor, so rooms line up across floors like windows.
+  // One column per room on the widest floor, so rooms line up across floors like windows. Tiles
+  // share the panel's width, up to a size where they would stop reading as windows.
   const columns = Math.max(1, ...floors.map((f) => f.rooms.length));
   let index = 0;
   return (
@@ -53,7 +54,10 @@ export function HouseMap({
             <ul
               aria-label={floor.floor === 0 ? 'Ground floor' : `Floor ${floor.floor}`}
               className="grid min-w-0 flex-1 gap-1 sm:gap-1.5"
-              style={{ gridTemplateColumns: `repeat(${columns}, minmax(0, 4rem))` }}
+              style={{
+                gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                maxWidth: `${columns * 6.5}rem`,
+              }}
             >
               {floor.rooms.map((room) => {
                 const stay = stays?.get(room.id);
@@ -64,7 +68,7 @@ export function HouseMap({
                       ? () => onBook(room.id)
                       : undefined;
                 const tile = cn(
-                  'flex h-8 w-full min-w-0 items-center justify-center rounded-md font-mono text-[0.65625rem]',
+                  'flex aspect-[2/1] max-h-11 min-h-8 w-full min-w-0 items-center justify-center rounded-md font-mono text-[0.65625rem]',
                   stateClass[room.state],
                 );
                 const name = (

@@ -10,7 +10,7 @@ export function RoomsPage() {
     <>
       <PageHeader title="Rooms" />
       <PageBody>
-        <div className="flex max-w-6xl flex-col gap-4">
+        <div className="flex flex-col gap-4">
           <ReadOnlyNotice what="rooms" />
           <RoomsEditor readOnly={!canManage} />
         </div>

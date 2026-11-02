@@ -81,7 +81,8 @@ export function RoomsEditor({ readOnly }: Props) {
   const floors = [...new Set(rooms.data.map((r) => r.floor))].sort((a, b) => b - a);
 
   return (
-    <div className="flex flex-col gap-4">
+    // On a wide screen the types sit beside the rooms instead of stretching across the page.
+    <div className="flex flex-col gap-4 2xl:grid 2xl:grid-cols-[minmax(0,40rem)_minmax(0,1fr)] 2xl:items-start">
       <Panel
         title="Room types"
         count={types.length}
@@ -182,7 +183,7 @@ export function RoomsEditor({ readOnly }: Props) {
               <h3 className="w-24 shrink-0 px-1 pt-2 text-xs text-muted-foreground">
                 {floor === 0 ? 'Ground floor' : `Floor ${floor}`}
               </h3>
-              <ul className="grid flex-1 grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+              <ul className="grid flex-1 grid-cols-[repeat(auto-fill,minmax(8.5rem,1fr))] gap-1.5">
                 {rooms.data
                   .filter((r) => r.floor === floor)
                   .map((r) => {
