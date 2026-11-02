@@ -61,9 +61,9 @@ function day(date: string): string {
   return `${weekday}, ${date}`;
 }
 
-/** In the units of the hotel's country, which the guest is travelling to. */
-function weatherLine(w: WeatherDay, country: string): string {
-  const { temperature, fall } = weatherReadings(w, imperialWeather(country));
+/** Fahrenheit and inches only for an English-writing guest of a US hotel; metric for the rest. */
+function weatherLine(w: WeatherDay, imperial: boolean): string {
+  const { temperature, fall } = weatherReadings(w, imperial);
   return [w.kind, temperature, fall].filter(Boolean).join(', ');
 }
 
@@ -92,7 +92,7 @@ Arrives: ${day(stay.checkIn)}, check-in from ${timeOfDay(hotel.profile.checkInFr
 Leaves: ${day(stay.checkOut)} (${nights} night${nights === 1 ? '' : 's'}), check-out by ${timeOfDay(hotel.profile.checkOutBy, country)}
 Room: ${stay.roomTypeName}, for ${party}
 Booked: ${booked.length > 0 ? booked.join(', ') : 'nothing extra'}
-Weather forecast for the arrival day: ${f.weather ? weatherLine(f.weather, country) : 'not known'}
+Weather forecast for the arrival day: ${f.weather ? weatherLine(f.weather, imperialWeather(country) && f.guest.language === 'en') : 'not known'}
 ID at check-in: ${f.idsFrom === 'everyone' ? 'an ID card or passport for everyone staying' : 'a photo ID for the guest who booked'}
 Remembered from earlier stays: ${f.remembered && f.remembered.length > 0 ? f.remembered.join(' ') : 'nothing, a first stay or nothing noted'}
 Signer: ${f.signer ?? 'none'}${feedback ? `\n\nYour previous email was rejected: ${feedback}` : ''}`;
