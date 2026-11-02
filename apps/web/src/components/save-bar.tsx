@@ -49,7 +49,7 @@ export function SaveBar({
   return (
     <>
       {(dirty || save.error || save.isSuccess) && (
-        <div className="flex shrink-0 items-center gap-3 border-t px-6 py-3">
+        <div className="flex shrink-0 items-center gap-3 border-t px-4 py-3 md:px-6">
           {save.error ? (
             <ErrorNotice message={save.error.message} className="min-w-0 flex-1" />
           ) : (

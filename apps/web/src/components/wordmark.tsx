@@ -2,7 +2,7 @@ import { LogoMark } from '@/components/logo-mark';
 import { cn } from '@/lib/utils';
 
 const sizes = {
-  sm: 'text-[15px]/none',
+  sm: 'text-[0.9375rem]/none',
   md: 'text-xl/none',
   lg: 'text-[1.75rem]/none',
 };

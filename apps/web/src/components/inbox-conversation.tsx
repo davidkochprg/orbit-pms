@@ -187,7 +187,7 @@ export function Conversation({ id }: { id: string }) {
     m.messages.at(-1)?.direction === 'in';
 
   return (
-    <article className="mx-auto flex max-w-4xl flex-col gap-6 px-6 py-6">
+    <article className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6 md:px-6">
       <Header inquiry={m} />
       <ol className="flex flex-col gap-3">
         {m.messages.map((msg) => (

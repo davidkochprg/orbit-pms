@@ -59,7 +59,7 @@ export function AttentionPanel({ brief, className }: { brief: DailyBrief; classN
     >
       <ScrollBox className="max-h-80 xl:absolute xl:inset-0 xl:max-h-none">
         {items.length === 0 ? (
-          <EmptyState icon={CircleCheck} title="Nothing needs attention" className="py-8" />
+          <EmptyState icon={CircleCheck} title="Nothing needs attention" className="h-full py-8" />
         ) : (
           <AttentionList items={items} />
         )}
@@ -92,7 +92,7 @@ export function GapsPanel({
           <EmptyState
             icon={CalendarCheck}
             title="No short gaps in the next two weeks"
-            className="h-full"
+            className="h-full py-8"
           />
         ) : (
           <AttentionList items={gaps} />

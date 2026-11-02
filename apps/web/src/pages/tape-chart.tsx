@@ -143,7 +143,7 @@ export function TapeChartPage() {
     return (
       <>
         <PageHeader title="Tape chart" />
-        <ErrorNotice message={day.error.message} className="m-6" />
+        <ErrorNotice message={day.error.message} className="m-4 md:m-6" />
       </>
     );
   }
@@ -151,7 +151,7 @@ export function TapeChartPage() {
     return (
       <>
         <PageHeader title="Tape chart" />
-        <Skeleton className="m-6 h-96" />
+        <Skeleton className="m-4 h-96 md:m-6" />
       </>
     );
   }
@@ -321,6 +321,7 @@ function TapeChart({ today }: { today: string }) {
                 size="icon-sm"
                 className="rounded-md"
                 aria-label={`Previous ${span} days`}
+                tooltip={`Previous ${span} days`}
                 onClick={() => goTo(addDaysIso(start, -span))}
               >
                 <ChevronLeft />
@@ -338,6 +339,7 @@ function TapeChart({ today }: { today: string }) {
                 size="icon-sm"
                 className="rounded-md"
                 aria-label={`Next ${span} days`}
+                tooltip={`Next ${span} days`}
                 onClick={() => goTo(addDaysIso(start, span))}
               >
                 <ChevronRight />
@@ -363,9 +365,9 @@ function TapeChart({ today }: { today: string }) {
 
       <div ref={viewport} className="relative min-h-0 flex-1 overflow-auto">
         {loadError ? (
-          <ErrorNotice message={loadError.message} className="m-6" />
+          <ErrorNotice message={loadError.message} className="m-4 md:m-6" />
         ) : !groups || !bookings.data ? (
-          <Skeleton className="m-6 h-96" />
+          <Skeleton className="m-4 h-96 md:m-6" />
         ) : groups.length === 0 ? (
           <EmptyState title="No rooms yet" />
         ) : (

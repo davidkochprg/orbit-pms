@@ -92,7 +92,7 @@ export function GuestsPage() {
     <>
       <PageHeader
         title="Guests"
-        meta={guests.data && `${rows.length}`}
+        meta={guests.data && `${rows.length} ${rows.length === 1 ? 'guest' : 'guests'}`}
         actions={
           <>
             <SearchField
@@ -110,11 +110,15 @@ export function GuestsPage() {
       />
       <div className="min-h-0 flex-1 overflow-auto">
         {guests.isError ? (
-          <ErrorNotice message={guests.error.message} className="m-6" />
+          <ErrorNotice message={guests.error.message} className="m-4 md:m-6" />
         ) : !guests.data ? (
-          <Skeleton className="m-6 h-64" />
+          <Skeleton className="m-4 h-64 md:m-6" />
         ) : rows.length === 0 ? (
-          <EmptyState icon={Users} title="No guests match this filter" className="mt-16" />
+          <EmptyState
+            icon={Users}
+            title={table.state.globalFilter ? 'No guests match this filter' : 'No guests'}
+            className="mt-16"
+          />
         ) : (
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10 bg-surface-sunken/90 backdrop-blur-md">

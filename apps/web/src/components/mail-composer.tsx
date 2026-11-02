@@ -79,7 +79,7 @@ export function MailComposer({ start, back }: { start: ComposerStart; back: stri
   }
 
   return (
-    <article className="mx-auto flex min-h-full max-w-4xl flex-col gap-4 px-6 py-6">
+    <article className="mx-auto flex min-h-full max-w-4xl flex-col gap-4 px-4 py-6 md:px-6">
       <header className="flex items-center gap-2">
         <Button variant="ghost" size="icon-sm" asChild className="lg:hidden">
           <Link to={back} aria-label="Back to the list">

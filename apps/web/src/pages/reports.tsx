@@ -103,7 +103,7 @@ export function ReportsPage() {
         }
       />
       <PageBody>
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4">
           {(summary.data || summary.isError) && (
             <Panel title="Summary">
               {summary.isError ? (
@@ -118,12 +118,8 @@ export function ReportsPage() {
           {report.isError ? (
             <ErrorNotice message={report.error.message} />
           ) : !report.data ? (
-            <div className="flex flex-col gap-6">
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {[0, 1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-28 rounded-card" />
-                ))}
-              </div>
+            <div className="flex flex-col gap-4">
+              <Skeleton className="h-28 rounded-card" />
               <Skeleton className="h-64 rounded-card" />
             </div>
           ) : (
@@ -308,7 +304,7 @@ function OccupancyChart({ days }: { days: ReportDay[] }) {
             className="absolute inset-x-0 border-t border-dashed border-border"
             style={{ bottom: `${line * 100}%` }}
           >
-            <span className="absolute -top-2 right-0 bg-background pl-1 font-mono text-[10px] text-subtle-foreground">
+            <span className="absolute -top-2 right-0 bg-background pl-1 font-mono text-[0.625rem] text-subtle-foreground">
               {line * 100}%
             </span>
           </div>
@@ -340,7 +336,7 @@ function OccupancyChart({ days }: { days: ReportDay[] }) {
           ))}
         </div>
       </div>
-      <div aria-hidden className="flex gap-[2px] pr-8 text-[10px] text-subtle-foreground">
+      <div aria-hidden className="flex gap-[2px] pr-8 text-[0.625rem] text-subtle-foreground">
         {days.map((d, i) => (
           <span key={d.date} className="min-w-0 flex-1 overflow-visible whitespace-nowrap">
             {i % every === 0 ? formatDate(d.date).replace(/^\w+ /, '') : ''}

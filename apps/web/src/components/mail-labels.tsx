@@ -211,7 +211,7 @@ function LabelForm({
           <Button
             type="button"
             variant="ghost"
-            className="mr-auto text-destructive"
+            className="mr-auto text-destructive hover:bg-destructive/10 hover:text-destructive"
             onClick={() => setDeleting(true)}
           >
             Delete

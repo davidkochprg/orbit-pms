@@ -121,7 +121,7 @@ export function TonightPanel({
                   first={
                     stay ? (
                       <ContextMenuItem onSelect={() => open(stay)}>
-                        <ExternalLink /> Open the stay
+                        <ExternalLink /> Open booking
                       </ContextMenuItem>
                     ) : item.room.status !== 'out_of_order' ? (
                       <ContextMenuItem onSelect={() => openNew({ roomId, checkIn: brief.date })}>

@@ -140,7 +140,7 @@ export function RoomsEditor({ readOnly }: Props) {
                       ? formatMoney(Math.round(perf.roomRevenue / perf.roomNights))
                       : '–'}
                   </span>
-                  <span className="text-right text-[0.8125rem] tabular-nums">
+                  <span className="text-right font-mono text-[0.8125rem] tabular-nums">
                     {formatMoney(t.basePrice)}
                   </span>
                   {readOnly ? (
@@ -212,7 +212,7 @@ export function RoomsEditor({ readOnly }: Props) {
                               type="button"
                               disabled={readOnly}
                               onClick={() => setEditingRoom({ item: r })}
-                              className="flex w-full flex-col items-start gap-0.5 rounded-[10px] bg-background px-2.5 py-2 text-left ring-1 ring-ink/6 outline-none ring-inset hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
+                              className="flex w-full flex-col items-start gap-0.5 rounded-stage bg-background px-2.5 py-2 text-left ring-1 ring-ink/6 outline-none ring-inset hover:bg-surface-raised focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none"
                             >
                               <span className="flex w-full items-center gap-1.5">
                                 <span className="font-mono text-[0.8125rem] font-medium">

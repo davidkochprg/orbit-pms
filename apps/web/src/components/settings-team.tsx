@@ -11,6 +11,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { FormField } from '@/components/form-field';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { Section } from '@/components/section';
+import { Segmented } from '@/components/segmented';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -27,6 +28,8 @@ import { useAddStaff, useHotelProfile, useUpdateStaff } from '@/lib/api';
 import { languageLabels } from '@/lib/format';
 import { staffRoleLabels } from '@/lib/session';
 import { cn } from '@/lib/utils';
+
+const roleOptions = staffRoles.map((value) => ({ value, label: staffRoleLabels[value] }));
 
 interface Props {
   staff: StaffMember[];
@@ -190,27 +193,7 @@ function AddMember({ onDone }: { onDone: () => void }) {
           </FormField>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div
-            role="radiogroup"
-            aria-label="Role"
-            className="grid grid-cols-3 gap-1 rounded-[0.625rem] border border-ink/6 bg-ink/4 p-1"
-          >
-            {staffRoles.map((r) => (
-              <button
-                key={r}
-                type="button"
-                role="radio"
-                aria-checked={role === r}
-                onClick={() => setRole(r)}
-                className={cn(
-                  'rounded-md px-3 py-1 text-xs text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
-                  role === r && 'relative fill-action text-foreground shadow-action stroke-lit',
-                )}
-              >
-                {staffRoleLabels[r]}
-              </button>
-            ))}
-          </div>
+          <Segmented label="Role" value={role} options={roleOptions} onChange={setRole} />
           <span className="ml-auto flex items-center gap-1.5">
             <Button type="button" variant="ghost" size="sm" onClick={onDone}>
               Cancel

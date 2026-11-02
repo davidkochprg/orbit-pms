@@ -22,6 +22,7 @@ export function ThemeToggle() {
           variant="ghost"
           size="icon-sm"
           aria-label="Appearance"
+          tooltip="Appearance"
           className="text-muted-foreground"
         >
           <Current />

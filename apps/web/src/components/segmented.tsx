@@ -27,7 +27,7 @@ export function Segmented<T extends string>({
       aria-label={label}
       className={cn(
         'inline-flex border border-ink/6 bg-ink/4',
-        size === 'sm' ? 'h-8 gap-0.5 rounded-control p-0.5' : 'gap-1 rounded-[0.625rem] p-1',
+        size === 'sm' ? 'h-8 gap-0.5 rounded-control p-0.5' : 'gap-1 rounded-stage p-1',
         className,
       )}
     >

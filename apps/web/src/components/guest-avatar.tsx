@@ -3,8 +3,8 @@ import { initials, orbShift } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
 const sizes = {
-  sm: 'size-6 text-[9px]',
-  md: 'size-8 text-[11px]',
+  sm: 'size-6 text-[0.5625rem]',
+  md: 'size-8 text-[0.6875rem]',
   lg: 'size-11 text-sm',
 };
 

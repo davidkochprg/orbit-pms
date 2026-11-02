@@ -41,7 +41,7 @@ export function ScanPage() {
     ? "This phone couldn't open that photo. Take it again with the camera."
     : (upload.error?.message ?? view.data?.error ?? null);
 
-  const who = view.data?.firstName ? `${view.data.firstName}'s` : 'the guest’s';
+  const who = view.data?.firstName ? `${view.data.firstName}'s` : "the guest's";
 
   return (
     <main className="flex min-h-dvh flex-col bg-sidebar px-4 py-6 text-foreground">

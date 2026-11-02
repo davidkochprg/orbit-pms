@@ -75,7 +75,7 @@ function BookingChip({ id }: { id: string }) {
         }
       >
         <button type="button" onClick={() => openBooking(id)} className={chip}>
-          <GuestAvatar name={b.guestName ?? '?'} className="size-5 text-[8px]" />
+          <GuestAvatar name={b.guestName ?? '?'} className="size-5 text-[0.5rem]" />
           <span className="truncate">{b.guestName ?? 'Booking'}</span>
           {b.roomName && <RoomBadge name={b.roomName} />}
         </button>
@@ -161,7 +161,7 @@ function GuestChip({ id }: { id: string }) {
       }}
       className={chip}
     >
-      <GuestAvatar name={known?.name ?? '?'} className="size-5 text-[8px]" />
+      <GuestAvatar name={known?.name ?? '?'} className="size-5 text-[0.5rem]" />
       <span className="truncate">{known?.name ?? 'Guest'}</span>
     </button>
   );

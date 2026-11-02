@@ -44,7 +44,7 @@ export function GuestBookCard({ bookingId }: { bookingId: string }) {
           const needs = missingSummary(g.missing);
           return (
             <li key={g.id} className="flex min-h-8 items-center gap-2.5">
-              <GuestAvatar name={g.name} className="size-6 text-[9px]" />
+              <GuestAvatar name={g.name} className="size-6 text-[0.5625rem]" />
               <span className="min-w-0 flex-1 truncate">{g.name}</span>
               {needs ? (
                 <>

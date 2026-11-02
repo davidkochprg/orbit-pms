@@ -82,6 +82,7 @@ export function RateCalendar({
               variant="ghost"
               size="icon-sm"
               aria-label="Previous month"
+              tooltip="Previous month"
               disabled={page === 0}
               onClick={() => setPage(page - 1)}
             >
@@ -91,6 +92,7 @@ export function RateCalendar({
               variant="ghost"
               size="icon-sm"
               aria-label="Next month"
+              tooltip="Next month"
               disabled={page >= pages.length - 1}
               onClick={() => setPage(page + 1)}
             >
@@ -186,7 +188,7 @@ function NightCell({
       onClick={onSelect}
       onKeyDown={onKeyDown}
       className={cn(
-        'relative flex h-[4.75rem] min-w-0 flex-col gap-1 overflow-hidden rounded-[10px] bg-background p-1.5 text-left sm:p-2 ring-1 ring-ink/6 transition-[box-shadow,background-color] duration-150 ease-snap ring-inset hover:bg-surface-raised',
+        'relative flex h-[4.75rem] min-w-0 flex-col gap-1 overflow-hidden rounded-stage bg-background p-1.5 text-left sm:p-2 ring-1 ring-ink/6 transition-[box-shadow,background-color] duration-150 ease-snap ring-inset hover:bg-surface-raised',
         outside && !selected && 'bg-transparent opacity-60 hover:opacity-100',
         selected && 'ring-2 ring-primary',
       )}

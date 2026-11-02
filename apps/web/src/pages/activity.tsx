@@ -73,7 +73,7 @@ export function ActivityPage() {
           ) : !activity.data ? (
             <Skeleton className="h-96" />
           ) : activity.data.length === 0 ? (
-            <EmptyState icon={History} title="Nothing yet" />
+            <EmptyState icon={History} title="No activity yet" />
           ) : (
             [...groups].map(([date, items]) => (
               <Section key={date} title={formatLongDate(date)} count={items.length}>

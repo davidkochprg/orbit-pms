@@ -95,7 +95,7 @@ function NightBars({ days }: { days: Report['days'] }) {
           </Tip>
         ))}
       </div>
-      <figcaption className="flex justify-between text-[10px] text-subtle-foreground">
+      <figcaption className="flex justify-between text-[0.625rem] text-subtle-foreground">
         <span>{formatDate(first.date)}</span>
         <span>{formatDate(last.date)}</span>
       </figcaption>

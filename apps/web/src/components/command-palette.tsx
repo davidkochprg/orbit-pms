@@ -473,7 +473,7 @@ function SearchView({
                 value={`${g.name} ${g.email ?? ''} ${g.id}`}
                 onSelect={run(() => void navigate(`/guests/${g.id}`))}
               >
-                <GuestAvatar name={g.name} className="size-4 text-[8px]" />
+                <GuestAvatar name={g.name} className="size-4 text-[0.5rem]" />
                 <span className="truncate">{g.name}</span>
                 {g.email && <span className="truncate text-muted-foreground">{g.email}</span>}
               </Item>

@@ -24,7 +24,7 @@ export function BookingList({
 }) {
   const { open } = useBookingDrawer();
   if (rows.length === 0) {
-    return <EmptyState icon={emptyIcon} title={empty} className="py-8" />;
+    return <EmptyState icon={emptyIcon} title={empty} className="h-full py-8" />;
   }
   return (
     <ul className="flex flex-col">

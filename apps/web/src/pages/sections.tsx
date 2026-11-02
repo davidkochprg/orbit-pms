@@ -11,7 +11,7 @@ export function NotFoundPage() {
       <PageBody>
         <EmptyState
           icon={Compass}
-          title="This page doesn’t exist"
+          title="This page doesn't exist"
           action={
             <Button variant="outline" size="sm" asChild>
               <Link to="/">Go to Today</Link>

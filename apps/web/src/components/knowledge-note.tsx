@@ -185,7 +185,7 @@ export function NoteView({
       }
     >
       <div className="flex flex-col gap-2.5">
-        <h2 className="text-2xl font-semibold tracking-tight text-balance">{note.title}</h2>
+        <h2 className="text-xl font-semibold tracking-tight text-balance">{note.title}</h2>
         <NoteMeta
           tags={note.tags ?? []}
           until={note.until}

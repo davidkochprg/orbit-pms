@@ -46,7 +46,7 @@ export function AgentContextChip({
           <Inbox className="size-3 text-muted-foreground" />
         </span>
       ) : (
-        <GuestAvatar name={name ?? '?'} className="size-5 text-[8px]" />
+        <GuestAvatar name={name ?? '?'} className="size-5 text-[0.5rem]" />
       )}
       <span className="truncate">{name ?? '…'}</span>
       {detail && <span className="shrink-0 font-mono text-muted-foreground">{detail}</span>}
