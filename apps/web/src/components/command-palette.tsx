@@ -6,7 +6,6 @@ import {
   withoutLinks,
 } from '@orbit/shared';
 import { DefaultChatTransport, type UIMessage } from 'ai';
-import { BorderBeam } from 'border-beam';
 import { Command as CommandPrimitive } from 'cmdk';
 import {
   ArrowLeft,
@@ -52,7 +51,6 @@ import {
   type OpenPaletteOptions,
   type PaletteMode,
 } from '@/hooks/use-command-palette';
-import { useDarkMode } from '@/hooks/use-dark-mode';
 import { useSession } from '@/hooks/use-session';
 import { canRecord, useVoiceQuestion, type VoiceQuestion } from '@/hooks/use-voice-question';
 import { agentErrorMessage, proposalGroups, suggestedQuestionsFor, toolResults } from '@/lib/agent';
@@ -99,7 +97,6 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<PaletteMode>('search');
   const [text, setText] = useState('');
-  const dark = useDarkMode();
 
   // Each staff member has their own recent conversations, and starts on a new one.
   const { storedId } = useSession();
@@ -249,7 +246,6 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent
           showCloseButton={false}
-          // A transparent shell: the panel is inside the beam, so its glow isn't clipped.
           className={cn(
             // One size for search and the agent, in rem so it grows with the type on a big screen:
             // switching modes or typing doesn't resize the bar.
@@ -273,43 +269,32 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
           <DialogDescription className="sr-only">
             Search guests and pages, or ask the Orbit agent.
           </DialogDescription>
-          {/* The beam runs round the bar only while the agent is working. */}
-          <BorderBeam
-            active={working}
-            size="md"
-            theme={dark ? 'dark' : 'light'}
-            brightness={1.8}
-            glowSize={1.4}
-            borderRadius={14}
-            className="rounded-card"
-          >
-            <div className="relative flex h-[min(42rem,78vh)] flex-col overflow-hidden rounded-card bg-popover shadow-floating backdrop-blur-2xl stroke-lit">
-              {mode === 'search' ? (
-                <SearchView
-                  context={context}
-                  text={text}
-                  onTextChange={setText}
-                  onAsk={askNew}
-                  voice={voice}
-                  recent={recent}
-                  onOpenConversation={openConversation}
-                  close={() => setOpen(false)}
-                />
-              ) : (
-                <AgentView
-                  chat={chat}
-                  context={context}
-                  onClearContext={() => setContext(null)}
-                  text={text}
-                  onTextChange={setText}
-                  onAsk={ask}
-                  voice={voice}
-                  onBack={() => setMode('search')}
-                  onNew={() => openConversation()}
-                />
-              )}
-            </div>
-          </BorderBeam>
+          <div className="relative flex h-[min(42rem,78vh)] flex-col overflow-hidden rounded-card bg-popover shadow-floating backdrop-blur-2xl stroke-lit">
+            {mode === 'search' ? (
+              <SearchView
+                context={context}
+                text={text}
+                onTextChange={setText}
+                onAsk={askNew}
+                voice={voice}
+                recent={recent}
+                onOpenConversation={openConversation}
+                close={() => setOpen(false)}
+              />
+            ) : (
+              <AgentView
+                chat={chat}
+                context={context}
+                onClearContext={() => setContext(null)}
+                text={text}
+                onTextChange={setText}
+                onAsk={ask}
+                voice={voice}
+                onBack={() => setMode('search')}
+                onNew={() => openConversation()}
+              />
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </CommandPaletteContext>

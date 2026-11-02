@@ -120,9 +120,6 @@ importers:
       ai:
         specifier: ^7.0.153
         version: 7.0.153(zod@4.6.7)
-      border-beam:
-        specifier: 1.4.1
-        version: 1.4.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1
@@ -2286,12 +2283,6 @@ packages:
   body-parser@2.4.0:
     resolution: {integrity: sha512-Ifk1KcLrxaGt1occQagQNFNNOqRt1LFuehEnHHzB8Z6cRgIxRU1TBaiIsUiCdA+gy5PL7Y1IX31DNKkRmxtXjQ==}
     engines: {node: '>=18'}
-
-  border-beam@1.4.1:
-    resolution: {integrity: sha512-YyugmKjrhkg1PBC1ZKX7JvFo/zYzha6NXOq24VWrnvBYmDRvGCgFS9oxZoKJ+oS9Kn436l1etYGlAdGiWK+3ag==}
-    peerDependencies:
-      react: '>=18.0.0'
-      react-dom: '>=18.0.0'
 
   brace-expansion@5.0.12:
     resolution: {integrity: sha512-YovQ3rzhaLMIrDjNDMkNS01tea93qhEhG5xy8f6+R0l+dw3Ki+5sCoIoI942iuLZTHWogWktgwVDhU09iNEimQ==}
@@ -6129,11 +6120,6 @@ snapshots:
       type-is: 2.1.0
     transitivePeerDependencies:
       - supports-color
-
-  border-beam@1.4.1(react-dom@19.3.1(react@19.3.1))(react@19.3.1):
-    dependencies:
-      react: 19.3.1
-      react-dom: 19.3.1(react@19.3.1)
 
   brace-expansion@5.0.12:
     dependencies:
