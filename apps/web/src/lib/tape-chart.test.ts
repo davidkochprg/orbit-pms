@@ -5,12 +5,16 @@ import {
   buildWindow,
   dayWidthFor,
   isIsoDate,
+  isTapeSpan,
   moveTarget,
   nightsFromDelta,
   placeBooking,
   resizeTarget,
   TAPE_MIN_DAY_WIDTH,
+  TAPE_MIN_DAY_WIDTH_MONTH,
   TAPE_ROOM_COLUMN,
+  TAPE_ROW_HEIGHT,
+  tapeGeometry,
 } from './tape-chart';
 
 const start = '2026-10-27'; // Tuesday
@@ -144,5 +148,36 @@ describe('dayWidthFor', () => {
   it('never goes below the minimum, even before the container is measured', () => {
     expect(dayWidthFor(0)).toBe(TAPE_MIN_DAY_WIDTH);
     expect(dayWidthFor(500)).toBe(TAPE_MIN_DAY_WIDTH);
+  });
+
+  it('lets a month of days be narrower than two weeks', () => {
+    expect(dayWidthFor(1200, 30)).toBe(TAPE_MIN_DAY_WIDTH_MONTH);
+    expect(dayWidthFor(TAPE_ROOM_COLUMN + 30 * 50, 30)).toBe(50);
+  });
+});
+
+describe('tapeGeometry', () => {
+  it('keeps the base sizes at the default type size', () => {
+    expect(tapeGeometry(TAPE_ROOM_COLUMN + 7 * 120, 7)).toEqual({
+      roomColumn: TAPE_ROOM_COLUMN,
+      rowHeight: TAPE_ROW_HEIGHT,
+      dayWidth: 120,
+    });
+  });
+
+  it('grows the room column, rows and minimum day with the root font size', () => {
+    const g = tapeGeometry(0, 14, 1.2);
+    expect(g.roomColumn).toBe(Math.round(TAPE_ROOM_COLUMN * 1.2));
+    expect(g.rowHeight).toBe(Math.round(TAPE_ROW_HEIGHT * 1.2));
+    expect(g.dayWidth).toBe(Math.round(TAPE_MIN_DAY_WIDTH * 1.2));
+  });
+});
+
+describe('isTapeSpan', () => {
+  it('accepts only the spans the chart offers', () => {
+    expect(isTapeSpan(7)).toBe(true);
+    expect(isTapeSpan(30)).toBe(true);
+    expect(isTapeSpan(10)).toBe(false);
+    expect(isTapeSpan(Number.NaN)).toBe(false);
   });
 });

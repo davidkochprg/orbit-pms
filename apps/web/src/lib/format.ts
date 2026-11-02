@@ -52,9 +52,10 @@ export function formatFullDate(date: string): string {
   return format(parseISO(date), region.usDates ? 'MMM d, yyyy' : 'd MMM yyyy');
 }
 
-/** "Wed" and "Oct 3" for a tape chart column header. */
-export function formatDayHeader(date: string): { weekday: string; day: string } {
+/** "Wed" and "Oct 3" for a tape chart column header, or "W" and "3" for a narrow one. */
+export function formatDayHeader(date: string, compact = false): { weekday: string; day: string } {
   const d = parseISO(date);
+  if (compact) return { weekday: format(d, 'EEEEE'), day: format(d, 'd') };
   return { weekday: format(d, 'EEE'), day: format(d, region.usDates ? 'MMM d' : 'd MMM') };
 }
 

@@ -80,6 +80,7 @@ describe('format', () => {
 
   it('formats headers and long dates', () => {
     expect(formatDayHeader('2026-10-27')).toEqual({ weekday: 'Tue', day: 'Oct 27' });
+    expect(formatDayHeader('2026-10-27', true)).toEqual({ weekday: 'T', day: '27' });
     expect(formatLongDate('2026-10-27')).toBe('Tuesday, October 27');
   });
 

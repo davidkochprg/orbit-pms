@@ -1,17 +1,55 @@
 import type { Booking, IsoDate } from '@orbit/shared';
 import { addDays, differenceInCalendarDays, format, getDay, parseISO } from 'date-fns';
 
-/** Days shown at once on the tape chart. */
-export const TAPE_DAYS = 14;
+/** How many days the tape chart can show at once: a week, two weeks or a month. */
+export const TAPE_SPANS = [7, 14, 30] as const;
+export type TapeSpan = (typeof TAPE_SPANS)[number];
 
-/** Tape chart geometry in px. Drag math depends on these, so they live in code, not CSS. */
+/** Days shown at once on the tape chart until someone picks another span. */
+export const TAPE_DAYS: TapeSpan = 14;
+
+export function isTapeSpan(value: number): value is TapeSpan {
+  return (TAPE_SPANS as readonly number[]).includes(value);
+}
+
+/**
+ * Tape chart geometry in px at the default type size. Drag math depends on these, so they live
+ * in code, not CSS; `tapeGeometry` scales them with the root font size.
+ */
 export const TAPE_ROOM_COLUMN = 156;
 export const TAPE_ROW_HEIGHT = 44;
 export const TAPE_MIN_DAY_WIDTH = 72;
+/** A month's days may be narrower: they show a weekday letter and bars without icons. */
+export const TAPE_MIN_DAY_WIDTH_MONTH = 40;
+
+/** Narrower than this, a day header shows a weekday letter and the date, without occupancy. */
+export const TAPE_COMPACT_DAY_WIDTH = 64;
 
 /** Day column width that fills the available width, but never narrower than the minimum. */
-export function dayWidthFor(containerWidth: number, days = TAPE_DAYS): number {
-  return Math.max(TAPE_MIN_DAY_WIDTH, Math.floor((containerWidth - TAPE_ROOM_COLUMN) / days));
+export function dayWidthFor(
+  containerWidth: number,
+  days: number = TAPE_DAYS,
+  roomColumn = TAPE_ROOM_COLUMN,
+  scale = 1,
+): number {
+  const min = (days > 14 ? TAPE_MIN_DAY_WIDTH_MONTH : TAPE_MIN_DAY_WIDTH) * scale;
+  return Math.max(Math.round(min), Math.floor((containerWidth - roomColumn) / days));
+}
+
+export interface TapeGeometry {
+  roomColumn: number;
+  rowHeight: number;
+  dayWidth: number;
+}
+
+/** The chart's sizes in px for a container width, a span and the root font scale (1 = 16px). */
+export function tapeGeometry(containerWidth: number, days: number, scale = 1): TapeGeometry {
+  const roomColumn = Math.round(TAPE_ROOM_COLUMN * scale);
+  return {
+    roomColumn,
+    rowHeight: Math.round(TAPE_ROW_HEIGHT * scale),
+    dayWidth: dayWidthFor(containerWidth, days, roomColumn, scale),
+  };
 }
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
@@ -25,7 +63,7 @@ export function addDaysIso(date: IsoDate, days: number): IsoDate {
 }
 
 /** The `count` dates of a window starting at `start`. */
-export function buildWindow(start: IsoDate, count = TAPE_DAYS): IsoDate[] {
+export function buildWindow(start: IsoDate, count: number = TAPE_DAYS): IsoDate[] {
   return Array.from({ length: count }, (_, i) => addDaysIso(start, i));
 }
 
@@ -52,7 +90,7 @@ export interface BarPlacement {
 export function placeBooking(
   booking: Pick<Booking, 'checkIn' | 'checkOut'>,
   windowStart: IsoDate,
-  windowDays = TAPE_DAYS,
+  windowDays: number = TAPE_DAYS,
 ): BarPlacement | null {
   const arrives = differenceInCalendarDays(parseISO(booking.checkIn), parseISO(windowStart)) + 0.5;
   const leaves = differenceInCalendarDays(parseISO(booking.checkOut), parseISO(windowStart)) + 0.5;

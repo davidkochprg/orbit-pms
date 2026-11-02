@@ -31,6 +31,7 @@ import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
 import { PageHeader } from '@/components/page-header';
 import { RoomStatusDot } from '@/components/room-status-dot';
+import { Segmented } from '@/components/segmented';
 import { StatusDot } from '@/components/status-dot';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
@@ -47,6 +48,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useElementWidth } from '@/hooks/use-element-width';
+import { useRemScale } from '@/hooks/use-rem-scale';
 import {
   useBookings,
   useChangeBookingDates,
@@ -62,15 +64,16 @@ import {
   addDaysIso,
   barGeometry,
   buildWindow,
-  dayWidthFor,
   isIsoDate,
+  isTapeSpan,
   isWeekend,
   moveTarget,
   placeBooking,
   resizeTarget,
+  TAPE_COMPACT_DAY_WIDTH,
   TAPE_DAYS,
-  TAPE_ROOM_COLUMN,
-  TAPE_ROW_HEIGHT,
+  tapeGeometry,
+  type TapeSpan,
 } from '@/lib/tape-chart';
 import { cn } from '@/lib/utils';
 
@@ -90,6 +93,24 @@ const movable: BookingStatus[] = ['hold', 'confirmed', 'checked_in'];
 const ICONS_MIN_WIDTH = 150;
 /** Narrower than this, a bar is a stub (a departure's morning) and shows only its stripe. */
 const LABEL_MIN_WIDTH = 48;
+
+const spanOptions: { value: `${TapeSpan}`; label: string }[] = [
+  { value: '7', label: 'Week' },
+  { value: '14', label: '2 weeks' },
+  { value: '30', label: 'Month' },
+];
+
+/** The span picked last on this device, so the chart opens the way it was left. */
+const SPAN_KEY = 'orbit.tape-span';
+
+function storedSpan(): TapeSpan {
+  try {
+    const value = Number(localStorage.getItem(SPAN_KEY));
+    return isTapeSpan(value) ? value : TAPE_DAYS;
+  } catch {
+    return TAPE_DAYS;
+  }
+}
 
 /** Where a bar being dragged would land, or where a dropped one landed while it saves. */
 interface DragTarget {
@@ -139,11 +160,17 @@ function TapeChart({ today }: { today: string }) {
   const [params, setParams] = useSearchParams();
   const fromParam = params.get('from');
   const start = isIsoDate(fromParam) ? fromParam : today;
-  const days = buildWindow(start);
-  const end = addDaysIso(start, TAPE_DAYS);
+  const spanParam = Number(params.get('days'));
+  const span = isTapeSpan(spanParam) ? spanParam : storedSpan();
+  const days = buildWindow(start, span);
+  const end = addDaysIso(start, span);
 
   const viewport = useRef<HTMLDivElement>(null);
-  const dayWidth = dayWidthFor(useElementWidth(viewport));
+  const { roomColumn, rowHeight, dayWidth } = tapeGeometry(
+    useElementWidth(viewport),
+    span,
+    useRemScale(),
+  );
 
   const rooms = useRooms();
   const roomTypes = useRoomTypes();
@@ -166,6 +193,17 @@ function TapeChart({ today }: { today: string }) {
       p.set('from', date);
       return p;
     });
+  const setSpan = (next: TapeSpan) => {
+    try {
+      localStorage.setItem(SPAN_KEY, String(next));
+    } catch {
+      // Storage can be off; the URL still carries the span.
+    }
+    setParams((p) => {
+      p.set('days', String(next));
+      return p;
+    });
+  };
 
   const guestName = (id: string) => guests.data?.find((g) => g.id === id)?.name ?? 'Unknown guest';
   const visible = (bookings.data ?? [])
@@ -234,6 +272,14 @@ function TapeChart({ today }: { today: string }) {
         actions={
           <>
             {busy && <LoaderCircle className="size-4 animate-spin text-muted-foreground" />}
+            <Segmented
+              label="Days shown"
+              size="sm"
+              value={`${span}`}
+              options={spanOptions}
+              onChange={(v) => setSpan(Number(v) as TapeSpan)}
+              className="max-md:hidden"
+            />
             <DatePicker
               variant="action"
               aria-label="Jump to date"
@@ -247,8 +293,8 @@ function TapeChart({ today }: { today: string }) {
                 variant="ghost"
                 size="icon-sm"
                 className="rounded-md"
-                aria-label={`Previous ${TAPE_DAYS} days`}
-                onClick={() => goTo(addDaysIso(start, -TAPE_DAYS))}
+                aria-label={`Previous ${span} days`}
+                onClick={() => goTo(addDaysIso(start, -span))}
               >
                 <ChevronLeft />
               </Button>
@@ -264,8 +310,8 @@ function TapeChart({ today }: { today: string }) {
                 variant="ghost"
                 size="icon-sm"
                 className="rounded-md"
-                aria-label={`Next ${TAPE_DAYS} days`}
-                onClick={() => goTo(addDaysIso(start, TAPE_DAYS))}
+                aria-label={`Next ${span} days`}
+                onClick={() => goTo(addDaysIso(start, span))}
               >
                 <ChevronRight />
               </Button>
@@ -288,7 +334,7 @@ function TapeChart({ today }: { today: string }) {
         />
       )}
 
-      <div ref={viewport} className="scrollbar-thin relative min-h-0 flex-1 overflow-auto">
+      <div ref={viewport} className="relative min-h-0 flex-1 overflow-auto">
         {loadError ? (
           <ErrorNotice message={loadError.message} className="m-6" />
         ) : !groups || !bookings.data ? (
@@ -307,13 +353,11 @@ function TapeChart({ today }: { today: string }) {
             }}
           >
             {/* Clipped, so a bar dragged past the edge doesn't widen the scroll area. */}
-            <div
-              className="overflow-x-clip"
-              style={{ width: TAPE_ROOM_COLUMN + TAPE_DAYS * dayWidth }}
-            >
+            <div className="overflow-x-clip" style={{ width: roomColumn + span * dayWidth }}>
               <DayHeader
                 days={days}
                 today={today}
+                roomColumn={roomColumn}
                 dayWidth={dayWidth}
                 occupied={occupied}
                 total={rooms.data?.length ?? 0}
@@ -325,6 +369,8 @@ function TapeChart({ today }: { today: string }) {
                   days={days}
                   today={today}
                   start={start}
+                  roomColumn={roomColumn}
+                  rowHeight={rowHeight}
                   dayWidth={dayWidth}
                   byRoom={byRoom}
                   preview={preview}
@@ -350,25 +396,59 @@ function TapeChart({ today }: { today: string }) {
 function DayHeader({
   days,
   today,
+  roomColumn,
   dayWidth,
   occupied,
   total,
 }: {
   days: string[];
   today: string;
+  roomColumn: number;
   dayWidth: number;
   occupied: (day: string) => number;
   total: number;
 }) {
+  // Narrow days (a month on a laptop) show a weekday letter and the date; occupancy is on hover.
+  const compact = dayWidth < TAPE_COMPACT_DAY_WIDTH;
   return (
     <div className="sticky top-0 z-20 flex h-12 border-b bg-background">
       <div
         className="sticky left-0 z-10 shrink-0 border-r bg-background"
-        style={{ width: TAPE_ROOM_COLUMN }}
+        style={{ width: roomColumn }}
       />
       {days.map((day) => {
-        const { weekday, day: date } = formatDayHeader(day);
         const isToday = day === today;
+        const share = total > 0 ? Math.round((occupied(day) / total) * 100) : 0;
+        if (compact) {
+          const { weekday, day: date } = formatDayHeader(day, true);
+          return (
+            <Tip key={day} label={`${occupied(day)} of ${total} rooms occupied (${share}%)`}>
+              <div
+                className={cn(
+                  'flex shrink-0 flex-col items-center justify-center border-r border-grid-line last:border-r-0',
+                  isWeekend(day) && 'bg-ink/[0.018]',
+                  isToday && 'bg-primary-soft',
+                )}
+                style={{ width: dayWidth }}
+              >
+                <span
+                  className={cn('text-xs', isToday ? 'text-primary-text' : 'text-muted-foreground')}
+                >
+                  {weekday}
+                </span>
+                <span
+                  className={cn(
+                    'rounded-md px-1 text-sm font-medium tabular-nums',
+                    isToday && 'bg-primary text-primary-foreground shadow-button',
+                  )}
+                >
+                  {date}
+                </span>
+              </div>
+            </Tip>
+          );
+        }
+        const { weekday, day: date } = formatDayHeader(day);
         return (
           <div
             key={day}
@@ -387,9 +467,7 @@ function DayHeader({
             >
               {weekday}
               <Tip label={`${occupied(day)} of ${total} rooms occupied`}>
-                <span className="text-subtle-foreground tabular-nums">
-                  {total > 0 ? Math.round((occupied(day) / total) * 100) : 0}%
-                </span>
+                <span className="text-subtle-foreground tabular-nums">{share}%</span>
               </Tip>
             </span>
             <span
@@ -411,6 +489,7 @@ interface RowProps {
   days: string[];
   today: string;
   start: string;
+  rowHeight: number;
   dayWidth: number;
   /** The bar being dragged and where it would land. */
   preview: DragTarget | null;
@@ -426,19 +505,21 @@ interface RowProps {
 function RoomGroupBlock({
   group,
   byRoom,
+  roomColumn,
   ...row
-}: RowProps & { group: RoomGroup; byRoom: Map<string, Booking[]> }) {
+}: RowProps & { group: RoomGroup; byRoom: Map<string, Booking[]>; roomColumn: number }) {
+  const { rowHeight } = row;
   return (
     <div className="flex border-b last:border-b-0">
       <div
         className="sticky left-0 z-10 flex shrink-0 border-r bg-background"
-        style={{ width: TAPE_ROOM_COLUMN }}
+        style={{ width: roomColumn }}
       >
         <div className="flex w-7 shrink-0 items-center justify-center border-r border-grid-line">
           <Tip label={group.label} side="right">
             <span
               className="rotate-180 truncate text-xs font-medium text-subtle-foreground [writing-mode:vertical-rl]"
-              style={{ maxHeight: group.rooms.length * TAPE_ROW_HEIGHT - 12 }}
+              style={{ maxHeight: group.rooms.length * rowHeight - 12 }}
             >
               {group.label}
             </span>
@@ -449,7 +530,7 @@ function RoomGroupBlock({
             <div
               key={room.id}
               className="flex items-center gap-1.5 border-b border-grid-line px-2 last:border-b-0"
-              style={{ height: TAPE_ROW_HEIGHT }}
+              style={{ height: rowHeight }}
             >
               <RoomStatusDot status={room.status} />
               <span
@@ -479,6 +560,7 @@ function RoomLane({
   days,
   today,
   start,
+  rowHeight,
   dayWidth,
   preview,
   saving,
@@ -497,7 +579,7 @@ function RoomLane({
         <div
           ref={setNodeRef}
           className="relative flex border-b border-grid-line last:border-b-0"
-          style={{ height: TAPE_ROW_HEIGHT }}
+          style={{ height: rowHeight }}
           onContextMenu={(e) =>
             setMenuDay(
               (e.target as HTMLElement).closest<HTMLElement>('[data-day]')?.dataset.day ?? null,
@@ -522,13 +604,14 @@ function RoomLane({
             <div className="bg-hatch pointer-events-none absolute inset-0" />
           )}
           {preview?.mode === 'move' && preview.roomId === room.id && (
-            <LandingGhost target={preview} start={start} dayWidth={dayWidth} />
+            <LandingGhost target={preview} start={start} span={days.length} dayWidth={dayWidth} />
           )}
           {bookings.map((booking) => (
             <BookingBar
               key={booking.id}
               booking={booking}
               start={start}
+              span={days.length}
               dayWidth={dayWidth}
               resizeTo={
                 preview?.mode === 'resize' && preview.id === booking.id
@@ -579,13 +662,15 @@ function bookingIcons(booking: Booking): { icon: LucideIcon; label: string }[] {
 function LandingGhost({
   target,
   start,
+  span,
   dayWidth,
 }: {
   target: DragTarget;
   start: string;
+  span: number;
   dayWidth: number;
 }) {
-  const place = placeBooking(target, start);
+  const place = placeBooking(target, start, span);
   if (!place) return null;
   const { left, width } = barGeometry(place, dayWidth);
   return (
@@ -606,6 +691,7 @@ function LandingGhost({
 function BookingBar({
   booking,
   start,
+  span,
   dayWidth,
   resizeTo,
   saving,
@@ -615,6 +701,7 @@ function BookingBar({
 }: {
   booking: Booking;
   start: string;
+  span: number;
   dayWidth: number;
   /** The departure the right edge is being dragged to, snapped to whole days. */
   resizeTo: IsoDate | undefined;
@@ -638,7 +725,7 @@ function BookingBar({
     isDragging: resizing,
   } = useDraggable({ id: `resize:${booking.id}`, disabled: !canDrag });
   // While resizing, the right edge jumps to the departure under the pointer, a day at a time.
-  const place = placeBooking({ ...booking, checkOut: resizeTo ?? booking.checkOut }, start);
+  const place = placeBooking({ ...booking, checkOut: resizeTo ?? booking.checkOut }, start, span);
   if (!place || booking.status === 'cancelled') return null;
 
   const { left, width } = barGeometry(place, dayWidth);
