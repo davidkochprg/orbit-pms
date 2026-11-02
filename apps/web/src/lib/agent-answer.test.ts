@@ -151,6 +151,15 @@ describe('parseAnswer', () => {
 });
 
 describe('settledText', () => {
+  it('holds back a list item until its line ends', () => {
+    expect(settledText('Arriving:\n- [[bk_1]] dog\n-')).toBe('Arriving:\n- [[bk_1]] dog\n');
+    expect(settledText('Arriving:\n- [[bk_1]] dog\n- [[bk_2')).toBe('Arriving:\n- [[bk_1]] dog\n');
+    expect(settledText('Arriving:\n- [[bk_1]] — arrives at')).toBe('Arriving:\n');
+    expect(settledText('Steps:\n1')).toBe('Steps:\n');
+    expect(settledText('Arriving:\n- [[bk_1]] dog\n')).toBe('Arriving:\n- [[bk_1]] dog\n');
+    expect(settledText('Done.\n**Total** is')).toBe('Done.\n**Total** is');
+  });
+
   it('holds back a mention until it is closed', () => {
     expect(settledText('Moved [[bk_14')).toBe('Moved ');
     expect(settledText('Moved [[')).toBe('Moved ');

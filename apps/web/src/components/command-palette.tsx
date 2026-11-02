@@ -749,7 +749,12 @@ function AgentView({
         )}
       </div>
 
-      <div ref={scroller} className="scroll-fade relative min-h-0 flex-1 overflow-y-auto px-5 py-4">
+      {/* The scrollbar's room is kept on both sides, so the thread doesn't narrow and shift as the
+          answer grows past the bottom. */}
+      <div
+        ref={scroller}
+        className="scroll-fade relative min-h-0 flex-1 overflow-y-auto px-2 py-4 [scrollbar-gutter:stable_both-edges]"
+      >
         {!aiOn && (
           <p className="text-muted-foreground">
             The agent is not configured on this server. Set the Meta API variables to use it.

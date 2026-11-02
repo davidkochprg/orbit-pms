@@ -194,12 +194,18 @@ export function parseAnswer(text: string): AnswerBlock[] {
 }
 
 /**
- * A streaming answer cut back to what can be shown without flicker: an unclosed `[[` and an ID
- * still at the very end (its last characters may yet come) wait for the next words, and an
- * unclosed `**` shows as plain text until it closes.
+ * A streaming answer cut back to what can be shown without flicker: a list item waits for its
+ * line to end (half written, it has no booking to lead with yet, which turns a list of booking
+ * rows into bullets until it does), an unclosed `[[` and an ID still at the very end (its last
+ * characters may yet come) wait for the next words, and an unclosed `**` shows as plain text
+ * until it closes.
  */
 export function settledText(text: string): string {
   let out = text;
+  const lastLine = out.slice(out.lastIndexOf('\n') + 1);
+  if (/^\s*(?:(?:[-•*]|\d+[.)])(?:\s|$)|\d+$)/.test(lastLine)) {
+    out = out.slice(0, out.length - lastLine.length);
+  }
   const open = out.lastIndexOf('[[');
   if (open !== -1 && !out.includes(']]', open)) out = out.slice(0, open);
   out = out.replace(/\b(?:bk|rm|gst|inq)_[A-Za-z0-9-]*$/, '');
