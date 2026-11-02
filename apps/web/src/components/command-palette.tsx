@@ -112,7 +112,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
     setChatFor(staffKey);
     setInstance(newChat());
   }
-  const chat = useChat({ chat: instance });
+  // Words arrive every 20ms; drawing the thread a little less often keeps the answer steady.
+  const chat = useChat({ chat: instance, throttle: 50 });
   const working = chat.status === 'submitted' || chat.status === 'streaming';
 
   /** Shows another conversation; the one left behind stops answering. */

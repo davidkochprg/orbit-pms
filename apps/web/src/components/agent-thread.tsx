@@ -48,7 +48,9 @@ import {
   collectEntities,
   entityKind,
   type Inline,
+  looksLikeAnswer,
   parseAnswer,
+  settledText,
 } from '@/lib/agent-answer';
 import { cn } from '@/lib/utils';
 
@@ -214,10 +216,14 @@ function AssistantMessage({
   const narration = message.parts
     .slice(0, Math.max(lastTool, 0))
     .flatMap((p) => (p.type === 'text' && p.text.trim() ? [p.text.trim()] : []));
-  const answer = message.parts
+  const written = message.parts
     .slice(lastTool + 1)
     .map((p) => (p.type === 'text' ? p.text : ''))
     .join('');
+  // While it streams, text after the last step may still be narration before another step, and
+  // its last words may be half a mention; it shows as the answer once it is clearly one.
+  const answer = !working ? written : looksLikeAnswer(written) ? settledText(written) : '';
+  const pendingNote = working && written.trim() && !answer ? written.trim() : null;
   const blocks = useMemo(() => parseAnswer(answer), [answer]);
   const proposals = tools.flatMap((p) => {
     const proposal = asProposal(outputOf(p));
@@ -238,7 +244,7 @@ function AssistantMessage({
       <WorkingLine
         state="working"
         label="Thinking"
-        note={narration.at(-1) ?? null}
+        note={pendingNote ?? narration.at(-1) ?? null}
         steps={tools.length}
       />
     );
@@ -297,7 +303,7 @@ function WorkingLine({
   steps: number;
 }) {
   return (
-    <div className="flex items-center gap-2.5 text-sm" role="status" aria-live="polite">
+    <div className="flex h-7 items-center gap-2.5 text-sm" role="status" aria-live="polite">
       <ThinkingOrb state={state} size={20} aria-label="Orbit is working" />
       <span className="min-w-0 truncate">
         <span className="font-medium">{label}…</span>
@@ -331,7 +337,7 @@ function StepSummary({ tools, narration }: { tools: ToolPart[]; narration: strin
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="group -mx-1.5 flex w-fit max-w-full items-center gap-2 rounded-md px-1.5 py-1 text-xs text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        className="group -mx-1.5 flex h-7 w-fit max-w-full items-center gap-2 rounded-md px-1.5 text-xs text-muted-foreground outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
       >
         <span className="flex -space-x-1">
           {icons.map((Icon, i) => (

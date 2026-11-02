@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { collectEntities, entityKind, parseAnswer, parseInline } from './agent-answer';
+import {
+  collectEntities,
+  entityKind,
+  looksLikeAnswer,
+  parseAnswer,
+  parseInline,
+  settledText,
+} from './agent-answer';
 
 describe('entityKind', () => {
   it('reads the kind from the ID prefix', () => {
@@ -140,5 +147,34 @@ describe('parseAnswer', () => {
     expect(parseAnswer('- [[bk_1]]')).toEqual([
       { type: 'list', items: [{ lead: 'bk_1', content: [] }] },
     ]);
+  });
+});
+
+describe('settledText', () => {
+  it('holds back a mention until it is closed', () => {
+    expect(settledText('Moved [[bk_14')).toBe('Moved ');
+    expect(settledText('Moved [[')).toBe('Moved ');
+    expect(settledText('Moved [[bk_147]] to')).toBe('Moved [[bk_147]] to');
+  });
+
+  it('holds back a bare ID still at the end', () => {
+    expect(settledText('Booking bk_1')).toBe('Booking ');
+    expect(settledText('Booking bk_1 is')).toBe('Booking bk_1 is');
+  });
+
+  it('shows unclosed bold as plain text', () => {
+    expect(settledText('Total **$120')).toBe('Total $120');
+    expect(settledText('Total **$120**')).toBe('Total **$120**');
+  });
+});
+
+describe('looksLikeAnswer', () => {
+  it('treats a short line as possible narration', () => {
+    expect(looksLikeAnswer('Let me check the bill.')).toBe(false);
+  });
+
+  it('treats several lines or a long paragraph as the answer', () => {
+    expect(looksLikeAnswer('Tomorrow:\n- [[bk_1]]')).toBe(true);
+    expect(looksLikeAnswer('x'.repeat(200))).toBe(true);
   });
 });

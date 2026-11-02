@@ -192,3 +192,30 @@ export function parseAnswer(text: string): AnswerBlock[] {
   flush();
   return blocks;
 }
+
+/**
+ * A streaming answer cut back to what can be shown without flicker: an unclosed `[[` and an ID
+ * still at the very end (its last characters may yet come) wait for the next words, and an
+ * unclosed `**` shows as plain text until it closes.
+ */
+export function settledText(text: string): string {
+  let out = text;
+  const open = out.lastIndexOf('[[');
+  if (open !== -1 && !out.includes(']]', open)) out = out.slice(0, open);
+  out = out.replace(/\b(?:bk|rm|gst|inq)_[A-Za-z0-9-]*$/, '');
+  if ((out.split('**').length - 1) % 2 === 1) {
+    const at = out.lastIndexOf('**');
+    out = out.slice(0, at) + out.slice(at + 2);
+  }
+  return out;
+}
+
+/**
+ * Whether text the agent is still writing after its last tool step reads as the answer. A
+ * line or two is often narration before another step ("Let me check the bill."), which would
+ * vanish from the answer when that step starts, so it shows on the working line until it grows.
+ */
+export function looksLikeAnswer(text: string): boolean {
+  const trimmed = text.trim();
+  return trimmed.includes('\n') || trimmed.length >= 160;
+}
