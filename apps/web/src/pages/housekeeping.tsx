@@ -218,15 +218,7 @@ export function HousekeepingPage() {
           </div>
         ) : (
           <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-            {/* An empty out-of-order column only needs to be a drop target, not a quarter of the page. */}
-            <div
-              className={cn(
-                'flex h-full snap-x gap-3 lg:grid',
-                board.data.rooms.some((r) => r.room.status === 'out_of_order')
-                  ? 'lg:grid-cols-4'
-                  : 'lg:grid-cols-[1fr_1fr_1fr_11rem]',
-              )}
-            >
+            <div className="flex h-full snap-x gap-3 lg:grid lg:grid-cols-4">
               {boardColumns.map((status) => (
                 <Column
                   key={status}

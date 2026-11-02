@@ -9,13 +9,13 @@ import {
 import {
   ArrowLeftRight,
   BedDouble,
+  BrushCleaning,
   Check,
   LogIn,
   LogOut,
   type LucideIcon,
   MoreHorizontal,
   Plus,
-  SprayCan,
   Wrench,
 } from 'lucide-react';
 import type { ComponentProps, PointerEvent } from 'react';
@@ -66,7 +66,8 @@ const noDrag = { onPointerDown: (e: PointerEvent) => e.stopPropagation() };
 
 /**
  * A room on the housekeeping board: today's situation, what still needs doing, and a button for
- * its usual next step (e.g. "Mark clean") with the other statuses in its menu.
+ * its usual next step (e.g. "Mark clean") with the other statuses in its menu. The buttons show
+ * on hover or focus, and always on a touch screen, so a full board isn't a wall of buttons.
  */
 export function HousekeepingRoomCard({
   item,
@@ -87,7 +88,7 @@ export function HousekeepingRoomCard({
     <div
       {...props}
       className={cn(
-        'relative flex flex-col gap-2 rounded-stage bg-background p-3 shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit outline-none',
+        'group/card relative flex flex-col gap-2 rounded-stage bg-background p-3 shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit outline-none',
         urgent && 'ring-1 ring-warning/60',
         busy && 'opacity-60',
         dragging && 'z-30 shadow-floating',
@@ -96,12 +97,10 @@ export function HousekeepingRoomCard({
     >
       <div className="flex items-center gap-2">
         <span className="font-mono text-[0.9375rem] font-medium">{room.name}</span>
-        <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-          {roomTypeName}
-        </span>
+        <span className="min-w-0 truncate text-xs text-muted-foreground">{roomTypeName}</span>
         {effort && <EffortMeter effort={effort} cues={cues} />}
         {onSetStatus && (
-          <span className="-my-1 -mr-1 flex shrink-0 items-center gap-0.5">
+          <span className="-my-1 -mr-1 ml-auto flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity duration-150 group-focus-within/card:opacity-100 group-hover/card:opacity-100 has-[[aria-expanded=true]]:opacity-100 [@media(hover:none)]:opacity-100">
             {next && (
               <Button
                 variant="outline"
@@ -188,7 +187,7 @@ export function HousekeepingRoomCard({
               {task.type === 'maintenance' ? (
                 <Wrench className="mt-px size-3.5 shrink-0 text-muted-foreground" />
               ) : (
-                <SprayCan className="mt-px size-3.5 shrink-0 text-muted-foreground" />
+                <BrushCleaning className="mt-px size-3.5 shrink-0 text-muted-foreground" />
               )}
               {task.type === 'maintenance' && onOpenRepair ? (
                 <button
