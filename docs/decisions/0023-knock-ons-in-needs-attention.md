@@ -6,7 +6,7 @@ Knock-ons were shown as cards floating in the corner of every page ([ADR 0018](0
 
 ## Decision
 
-- No corner cards. A knock-on joins the "Needs attention" row it is about and makes the row the fix: an out-of-order room with stays to move opens a dialog listing them with their new rooms and one Move button; a repair nobody was asked about names the contractor, with a call button, and opens its contacts on the email. A room free again for a request has no row of its own in the brief, so it gets one that looks for rooms again and opens the conversation.
+- No corner cards. A knock-on joins the "Needs attention" row it is about and makes the row the fix: an out-of-order room with stays to move opens a dialog listing them with their new rooms and one Move button; a repair nobody was asked about names the contractor and opens its contacts on the email. A room free again for a request has no row of its own in the brief, so it gets one that looks for rooms again and opens the conversation.
 - The sidebar shows how many knock-ons there are on Today, so they are visible from any page without covering it.
 - Where the change is made, the fix is offered in place: marking a room out of order on the housekeeping board opens the stays to move as soon as the knock-ons are worked out again.
 - No "Not now": a row goes when the situation is dealt with, like every other row in the list.

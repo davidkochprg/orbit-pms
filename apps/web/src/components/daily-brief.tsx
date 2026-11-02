@@ -10,7 +10,6 @@ import {
   type LucideIcon,
   MailCheck,
   OctagonAlert,
-  Phone,
   ScanLine,
   Wrench,
 } from 'lucide-react';
@@ -22,17 +21,9 @@ import { ErrorNotice } from '@/components/error-notice';
 import { Panel, ScrollBox } from '@/components/panel';
 import { RelocateDialog } from '@/components/relocate-dialog';
 import { RepairDialog } from '@/components/repair-panel';
-import { Button } from '@/components/ui/button';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
-import {
-  useArrivalNotes,
-  useAskToRepair,
-  useHealth,
-  useKnockOns,
-  useRefreshInboxRooms,
-} from '@/lib/api';
+import { useArrivalNotes, useHealth, useKnockOns, useRefreshInboxRooms } from '@/lib/api';
 import { type AttentionItem, type AttentionKind, attentionItems, gapItems } from '@/lib/brief';
-import { contactName, telHref } from '@/lib/repairs';
 import { cn } from '@/lib/utils';
 
 const kindIcons: Record<AttentionKind, { icon: LucideIcon; className: string }> = {
@@ -239,7 +230,7 @@ function RepairItemRow({ taskId, body }: { taskId: string; body: ReactNode }) {
   );
 }
 
-/** Opens the repair's contacts on the email to the first one, with a call button beside it. */
+/** Opens the repair's contacts on the email to the first one; calling is there too. */
 function RepairRow({
   knockOn,
   body,
@@ -248,32 +239,18 @@ function RepairRow({
   body: ReactNode;
 }) {
   const [writing, setWriting] = useState(false);
-  const ask = useAskToRepair(knockOn.taskId);
   const { contact } = knockOn;
   return (
-    <span className="flex items-center gap-1 pr-2">
-      <button type="button" onClick={() => setWriting(true)} className={cn(rowClass, 'flex-1')}>
+    <>
+      <button type="button" onClick={() => setWriting(true)} className={rowClass}>
         {body}
       </button>
-      {contact.phone && (
-        <Button
-          asChild
-          variant="outline"
-          size="icon-sm"
-          aria-label={`Call ${contactName(contact)}`}
-          tooltip={`Call ${contact.phone}`}
-        >
-          <a href={telHref(contact.phone)} onClick={() => ask.mutate(contact.id)}>
-            <Phone />
-          </a>
-        </Button>
-      )}
       <RepairDialog
         taskId={writing ? knockOn.taskId : null}
         writeTo={contact.email ? contact.id : undefined}
         onOpenChange={setWriting}
       />
-    </span>
+    </>
   );
 }
 
