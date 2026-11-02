@@ -19,10 +19,12 @@ import { ErrorNotice } from '@/components/error-notice';
 import { NoteEditor } from '@/components/knowledge-editor';
 import { NewNote } from '@/components/knowledge-new';
 import { NoteView } from '@/components/knowledge-note';
+import { LogoMark } from '@/components/logo-mark';
 import { PageHeader } from '@/components/page-header';
 import { SearchField } from '@/components/search-field';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAskOrbit } from '@/hooks/use-ask-orbit';
 import { useDayOverview, useHotelInfo, useRemoveEntry } from '@/lib/api';
 import {
   activeNotices,
@@ -298,6 +300,7 @@ function TreeGroup({
   open: boolean;
 }) {
   const navigate = useNavigate();
+  const ask = useAskOrbit();
   const [folded, setFolded] = useState(false);
   const open = forced || !folded;
   return (
@@ -338,6 +341,11 @@ function TreeGroup({
                       label: 'Edit',
                       icon: Pencil,
                       onSelect: () => void navigate(`${noteHref(n.id)}&edit`),
+                    },
+                    ask && {
+                      label: 'Ask Orbit',
+                      icon: LogoMark,
+                      onSelect: () => ask({ kind: 'note', id: n.id }),
                     },
                     {
                       label: 'Delete…',

@@ -2,6 +2,7 @@ import { type HousekeepingRoom, type RoomStatus, roomStatuses } from '@orbit/sha
 import { CalendarRange, Plus } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { useNavigate } from 'react-router';
+import { LogoMark } from '@/components/logo-mark';
 import { StatusDot } from '@/components/status-dot';
 import {
   ContextMenu,
@@ -11,9 +12,10 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
+import { useAskOrbit } from '@/hooks/use-ask-orbit';
 import { roomStatusColor, roomStatusLabels } from '@/lib/status';
 
-/** A room's right-click menu: its other statuses, a task, and the tape chart. */
+/** A room's right-click menu: its other statuses, a task, the tape chart and the agent. */
 export function RoomContextMenu({
   item,
   onSetStatus,
@@ -29,6 +31,7 @@ export function RoomContextMenu({
   children: ReactElement;
 }) {
   const navigate = useNavigate();
+  const ask = useAskOrbit();
   const { room } = item;
   return (
     <ContextMenu>
@@ -56,6 +59,11 @@ export function RoomContextMenu({
         <ContextMenuItem onSelect={() => void navigate('/tape-chart')}>
           <CalendarRange /> Open tape chart
         </ContextMenuItem>
+        {ask && (
+          <ContextMenuItem onSelect={() => ask({ kind: 'room', id: room.id })}>
+            <LogoMark /> Ask Orbit
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

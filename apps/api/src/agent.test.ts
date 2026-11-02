@@ -228,6 +228,23 @@ describe('POST /api/agent', () => {
     expect(prompt).toContain(arrival.checkOut);
   });
 
+  it('tells the agent about a room, a night or the dates the staff member is looking at', async () => {
+    const room = seed.rooms[0]!;
+    const asked = async (kind: string, id: string) => {
+      const model = scriptedModel([{ text: 'Done.' }]);
+      const message = { ...userMessage('And here?'), metadata: { context: { kind, id } } };
+      await (await post(appWith(model), '/api/agent', { messages: [message] })).text();
+      return JSON.stringify(model.doStreamCalls[0]?.prompt);
+    };
+    expect(await asked('room', room.id)).toContain(`looking at room [[${room.id}]]`);
+    expect(await asked('night', '2026-11-06')).toContain('the night of 2026-11-06');
+    expect(await asked('tape_chart', '2026-11-02..2026-11-15')).toContain(
+      'the tape chart for the nights 2026-11-02 to 2026-11-15',
+    );
+    // Something that isn't there any more is left out rather than guessed.
+    expect(await asked('room', 'rm_gone')).not.toContain('looking at room');
+  });
+
   it('refuses context it does not know the shape of', async () => {
     const message = {
       ...userMessage('hi'),

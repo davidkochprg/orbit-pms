@@ -1,21 +1,76 @@
 import type { AgentContext } from '@orbit/shared';
-import { Inbox, X } from 'lucide-react';
+import {
+  BookOpenText,
+  CalendarRange,
+  ChartColumn,
+  Contact,
+  DoorOpen,
+  Inbox,
+  type LucideIcon,
+  Tags,
+  Wrench,
+  X,
+} from 'lucide-react';
 import { GuestAvatar } from '@/components/guest-avatar';
-import { useBookingDetail, useGuest, useInquiry } from '@/lib/api';
+import {
+  useBookingDetail,
+  useContacts,
+  useGuest,
+  useHotelInfo,
+  useInquiry,
+  useRepair,
+  useRooms,
+} from '@/lib/api';
+import { parseRangeId } from '@/lib/agent-context';
+import { formatDate, formatRange } from '@/lib/format';
 import { cn } from '@/lib/utils';
+
+/** Contexts shown with an icon; a booking or guest shows the person's orb. */
+const kindIcons: Partial<Record<AgentContext['kind'], LucideIcon>> = {
+  inquiry: Inbox,
+  room: DoorOpen,
+  repair: Wrench,
+  contact: Contact,
+  note: BookOpenText,
+  night: Tags,
+  tape_chart: CalendarRange,
+  report: ChartColumn,
+};
 
 /** "Grace Lane · 210": who or what a context is about, read from hotel data. */
 function useContextLabel(context: AgentContext): { name: string | null; detail: string | null } {
-  const booking = useBookingDetail(context.kind === 'booking' ? context.id : null).data;
-  const guest = useGuest(context.kind === 'guest' ? context.id : '').data;
-  const inquiry = useInquiry(context.kind === 'inquiry' ? context.id : undefined).data;
-  switch (context.kind) {
+  const { kind, id } = context;
+  const booking = useBookingDetail(kind === 'booking' ? id : null).data;
+  const guest = useGuest(kind === 'guest' ? id : '').data;
+  const inquiry = useInquiry(kind === 'inquiry' ? id : undefined).data;
+  const repair = useRepair(kind === 'repair' ? id : null).data;
+  const rooms = useRooms().data;
+  const contacts = useContacts().data;
+  const notes = useHotelInfo().data;
+  const range = parseRangeId(id);
+  switch (kind) {
     case 'booking':
       return { name: booking?.guest.name ?? null, detail: booking ? booking.room.name : null };
     case 'guest':
       return { name: guest?.name ?? null, detail: 'Guest' };
     case 'inquiry':
       return { name: inquiry?.senderName ?? inquiry?.senderAddress ?? null, detail: 'Inbox' };
+    case 'room':
+      return { name: 'Room', detail: rooms?.find((r) => r.id === id)?.name ?? null };
+    case 'repair':
+      return {
+        name: repair ? (repair.task.notes ?? 'Repair') : null,
+        detail: repair?.roomName ?? null,
+      };
+    case 'contact':
+      return { name: contacts?.find((c) => c.id === id)?.name ?? null, detail: null };
+    case 'note':
+      return { name: notes?.find((n) => n.id === id)?.title ?? null, detail: null };
+    case 'night':
+      return { name: formatDate(id), detail: null };
+    case 'tape_chart':
+    case 'report':
+      return { name: range ? formatRange(range.from, range.to) : null, detail: null };
   }
 }
 
@@ -33,6 +88,7 @@ export function AgentContextChip({
   className?: string;
 }) {
   const { name, detail } = useContextLabel(context);
+  const Icon = kindIcons[context.kind];
   return (
     <span
       className={cn(
@@ -41,9 +97,9 @@ export function AgentContextChip({
         className,
       )}
     >
-      {context.kind === 'inquiry' ? (
-        <span className="grid size-5 place-items-center rounded-full bg-background">
-          <Inbox className="size-3 text-muted-foreground" />
+      {Icon ? (
+        <span className="grid size-5 shrink-0 place-items-center rounded-full bg-background">
+          <Icon className="size-3 text-muted-foreground" />
         </span>
       ) : (
         <GuestAvatar name={name ?? '?'} className="size-5 text-[0.5rem]" />

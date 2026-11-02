@@ -43,6 +43,9 @@ import {
   type AgentMessageMetadata,
   agentMessageMetadataSchema,
   agentRequestSchema,
+  hotelInfoCategoryLabels,
+  isoDateSchema,
+  tradeLabels,
 } from '@orbit/shared';
 import {
   convertToModelMessages,
@@ -187,6 +190,64 @@ export function agentRoutes({
             request: inquiry.parsed,
             lastMessage: inquiry.messages.findLast((m) => m.direction === 'in')?.body ?? null,
           });
+        }
+        case 'room': {
+          const item = (await housekeeping.board()).rooms.find((r) => r.room.id === context.id);
+          if (!item) return null;
+          return contextNote({
+            kind: 'room',
+            roomId: item.room.id,
+            roomTypeName: item.roomTypeName,
+            status: item.room.status,
+            occupancy: item.occupancy,
+            guestName: item.guestName,
+            openTasks: item.openTasks.map((t) => t.notes ?? t.type),
+          });
+        }
+        case 'repair': {
+          const { task, roomName, contact } = await contacts.repair(context.id);
+          return contextNote({
+            kind: 'repair',
+            taskId: task.id,
+            roomName,
+            issue: task.notes,
+            trade: task.trade && tradeLabels[task.trade].toLowerCase(),
+            done: task.status === 'done',
+            askedName: contact?.name ?? null,
+          });
+        }
+        case 'contact': {
+          const contact = (await contacts.list()).find((c) => c.id === context.id);
+          if (!contact) return null;
+          return contextNote({
+            kind: 'contact',
+            contactId: contact.id,
+            name: contact.name,
+            trades: contact.trades.map((t) => tradeLabels[t].toLowerCase()),
+            email: contact.email,
+            phone: contact.phone,
+          });
+        }
+        case 'note': {
+          const { profile } = await hotelContext();
+          const note = profile.entries.find((e) => e.id === context.id);
+          if (!note) return null;
+          return contextNote({
+            kind: 'note',
+            title: note.title,
+            folder: hotelInfoCategoryLabels[note.category],
+            until: note.until ?? null,
+          });
+        }
+        case 'night': {
+          const date = isoDateSchema.safeParse(context.id);
+          return date.success ? contextNote({ kind: 'night', date: date.data }) : null;
+        }
+        case 'tape_chart':
+        case 'report': {
+          const [from, to] = context.id.split('..').map((d) => isoDateSchema.safeParse(d));
+          if (!from?.success || !to?.success) return null;
+          return contextNote({ kind: context.kind, from: from.data, to: to.data });
         }
       }
     } catch (err) {

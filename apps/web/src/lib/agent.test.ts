@@ -5,6 +5,7 @@ import {
   asToolError,
   proposalGroups,
   orbStateFor,
+  suggestedQuestionsFor,
   toolLabel,
   toolResultSummary,
 } from './agent';
@@ -102,5 +103,18 @@ describe('proposalGroups', () => {
       parts: [proposal('act_3')],
     };
     expect(proposalGroups([...messages, later])).toEqual([['act_1', 'act_2'], ['act_3']]);
+  });
+});
+
+describe('suggestedQuestionsFor', () => {
+  it('asks about what is open first, then about the page, then in general', () => {
+    expect(suggestedQuestionsFor('/housekeeping', { kind: 'repair', id: 'hk_1' })).toContain(
+      'Email the contractor about it.',
+    );
+    expect(suggestedQuestionsFor('/housekeeping', null)).toContain(
+      'Which rooms should we clean first?',
+    );
+    expect(suggestedQuestionsFor('/inbox/inq_1', null)).toContain('What is waiting for a reply?');
+    expect(suggestedQuestionsFor('/', null)).toContain('How does today look?');
   });
 });

@@ -86,12 +86,27 @@ export const aiUsageSummarySchema = z.object({
 });
 export type AiUsageSummary = z.infer<typeof aiUsageSummarySchema>;
 
+export const agentContextKinds = [
+  'booking',
+  'guest',
+  'inquiry',
+  'room',
+  'repair',
+  'contact',
+  'note',
+  'night',
+  'tape_chart',
+  'report',
+] as const;
+
 /**
- * What the staff member was looking at when they asked: a booking, a guest or an inbox
- * conversation. Only the ID travels; the server reads the rest from its own data.
+ * What the staff member was looking at when they asked: a record (booking, guest, conversation,
+ * room, repair, contact or Knowledge note) by its ID, a night on the rate outlook by its date, or
+ * the nights on the tape chart or a report as `from..to`, both included. Only the ID travels; the
+ * server reads the rest from its own data.
  */
 export const agentContextSchema = z.object({
-  kind: z.enum(['booking', 'guest', 'inquiry']),
+  kind: z.enum(agentContextKinds),
   id: z.string().min(1).max(100),
 });
 export type AgentContext = z.infer<typeof agentContextSchema>;

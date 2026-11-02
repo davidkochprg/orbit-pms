@@ -27,6 +27,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { BookingContextMenu } from '@/components/booking-menu';
+import { LogoMark } from '@/components/logo-mark';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
 import { PageHeader } from '@/components/page-header';
@@ -47,6 +48,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
+import { useAskOrbit } from '@/hooks/use-ask-orbit';
+import { usePageAgentContext } from '@/hooks/use-command-palette';
 import { useElementWidth } from '@/hooks/use-element-width';
 import { useRemScale } from '@/hooks/use-rem-scale';
 import {
@@ -74,6 +77,7 @@ import {
   tapeGeometry,
   type TapeSpan,
 } from '@/lib/tape-chart';
+import { rangeId } from '@/lib/agent-context';
 import { cn } from '@/lib/utils';
 
 type VisibleStatus = Exclude<BookingStatus, 'cancelled'>;
@@ -166,6 +170,7 @@ function TapeChart({ today }: { today: string }) {
   const span = isTapeSpan(spanParam) ? spanParam : storedSpan();
   const days = buildWindow(start, span);
   const end = addDaysIso(start, span);
+  usePageAgentContext({ kind: 'tape_chart', id: rangeId(start, addDaysIso(end, -1)) });
 
   const viewport = useRef<HTMLDivElement>(null);
   const { roomColumn, rowHeight, dayWidth, compactDays } = tapeGeometry(
@@ -607,6 +612,7 @@ function RoomLane({
   const { setNodeRef } = useDroppable({ id: room.id });
   // The night under the pointer when the context menu opened.
   const [menuDay, setMenuDay] = useState<string | null>(null);
+  const ask = useAskOrbit();
   const bookable = (day: string) => day >= today && room.status !== 'out_of_order';
   return (
     <ContextMenu>
@@ -678,6 +684,11 @@ function RoomLane({
               ? 'Past nights cannot be booked'
               : 'New booking from this night…'}
         </ContextMenuItem>
+        {ask && (
+          <ContextMenuItem onSelect={() => ask({ kind: 'room', id: room.id })}>
+            <LogoMark /> Ask Orbit
+          </ContextMenuItem>
+        )}
       </ContextMenuContent>
     </ContextMenu>
   );

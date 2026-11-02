@@ -18,10 +18,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAskOrbit } from '@/hooks/use-ask-orbit';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
-import { useCommandPalette } from '@/hooks/use-command-palette';
-import { useBookingAction, useBookingDetail, useHealth } from '@/lib/api';
+import { useBookingAction, useBookingDetail } from '@/lib/api';
 import { actionLabels, formatRange } from '@/lib/format';
 
 /** The parts a menu is built from, so one item list serves context and dropdown menus. */
@@ -103,8 +103,7 @@ function BookingMenuItems({
   const action = useBookingAction(bookingId);
   const { open } = useBookingDrawer();
   const { openEdit } = useBookingEditor();
-  const { openPalette } = useCommandPalette();
-  const aiOn = useHealth().data?.ai.configured ?? false;
+  const ask = useAskOrbit();
   const navigate = useNavigate();
   const d = detail.data;
   const steps =
@@ -152,12 +151,8 @@ function BookingMenuItems({
           <User /> Open guest profile
         </Item>
       )}
-      {d && aiOn && (
-        <Item
-          onSelect={() =>
-            openPalette({ mode: 'agent', context: { kind: 'booking', id: d.booking.id } })
-          }
-        >
+      {d && ask && (
+        <Item onSelect={() => ask({ kind: 'booking', id: d.booking.id })}>
           <LogoMark /> Ask Orbit
         </Item>
       )}

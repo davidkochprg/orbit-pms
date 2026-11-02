@@ -38,9 +38,9 @@ import {
 } from '@/components/ui/sheet';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAskOrbit } from '@/hooks/use-ask-orbit';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
-import { useCommandPalette } from '@/hooks/use-command-palette';
 import { activityDetail, activityLabel } from '@/lib/activity';
 import {
   useAuditLog,
@@ -48,7 +48,6 @@ import {
   useBookingDetail,
   useFolio,
   useGuestBook,
-  useHealth,
   useInbox,
   useUpdateBooking,
   useUpdateGuest,
@@ -122,12 +121,11 @@ function tracksGuestBook(status: BookingDetail['booking']['status']) {
 
 function BookingDetailView({ detail }: { detail: BookingDetail }) {
   const { booking, guest, room, roomType, allowedActions, missingIds } = detail;
-  const { openPalette } = useCommandPalette();
   const { openEdit } = useBookingEditor();
   const { intent, clearIntent } = useBookingDrawer();
   const navigate = useNavigate();
   const folio = useFolio(booking.id);
-  const aiOn = useHealth().data?.ai.configured ?? false;
+  const ask = useAskOrbit();
   const [tab, setTab] = useState<Tab>('overview');
   // A context menu's "Check in…" opens the inspector straight into the flow.
   const [checkingIn, setCheckingIn] = useState(
@@ -248,14 +246,12 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
             <CalendarRange />
           </Button>
         )}
-        {aiOn && (
+        {ask && (
           <Button
             variant="ghost"
             size="sm"
             className="ml-auto"
-            onClick={() =>
-              openPalette({ mode: 'agent', context: { kind: 'booking', id: booking.id } })
-            }
+            onClick={() => ask({ kind: 'booking', id: booking.id })}
           >
             <LogoMark className="text-primary-text" /> Ask Orbit
           </Button>

@@ -334,7 +334,7 @@ Body `{ name, roomTypeId, kind, floor }`. `POST` returns `201` with the new `Roo
 
 ### `POST /api/agent`
 
-Body: `{ "messages": UIMessage[] }`, the chat so far in AI SDK UI message format. A staff member's message may carry `metadata.context`: `{ kind: "booking" | "guest" | "inquiry", id }`, what they were looking at. The server reads that record itself and puts a one-line note before the message for the model; an unknown kind is a 400, a record that no longer exists is left out. Responds with an AI SDK UI message stream (`text/event-stream`): text deltas, tool calls and tool results. Proposal tools stream a result of `{ pendingActionId, summary, status: "awaiting_confirmation" }`. See [ai.md](ai.md).
+Body: `{ "messages": UIMessage[] }`, the chat so far in AI SDK UI message format. A staff member's message may carry `metadata.context`: `{ kind, id }`, what they were looking at: `booking`, `guest`, `inquiry`, `room`, `repair` (a task ID), `contact` or `note` by ID, `night` with the date as the ID, or `tape_chart` or `report` with `from..to` (both nights included) as the ID. The server reads that record itself and puts a one-line note before the message for the model; an unknown kind is a 400, a record that no longer exists is left out. Responds with an AI SDK UI message stream (`text/event-stream`): text deltas, tool calls and tool results. Proposal tools stream a result of `{ pendingActionId, summary, status: "awaiting_confirmation" }`. See [ai.md](ai.md).
 
 | Status | Code                               | When                                         |
 | ------ | ---------------------------------- | -------------------------------------------- |

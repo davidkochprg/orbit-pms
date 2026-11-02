@@ -1,4 +1,11 @@
-import type { BookingStatus, InquiryExtraction, IsoDate, Language } from '@orbit/shared';
+import type {
+  BookingStatus,
+  InquiryExtraction,
+  IsoDate,
+  Language,
+  RoomOccupancy,
+  RoomStatus,
+} from '@orbit/shared';
 
 /** What the staff member was looking at, read by the server from its own data. */
 export type ContextSubject =
@@ -20,7 +27,46 @@ export type ContextSubject =
       request: InquiryExtraction | null;
       /** The guest's latest message, cut to a few hundred characters. */
       lastMessage: string | null;
-    };
+    }
+  | {
+      kind: 'room';
+      roomId: string;
+      roomTypeName: string;
+      status: RoomStatus;
+      occupancy: RoomOccupancy;
+      guestName: string | null;
+      /** What is still to do in it, e.g. "Shower drips". */
+      openTasks: string[];
+    }
+  | {
+      kind: 'repair';
+      taskId: string;
+      roomName: string;
+      issue: string | null;
+      trade: string | null;
+      done: boolean;
+      /** Who was asked to fix it, once someone was. */
+      askedName: string | null;
+    }
+  | {
+      kind: 'contact';
+      contactId: string;
+      name: string;
+      trades: string[];
+      email: string | null;
+      phone: string | null;
+    }
+  | { kind: 'note'; title: string; folder: string; until: IsoDate | null }
+  | { kind: 'night'; date: IsoDate }
+  | { kind: 'tape_chart' | 'report'; from: IsoDate; to: IsoDate };
+
+const occupancyWords: Record<RoomOccupancy, string> = {
+  turnover: 'a guest leaves and another arrives today',
+  arriving: 'a guest arrives today',
+  departing: 'a guest leaves today',
+  staying: 'a guest is staying',
+  vacant: 'nobody is staying',
+};
 
 const statusWords: Record<BookingStatus, string> = {
   hold: 'a hold',
@@ -69,5 +115,36 @@ export function contextNote(subject: ContextSubject): string {
         .filter(Boolean)
         .join(' ');
     }
+    case 'room': {
+      const guest = subject.guestName ? ` (${subject.guestName})` : '';
+      const tasks =
+        subject.openTasks.length > 0 ? ` Still to do: ${subject.openTasks.join('; ')}.` : '';
+      return `The staff member is looking at room [[${subject.roomId}]], ${subject.roomTypeName}: ${subject.status.replace(/_/g, ' ')}, ${occupancyWords[subject.occupancy]}${guest}.${tasks}`;
+    }
+    case 'repair': {
+      const what = subject.issue ? `"${subject.issue}"` : 'a repair';
+      const trade = subject.trade ? ` (${subject.trade})` : '';
+      const state = subject.done
+        ? 'done'
+        : subject.askedName
+          ? `${subject.askedName} was asked to fix it`
+          : 'nobody asked to fix it yet';
+      return `The staff member is looking at the repair ${subject.taskId} in room ${subject.roomName}: ${what}${trade}, ${state}. Use taskId ${subject.taskId}.`;
+    }
+    case 'contact': {
+      const trades = subject.trades.length > 0 ? ` (${subject.trades.join(', ')})` : '';
+      const reach = [subject.email, subject.phone].filter(Boolean).join(', ');
+      return `The staff member is looking at the contact ${subject.contactId}: ${subject.name}${trades}${reach ? `, ${reach}` : ''}.`;
+    }
+    case 'note': {
+      const until = subject.until ? `, a notice until ${subject.until}` : '';
+      return `The staff member is looking at the note "${subject.title}" in Knowledge (${subject.folder})${until}.`;
+    }
+    case 'night':
+      return `The staff member is looking at the night of ${subject.date} on the rate outlook.`;
+    case 'tape_chart':
+      return `The staff member is looking at the tape chart for the nights ${subject.from} to ${subject.to}.`;
+    case 'report':
+      return `The staff member is looking at the report for the nights ${subject.from} to ${subject.to}.`;
   }
 }

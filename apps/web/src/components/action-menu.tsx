@@ -1,5 +1,4 @@
-import type { LucideIcon } from 'lucide-react';
-import { Fragment, type ReactElement, type ReactNode } from 'react';
+import { type ComponentType, Fragment, type ReactElement, type ReactNode } from 'react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -11,7 +10,8 @@ import {
 
 export interface MenuAction {
   label: ReactNode;
-  icon: LucideIcon;
+  /** A lucide icon, or Orbit's mark for asking the agent. */
+  icon: ComponentType;
   /** Runs the action; or `href` opens a link (a phone number, an email). */
   onSelect?: () => void;
   href?: string;

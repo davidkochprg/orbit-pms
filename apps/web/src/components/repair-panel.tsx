@@ -4,12 +4,14 @@ import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ConversationList } from '@/components/conversation-list';
 import { ErrorNotice } from '@/components/error-notice';
+import { LogoMark } from '@/components/logo-mark';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { useAskOrbit } from '@/hooks/use-ask-orbit';
 import { useToast } from '@/hooks/use-toast';
 import {
   useAskToRepair,
@@ -34,6 +36,7 @@ export function RepairDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const repair = useRepair(taskId);
+  const ask = useAskOrbit();
   return (
     <Dialog open={taskId !== null} onOpenChange={onOpenChange}>
       <DialogContent aria-describedby={undefined} className="shadow-floating sm:max-w-lg">
@@ -51,6 +54,19 @@ export function RepairDialog({
           />
         ) : (
           <Skeleton className="h-24" />
+        )}
+        {ask && taskId && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="justify-self-end"
+            onClick={() => {
+              onOpenChange(false);
+              ask({ kind: 'repair', id: taskId });
+            }}
+          >
+            <LogoMark className="text-primary-text" /> Ask Orbit
+          </Button>
         )}
       </DialogContent>
     </Dialog>

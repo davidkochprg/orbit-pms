@@ -5,11 +5,13 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ActionMenu } from '@/components/action-menu';
 import { ContactEditorDialog } from '@/components/contact-editor';
 import { EmptyState } from '@/components/empty-state';
+import { LogoMark } from '@/components/logo-mark';
 import { ErrorNotice } from '@/components/error-notice';
 import { PageHeader } from '@/components/page-header';
 import { SearchField } from '@/components/search-field';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAskOrbit } from '@/hooks/use-ask-orbit';
 import { useContacts } from '@/lib/api';
 import { contactMatches } from '@/lib/contacts';
 import { composeLink } from '@/lib/mail';
@@ -20,6 +22,7 @@ import { cn, labelCaps } from '@/lib/utils';
 export function ContactsPage() {
   const contacts = useContacts();
   const navigate = useNavigate();
+  const ask = useAskOrbit();
   const [query, setQuery] = useState('');
   // `?new=contact&trade=plumbing` opens the form, e.g. from a repair with nobody to ask;
   // `?contact=<id>` opens a contact, e.g. from the command bar.
@@ -114,6 +117,11 @@ export function ContactsPage() {
                         void navigate(composeLink({ name: c.name, address: c.email! })),
                     },
                     { label: 'Edit…', icon: Pencil, onSelect: () => setEditing(c), group: true },
+                    ask && {
+                      label: 'Ask Orbit',
+                      icon: LogoMark,
+                      onSelect: () => ask({ kind: 'contact', id: c.id }),
+                    },
                   ]}
                 >
                   <tr

@@ -5,6 +5,7 @@ import { ArrivalRisks } from '@/components/arrival-risks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorNotice } from '@/components/error-notice';
 import { LocalEvents } from '@/components/local-events';
+import { LogoMark } from '@/components/logo-mark';
 import { Panel, ScrollBox } from '@/components/panel';
 import { RateCalendar } from '@/components/rate-calendar';
 import { RateNightPanel } from '@/components/rate-night-panel';
@@ -17,6 +18,8 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAskOrbit } from '@/hooks/use-ask-orbit';
+import { usePageAgentContext } from '@/hooks/use-command-palette';
 import { useToast } from '@/hooks/use-toast';
 import {
   useAdjustRates,
@@ -43,6 +46,7 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
   const review = useRateReview(DAYS);
   const aiOn = useHealth().data?.ai.configured ?? false;
   const { toast } = useToast();
+  const ask = useAskOrbit();
   const [picked, setPicked] = useState<string | null>(null);
   const [confirmAll, setConfirmAll] = useState(false);
   const nightPanel = useRef<HTMLElement>(null);
@@ -56,6 +60,12 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
     reviewed.current = stale;
     runReview();
   }, [aiOn, stale, runReview]);
+
+  // The night in the panel, which a question from the command bar is about.
+  const shownNight =
+    picked ??
+    (outlook.data && (suggestions(outlook.data.nights)[0] ?? outlook.data.nights[0])?.date);
+  usePageAgentContext(shownNight ? { kind: 'night', id: shownNight } : null);
 
   if (outlook.isError) return <ErrorNotice message={outlook.error.message} />;
   if (!outlook.data) {
@@ -161,6 +171,11 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
                   <ContextMenuItem onSelect={() => setPicked(night.date)}>
                     <PanelRight /> Show this night
                   </ContextMenuItem>
+                  {ask && (
+                    <ContextMenuItem onSelect={() => ask({ kind: 'night', id: night.date })}>
+                      <LogoMark /> Ask Orbit
+                    </ContextMenuItem>
+                  )}
                   {canManage && night.suggestedPercent !== night.currentPercent && (
                     <ContextMenuItem
                       disabled={adjust.isPending}

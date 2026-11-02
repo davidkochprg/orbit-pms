@@ -1,3 +1,4 @@
+import type { AgentContext } from '@orbit/shared';
 import { getToolName, isToolUIPart, type UIMessage } from 'ai';
 import { z } from 'zod';
 import { formatMoney } from '@/lib/format';
@@ -246,7 +247,7 @@ export function toolResultSummary(toolName: string, output: unknown): string | n
  * Starting points shown in the command bar before anything is typed, one per kind of card the
  * agent can show. None names a guest, so they work on any day the demo data is seeded.
  */
-export const suggestedQuestions = [
+const generalQuestions = [
   'How does today look?',
   'Which rooms are free this weekend for two adults and a dog?',
   'What do we remember about the guests arriving today?',
@@ -255,3 +256,79 @@ export const suggestedQuestions = [
   'Hold the rooms for the team offsite.',
   'The shower in room 307 drips, log it for maintenance.',
 ];
+
+/** Questions about what the staff member is looking at; "this" is the context. */
+const contextQuestions: Record<AgentContext['kind'], string[]> = {
+  booking: [
+    'What is still due on this booking?',
+    'Who still needs an ID?',
+    'Write the note before this stay.',
+  ],
+  guest: [
+    'What do we remember about them?',
+    'When did they last stay, and what did they spend?',
+    'Write to them about their next stay.',
+  ],
+  inquiry: ['Draft a reply.', 'Which rooms fit this request?', 'Hold the best room for them.'],
+  room: [
+    'What is happening in this room today?',
+    'When is this room free next?',
+    'Log a repair for this room.',
+  ],
+  repair: [
+    'Who can fix this, and when can they get in?',
+    'Email the contractor about it.',
+    'Mark this repair done.',
+  ],
+  contact: ['Which open repairs could they fix?', 'Write to them.'],
+  note: ['Is anything in this note out of date?', 'Shorten this note.'],
+  night: [
+    'Why is this night priced like this?',
+    'Take the suggestion for this night.',
+    'Who arrives this night?',
+  ],
+  tape_chart: [
+    'Where are the empty nights in these dates?',
+    'Which rooms are free for three guests for two nights?',
+  ],
+  report: [
+    'What explains these numbers?',
+    'Compare it with the period before.',
+    'Which booking sources brought the most revenue?',
+  ],
+};
+
+/** Questions for a page when nothing in particular is open on it. */
+const pageQuestions: Record<string, string[]> = {
+  '/inbox': ['What is waiting for a reply?', 'Who arrives tomorrow without a note from us?'],
+  '/housekeeping': [
+    'Which rooms should we clean first?',
+    'Which repairs is nobody fixing yet?',
+    'The shower in room 307 drips, log it for maintenance.',
+  ],
+  '/guests': [
+    'What do we remember about the guests arriving today?',
+    'Who arrives tomorrow without a note from us?',
+  ],
+  '/rates': [
+    'Which nights should we raise?',
+    'Raise next weekend by the suggested amount.',
+    'Which arrivals this week are most likely not to come?',
+  ],
+  '/reports': [
+    'How did the last 7 nights compare with the week before?',
+    'Which booking sources brought the most revenue?',
+  ],
+  '/contacts': ['Who fixes plumbing?', 'Which open repairs is nobody fixing yet?'],
+  '/knowledge': ['Which notices end this week?', 'Note that the sauna is closed until Friday.'],
+};
+
+/**
+ * The starting points for a new conversation: about what the staff member is looking at, else
+ * about the page, else the general ones.
+ */
+export function suggestedQuestionsFor(pathname: string, context: AgentContext | null): string[] {
+  if (context) return contextQuestions[context.kind];
+  const page = Object.keys(pageQuestions).find((p) => pathname.startsWith(p));
+  return page ? pageQuestions[page]! : generalQuestions;
+}

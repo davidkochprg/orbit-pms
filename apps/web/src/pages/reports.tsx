@@ -11,6 +11,9 @@ import { Select } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger, Tip } from '@/components/ui/tooltip';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
+import { usePageAgentContext } from '@/hooks/use-command-palette';
+import { rangeId } from '@/lib/agent-context';
+import { addDaysIso } from '@/lib/tape-chart';
 import { useDayOverview, useHealth, usePricing, useReport, useReportSummary } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import {
@@ -49,6 +52,10 @@ export function ReportsPage() {
   const today = useDayOverview().data?.date;
   const range = useMemo(() => (today ? periodRange(period, today) : null), [period, today]);
   const previousRange = useMemo(() => range && comparisonRange(range), [range]);
+  // The period's last night is the day before `to`.
+  usePageAgentContext(
+    range && { kind: 'report', id: rangeId(range.from, addDaysIso(range.to, -1)) },
+  );
   const report = useReport(range);
   const previous = useReport(previousRange);
   const summary = useReportSummary();

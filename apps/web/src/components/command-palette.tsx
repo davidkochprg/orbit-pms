@@ -55,7 +55,7 @@ import {
 import { useDarkMode } from '@/hooks/use-dark-mode';
 import { useSession } from '@/hooks/use-session';
 import { canRecord, useVoiceQuestion, type VoiceQuestion } from '@/hooks/use-voice-question';
-import { agentErrorMessage, proposalGroups, suggestedQuestions, toolResults } from '@/lib/agent';
+import { agentErrorMessage, proposalGroups, suggestedQuestionsFor, toolResults } from '@/lib/agent';
 import { contextFromLocation } from '@/lib/agent-context';
 import {
   recentConversations,
@@ -139,11 +139,16 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   // What the next questions are about: the page's booking, guest or conversation, read when the
   // bar opens; the staff member can leave it out.
   const location = useLocation();
-  const pageContext = useRef<AgentContext | null>(null);
+  const urlContext = useRef<AgentContext | null>(null);
+  const shownContext = useRef<AgentContext | null>(null);
+  const pageContext = useCallback(() => urlContext.current ?? shownContext.current, []);
+  const setPageContext = useCallback((c: AgentContext | null) => {
+    shownContext.current = c;
+  }, []);
   const [context, setContext] = useState<AgentContext | null>(null);
   const isOpen = useRef(false);
   useEffect(() => {
-    pageContext.current = contextFromLocation(location.pathname, location.search);
+    urlContext.current = contextFromLocation(location.pathname, location.search);
   }, [location.pathname, location.search]);
   useEffect(() => {
     isOpen.current = open;
@@ -155,23 +160,23 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
       if (options?.mode === 'agent' && current.current.messages.length > 0) switchTo(newChat());
       setMode(options?.mode ?? 'search');
       setText(options?.text ?? '');
-      setContext(options?.context !== undefined ? options.context : pageContext.current);
+      setContext(options?.context !== undefined ? options.context : pageContext());
       setOpen(true);
     },
-    [switchTo],
+    [switchTo, pageContext],
   );
 
   useEffect(() => {
     const onKey = (e: globalThis.KeyboardEvent) => {
       if (e.key.toLowerCase() === 'k' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
-        if (!isOpen.current) setContext(pageContext.current);
+        if (!isOpen.current) setContext(pageContext());
         setOpen(!isOpen.current);
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, []);
+  }, [pageContext]);
 
   const send = (target: Chat<UIMessage>, question: string) =>
     void target.sendMessage({ text: question, ...(context && { metadata: { context } }) });
@@ -234,8 +239,8 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   }, [drawerBooking]);
 
   const value = useMemo(
-    () => ({ openPalette, closePalette, openBooking }),
-    [openPalette, closePalette, openBooking],
+    () => ({ openPalette, closePalette, openBooking, setPageContext }),
+    [openPalette, closePalette, openBooking, setPageContext],
   );
 
   return (
@@ -646,6 +651,7 @@ function AgentView({
   onNew: () => void;
 }) {
   const health = useHealth();
+  const { pathname } = useLocation();
   const aiOn = health.data?.ai.configured ?? false;
   const voiceOn = (health.data?.ai.voice ?? false) && canRecord();
   const busy = chat.status === 'submitted' || chat.status === 'streaming';
@@ -761,7 +767,10 @@ function AgentView({
       {chat.messages.length === 0 && aiOn && (
         <div className="shrink-0 px-5 py-2.5">
           <FollowUps
-            followUps={suggestedQuestions.map((q) => ({ label: q, ask: q }))}
+            followUps={suggestedQuestionsFor(pathname, context).map((q) => ({
+              label: q,
+              ask: q,
+            }))}
             onPick={(f) => 'ask' in f && onAsk(f.ask)}
           />
         </div>

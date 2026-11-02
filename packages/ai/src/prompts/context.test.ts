@@ -60,4 +60,62 @@ describe('contextNote', () => {
       'The staff member is looking at the inbox conversation [[inq_9]] with a guest, not yet a guest record.',
     );
   });
+
+  it('describes a room by its state today and what is still to do in it', () => {
+    expect(
+      contextNote({
+        kind: 'room',
+        roomId: 'rm_104',
+        roomTypeName: 'Double room',
+        status: 'out_of_order',
+        occupancy: 'arriving',
+        guestName: 'Demo Guest',
+        openTasks: ['Shower drips'],
+      }),
+    ).toBe(
+      'The staff member is looking at room [[rm_104]], Double room: out of order, a guest arrives today (Demo Guest). Still to do: Shower drips.',
+    );
+  });
+
+  it('describes a repair, a contact and a note', () => {
+    expect(
+      contextNote({
+        kind: 'repair',
+        taskId: 'hk_3',
+        roomName: '201',
+        issue: 'Lamp broken',
+        trade: 'electrical',
+        done: false,
+        askedName: null,
+      }),
+    ).toBe(
+      'The staff member is looking at the repair hk_3 in room 201: "Lamp broken" (electrical), nobody asked to fix it yet. Use taskId hk_3.',
+    );
+    expect(
+      contextNote({
+        kind: 'contact',
+        contactId: 'ct_1',
+        name: 'Demo Plumbing',
+        trades: ['plumbing'],
+        email: 'plumber@example.com',
+        phone: null,
+      }),
+    ).toBe(
+      'The staff member is looking at the contact ct_1: Demo Plumbing (plumbing), plumber@example.com.',
+    );
+    expect(
+      contextNote({ kind: 'note', title: 'Sauna', folder: 'Wellness', until: '2026-11-08' }),
+    ).toBe(
+      'The staff member is looking at the note "Sauna" in Knowledge (Wellness), a notice until 2026-11-08.',
+    );
+  });
+
+  it('names a night and a range of nights', () => {
+    expect(contextNote({ kind: 'night', date: '2026-11-06' })).toBe(
+      'The staff member is looking at the night of 2026-11-06 on the rate outlook.',
+    );
+    expect(contextNote({ kind: 'tape_chart', from: '2026-11-02', to: '2026-11-15' })).toBe(
+      'The staff member is looking at the tape chart for the nights 2026-11-02 to 2026-11-15.',
+    );
+  });
 });
