@@ -1,6 +1,6 @@
 import type { HousekeepingRoom, RoomOccupancy, RoomStatus } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
-import { houseFloors, stayByRoom } from './house-map';
+import { houseFloors, stayByRoom, tonightByRoom } from './house-map';
 
 function room(
   name: string,
@@ -54,9 +54,31 @@ describe('houseFloors', () => {
       room('206', 2, 'vacant', 'clean', null),
     ]);
     expect(floor?.rooms.map((r) => r.label)).toEqual([
-      'Room 205, turnover, Guest B',
+      'Room 205, confirmed, Guest B',
       'Room 206, free',
     ]);
+  });
+
+  it("colors rooms by tonight's stay, like the tape chart", () => {
+    const tonight = new Map([
+      ['rm_201', 'checked_in' as const],
+      ['rm_202', 'hold' as const],
+    ]);
+    const [floor] = houseFloors(
+      [
+        room('201', 2, 'arriving'),
+        room('202', 2, 'arriving'),
+        room('203', 2, 'departing'),
+        room('204', 2, 'vacant'),
+      ],
+      tonight,
+    );
+    expect(floor?.rooms.map((r) => r.state)).toEqual(['checked_in', 'hold', 'leaving', 'vacant']);
+  });
+
+  it('falls back to occupancy until the day has loaded', () => {
+    const [floor] = houseFloors([room('201', 2, 'staying'), room('202', 2, 'turnover')]);
+    expect(floor?.rooms.map((r) => r.state)).toEqual(['checked_in', 'confirmed']);
   });
 });
 
@@ -92,5 +114,46 @@ describe('stayByRoom', () => {
     expect(stays.get('rm_2')).toBe('bk_gone');
     expect(stays.get('rm_3')).toBe('bk_stay');
     expect(stays.has('rm_4')).toBe(false);
+  });
+});
+
+describe('tonightByRoom', () => {
+  const summary = (
+    id: string,
+    roomId: string,
+    status: 'confirmed' | 'checked_in' | 'checked_out',
+  ) => ({
+    booking: {
+      id,
+      guestId: 'gst_1',
+      roomId,
+      checkIn: '2026-10-30',
+      checkOut: '2026-11-01',
+      adults: 1,
+      childAges: [],
+      status,
+      holdExpiresAt: null,
+      source: 'phone' as const,
+      addons: { wellness: false, dogs: 0, extraBeds: 0 },
+      priceSnapshot: null,
+      notes: null,
+    },
+    guestName: 'Test Guest',
+    roomName: roomId,
+  });
+
+  it("takes the arrival's status in a turnover room and leaves departures out", () => {
+    const tonight = tonightByRoom({
+      date: '2026-10-30',
+      arrivals: [summary('bk_in', 'rm_1', 'checked_in')],
+      departures: [
+        summary('bk_out', 'rm_1', 'checked_out'),
+        summary('bk_gone', 'rm_2', 'checked_in'),
+      ],
+      inHouse: [summary('bk_stay', 'rm_3', 'confirmed')],
+    });
+    expect(tonight.get('rm_1')).toBe('checked_in');
+    expect(tonight.has('rm_2')).toBe(false);
+    expect(tonight.get('rm_3')).toBe('confirmed');
   });
 });

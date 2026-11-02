@@ -14,7 +14,7 @@ import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useToast } from '@/hooks/use-toast';
 import { useSetRoomStatus } from '@/lib/api';
 import { doneOf, occupancyPercent } from '@/lib/brief';
-import { stayByRoom } from '@/lib/house-map';
+import { stayByRoom, tonightByRoom } from '@/lib/house-map';
 import { roomStatusLabels } from '@/lib/status';
 
 /** Tonight at a glance: the day's figures in a row over the house map. */
@@ -33,6 +33,7 @@ export function TonightPanel({
   const { open } = useBookingDrawer();
   const { openNew } = useBookingEditor();
   const stays = useMemo(() => day && stayByRoom(day), [day]);
+  const tonight = useMemo(() => day && tonightByRoom(day), [day]);
   const setStatus = useSetRoomStatus();
   const { toast } = useToast();
   const [taskRoom, setTaskRoom] = useState<string | null>(null);
@@ -107,6 +108,7 @@ export function TonightPanel({
           <HouseMap
             rooms={rooms}
             stays={stays}
+            tonight={tonight}
             onOpenStay={(id) => open(id)}
             onBook={(roomId) => openNew({ roomId, checkIn: brief.date })}
             menu={(roomId, tile) => {

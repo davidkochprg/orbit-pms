@@ -75,7 +75,7 @@ import {
   useResolvePendingActions,
 } from '@/lib/api';
 import { formatRecent } from '@/lib/format';
-import { houseRoomState, houseStateLabels, stayByRoom } from '@/lib/house-map';
+import { houseRoomState, houseStateLabels, stayByRoom, tonightByRoom } from '@/lib/house-map';
 import { folderIcons, noteHref } from '@/lib/knowledge';
 import { navItems } from '@/lib/nav';
 import { useTheme } from '@/lib/theme';
@@ -333,6 +333,7 @@ function SearchView({
   const day = useDayOverview();
   const board = useHousekeeping();
   const stays = useMemo(() => day.data && stayByRoom(day.data), [day.data]);
+  const tonight = useMemo(() => day.data && tonightByRoom(day.data), [day.data]);
   const aiOn = health.data?.ai.configured ?? false;
   const voiceOn = (health.data?.ai.voice ?? false) && canRecord();
   const query = text.trim();
@@ -475,7 +476,7 @@ function SearchView({
           <CommandPrimitive.Group heading="Rooms">
             {board.data.rooms.map((r) => {
               const stay = stays?.get(r.room.id);
-              const state = houseRoomState(r);
+              const state = houseRoomState(r, tonight);
               return (
                 <Item
                   key={r.room.id}
