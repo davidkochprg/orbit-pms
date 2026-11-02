@@ -162,6 +162,7 @@ describe('tapeGeometry', () => {
       roomColumn: TAPE_ROOM_COLUMN,
       rowHeight: TAPE_ROW_HEIGHT,
       dayWidth: 120,
+      compactDays: false,
     });
   });
 
@@ -170,6 +171,15 @@ describe('tapeGeometry', () => {
     expect(g.roomColumn).toBe(Math.round(TAPE_ROOM_COLUMN * 1.2));
     expect(g.rowHeight).toBe(Math.round(TAPE_ROW_HEIGHT * 1.2));
     expect(g.dayWidth).toBe(Math.round(TAPE_MIN_DAY_WIDTH * 1.2));
+    expect(g.compactDays).toBe(false);
+  });
+
+  it('compacts day headers narrower than the usual minimum, measured at the type size', () => {
+    expect(tapeGeometry(0, 30).compactDays).toBe(true);
+    expect(tapeGeometry(TAPE_ROOM_COLUMN + 30 * TAPE_MIN_DAY_WIDTH, 30).compactDays).toBe(false);
+    // A wide screen grows the type to 110%: 74px days fit at 16px, not at 17.6px.
+    const roomColumn = Math.round(TAPE_ROOM_COLUMN * 1.1);
+    expect(tapeGeometry(roomColumn + 30 * 74, 30, 1.1).compactDays).toBe(true);
   });
 });
 

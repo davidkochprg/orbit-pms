@@ -70,7 +70,6 @@ import {
   moveTarget,
   placeBooking,
   resizeTarget,
-  TAPE_COMPACT_DAY_WIDTH,
   TAPE_DAYS,
   tapeGeometry,
   type TapeSpan,
@@ -166,7 +165,7 @@ function TapeChart({ today }: { today: string }) {
   const end = addDaysIso(start, span);
 
   const viewport = useRef<HTMLDivElement>(null);
-  const { roomColumn, rowHeight, dayWidth } = tapeGeometry(
+  const { roomColumn, rowHeight, dayWidth, compactDays } = tapeGeometry(
     useElementWidth(viewport),
     span,
     useRemScale(),
@@ -359,6 +358,7 @@ function TapeChart({ today }: { today: string }) {
                 today={today}
                 roomColumn={roomColumn}
                 dayWidth={dayWidth}
+                compact={compactDays}
                 occupied={occupied}
                 total={rooms.data?.length ?? 0}
               />
@@ -398,6 +398,7 @@ function DayHeader({
   today,
   roomColumn,
   dayWidth,
+  compact,
   occupied,
   total,
 }: {
@@ -405,11 +406,11 @@ function DayHeader({
   today: string;
   roomColumn: number;
   dayWidth: number;
+  /** Narrow days (a month on most screens) show a weekday letter and the date; occupancy on hover. */
+  compact: boolean;
   occupied: (day: string) => number;
   total: number;
 }) {
-  // Narrow days (a month on a laptop) show a weekday letter and the date; occupancy is on hover.
-  const compact = dayWidth < TAPE_COMPACT_DAY_WIDTH;
   return (
     <div className="sticky top-0 z-20 flex h-12 border-b bg-background">
       <div

@@ -22,9 +22,6 @@ export const TAPE_MIN_DAY_WIDTH = 72;
 /** A month's days may be narrower: they show a weekday letter and bars without icons. */
 export const TAPE_MIN_DAY_WIDTH_MONTH = 40;
 
-/** Narrower than this, a day header shows a weekday letter and the date, without occupancy. */
-export const TAPE_COMPACT_DAY_WIDTH = 64;
-
 /** Day column width that fills the available width, but never narrower than the minimum. */
 export function dayWidthFor(
   containerWidth: number,
@@ -40,15 +37,22 @@ export interface TapeGeometry {
   roomColumn: number;
   rowHeight: number;
   dayWidth: number;
+  /**
+   * Days narrower than the usual minimum (a month on most screens) are too narrow for the full
+   * header, so it shows a weekday letter and the date, with occupancy on hover.
+   */
+  compactDays: boolean;
 }
 
 /** The chart's sizes in px for a container width, a span and the root font scale (1 = 16px). */
 export function tapeGeometry(containerWidth: number, days: number, scale = 1): TapeGeometry {
   const roomColumn = Math.round(TAPE_ROOM_COLUMN * scale);
+  const dayWidth = dayWidthFor(containerWidth, days, roomColumn, scale);
   return {
     roomColumn,
     rowHeight: Math.round(TAPE_ROW_HEIGHT * scale),
-    dayWidth: dayWidthFor(containerWidth, days, roomColumn, scale),
+    dayWidth,
+    compactDays: dayWidth < Math.round(TAPE_MIN_DAY_WIDTH * scale),
   };
 }
 
