@@ -1,3 +1,5 @@
+import { modKey } from './platform';
+
 /** What a key press in the inbox asks for, Gmail style. */
 export type MailKeyAction =
   | 'compose'
@@ -94,6 +96,6 @@ export const mailShortcuts: { keys: string[]; does: string }[] = [
   { keys: ['g', 's'], does: 'Go to Starred' },
   { keys: ['g', 't'], does: 'Go to Sent' },
   { keys: ['g', 'd'], does: 'Go to Drafts' },
-  { keys: ['⌘', 'Enter'], does: 'Send' },
+  { keys: [modKey, 'Enter'], does: 'Send' },
   { keys: ['?'], does: 'These shortcuts' },
 ];

@@ -22,6 +22,7 @@ import { useHotelProfile, useInbox, useKnockOns } from '@/lib/api';
 import { folderCounts } from '@/lib/inbox';
 import { type NavGroup, navItemFor, navItems } from '@/lib/nav';
 import { cn, labelCaps } from '@/lib/utils';
+import { modShortcut } from '@/lib/platform';
 
 /** The utilities have no label and sit at the bottom, above the signed-in staff member. */
 const groups: { group: NavGroup; label?: string }[] = [
@@ -53,13 +54,13 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              tooltip="Ask Orbit or search (⌘K)"
+              tooltip={`Ask Orbit or search (${modShortcut('K')})`}
               onClick={() => openPalette()}
               className="relative h-9 rounded-control bg-background/70 pl-3 text-muted-foreground shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit hover:bg-background hover:text-foreground group-data-[collapsible=icon]:rounded-control"
             >
               <Search />
               <span>Ask or search…</span>
-              <Kbd className="ml-auto">⌘K</Kbd>
+              <Kbd className="ml-auto">{modShortcut('K')}</Kbd>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

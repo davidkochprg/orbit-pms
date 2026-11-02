@@ -15,6 +15,7 @@ import {
 import { formatMoney, formatRange } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
+import { modShortcut } from '@/lib/platform';
 const outcome = {
   confirmed: { icon: Check, text: 'Done', className: 'text-success' },
   rejected: { icon: X, text: 'Rejected', className: 'text-muted-foreground' },
@@ -79,7 +80,7 @@ export function PendingActionCard({
 }: {
   id: string;
   summary: string;
-  /** The change ⌘↵ confirms and ⌘⌫ rejects: outlined, with the shortcuts on its buttons. */
+  /** The change Ctrl/⌘ ↵ confirms and Ctrl/⌘ ⌫ rejects: outlined, with the shortcuts on its buttons. */
   targeted?: boolean;
 }) {
   const action = usePendingAction(id);
@@ -137,7 +138,7 @@ export function PendingActionCard({
               onClick={() => resolve.mutate('confirm')}
             >
               Confirm
-              {targeted && <Kbd className="ml-1 bg-white/15 text-inherit">⌘↵</Kbd>}
+              {targeted && <Kbd className="ml-1 bg-white/15 text-inherit">{modShortcut('↵')}</Kbd>}
             </Button>
             <Button
               size="sm"
@@ -146,7 +147,7 @@ export function PendingActionCard({
               onClick={() => resolve.mutate('reject')}
             >
               Reject
-              {targeted && <Kbd className="ml-1">⌘⌫</Kbd>}
+              {targeted && <Kbd className="ml-1">{modShortcut('⌫')}</Kbd>}
             </Button>
           </>
         )}

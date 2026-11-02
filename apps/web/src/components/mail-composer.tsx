@@ -12,6 +12,7 @@ import { useAddressBook } from '@/hooks/use-address-book';
 import { useAutosave } from '@/hooks/use-autosave';
 import { useComposeMessage, useDeleteDraft, useSaveDraft } from '@/lib/api';
 import { Tip } from '@/components/ui/tooltip';
+import { modKey } from '@/lib/platform';
 
 export interface ComposerStart {
   draftId: string;
@@ -164,7 +165,7 @@ export function MailComposer({ start, back }: { start: ComposerStart; back: stri
             <span className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
               {save.isPending ? 'Saving…' : save.isSuccess ? 'Saved' : null}
               <span className="max-sm:hidden">
-                <Kbd>⌘</Kbd> <Kbd>Enter</Kbd>
+                <Kbd>{modKey}</Kbd> <Kbd>Enter</Kbd>
               </span>
             </span>
             <Button

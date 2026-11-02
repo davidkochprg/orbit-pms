@@ -12,6 +12,7 @@ import { useSession } from '@/hooks/use-session';
 import { useDailyBrief, useDayOverview } from '@/lib/api';
 import { sceneMessages } from '@/lib/scene-messages';
 import { demoManager, staffRoleLabels } from '@/lib/session';
+import { modShortcut } from '@/lib/platform';
 
 const features: { icon: ComponentType<{ className?: string }>; title: string; text: string }[] = [
   {
@@ -123,7 +124,7 @@ export function WelcomePage() {
                 {manager
                   ? `You enter as ${manager.name}, ${staffRoleLabels[manager.role].toLowerCase()} of a fictional ${b?.occupancy.total ?? 50}-room hotel.`
                   : 'You enter as the manager of a fictional hotel.'}{' '}
-                Press <Kbd>⌘K</Kbd> inside to talk to the agent.
+                Press <Kbd>{modShortcut('K')}</Kbd> inside to talk to the agent.
               </p>
             </div>
           </div>

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Kbd } from '@/components/ui/kbd';
 import { useFileNote, useHealth, useSaveEntry } from '@/lib/api';
 import { Tip } from '@/components/ui/tooltip';
+import { modShortcut } from '@/lib/platform';
 
 /**
  * A new note: staff describe it in their own words and Orbit titles, files, tags and links it, or
@@ -146,7 +147,7 @@ export function NewNote({
               >
                 Write it myself
               </Button>
-              <Kbd className="ml-auto max-sm:hidden">⌘↵</Kbd>
+              <Kbd className="ml-auto max-sm:hidden">{modShortcut('↵')}</Kbd>
               <Button type="submit" size="sm" disabled={!text.trim() || file.isPending}>
                 {file.isPending && <LoaderCircle className="animate-spin" />} Add note
               </Button>
