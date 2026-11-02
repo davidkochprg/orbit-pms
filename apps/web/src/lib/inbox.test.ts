@@ -248,6 +248,12 @@ describe('mailbox views', () => {
   });
   const archived = conversation({ id: 'c', archivedAt: '2026-10-27T10:00:00.000Z' });
   const all = [asked, answered, archived];
+  // A conversation the hotel started, e.g. an email to a contractor: no one has written back.
+  const started = conversation({
+    id: 's',
+    unread: true,
+    messages: answered.messages.slice(1).map((x) => ({ ...x, inquiryId: 's' })),
+  });
 
   it('sorts conversations into folders', () => {
     const ids = (folder: Parameters<typeof filterConversations>[1]['folder']) =>
@@ -257,6 +263,16 @@ describe('mailbox views', () => {
     expect(ids('sent')).toEqual(['b']);
     expect(ids('archived')).toEqual(['c']);
     expect(folderCounts(all)).toEqual({ unread: 1, awaiting: 1, starred: 0, trash: 0 });
+  });
+
+  it('keeps conversations the hotel started out of the inbox until someone writes back', () => {
+    const ids = (list: Inquiry[], folder: 'inbox' | 'sent') =>
+      filterConversations(list, { folder, label: null, channel: null, query: '' }).map((m) => m.id);
+    expect(ids([...all, started], 'inbox')).toEqual(['a', 'b']);
+    expect(ids([...all, started], 'sent')).toContain('s');
+    expect(folderCounts([...all, started]).unread).toBe(1);
+    const repliedTo = { ...started, messages: [...started.messages, ...asked.messages] };
+    expect(ids([repliedTo], 'inbox')).toEqual(['s']);
   });
 
   it('keeps trashed conversations out of every folder and label but Trash', () => {

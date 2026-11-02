@@ -179,7 +179,7 @@ export function folderCounts(list: Inquiry[]): {
 } {
   const live = list.filter((m) => m.trashedAt === null);
   return {
-    unread: live.filter((m) => m.unread && m.archivedAt === null).length,
+    unread: live.filter((m) => m.unread && inMailFolder(m, 'inbox')).length,
     awaiting: live.filter((m) => inMailFolder(m, 'awaiting')).length,
     starred: live.filter((m) => m.starred).length,
     trash: list.length - live.length,

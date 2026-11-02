@@ -2,7 +2,8 @@ import type { Inquiry } from './entities';
 
 /**
  * The mailbox views. A conversation in the trash is in no other folder; starred and sent ones
- * stay there when archived, as in Gmail.
+ * stay there when archived, as in Gmail. One the hotel started shows in the inbox only once
+ * someone writes back; until then it is only in Sent.
  */
 export const mailFolders = [
   'inbox',
@@ -26,7 +27,7 @@ export function inMailFolder(m: Inquiry, folder: MailFolder): boolean {
   if (m.trashedAt !== null) return false;
   switch (folder) {
     case 'inbox':
-      return m.archivedAt === null;
+      return m.archivedAt === null && m.messages.some((x) => x.direction === 'in');
     case 'starred':
       return m.starred;
     case 'awaiting':

@@ -79,7 +79,7 @@ Every mutation also has a `preview*` variant that runs the same rules against cu
 - `setUnread(id, unread)`, `setArchived(id, archived)`, `setStarred(id, starred)`, `setLabels(id, labelIds)` (labels must exist), `saveTranslation(id, messageId, translation)`.
 - `setTrashed(id, trashed, actor)`: the trash takes a conversation out of every other folder (`inquiry.trash`, `inquiry.restore`); a guest writing again brings it back. `deleteForever(id, actor)` only from the trash, with its drafts (`inquiry.delete`).
 - `bulk({ ids, action, labelId }, actor)`: one change to many conversations in one transaction (archive, unarchive, trash, restore, read, unread, star, unstar, label, unlabel); an unknown conversation or label changes none.
-- Folders (`inMailFolder`, `packages/shared/src/mailbox.ts`): Inbox (not archived), Starred, Needs a reply (the guest wrote last, not declined, not archived), Sent (the hotel wrote), Archive and Trash. A conversation in the trash is in no other folder; starred and sent ones stay there when archived.
+- Folders (`inMailFolder`, `packages/shared/src/mailbox.ts`): Inbox (not archived, with at least one message from the other side, so a conversation the hotel started stays only in Sent until someone writes back), Starred, Needs a reply (the guest wrote last, not declined, not archived), Sent (the hotel wrote), Archive and Trash. A conversation in the trash is in no other folder; starred and sent ones stay there when archived.
 
 `createMailboxService` (`mailbox.ts`) keeps what surrounds the conversations:
 
