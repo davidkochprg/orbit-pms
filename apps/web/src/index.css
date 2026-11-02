@@ -697,28 +697,43 @@
 }
 
 /*
- * Scrollbars everywhere: a slim rounded thumb on a clear track, so Windows shows the same quiet
- * bar as a Mac and a box that scrolls still says so. Chrome ignores the ::-webkit-scrollbar rules
- * once scrollbar-width or scrollbar-color is set, so those are only for browsers without them.
+ * Our own scrollbar instead of the browser's: a slim rounded thumb floating on a clear track,
+ * inset from the box's edge and kept clear of its rounded corners by the track's margin, so it
+ * never cuts into a panel. It is faint until the pointer is over the box, so a box that scrolls
+ * still says so without the bar drawing the eye.
+ *
+ * Chrome drops every ::-webkit-scrollbar rule on an element once scrollbar-width or
+ * scrollbar-color applies to it, so the standard properties are set for Firefox alone (the only
+ * browser without ::-webkit-scrollbar).
  */
 ::-webkit-scrollbar {
-  width: 0.625rem;
-  height: 0.625rem;
+  width: 0.75rem;
+  height: 0.75rem;
 }
-::-webkit-scrollbar-track,
+::-webkit-scrollbar-track {
+  margin: 0.5rem;
+  background: transparent;
+}
 ::-webkit-scrollbar-corner {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  border: 0.1875rem solid transparent;
+  min-height: 2rem;
+  min-width: 2rem;
+  border: 0.25rem solid transparent;
   border-radius: 9999px;
-  background-color: color-mix(in oklab, var(--ink) 16%, transparent);
+  background-color: color-mix(in oklab, var(--ink) 12%, transparent);
   background-clip: padding-box;
 }
-::-webkit-scrollbar-thumb:hover {
-  background-color: color-mix(in oklab, var(--ink) 30%, transparent);
+:hover::-webkit-scrollbar-thumb {
+  background-color: color-mix(in oklab, var(--ink) 22%, transparent);
 }
-@supports not selector(::-webkit-scrollbar) {
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  border-width: 0.1875rem;
+  background-color: color-mix(in oklab, var(--ink) 36%, transparent);
+}
+@supports (-moz-appearance: none) {
   * {
     scrollbar-width: thin;
     scrollbar-color: color-mix(in oklab, var(--ink) 18%, transparent) transparent;
