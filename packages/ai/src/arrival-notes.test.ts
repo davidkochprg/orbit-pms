@@ -87,7 +87,7 @@ describe('arrivalNotePrompt', () => {
     expect(prompt).toContain('(2 nights)');
     expect(prompt).toContain('for 2 adults and children aged 8');
     expect(prompt).toContain('Booked: wellness (spa) for the stay, 1 dog');
-    expect(prompt).toContain('snow, -7 to 2 °C, 5.6 cm of snow');
+    expect(prompt).toContain('snow, 19 to 36 °F, 2.2 in of snow');
     expect(prompt).toContain('a photo ID for the guest who booked');
   });
 });

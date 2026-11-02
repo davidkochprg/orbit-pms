@@ -1,4 +1,4 @@
-import type { QuoteAddons, WeatherDay } from '@orbit/shared';
+import { imperialWeather, type QuoteAddons, type WeatherDay, weatherReadings } from '@orbit/shared';
 import { type HotelContext, hotelFacts, timeOfDay } from './hotel';
 import { languageNames } from './inbox';
 
@@ -61,11 +61,10 @@ function day(date: string): string {
   return `${weekday}, ${date}`;
 }
 
-function weatherLine(w: WeatherDay): string {
-  const parts = [`${w.kind}, ${w.tempMinC} to ${w.tempMaxC} °C`];
-  if (w.snowfallCm > 0) parts.push(`${w.snowfallCm} cm of snow`);
-  else if (w.precipitationMm > 0) parts.push(`${w.precipitationMm} mm of rain`);
-  return parts.join(', ');
+/** In the units of the hotel's country, which the guest is travelling to. */
+function weatherLine(w: WeatherDay, country: string): string {
+  const { temperature, fall } = weatherReadings(w, imperialWeather(country));
+  return [w.kind, temperature, fall].filter(Boolean).join(', ');
 }
 
 export function arrivalNotePrompt(f: ArrivalNoteFacts, hotel: HotelContext, feedback?: string) {
@@ -93,7 +92,7 @@ Arrives: ${day(stay.checkIn)}, check-in from ${timeOfDay(hotel.profile.checkInFr
 Leaves: ${day(stay.checkOut)} (${nights} night${nights === 1 ? '' : 's'}), check-out by ${timeOfDay(hotel.profile.checkOutBy, country)}
 Room: ${stay.roomTypeName}, for ${party}
 Booked: ${booked.length > 0 ? booked.join(', ') : 'nothing extra'}
-Weather forecast for the arrival day: ${f.weather ? weatherLine(f.weather) : 'not known'}
+Weather forecast for the arrival day: ${f.weather ? weatherLine(f.weather, country) : 'not known'}
 ID at check-in: ${f.idsFrom === 'everyone' ? 'an ID card or passport for everyone staying' : 'a photo ID for the guest who booked'}
 Remembered from earlier stays: ${f.remembered && f.remembered.length > 0 ? f.remembered.join(' ') : 'nothing, a first stay or nothing noted'}
 Signer: ${f.signer ?? 'none'}${feedback ? `\n\nYour previous email was rejected: ${feedback}` : ''}`;

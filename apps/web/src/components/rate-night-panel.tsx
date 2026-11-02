@@ -1,4 +1,9 @@
-import type { NightOutlook, RateFactor } from '@orbit/shared';
+import {
+  type NightOutlook,
+  type RateFactor,
+  type WeatherDay,
+  weatherReadings,
+} from '@orbit/shared';
 import { format, parseISO } from 'date-fns';
 import { CalendarDays, Cloud, Lightbulb, type LucideIcon, TrendingUp, UserX } from 'lucide-react';
 import { useState } from 'react';
@@ -8,6 +13,12 @@ import { displayRegion, formatMoney } from '@/lib/format';
 import { occupancy, ratePercent, signed, weatherLabels } from '@/lib/revenue';
 import { weatherIcons } from '@/lib/weather-icons';
 import { cn } from '@/lib/utils';
+
+/** "-3 to 12 °C", "5.6 cm of snow", in Fahrenheit and inches for a US hotel. */
+function weatherText(w: WeatherDay): string[] {
+  const { temperature, fall } = weatherReadings(w, displayRegion().usDates);
+  return fall ? [temperature, fall] : [temperature];
+}
 
 const factorIcons: Record<Exclude<RateFactor['kind'], 'weather'>, LucideIcon> = {
   demand: TrendingUp,
@@ -97,12 +108,7 @@ export function RateNightPanel({
           {night.weather && (
             <p className="flex items-center gap-2">
               <WeatherIcon kind={night.weather.kind} />
-              {weatherLabels[night.weather.kind]}, {night.weather.tempMinC}° to{' '}
-              {night.weather.tempMaxC}°C
-              {night.weather.snowfallCm > 0 && `, ${night.weather.snowfallCm} cm snow`}
-              {night.weather.snowfallCm === 0 &&
-                night.weather.precipitationMm > 0 &&
-                `, ${night.weather.precipitationMm} mm`}
+              {[weatherLabels[night.weather.kind], ...weatherText(night.weather)].join(', ')}
             </p>
           )}
           {night.expectedNoShows > 0 && (

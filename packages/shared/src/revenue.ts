@@ -48,6 +48,34 @@ export const weatherDaySchema = z.object({
 });
 export type WeatherDay = z.infer<typeof weatherDaySchema>;
 
+/** Whether people in the hotel's country read weather in Fahrenheit and inches: the US. */
+export const imperialWeather = (country: string) => country === 'US';
+
+const fahrenheit = (c: number) => Math.round((c * 9) / 5 + 32);
+/** Tenths of an inch, at least 0.1 so a drizzle isn't "0 in". */
+const inches = (mm: number) => Math.max(1, Math.round(mm / 2.54)) / 10;
+
+/**
+ * A forecast day's temperatures and rain or snow as the hotel's country writes them:
+ * "-3 to 12 °C" and "5.6 cm of snow", or "27 to 54 °F" and "2.2 in of snow".
+ */
+export function weatherReadings(w: WeatherDay, imperial: boolean) {
+  const temperature = imperial
+    ? `${fahrenheit(w.tempMinC)} to ${fahrenheit(w.tempMaxC)} °F`
+    : `${w.tempMinC} to ${w.tempMaxC} °C`;
+  const fall =
+    w.snowfallCm > 0
+      ? imperial
+        ? `${inches(w.snowfallCm * 10)} in of snow`
+        : `${w.snowfallCm} cm of snow`
+      : w.precipitationMm > 0
+        ? imperial
+          ? `${inches(w.precipitationMm)} in of rain`
+          : `${w.precipitationMm} mm of rain`
+        : null;
+  return { temperature, fall };
+}
+
 /** `insight` is a signal from the model's review that the rules can't see, e.g. a group request. */
 export const rateFactorKinds = ['demand', 'event', 'weather', 'insight'] as const;
 
