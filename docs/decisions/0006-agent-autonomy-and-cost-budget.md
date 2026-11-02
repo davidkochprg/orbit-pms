@@ -1,5 +1,7 @@
 # 6. Agent autonomy and cost budget
 
+The monthly cap and the demo limits are removed by [ADR 0026](0026-no-ai-limits-in-the-demo.md).
+
 ## Context
 
 The agent should feel built in: work happens where the staff already are (inbox, check-in, housekeeping), not only in a chat panel. But a real small property must stay in control and pay little. Target: under $100 a month in Meta API spend for a 30-room property.

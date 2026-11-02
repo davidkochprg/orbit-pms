@@ -24,7 +24,6 @@ import {
 } from '@orbit/shared';
 import { type Context, Hono } from 'hono';
 import { errorBody } from '../http';
-import type { AiGate } from '../ai-gate';
 import { validate } from '../validate';
 
 export interface InboxRouteDeps {
@@ -39,7 +38,6 @@ export interface InboxRouteDeps {
   /** The hotel information guests are told about today. */
   hotelEntries: () => Promise<HotelInfoEntry[]>;
   today: () => string;
-  gate: AiGate;
   /** The signed-in staff member, who signs what they send. */
   identify: (id: string | undefined) => Promise<StaffMember | null>;
 }
@@ -62,11 +60,9 @@ export function inboxRoutes({
   actions,
   hotelEntries,
   today,
-  gate,
   identify,
 }: InboxRouteDeps) {
   const author = async (c: Context) => (await identify(c.req.header(STAFF_HEADER)))?.name ?? null;
-  const blocked = (c: Context) => gate(c.req.header('x-forwarded-for'));
   const translationFailed = (c: Context, err: unknown) => {
     if (err instanceof TranslationError)
       return c.json(errorBody('translation_failed', err.message), 422);
@@ -84,8 +80,6 @@ export function inboxRoutes({
       )
       .post('/inbox/translate', validate('json', translateBodySchema), async (c) => {
         if (!translator) return c.json(notConfigured, 503);
-        const limit = await blocked(c);
-        if (limit) return c.json(errorBody('demo_limit', limit), 429);
         const { text, to } = c.req.valid('json');
         try {
           return c.json<TranslateResult>({ text: await translator.translate(text, to) });
@@ -107,8 +101,6 @@ export function inboxRoutes({
         const reply = current.messages.findLast((m) => m.direction === 'out');
         const guestMessage = current.messages.findLast((m) => m.direction === 'in');
         if (!reply || !guestMessage) return c.json(null);
-        const limit = await blocked(c);
-        if (limit) return c.json(errorBody('demo_limit', limit), 429);
         const draft = await learner.learn({
           guestMessage: guestMessage.body,
           reply: reply.body,
@@ -139,8 +131,6 @@ export function inboxRoutes({
         const current = await inbox.get(id);
         // Already prepared conversations are served from storage and cost nothing.
         if (current.processedAt && !current.processingError && !force) return c.json(current);
-        const limit = await blocked(c);
-        if (limit) return c.json(errorBody('demo_limit', limit), 429);
         return c.json(await pipeline.process(id, { force, language }));
       })
       .post('/inbox/:id/read', validate('json', processMessageBodySchema), async (c) => {
@@ -151,14 +141,10 @@ export function inboxRoutes({
         if (hasReading(current) && !c.req.valid('json').force) {
           return c.json(current);
         }
-        const limit = await blocked(c);
-        if (limit) return c.json(errorBody('demo_limit', limit), 429);
         return c.json(await pipeline.read(id, { force: true }));
       })
       .post('/inbox/:id/draft', validate('json', processMessageBodySchema), async (c) => {
         if (!pipeline) return c.json(notConfigured, 503);
-        const limit = await blocked(c);
-        if (limit) return c.json(errorBody('demo_limit', limit), 429);
         return c.json(
           await pipeline.draft(c.req.param('id'), { language: c.req.valid('json').language }),
         );
@@ -176,8 +162,6 @@ export function inboxRoutes({
           if (!message) return c.json(errorBody('not_found', 'Message not found'), 404);
           // A message is translated once per language; reading it again costs nothing.
           if (message.translation?.language === to) return c.json(current);
-          const limit = await blocked(c);
-          if (limit) return c.json(errorBody('demo_limit', limit), 429);
           try {
             const text = await translator.translate(message.body, to);
             return c.json(await inbox.saveTranslation(id, messageId, { language: to, text }));

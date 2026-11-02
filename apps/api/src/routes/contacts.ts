@@ -8,7 +8,6 @@ import {
   workOrderBodySchema,
 } from '@orbit/shared';
 import { Hono } from 'hono';
-import type { AiGate } from '../ai-gate';
 import { errorBody } from '../http';
 import { validate } from '../validate';
 
@@ -18,18 +17,11 @@ export interface ContactRouteDeps {
   inbox: Pick<InboxService, 'sendWorkOrder'>;
   /** Writes the email to a contractor; null when AI is not configured. */
   draftWorkOrder: WorkOrderDrafter | null;
-  gate: AiGate;
   identify: (id: string | undefined) => Promise<StaffMember | null>;
 }
 
 /** Suppliers and contractors, and asking one of them to fix a repair. */
-export function contactRoutes({
-  contacts,
-  inbox,
-  draftWorkOrder,
-  gate,
-  identify,
-}: ContactRouteDeps) {
+export function contactRoutes({ contacts, inbox, draftWorkOrder, identify }: ContactRouteDeps) {
   return new Hono()
     .get('/contacts', async (c) => c.json(await contacts.list()))
     .post('/contacts', validate('json', contactBodySchema), async (c) =>
@@ -56,8 +48,6 @@ export function contactRoutes({
           return c.json(errorBody('ai_not_configured', 'The AI agent is not configured.'), 503);
         }
         const staff = await identify(c.req.header(STAFF_HEADER));
-        const blocked = await gate(c.req.header('x-forwarded-for'));
-        if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
         // Unknown repairs and contacts fail before the model is asked.
         return c.json(
           await draftWorkOrder(

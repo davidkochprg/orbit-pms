@@ -29,15 +29,13 @@ export interface TranslatorDeps {
   model: LanguageModel;
   modelId: string;
   usage: UsageStore;
-  /** False once the monthly AI budget is spent. */
-  canSpend: () => Promise<boolean>;
 }
 
 /**
  * Translates guest messages and reply drafts. It runs only when staff ask for it, at minimal
  * reasoning, and a translation that changes an amount is redone once and otherwise refused.
  */
-export function createTranslator({ model, modelId, usage, canSpend }: TranslatorDeps) {
+export function createTranslator({ model, modelId, usage }: TranslatorDeps) {
   /** `servedBy` is the model that answered, which differs from `modelId` after a fallback. */
   async function record(tokens: TokenUsage, servedBy = modelId) {
     await usage.record({
@@ -51,8 +49,6 @@ export function createTranslator({ model, modelId, usage, canSpend }: Translator
 
   return {
     async translate(text: string, to: Language): Promise<string> {
-      if (!(await canSpend()))
-        throw new TranslationError('The AI budget for this month is used up.');
       let prompt = text;
       for (let attempt = 0; attempt < 2; attempt++) {
         const result = await generateText({

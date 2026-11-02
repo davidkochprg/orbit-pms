@@ -12,7 +12,6 @@ import {
   taskStatusBodySchema,
 } from '@orbit/shared';
 import { Hono } from 'hono';
-import type { AiGate } from '../ai-gate';
 import { readRecording } from '../audio';
 import { errorBody } from '../http';
 import { validate } from '../validate';
@@ -25,23 +24,16 @@ export interface HousekeepingRouteDeps {
   stays: StayNotesReader | null;
   /** Works out who fixes a repair added by hand; null when AI is not configured. */
   desk: RepairDesk | null;
-  gate: AiGate;
 }
 
 /**
  * Room status, housekeeping tasks, notes the agent applies (ADR 0006), and reading stays' notes
  * for the board's cleaning effort.
  */
-export function housekeepingRoutes({
-  housekeeping,
-  notes,
-  stays,
-  desk,
-  gate,
-}: HousekeepingRouteDeps) {
+export function housekeepingRoutes({ housekeeping, notes, stays, desk }: HousekeepingRouteDeps) {
   /** Who fixes a repair, when the model can say; the task is added either way. */
-  async function tradeFor(issue: string | null, ip: string | undefined) {
-    if (!desk || !issue || (await gate(ip))) return null;
+  async function tradeFor(issue: string | null) {
+    if (!desk || !issue) return null;
     return desk.trade(issue).catch((err: unknown) => {
       console.warn('Could not work out the trade of a repair:', err);
       return null;
@@ -57,8 +49,6 @@ export function housekeepingRoutes({
       const board = await housekeeping.board();
       // Nothing new to read costs nothing and uses none of the demo's allowance.
       if (board.unreadStays === 0) return c.json(board);
-      const blocked = await gate(c.req.header('x-forwarded-for'));
-      if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
       await stays.read();
       return c.json(await housekeeping.board());
     })
@@ -71,7 +61,7 @@ export function housekeepingRoutes({
       const body = c.req.valid('json');
       const trade =
         body.type === 'maintenance' && body.trade === undefined
-          ? await tradeFor(body.notes, c.req.header('x-forwarded-for'))
+          ? await tradeFor(body.notes)
           : body.trade;
       return c.json(await housekeeping.createTask({ ...body, trade }, 'user'), 201);
     })
@@ -84,8 +74,6 @@ export function housekeepingRoutes({
       if (!notes) {
         return c.json(errorBody('ai_not_configured', 'The AI agent is not configured.'), 503);
       }
-      const blocked = await gate(c.req.header('x-forwarded-for'));
-      if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
       return c.json(await notes.fromText(c.req.valid('json').text));
     })
     .post('/housekeeping/voice', async (c) => {
@@ -94,8 +82,6 @@ export function housekeepingRoutes({
       }
       const recording = await readRecording(c);
       if ('error' in recording) return recording.error;
-      const blocked = await gate(c.req.header('x-forwarded-for'));
-      if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
       try {
         return c.json(await notes.fromAudio(recording.wav));
       } catch (err) {

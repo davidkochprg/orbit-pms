@@ -9,7 +9,6 @@ import {
 import { RevenueBriefError, type RevenueBriefWriter, type RateReviewer } from '@orbit/ai';
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
-import type { AiGate } from '../ai-gate';
 import { errorBody } from '../http';
 import { validate } from '../validate';
 
@@ -25,7 +24,6 @@ export interface RevenueRouteDeps {
   brief: RevenueBriefWriter | null;
   /** Null when AI is not configured. */
   reviewer: RateReviewer | null;
-  gate: AiGate;
 }
 
 const outlookQuerySchema = z.object({ days: z.coerce.number().int().min(7).max(90).default(60) });
@@ -42,7 +40,6 @@ export function revenueRoutes({
   forecast,
   brief,
   reviewer,
-  gate,
 }: RevenueRouteDeps) {
   const signedIn = (c: Context) => staff.identify(c.req.header(STAFF_HEADER));
   // One review at a time: a second tab asking for the same outlook waits for the first.
@@ -57,8 +54,6 @@ export function revenueRoutes({
         if (!brief) {
           return c.json(errorBody('ai_not_configured', 'The AI agent is not configured.'), 503);
         }
-        const blocked = await gate(c.req.header('x-forwarded-for'));
-        if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
         try {
           const text = await brief.write(await outlook(c.req.valid('json').days));
           return c.json({ text });
@@ -82,8 +77,6 @@ export function revenueRoutes({
         if (review?.basis !== basis) {
           let job = running?.basis === basis ? running : null;
           if (!job) {
-            const blocked = await gate(c.req.header('x-forwarded-for'));
-            if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
             const done: Promise<unknown> = reviewer
               .review(input)
               .then((signals) => revenue.saveReview(input, signals))

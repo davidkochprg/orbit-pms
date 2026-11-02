@@ -23,11 +23,11 @@ describe('agent helpers', () => {
     expect(asToolError([1, 2])).toBeNull();
   });
 
-  it('shows API error messages such as the demo limit', () => {
+  it('shows API error messages such as AI being off', () => {
     const body = JSON.stringify({
-      error: { code: 'demo_limit', message: 'Demo limit reached for today.' },
+      error: { code: 'ai_not_configured', message: 'The agent is not configured.' },
     });
-    expect(agentErrorMessage(new Error(body))).toBe('Demo limit reached for today.');
+    expect(agentErrorMessage(new Error(body))).toBe('The agent is not configured.');
     expect(agentErrorMessage(new Error('socket hang up'))).toMatch(/unavailable/);
   });
 

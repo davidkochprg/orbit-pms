@@ -55,11 +55,9 @@ const TOTAL = '5 000 CZK';
 function setup(
   replies: string[],
   {
-    budgetLeft = true,
     roomCount = 1,
     repairReply,
   }: {
-    budgetLeft?: boolean;
     roomCount?: number;
     repairReply?: InboxPipelineDeps['repairReply'];
   } = {},
@@ -125,7 +123,6 @@ function setup(
     },
     monthToDateMicroUsd: () => Promise.resolve(0),
   };
-  const canSpend = () => Promise.resolve(budgetLeft);
   const pipeline = createInboxPipeline({
     model,
     modelId: 'muse-spark-1.3',
@@ -134,9 +131,8 @@ function setup(
     hotelContext: () =>
       Promise.resolve({ profile: emptyHotelProfile, policy: hotelPolicy, pricing }),
     usage,
-    canSpend,
     today: () => '2026-05-10',
-    translator: createTranslator({ model, modelId: 'muse-spark-1.3', usage, canSpend }),
+    translator: createTranslator({ model, modelId: 'muse-spark-1.3', usage }),
     ...(repairReply && { repairReply }),
   });
   return { repos, inbox, pipeline, calls, records };
@@ -391,14 +387,6 @@ describe('inbox pipeline', () => {
       draftLanguage: 'cs',
       draftTranslation: null,
     });
-  });
-
-  it('does not call the model once the budget is spent', async () => {
-    const { inbox, pipeline, calls } = setup([JSON.stringify(request)], { budgetLeft: false });
-    const result = await pipeline.process((await inbox.create(message)).id);
-    expect(calls).toHaveLength(0);
-    expect(result.processingError).toMatch(/budget/);
-    expect(result.parsed).toBeNull();
   });
 
   it('records invalid model output as a processing error and retries it next time', async () => {

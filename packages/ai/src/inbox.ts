@@ -47,8 +47,6 @@ export interface InboxPipelineDeps {
   /** Read for every draft, so edits in Settings apply to the next reply. */
   hotelContext: () => Promise<HotelContext>;
   usage: UsageStore;
-  /** False once the monthly AI budget is spent. */
-  canSpend: () => Promise<boolean>;
   today: () => IsoDate;
   /** Puts the draft into the staff member's language, to read side by side. */
   translator: Translator;
@@ -118,7 +116,7 @@ export function hasReading(
 }
 
 export function createInboxPipeline(deps: InboxPipelineDeps) {
-  const { model, modelId, hotel, inbox, hotelContext, usage, canSpend, today, translator } = deps;
+  const { model, modelId, hotel, inbox, hotelContext, usage, today, translator } = deps;
   const draftModel = deps.draftModel ?? model;
 
   /** `servedBy` is the model that answered, which differs from `modelId` after a fallback. */
@@ -234,8 +232,6 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
       ok: false,
       error: err instanceof Error ? err.message : 'Processing failed',
     });
-  const budgetSpent = (id: string) =>
-    inbox.saveProcessing(id, { ok: false, error: 'The AI budget for this month is used up.' });
 
   /** The draft, in the staff member's language as well when theirs differs. */
   async function sideBySide(
@@ -258,7 +254,6 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
   async function replyAboutRepair(inquiry: Inquiry, language: Language | null): Promise<Inquiry> {
     const { repairReply } = deps;
     if (!repairReply) return failed(inquiry.id, new Error('Replies about repairs are not set up.'));
-    if (!(await canSpend())) return budgetSpent(inquiry.id);
     try {
       const { text, language: draftLanguage } = await repairReply(inquiry);
       return await inbox.saveProcessing(inquiry.id, {
@@ -289,7 +284,6 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
       return hasRepairReply(inquiry) && !force ? inquiry : replyAboutRepair(inquiry, null);
     }
     if (hasReading(inquiry) && !force) return inquiry;
-    if (!(await canSpend())) return budgetSpent(id);
     try {
       const { analysis, tokens } = await extractMessage(model, inquiry, today());
       await record('inbox_extract', tokens);
@@ -326,7 +320,6 @@ export function createInboxPipeline(deps: InboxPipelineDeps) {
       if (!hasReading(inquiry)) return inquiry;
     }
     const analysis = inquiry.parsed;
-    if (!(await canSpend())) return budgetSpent(id);
     try {
       const { options, block, note, held, heldRooms } = await roomsFor(inquiry, analysis);
       // A held room or block is the only offer.

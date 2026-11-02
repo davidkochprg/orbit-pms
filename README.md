@@ -91,7 +91,7 @@ Muse Spark always reasons before answering, so the reasoning effort is set per f
 - The model calls `quote` and `checkAvailability` and repeats their results. Tool arguments and model output are validated with zod.
 - Booking changes are proposals that run only after a person confirms, with the stored arguments, never ones sent by the browser ([ADR 0004](docs/decisions/0004-human-approval-for-mutations.md)).
 - Every change, by staff or agent, is written to the audit log with its actor.
-- Every model call is metered in the database against a monthly budget, with per-IP and daily limits on top ([ADR 0006](docs/decisions/0006-agent-autonomy-and-cost-budget.md)).
+- Every model call is metered in the database, its cost at Meta's list price ([ADR 0006](docs/decisions/0006-agent-autonomy-and-cost-budget.md)); the demo sets no AI limits ([ADR 0026](docs/decisions/0026-no-ai-limits-in-the-demo.md)).
 
 **Cost, measured with real calls:** an agent question costs about $0.019, a guest message about $0.004, a housekeeping note about $0.002. For a 30-room property that comes to roughly $30 a month.
 
@@ -185,7 +185,7 @@ Open **http://localhost:5173** and click **Enter demo**. The API's first log lin
 | `META_MODEL_VISION` (preset) | Reading ID scans.                                                                                           |
 | `BASETEN_API_KEY` (optional) | Reply drafts and translations on Muse Spark Open, Meta's open-weight model. Without it they use Muse Spark. |
 
-The other values in `.env.example` work as they are. The API never sends the keys to the browser. AI spend is recorded and capped at $50 a month by default (`AI_MONTHLY_BUDGET_USD`).
+The other values in `.env.example` work as they are. The API never sends the keys to the browser. AI spend is recorded in the database; Orbit sets no limit on it.
 
 ### If something goes wrong
 

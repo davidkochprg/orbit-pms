@@ -54,8 +54,6 @@ import {
 import { Hono } from 'hono';
 import { readRecording } from '../audio';
 import { errorBody } from '../http';
-import type { AiGate } from '../ai-gate';
-import type { AiLimiter } from '../limits';
 import { validate } from '../validate';
 
 export interface AgentRouteDeps {
@@ -89,8 +87,6 @@ export interface AgentRouteDeps {
   draftWorkOrder?: ((taskId: string, contactId: string) => Promise<WorkOrder>) | null;
   /** What was remembered about a guest, as last read. */
   guestMemory: (guestId: string) => Promise<GuestMemory>;
-  limiter: AiLimiter;
-  gate: AiGate;
   clock: () => Date;
   usage: UsageStore;
 }
@@ -121,10 +117,8 @@ export function agentRoutes({
   draftArrivalNote,
   draftWorkOrder = null,
   guestMemory,
-  limiter,
   clock,
   usage,
-  gate,
 }: AgentRouteDeps) {
   const tools = createAgentTools({
     hotel,
@@ -243,8 +237,6 @@ export function agentRoutes({
       }
       const recording = await readRecording(c);
       if ('error' in recording) return recording.error;
-      const blocked = await gate(c.req.header('x-forwarded-for'));
-      if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
       try {
         return c.json({ text: await speech.transcribe(recording.wav, await keywords()) });
       } catch (err) {
@@ -264,8 +256,6 @@ export function agentRoutes({
           503,
         );
       }
-      const blocked = await gate(c.req.header('x-forwarded-for'));
-      if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
 
       let messages: UIMessage<AgentMessageMetadata>[];
       try {
@@ -295,7 +285,6 @@ export function agentRoutes({
         tools,
         abortSignal: c.req.raw.signal,
         onUsage: async (tokens) => {
-          limiter.recordTokens(tokens.input + tokens.output);
           await usage.record({
             feature: 'agent',
             model: ai.agentModelId,

@@ -51,9 +51,7 @@ import type { Health } from '@orbit/shared';
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { createDemoAccess } from './access';
-import { createAiGate } from './ai-gate';
 import { errorBody, handleError } from './http';
-import { type AiLimitsConfig, createAiLimiter } from './limits';
 import { activityRoutes } from './routes/activity';
 import { arrivalNoteRoutes, createArrivalNoteDrafter } from './routes/arrival-notes';
 import { agentRoutes } from './routes/agent';
@@ -79,9 +77,7 @@ import { type UsageReport, usageRoutes } from './routes/usage';
 export interface AppDeps {
   repos: Repositories;
   ai: MetaProvider | null;
-  limits?: AiLimitsConfig;
   usage: UsageStore & { monthToDateByFeature?: UsageReport };
-  monthlyBudgetUsd?: number;
   /** When set, the API answers only browsers that entered this code. */
   accessCode?: string;
   clock?: () => Date;
@@ -98,9 +94,7 @@ const newScanToken = () => randomBytes(18).toString('base64url');
 export function createApp({
   repos,
   ai,
-  limits = { perIpPerHour: 300, dailyTokenBudget: 20_000_000 },
   usage,
-  monthlyBudgetUsd = 50,
   accessCode,
   clock = () => new Date(),
   newId = defaultNewId,
@@ -155,16 +149,12 @@ export function createApp({
     policy: hotelPolicy,
     pricing: await rates.getPricing(),
   });
-  const limiter = createAiLimiter(limits, clock);
-  const monthlyBudgetMicroUsd = Math.round(monthlyBudgetUsd * 1_000_000);
-  const { gate, withinBudget } = createAiGate({ limiter, usage, monthlyBudgetMicroUsd, clock });
   const translator =
     ai &&
     createTranslator({
       model: ai.translate,
       modelId: ai.translateModelId,
       usage,
-      canSpend: withinBudget,
     });
   const desk =
     ai &&
@@ -190,7 +180,6 @@ export function createApp({
       inbox,
       hotelContext,
       usage,
-      canSpend: withinBudget,
       today: () => hotelToday(clock()),
       translator,
       ...(repairReply && { repairReply: (inquiry) => repairReply(inquiry) }),
@@ -266,7 +255,6 @@ export function createApp({
         ai && createReportSummaryWriter({ model: ai.agent, modelId: ai.agentModelId, usage }),
       currency: async () => (await rates.getPricing()).currency,
       today: () => hotelToday(clock()),
-      gate,
     }),
   );
   app.route('/api', registrationRoutes(registrations));
@@ -278,7 +266,6 @@ export function createApp({
         ai?.vision && ai.visionModelId
           ? createIdScanReader({ model: ai.vision, modelId: ai.visionModelId, usage })
           : null,
-      gate,
     }),
   );
   app.route('/api', activityRoutes(activity));
@@ -289,7 +276,6 @@ export function createApp({
       guests,
       memories,
       reader: memoryReader,
-      gate,
     }),
   );
   app.route('/api', overviewRoutes(repos, hotel));
@@ -305,7 +291,6 @@ export function createApp({
       hotel,
       inbox,
       draft: draftArrivalNote,
-      gate,
       identify: (id) => staff.identify(id),
     }),
   );
@@ -321,18 +306,16 @@ export function createApp({
       actions,
       hotelEntries: async () => (await hotelContext()).profile.entries,
       today: () => hotelToday(clock()),
-      gate,
       identify: (id) => staff.identify(id),
     }),
   );
-  app.route('/api', housekeepingRoutes({ housekeeping, notes, stays, desk, gate }));
+  app.route('/api', housekeepingRoutes({ housekeeping, notes, stays, desk }));
   app.route(
     '/api',
     contactRoutes({
       contacts,
       inbox,
       draftWorkOrder,
-      gate,
       identify: (id) => staff.identify(id),
     }),
   );
@@ -363,8 +346,6 @@ export function createApp({
       draftArrivalNote: draftArrivalNote && ((bookingId) => draftArrivalNote(bookingId, null)),
       draftWorkOrder:
         draftWorkOrder && ((taskId, contactId) => draftWorkOrder(taskId, contactId, null)),
-      limiter,
-      gate,
       clock,
       usage,
     }),
@@ -377,7 +358,6 @@ export function createApp({
       rates,
       filer: ai && createNoteFiler({ model: ai.agent, modelId: ai.agentModelId, usage }),
       today: () => hotelToday(clock()),
-      gate,
     }),
   );
   app.route(
@@ -390,10 +370,9 @@ export function createApp({
       forecast,
       brief: ai && createRevenueBriefWriter({ model: ai.agent, modelId: ai.agentModelId, usage }),
       reviewer: ai && createRateReviewer({ model: ai.agent, modelId: ai.agentModelId, usage }),
-      gate,
     }),
   );
-  app.route('/api', usageRoutes({ usage, monthlyBudgetMicroUsd, clock }));
+  app.route('/api', usageRoutes({ usage, clock }));
 
   app.notFound((c) => c.json(errorBody('not_found', 'Route not found'), 404));
   app.onError(handleError);

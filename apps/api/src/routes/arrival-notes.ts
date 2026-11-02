@@ -15,7 +15,6 @@ import {
 } from '@orbit/shared';
 import { Hono } from 'hono';
 import { z } from 'zod';
-import type { AiGate } from '../ai-gate';
 import { errorBody } from '../http';
 import { validate } from '../validate';
 
@@ -78,7 +77,6 @@ export interface ArrivalNoteRouteDeps {
   inbox: InboxService;
   /** Null when AI is not configured. */
   draft: ArrivalNoteDrafter | null;
-  gate: AiGate;
   identify: (id: string | undefined) => Promise<StaffMember | null>;
 }
 
@@ -91,7 +89,6 @@ export function arrivalNoteRoutes({
   hotel,
   inbox,
   draft,
-  gate,
   identify,
 }: ArrivalNoteRouteDeps) {
   return new Hono()
@@ -107,8 +104,6 @@ export function arrivalNoteRoutes({
       const bookingId = c.req.param('bookingId');
       // An unknown booking is a 404 before anything counts against the limits.
       await hotel.getBookingDetail(bookingId);
-      const blocked = await gate(c.req.header('x-forwarded-for'));
-      if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
       const signer = await identify(c.req.header(STAFF_HEADER));
       try {
         return c.json(await draft(bookingId, signer?.name ?? null));

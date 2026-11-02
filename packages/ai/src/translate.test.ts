@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { createTranslator, sameAmounts } from './translate';
 import type { UsageRecord } from './usage';
 
-function setup(replies: string[], budgetLeft = true) {
+function setup(replies: string[]) {
   const prompts: string[] = [];
   const model = new MockLanguageModelV4({
     doGenerate: (options) => {
@@ -30,7 +30,6 @@ function setup(replies: string[], budgetLeft = true) {
       },
       monthToDateMicroUsd: () => Promise.resolve(0),
     },
-    canSpend: () => Promise.resolve(budgetLeft),
   });
   return { translator, prompts, records };
 }
@@ -66,11 +65,5 @@ describe('translator', () => {
     await expect(wrong.translator.translate('5 000 CZK', 'cs')).rejects.toThrow(
       /changed an amount/,
     );
-  });
-
-  it('does not call the model once the budget is spent', async () => {
-    const { translator, prompts } = setup(['x'], false);
-    await expect(translator.translate('Hello', 'cs')).rejects.toThrow(/budget/);
-    expect(prompts).toEqual([]);
   });
 });

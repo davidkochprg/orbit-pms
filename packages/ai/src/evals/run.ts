@@ -497,7 +497,6 @@ const translateOk = await suite(
           },
           monthToDateMicroUsd: () => Promise.resolve(0),
         },
-        canSpend: () => Promise.resolve(true),
       });
       const text = await translator.translate(f.text, f.to).catch((e: unknown) => String(e));
       const problems = f.check(text);

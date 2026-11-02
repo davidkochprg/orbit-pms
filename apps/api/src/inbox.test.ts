@@ -59,7 +59,7 @@ function scriptedModel() {
   return { model, calls: () => calls };
 }
 
-function appWith(model: MockLanguageModelV4 | null, monthlyBudgetUsd = 100) {
+function appWith(model: MockLanguageModelV4 | null) {
   return createApp({
     repos,
     ai: model && {
@@ -74,7 +74,6 @@ function appWith(model: MockLanguageModelV4 | null, monthlyBudgetUsd = 100) {
       transcription: null,
     },
     usage: usageStore,
-    monthlyBudgetUsd,
     clock: () => now,
   });
 }
@@ -348,20 +347,6 @@ describe('unified inbox', () => {
     const { status, body } = await call<Inquiry>(app, 'POST', '/api/inbox/inq_02/decline');
     expect(status).toBe(200);
     expect(body.status).toBe('declined');
-  });
-
-  it('refuses to process once the monthly budget is spent', async () => {
-    await usageStore.record({
-      feature: 'agent',
-      model: 'm',
-      tokens: { input: 0, cachedInput: 0, output: 0 },
-      audioSeconds: 0,
-      costMicroUsd: 2_000_000,
-    });
-    const { model, calls } = scriptedModel();
-    const res = await call<ApiError>(appWith(model, 1), 'POST', '/api/inbox/inq_01/process', {});
-    expect(res.status).toBe(429);
-    expect(calls()).toBe(0);
   });
 
   it('returns 404 for an unknown message and 409 for a hold without a processed request', async () => {

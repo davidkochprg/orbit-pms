@@ -148,7 +148,7 @@ flowchart LR
 
 5. **In the staff's language** (`translate.ts`): when the staff member who asked reads another language than the guest writes, the draft is translated into theirs (`draftTranslation`). The reply box opens on that version with a tab for the guest's; staff edit either and translate it into the other, only the guest's text is sent, and sending waits until edits in the staff's language are translated.
 
-The pipeline checks the monthly budget before calling the model and records `inbox_extract`, `inbox_draft` and `translate` usage separately. Errors are stored on the conversation (`processingError`) and the next request retries.
+The pipeline records `inbox_extract`, `inbox_draft` and `translate` usage separately. Errors are stored on the conversation (`processingError`) and the next request retries.
 
 ### Translation
 
@@ -296,7 +296,7 @@ Muse Spark Open is Meta's open-weight release of Muse Spark; Orbit uses the date
 - Baseten serves it without structured output or JSON mode, so it takes only the two plain-text features.
 - It always reasons and defaults to `xhigh`; the features send `minimal`, which Baseten runs as `low`, its lowest level.
 - `withFallback` (`packages/ai/src/fallback.ts`) wraps it: a call that fails (credits used up, rate limit, outage) or answers with no text is sent again to Meta's model, the agent model for drafts and `META_MODEL_TRANSLATE` for translations. Usage is recorded under the model that answered.
-- Prices are the same as Meta's Standard tier, and its spend counts towards the same `AI_MONTHLY_BUDGET_USD`.
+- Prices are the same as Meta's Standard tier, and its spend is recorded the same way.
 
 Constraints from Meta's tool-calling docs that the agent respects: `tool_choice` only accepts `"auto"` (the SDK default), and tool arguments are not guaranteed to match the schema, so the SDK validates them with the zod schemas.
 
@@ -304,7 +304,7 @@ Constraints from Meta's tool-calling docs that the agent respects: `tool_choice`
 
 Rules in [ADR 0006](decisions/0006-agent-autonomy-and-cost-budget.md). Prices (Standard tier, `packages/ai/src/cost.ts`): $1.25 per 1M input tokens, $0.15 per 1M cached input tokens, $4.25 per 1M output tokens, $0.18 per hour of transcribed audio.
 
-Every model call is recorded in the `ai_usage` table (feature, model, tokens, cost in micro-dollars). This table is real spend, so `db:seed` and demo resets leave it alone. `GET /api/ai-usage` reports this month's spend by feature against `AI_MONTHLY_BUDGET_USD`. If a client disconnects mid-turn, the completed steps are still recorded; the step in flight is not reported by the provider.
+Every model call is recorded in the `ai_usage` table (feature, model, tokens, cost in micro-dollars). This table is real spend, so `db:seed` and demo resets leave it alone. `GET /api/ai-usage` reports this month's spend by feature. If a client disconnects mid-turn, the completed steps are still recorded; the step in flight is not reported by the provider.
 
 What keeps cost down:
 
@@ -314,18 +314,10 @@ What keeps cost down:
 
 Measured with `muse-spark-1.3` (2026-10-28, 31 tools): each agent step sends about 10,000 input tokens (system prompt and tool definitions, cached after the first call), so a question answered from one lookup costs about $0.005 and a change that needs lookups first about $0.02–0.03; the average turn stays near $0.019. An inbox message costs about $0.004 (extraction $0.002 plus draft at `minimal` effort).
 
-Estimate for a 30-room property per month, at 40 agent questions and 30 guest messages a day: agent ≈ $23, inbox ≈ $4, ID scans, voice notes and daily briefs ≈ $2. Total ≈ $30, well under the $100 cap.
+Estimate for a 30-room property per month, at 40 agent questions and 30 guest messages a day: agent ≈ $23, inbox ≈ $4, ID scans, voice notes and daily briefs ≈ $2. Total ≈ $30, well under the $100 target.
 
-## Rate limits
+## Limits
 
-The public demo is protected in `apps/api/src/limits.ts` (in memory, reset on restart):
-
-- `AI_RATE_LIMIT_PER_HOUR` AI requests (agent turns, inbox reads and drafts, notes, summaries) per client IP per rolling hour (IP from `x-forwarded-for`), 300 by default.
-- `AI_DAILY_TOKEN_BUDGET` tokens per UTC day across all visitors, counted from model usage after each turn. The default of 20,000,000 is about 1,000 agent turns, or roughly $20 a day.
-- `AI_MONTHLY_BUDGET_USD` real spend per UTC month, from the `ai_usage` table, $50 by default. Persisted, so it survives restarts.
-
-The defaults suit one person trying Orbit on their own key; a shared public demo should set lower ones.
+Orbit puts no limit of its own on AI calls: no cap per address or per day, and no monthly spend cap ([ADR 0026](decisions/0026-no-ai-limits-in-the-demo.md)). Spend is still recorded and reported, and the demo's access code keeps the deployed app private.
 
 Baseten allows 15 requests a minute on an unverified account and 120 once verified; beyond that a draft or translation falls back to Meta's API.
-
-When a limit is hit, `POST /api/agent` returns 429 `demo_limit` with a message the command bar can show as is.

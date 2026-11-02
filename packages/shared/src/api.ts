@@ -71,7 +71,6 @@ export const auditLogListSchema = z.array(auditLogEntrySchema);
 export const aiUsageSummarySchema = z.object({
   /** UTC month, `YYYY-MM`. */
   month: z.string(),
-  budgetMicroUsd: z.number().int(),
   spentMicroUsd: z.number().int(),
   byFeature: z.array(
     z.object({

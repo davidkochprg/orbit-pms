@@ -2,7 +2,6 @@ import type { IdScanReader } from '@orbit/ai';
 import type { IdScanService } from '@orbit/domain';
 import { newIdScanBodySchema } from '@orbit/shared';
 import { type Context, Hono } from 'hono';
-import type { AiGate } from '../ai-gate';
 import { errorBody } from '../http';
 import { validate } from '../validate';
 
@@ -21,7 +20,6 @@ export interface IdScanRouteDeps {
   scans: IdScanService;
   /** Null when no vision model is configured. */
   read: IdScanReader | null;
-  gate: AiGate;
 }
 
 const notConfigured = errorBody('ai_not_configured', 'ID scanning needs a vision model.');
@@ -31,7 +29,7 @@ const notConfigured = errorBody('ai_not_configured', 'ID scanning needs a vision
  * where the unguessable ID is the only key and nothing from the document is returned. The photo
  * is read in memory and never stored.
  */
-export function idScanRoutes({ scans, read, gate }: IdScanRouteDeps) {
+export function idScanRoutes({ scans, read }: IdScanRouteDeps) {
   async function readPhoto(c: Context, scanId: string) {
     if (!read) return c.json(notConfigured, 503);
     if (Number(c.req.header('content-length') ?? 0) > MAX_ID_PHOTO_BYTES) {
@@ -50,8 +48,6 @@ export function idScanRoutes({ scans, read, gate }: IdScanRouteDeps) {
     if (!imageTypes[mediaType]?.(bytes)) {
       return c.json(errorBody('invalid_input', 'The photo must be a JPEG, PNG or WebP.'), 400);
     }
-    const blocked = await gate(c.req.header('x-forwarded-for'));
-    if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
     await scans.beginReading(scanId);
     try {
       await scans.complete(scanId, await read({ bytes, mediaType }));

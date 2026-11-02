@@ -2,7 +2,6 @@ import type { GuestMemoryReader } from '@orbit/ai';
 import type { GuestMemoryService, GuestService, Repositories } from '@orbit/domain';
 import { guestPatchSchema, newGuestBodySchema } from '@orbit/shared';
 import { Hono } from 'hono';
-import type { AiGate } from '../ai-gate';
 import { errorBody, notFound } from '../http';
 import { validate } from '../validate';
 
@@ -12,14 +11,13 @@ export interface GuestRouteDeps {
   memories: GuestMemoryService;
   /** Null when AI is not configured. */
   reader: GuestMemoryReader | null;
-  gate: AiGate;
 }
 
 /**
  * Guest profiles, and what Orbit remembers about each guest from earlier stays: read by the
  * model on request when the history changed, free when it didn't.
  */
-export function guestRoutes({ repos, guests, memories, reader, gate }: GuestRouteDeps) {
+export function guestRoutes({ repos, guests, memories, reader }: GuestRouteDeps) {
   return new Hono()
     .get('/guests', async (c) => c.json(await repos.guests.listGuests()))
     .post('/guests', validate('json', newGuestBodySchema), async (c) =>
@@ -41,8 +39,6 @@ export function guestRoutes({ repos, guests, memories, reader, gate }: GuestRout
       if (!reader) {
         return c.json(errorBody('ai_not_configured', 'The AI agent is not configured.'), 503);
       }
-      const blocked = await gate(c.req.header('x-forwarded-for'));
-      if (blocked) return c.json(errorBody('demo_limit', blocked), 429);
       return c.json(await memories.save(id, source, await reader.read(source)));
     });
 }

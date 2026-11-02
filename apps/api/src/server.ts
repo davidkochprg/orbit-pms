@@ -14,12 +14,7 @@ export function createServer(source: Record<string, string | undefined>) {
   const app = createApp({
     repos: createRepositories(db.db),
     ai,
-    limits: {
-      perIpPerHour: env.AI_RATE_LIMIT_PER_HOUR,
-      dailyTokenBudget: env.AI_DAILY_TOKEN_BUDGET,
-    },
     usage: createUsageStore(db.db),
-    monthlyBudgetUsd: env.AI_MONTHLY_BUDGET_USD,
     accessCode: env.DEMO_ACCESS_CODE,
     weather: createOpenMeteo(),
     log: true,

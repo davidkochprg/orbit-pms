@@ -64,11 +64,7 @@ function scriptedModel(steps: ({ tool: string; input: unknown } | { text: string
 
 const userMessage = (text: string) => ({ id: 'm1', role: 'user', parts: [{ type: 'text', text }] });
 
-function appWith(
-  model: MockLanguageModelV4 | null,
-  limits = { perIpPerHour: 20, dailyTokenBudget: 1_000_000 },
-  monthlyBudgetUsd = 100,
-) {
+function appWith(model: MockLanguageModelV4 | null) {
   return createApp({
     repos,
     ai: model && {
@@ -82,9 +78,7 @@ function appWith(
       visionModelId: null,
       transcription: null,
     },
-    limits,
     usage: usageStore,
-    monthlyBudgetUsd,
     clock: () => now,
   });
 }
@@ -272,20 +266,14 @@ describe('POST /api/agent', () => {
     expect(((await res.json()) as ApiError).error.code).toBe('ai_not_configured');
   });
 
-  it('returns 429 with a demo message once the per-IP limit is reached', async () => {
-    const app = appWith(scriptedModel([{ text: 'Hello' }]), {
-      perIpPerHour: 1,
-      dailyTokenBudget: 1_000_000,
-    });
-    const first = await post(app, '/api/agent', { messages: [userMessage('hi')] });
-    expect(first.status).toBe(200);
-    // Read the stream to the end so its usage is recorded inside this test.
-    await first.text();
-    const limited = await post(app, '/api/agent', { messages: [userMessage('hi again')] });
-    expect(limited.status).toBe(429);
-    const body = (await limited.json()) as ApiError;
-    expect(body.error.code).toBe('demo_limit');
-    expect(body.error.message).toMatch(/Demo limit reached/);
+  it('answers every question from the same address, with no demo limit', async () => {
+    const app = appWith(scriptedModel([{ text: 'Hello' }, { text: 'Hello again' }]));
+    for (const text of ['hi', 'hi again']) {
+      const res = await post(app, '/api/agent', { messages: [userMessage(text)] });
+      expect(res.status).toBe(200);
+      // Read the stream to the end so its usage is recorded inside this test.
+      await res.text();
+    }
   });
 
   it('rejects malformed messages', async () => {
@@ -295,13 +283,12 @@ describe('POST /api/agent', () => {
   });
 });
 
-describe('AI usage and budget', () => {
+describe('AI usage', () => {
   it('records each agent turn with its cost and reports it', async () => {
     const app = appWith(scriptedModel([{ tool: 'getArrivals', input: {} }, { text: 'Done.' }]));
     await (await post(app, '/api/agent', { messages: [userMessage('arrivals?')] })).text();
     const summary = (await (await app.request('/api/ai-usage')).json()) as AiUsageSummary;
     expect(summary.month).toBe('2026-10');
-    expect(summary.budgetMicroUsd).toBe(100_000_000);
     // Two model calls of 100 input + 20 output tokens each.
     const expected = Math.round(200 * 1.25 + 40 * 4.25);
     expect(summary.spentMicroUsd).toBe(expected);
@@ -316,18 +303,19 @@ describe('AI usage and budget', () => {
     ]);
   });
 
-  it('stops the agent once the monthly budget is spent', async () => {
+  it('keeps answering however much has been spent this month', async () => {
     await usageStore.record({
       feature: 'agent',
       model: 'm',
       tokens: { input: 0, cachedInput: 0, output: 0 },
       audioSeconds: 0,
-      costMicroUsd: 1_000_000,
+      costMicroUsd: 1_000_000_000,
     });
-    const app = appWith(scriptedModel([{ text: 'x' }]), undefined, 1);
-    const res = await post(app, '/api/agent', { messages: [userMessage('hi')] });
-    expect(res.status).toBe(429);
-    expect(((await res.json()) as ApiError).error.message).toMatch(/budget for this month/);
+    const res = await post(appWith(scriptedModel([{ text: 'x' }])), '/api/agent', {
+      messages: [userMessage('hi')],
+    });
+    expect(res.status).toBe(200);
+    await res.text();
   });
 });
 

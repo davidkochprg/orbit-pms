@@ -125,7 +125,7 @@ A cancelled booking answers `409 invalid_transition`. Check-in doesn't wait for 
 - `POST /api/bookings/:id/scans` takes `{ stayGuestId: string | null }` (`null` to add a companion from the scan) and returns `201` with the `IdScan`; its `id` goes in the phone link `/scan/<id>`. `503 ai_not_configured` without a vision model.
 - `GET /api/bookings/:id/scans/:scanId` returns the `IdScan` for the desk to poll: `status` (`waiting`, `reading`, `done`, `failed`), `result` (`name`, the guest-book fields, `expiresOn`, `warnings`), `error` and `readingSince`. A read still running after 90 seconds comes back as `failed`, so the photo can be taken again.
 - `GET /api/scan/:scanId` is the phone's view, with no sign-in: `{ status, firstName, roomName, error, expiresAt }`, never the result.
-- `POST /api/scan/:scanId/photo` (phone) and `POST /api/bookings/:id/scans/:scanId/photo` (desk upload) take a multipart `photo` (JPEG, PNG or WebP, at most 8 MB; the web app sends a JPEG of at most 1600 px), read it with the vision model and return the phone's view. The photo is never stored. A failed model call returns `200` with `status: 'failed'` so the phone can retake. `400` for a file that is not an image, `413` too large, `429` over the demo limits, `409` while a photo is already being read.
+- `POST /api/scan/:scanId/photo` (phone) and `POST /api/bookings/:id/scans/:scanId/photo` (desk upload) take a multipart `photo` (JPEG, PNG or WebP, at most 8 MB; the web app sends a JPEG of at most 1600 px), read it with the vision model and return the phone's view. The photo is never stored. A failed model call returns `200` with `status: 'failed'` so the phone can retake. `400` for a file that is not an image, `413` too large, `409` while a photo is already being read.
 
 An expired, unknown or saved scan is `404`. See [domain.md](domain.md#id-scans) and [ai.md](ai.md#id-scans).
 
@@ -147,7 +147,7 @@ Takes `{ kind?: 'payment' | 'refund', method: 'cash' | 'card' | 'bank_transfer',
 
 ### `GET /api/guests/:id/memory`, `POST /api/guests/:id/memory/read`
 
-`GuestMemory`: `pastStays`, `items` (`{ kind: "preference" | "occasion" | "care" | "habit", text }`), `current` (the history hasn't changed since it was read), `hasHistory` and `readAt`. `GET` never calls a model. `POST …/read` reads the history with the model when it isn't current, and returns the stored reading at no cost when it is. 404 for an unknown guest, 503 `ai_not_configured` and 429 `demo_limit` only when a reading is needed. See [ai.md](ai.md#guest-memory).
+`GuestMemory`: `pastStays`, `items` (`{ kind: "preference" | "occasion" | "care" | "habit", text }`), `current` (the history hasn't changed since it was read), `hasHistory` and `readAt`. `GET` never calls a model. `POST …/read` reads the history with the model when it isn't current, and returns the stored reading at no cost when it is. 404 for an unknown guest, 503 `ai_not_configured` only when a reading is needed. See [ai.md](ai.md#guest-memory).
 
 ### `POST /api/guests`, `PATCH /api/guests/:id`
 
@@ -167,7 +167,7 @@ The hotel-wide audit log, newest first: `ActivityItem[]`, each an audit entry pl
 
 ### `POST /api/reports/summary`
 
-Body `{ from, to }` as for the report. Returns `{ text }`: three sentences on the period against the same number of nights before it, every number checked against the figures the server worked out ([ai.md](ai.md#report-summary)). 422 `summary_failed`, 429 `demo_limit`, 503 `ai_not_configured`.
+Body `{ from, to }` as for the report. Returns `{ text }`: three sentences on the period against the same number of nights before it, every number checked against the figures the server worked out ([ai.md](ai.md#report-summary)). 422 `summary_failed`, 503 `ai_not_configured`.
 
 ### `GET /api/reports?from=&to=`
 
@@ -191,24 +191,24 @@ Conversations with guests by email, web form, phone note and OTA messaging ([ADR
 | `POST /api/inbox/:id/receive`                       | `{ body }`                                                               | `Inquiry` with the guest's next message: unread, back in the inbox, `status: "new"` unless settled, the prepared reply cleared.                                                                                                            |
 | `POST /api/inbox/:id/unread`                        | `{ unread }`                                                             | `Inquiry`                                                                                                                                                                                                                                  |
 | `POST /api/inbox/:id/archive`                       | `{ archived }`                                                           | `Inquiry`                                                                                                                                                                                                                                  |
-| `POST /api/inbox/:id/read`                          | `{ force?: boolean }`                                                    | `Inquiry` with `parsed` and `suggestion.options`, no draft: the request read and its rooms found. A conversation already read since the guest last wrote returns at no cost. 503 `ai_not_configured`, 429 `demo_limit`.                    |
-| `POST /api/inbox/:id/draft`                         | `{ language?: Language }`                                                | `Inquiry` with `suggestion.draft` written from the stored reading and the room held now (reading the request first if needed), translated into `language` when it differs from the guest's. Rooms are looked up again. 503, 429 as above.  |
-| `POST /api/inbox/:id/process`                       | `{ force?: boolean, language?: Language }`                               | `Inquiry` with `parsed` and `suggestion`, the draft translated into `language` when it differs from the guest's. Already prepared conversations return at no cost. 503 `ai_not_configured`, 429 `demo_limit`.                              |
-| `POST /api/inbox/:id/messages/:messageId/translate` | `{ to: Language }`                                                       | `Inquiry` with the message's `translation`, kept so asking again is free. 404, 422 `translation_failed`, 503, 429.                                                                                                                         |
-| `POST /api/inbox/translate`                         | `{ text, to: Language }`                                                 | `{ text }`: any text translated, e.g. a reply as staff edit it. Nothing is stored. 422 `translation_failed`, 503, 429.                                                                                                                     |
+| `POST /api/inbox/:id/read`                          | `{ force?: boolean }`                                                    | `Inquiry` with `parsed` and `suggestion.options`, no draft: the request read and its rooms found. A conversation already read since the guest last wrote returns at no cost. 503 `ai_not_configured`.                                      |
+| `POST /api/inbox/:id/draft`                         | `{ language?: Language }`                                                | `Inquiry` with `suggestion.draft` written from the stored reading and the room held now (reading the request first if needed), translated into `language` when it differs from the guest's. Rooms are looked up again. 503 as above.       |
+| `POST /api/inbox/:id/process`                       | `{ force?: boolean, language?: Language }`                               | `Inquiry` with `parsed` and `suggestion`, the draft translated into `language` when it differs from the guest's. Already prepared conversations return at no cost. 503 `ai_not_configured`.                                                |
+| `POST /api/inbox/:id/messages/:messageId/translate` | `{ to: Language }`                                                       | `Inquiry` with the message's `translation`, kept so asking again is free. 404, 422 `translation_failed`, 503.                                                                                                                              |
+| `POST /api/inbox/translate`                         | `{ text, to: Language }`                                                 | `{ text }`: any text translated, e.g. a reply as staff edit it. Nothing is stored. 422 `translation_failed`, 503.                                                                                                                          |
 | `POST /api/inbox/:id/hold`                          | `{ roomId }`                                                             | 201 `BookingDetail` of the hold for the requested stay: a new one, or the message's hold moved to this room and re-quoted. 409 if the message has no complete stay request, that room is already held, or its booking is no longer a hold. |
 | `POST /api/inbox/:id/hold-block`                    |                                                                          | 201 `Inquiry` with every room of its block held for the guest (`blockBookingIds`). 409 if it has no block or already has a hold.                                                                                                           |
 | `POST /api/inbox/:id/rooms`                         |                                                                          | `Inquiry` with rooms looked up again for its request (`refreshOptions`) and the old draft dropped. 409 `invalid_transition` before it is read.                                                                                             |
-| `POST /api/inbox/:id/learn`                         |                                                                          | The `PendingAction` (`save_hotel_info`) for a fact the latest reply states that the hotel information lacks, or `null`. One model call. 503 `ai_not_configured`, 429 `demo_limit`.                                                         |
+| `POST /api/inbox/:id/learn`                         |                                                                          | The `PendingAction` (`save_hotel_info`) for a fact the latest reply states that the hotel information lacks, or `null`. One model call. 503 `ai_not_configured`.                                                                           |
 | `POST /api/inbox/:id/decline`                       |                                                                          | `Inquiry` with `status: "declined"`. 409 `invalid_transition` if it already led to a booking.                                                                                                                                              |
 
 ### Notes before a stay
 
-| Endpoint                                   | Body                        | Returns                                                                                                                                                                                                                            |
-| ------------------------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/arrival-notes`                   | `?date=` (default tomorrow) | `{ date, due }`: confirmed arrivals on that day whose guest has an email and hasn't heard from the hotel about the stay, with name, email, language, room, room type, party and add-ons.                                           |
-| `POST /api/arrival-notes/:bookingId/draft` |                             | `{ subject, body }` written by the model in the guest's language; nothing is saved. 422 `draft_failed` when it can't be written without an unstated amount, 503 `ai_not_configured`, 429 `demo_limit`, 404 for an unknown booking. |
-| `POST /api/arrival-notes/:bookingId/send`  | `{ subject, body }`         | 201 `Inquiry`: the note sent as an email linked to the booking, signed by the signed-in staff member. 400 for an empty subject or body or a guest without an email.                                                                |
+| Endpoint                                   | Body                        | Returns                                                                                                                                                                                                          |
+| ------------------------------------------ | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /api/arrival-notes`                   | `?date=` (default tomorrow) | `{ date, due }`: confirmed arrivals on that day whose guest has an email and hasn't heard from the hotel about the stay, with name, email, language, room, room type, party and add-ons.                         |
+| `POST /api/arrival-notes/:bookingId/draft` |                             | `{ subject, body }` written by the model in the guest's language; nothing is saved. 422 `draft_failed` when it can't be written without an unstated amount, 503 `ai_not_configured`, 404 for an unknown booking. |
+| `POST /api/arrival-notes/:bookingId/send`  | `{ subject, body }`         | 201 `Inquiry`: the note sent as an email linked to the booking, signed by the signed-in staff member. 400 for an empty subject or body or a guest without an email.                                              |
 
 ### Mailbox
 
@@ -233,11 +233,11 @@ Registered before `/api/inbox/:id`, so these paths win. Nothing here calls a mod
 | Endpoint                                  | Body                                                            | Returns                                                                                                                                                                                                                                                                                                                           |
 | ----------------------------------------- | --------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `GET /api/housekeeping`                   |                                                                 | `{ date, rooms: HousekeepingRoom[] }`: each room with `roomTypeName`, `occupancy` (`turnover`, `arriving`, `departing`, `staying`, `vacant`), `guestName`, `urgent`, `effort` (`light`, `standard`, `heavy` or null), `cues`, `openTasks`; and `unreadStays`. Urgent rooms first, heavier cleans first within the same occupancy. |
-| `POST /api/housekeeping/read-stays`       |                                                                 | The board, after the model read up to 12 unread stays' notes. Returns at once, without a model call, when none are unread. 503 `ai_not_configured`, 429 `demo_limit`.                                                                                                                                                             |
+| `POST /api/housekeeping/read-stays`       |                                                                 | The board, after the model read up to 12 unread stays' notes. Returns at once, without a model call, when none are unread. 503 `ai_not_configured`.                                                                                                                                                                               |
 | `POST /api/rooms/:id/status`              | `{ status }`                                                    | `Room`. 409 `invalid_transition` from `out_of_order` straight to `clean` or `inspected`.                                                                                                                                                                                                                                          |
 | `POST /api/housekeeping/tasks`            | `{ roomId, type, notes, trade? }`                               | 201 `HousekeepingTask`. A repair without `trade` gets one from the model when AI is on and within the limit, else null. 400 `invalid_input` for a maintenance task without notes.                                                                                                                                                 |
 | `POST /api/housekeeping/tasks/:id/status` | `{ status }`                                                    | `HousekeepingTask`                                                                                                                                                                                                                                                                                                                |
-| `POST /api/housekeeping/notes`            | `{ text }`                                                      | `HousekeepingNoteResult`: `{ transcript, changes, skipped, unclear }`. Changes are already applied, as the agent. 503 `ai_not_configured`, 429 `demo_limit`.                                                                                                                                                                      |
+| `POST /api/housekeeping/notes`            | `{ text }`                                                      | `HousekeepingNoteResult`: `{ transcript, changes, skipped, unclear }`. Changes are already applied, as the agent. 503 `ai_not_configured`.                                                                                                                                                                                        |
 | `POST /api/housekeeping/voice`            | multipart, `audio`: WAV (mono 16-bit PCM, 16 kHz), at most 5 MB | `HousekeepingNoteResult` with the transcript. 400 if not WAV, 413 if too large, 502 `transcription_failed`, 503 when voice is not configured.                                                                                                                                                                                     |
 
 ## Contacts and repairs
@@ -256,7 +256,7 @@ A maintenance task as a `Repair`: the task, its room name, `access` (`guestName`
 
 ### `POST /api/housekeeping/tasks/:id/work-order`
 
-`{ contactId }`. Drafts the email asking the contact to come (Muse Spark Open, falling back to Muse Spark), in the contact's language, signed by the staff member in `x-staff-id`. Returns `{ to, subject, body }`; nothing is sent. 503 without AI, 429 over the demo limit.
+`{ contactId }`. Drafts the email asking the contact to come (Muse Spark Open, falling back to Muse Spark), in the contact's language, signed by the staff member in `x-staff-id`. Returns `{ to, subject, body }`; nothing is sent. 503 without AI.
 
 ### `POST /api/housekeeping/tasks/:id/email`
 
@@ -288,7 +288,7 @@ Knowledge: the profile's entries, as notes. `GET` returns them; `POST` (201) and
 
 ### `POST /api/hotel-info/file`
 
-Body `{ text }` (1–1500 characters): a note described in staff's own words. Returns `{ id, draft }`: the note as Orbit titled, filed, tagged and linked it, either new (`id` null) or folded into the existing note `id` covers, with that note's text kept. Saves nothing: staff save `draft` with `POST /api/hotel-info` or `PUT /api/hotel-info/:id`. One model call. 503 `ai_not_configured`, 429 `demo_limit`, 422 `not_filed` when the model's note doesn't fit one (empty, too long, or a title another note has).
+Body `{ text }` (1–1500 characters): a note described in staff's own words. Returns `{ id, draft }`: the note as Orbit titled, filed, tagged and linked it, either new (`id` null) or folded into the existing note `id` covers, with that note's text kept. Saves nothing: staff save `draft` with `POST /api/hotel-info` or `PUT /api/hotel-info/:id`. One model call. 503 `ai_not_configured`, 422 `not_filed` when the model's note doesn't fit one (empty, too long, or a title another note has).
 
 ### `GET /api/settings/pricing`, `PUT /api/settings/pricing`
 
@@ -304,11 +304,11 @@ Body `{ nights: [{ date, percent }] }` (1 to 120 nights, −50 to +100; 0 goes b
 
 ### `POST /api/revenue/brief`
 
-Body `{ days? }`. `{ text }`: a few sentences from Muse Spark on the outlook. 503 `ai_not_configured`, 429 `demo_limit`, 502 `brief_failed` when the text twice stated a percent the outlook doesn't have.
+Body `{ days? }`. `{ text }`: a few sentences from Muse Spark on the outlook. 503 `ai_not_configured`, 502 `brief_failed` when the text twice stated a percent the outlook doesn't have.
 
 ### `POST /api/revenue/review`
 
-Body `{ days? }`. Reviews the outlook with Muse Spark when what it reads changed since the stored review, then returns the `RevenueOutlook` for `days` nights with the review's signals; when nothing changed it returns at once without a model call. Concurrent requests for the same outlook share one review. 503 `ai_not_configured`, 429 `demo_limit`, 502 `review_failed`.
+Body `{ days? }`. Reviews the outlook with Muse Spark when what it reads changed since the stored review, then returns the `RevenueOutlook` for `days` nights with the review's signals; when nothing changed it returns at once without a model call. Concurrent requests for the same outlook share one review. 503 `ai_not_configured`, 502 `review_failed`.
 
 ### `GET /api/events`, `POST /api/events`, `DELETE /api/events/:id`
 
@@ -336,15 +336,14 @@ Body `{ name, roomTypeId, kind, floor }`. `POST` returns `201` with the new `Roo
 
 Body: `{ "messages": UIMessage[] }`, the chat so far in AI SDK UI message format. A staff member's message may carry `metadata.context`: `{ kind: "booking" | "guest" | "inquiry", id }`, what they were looking at. The server reads that record itself and puts a one-line note before the message for the model; an unknown kind is a 400, a record that no longer exists is left out. Responds with an AI SDK UI message stream (`text/event-stream`): text deltas, tool calls and tool results. Proposal tools stream a result of `{ pendingActionId, summary, status: "awaiting_confirmation" }`. See [ai.md](ai.md).
 
-| Status | Code                               | When                                                                          |
-| ------ | ---------------------------------- | ----------------------------------------------------------------------------- |
-| 400    | `invalid_json`, `invalid_messages` | Missing or malformed messages                                                 |
-| 429    | `demo_limit`                       | Per-IP hourly limit or daily token budget reached; `message` is ready to show |
-| 503    | `ai_not_configured`                | `META_API_KEY` or `META_MODEL_AGENT` not set                                  |
+| Status | Code                               | When                                         |
+| ------ | ---------------------------------- | -------------------------------------------- |
+| 400    | `invalid_json`, `invalid_messages` | Missing or malformed messages                |
+| 503    | `ai_not_configured`                | `META_API_KEY` or `META_MODEL_AGENT` not set |
 
 ### `POST /api/agent/transcribe`
 
-A question asked out loud, as the multipart field `audio`: a WAV recording (mono 16-bit PCM, 16 kHz, at most 5 MB). Returns `{ text }`, transcribed by Meta's speech-to-text listening for the names of guests staying from yesterday to two weeks out and room names that aren't plain numbers. The app sends the text to `POST /api/agent` as a typed question. 400 `invalid_input` for a missing file or one that isn't WAV, 413 `too_large`, 429 `demo_limit`, 502 `transcription_failed`, 503 `ai_not_configured` without `META_MODEL_VOICE`.
+A question asked out loud, as the multipart field `audio`: a WAV recording (mono 16-bit PCM, 16 kHz, at most 5 MB). Returns `{ text }`, transcribed by Meta's speech-to-text listening for the names of guests staying from yesterday to two weeks out and room names that aren't plain numbers. The app sends the text to `POST /api/agent` as a typed question. 400 `invalid_input` for a missing file or one that isn't WAV, 413 `too_large`, 502 `transcription_failed`, 503 `ai_not_configured` without `META_MODEL_VOICE`.
 
 ### `GET /api/pending-actions/:id`
 
@@ -360,4 +359,4 @@ Marks the action `rejected` without running it.
 
 ### `GET /api/ai-usage`
 
-This month's real Meta spend: `{ month: "2026-10", budgetMicroUsd, spentMicroUsd, byFeature: [{ feature, calls, inputTokens, cachedInputTokens, outputTokens, audioSeconds, costMicroUsd }] }`. Money is in micro-dollars (1e-6 USD) as integers.
+This month's real Meta spend: `{ month: "2026-10", spentMicroUsd, byFeature: [{ feature, calls, inputTokens, cachedInputTokens, outputTokens, audioSeconds, costMicroUsd }] }`. Money is in micro-dollars (1e-6 USD) as integers.

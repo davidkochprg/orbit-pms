@@ -13,7 +13,6 @@ import {
   updateStaffBodySchema,
 } from '@orbit/shared';
 import { type Context, Hono } from 'hono';
-import type { AiGate } from '../ai-gate';
 import { errorBody } from '../http';
 import { validate } from '../validate';
 
@@ -24,14 +23,13 @@ export interface SettingsRouteDeps {
   /** Null when AI is not configured. */
   filer: NoteFiler | null;
   today: () => string;
-  gate: AiGate;
 }
 
 /**
  * The hotel profile, rates, rooms and the team. Anyone may read them; changes need the signed-in staff member
  * (`x-staff-id`) to be an active manager, which the domain checks.
  */
-export function settingsRoutes({ settings, staff, rates, filer, today, gate }: SettingsRouteDeps) {
+export function settingsRoutes({ settings, staff, rates, filer, today }: SettingsRouteDeps) {
   const signedIn = (c: Context) => staff.identify(c.req.header(STAFF_HEADER));
 
   return (
@@ -51,8 +49,6 @@ export function settingsRoutes({ settings, staff, rates, filer, today, gate }: S
             503,
           );
         }
-        const limit = await gate(c.req.header('x-forwarded-for'));
-        if (limit) return c.json(errorBody('demo_limit', limit), 429);
         const filed = await filer.file({
           text: c.req.valid('json').text,
           notes: (await settings.getProfile()).entries,
