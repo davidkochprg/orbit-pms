@@ -24,7 +24,7 @@ import {
   Plus,
   StickyNote,
 } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { BookingContextMenu } from '@/components/booking-menu';
 import { EmptyState } from '@/components/empty-state';
@@ -87,6 +87,9 @@ const barStyles: Record<VisibleStatus, string> = {
 
 /** Statuses whose bars can be dragged; the API still checks every rule. */
 const movable: BookingStatus[] = ['hold', 'confirmed', 'checked_in'];
+
+/** How long a bar shown from the inspector stays ringed. */
+const FLASH_MS = 2500;
 
 /** Bars narrower than this show only the name. */
 const ICONS_MIN_WIDTH = 150;
@@ -186,6 +189,31 @@ function TapeChart({ today }: { today: string }) {
   const [preview, setPreview] = useState<DragTarget | null>(null);
   // A dropped bar stays where it landed until the change is saved, and goes back if it fails.
   const [landed, setLanded] = useState<DragTarget | null>(null);
+  // ?focus=<id> ("Show on tape chart" in the inspector): scroll to the bar and ring it a moment.
+  const focusId = params.get('focus');
+  const [flash, setFlash] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!focusId) return;
+    const bar = viewport.current?.querySelector(`[data-booking="${CSS.escape(focusId)}"]`);
+    if (!bar) return;
+    bar.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+    setFlash(focusId);
+    setParams(
+      (p) => {
+        p.delete('focus');
+        return p;
+      },
+      { replace: true },
+    );
+    // Runs again once the window's bookings and rooms load and the bar can be found.
+  }, [focusId, bookings.data, rooms.data, roomTypes.data, setParams]);
+
+  useEffect(() => {
+    if (!flash) return;
+    const timer = setTimeout(() => setFlash(null), FLASH_MS);
+    return () => clearTimeout(timer);
+  }, [flash]);
 
   const goTo = (date: string) =>
     setParams((p) => {
@@ -375,6 +403,7 @@ function TapeChart({ today }: { today: string }) {
                   byRoom={byRoom}
                   preview={preview}
                   saving={landed?.id ?? null}
+                  flash={flash}
                   guestName={guestName}
                   onOpen={(id) => !dragged.current && open(id)}
                   onNew={(roomId, checkIn) => openNew({ roomId, checkIn })}
@@ -496,6 +525,8 @@ interface RowProps {
   preview: DragTarget | null;
   /** The booking whose drop is being saved. */
   saving: string | null;
+  /** The booking just shown from the inspector, ringed for a moment. */
+  flash: string | null;
   guestName: (id: string) => string;
   onOpen: (id: string) => void;
   /** Starts a new booking in a room from a night. */
@@ -565,6 +596,7 @@ function RoomLane({
   dayWidth,
   preview,
   saving,
+  flash,
   guestName,
   onOpen,
   onNew,
@@ -620,6 +652,7 @@ function RoomLane({
                   : undefined
               }
               saving={saving === booking.id}
+              flash={flash === booking.id}
               name={guestName(booking.guestId)}
               onOpen={onOpen}
               disabled={disabled}
@@ -696,6 +729,7 @@ function BookingBar({
   dayWidth,
   resizeTo,
   saving,
+  flash,
   name,
   onOpen,
   disabled,
@@ -707,6 +741,7 @@ function BookingBar({
   /** The departure the right edge is being dragged to, snapped to whole days. */
   resizeTo: IsoDate | undefined;
   saving: boolean;
+  flash: boolean;
   name: string;
   onOpen: (id: string) => void;
   disabled: boolean;
@@ -747,6 +782,7 @@ function BookingBar({
             ref={moveRef}
             type="button"
             aria-label={label}
+            data-booking={booking.id}
             onClick={() => onOpen(booking.id)}
             // The bar has its own menu; keep the lane's "new booking" menu from opening too.
             onContextMenu={(e) => e.stopPropagation()}
@@ -761,6 +797,8 @@ function BookingBar({
               canDrag && 'cursor-grab active:cursor-grabbing',
               dragging && 'z-30 shadow-floating',
               saving && 'opacity-70',
+              flash &&
+                'z-30 shadow-floating ring-2 ring-primary ring-offset-2 ring-offset-background',
             )}
             style={{
               left,

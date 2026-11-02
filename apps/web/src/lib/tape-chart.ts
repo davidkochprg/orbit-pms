@@ -66,6 +66,15 @@ export function addDaysIso(date: IsoDate, days: number): IsoDate {
   return format(addDays(parseISO(date), days), 'yyyy-MM-dd');
 }
 
+/**
+ * The tape chart opened on a booking: the window starts the day before arrival, and the chart
+ * scrolls to the bar and highlights it. `focus`, not `booking`, which would open the inspector.
+ */
+export function tapeChartHref(booking: Pick<Booking, 'id' | 'checkIn'>): string {
+  const params = new URLSearchParams({ from: addDaysIso(booking.checkIn, -1), focus: booking.id });
+  return `/tape-chart?${params}`;
+}
+
 /** The `count` dates of a window starting at `start`. */
 export function buildWindow(start: IsoDate, count: number = TAPE_DAYS): IsoDate[] {
   return Array.from({ length: count }, (_, i) => addDaysIso(start, i));

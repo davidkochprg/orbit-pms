@@ -5,10 +5,10 @@ import type {
   BookingSource,
   Language,
 } from '@orbit/shared';
-import { CircleDashed, MoreHorizontal, Pencil, ScanLine } from 'lucide-react';
+import { CalendarRange, CircleDashed, MoreHorizontal, Pencil, ScanLine } from 'lucide-react';
 import { LogoMark } from '@/components/logo-mark';
 import { type ReactNode, useEffect, useState } from 'react';
-import { Link } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { BookingBill, PaymentForm } from '@/components/booking-bill';
 import { BookingGuests } from '@/components/booking-guests';
 import { BookingDropdownMenu, CancelBookingDialog } from '@/components/booking-menu';
@@ -62,6 +62,7 @@ import {
   languageLabels,
 } from '@/lib/format';
 import { keepOpenWhileEditing } from '@/lib/inline-edit';
+import { tapeChartHref } from '@/lib/tape-chart';
 import { guestBookProgress } from '@/lib/registration';
 import { cn } from '@/lib/utils';
 
@@ -123,6 +124,7 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
   const { openPalette } = useCommandPalette();
   const { openEdit } = useBookingEditor();
   const { intent, clearIntent } = useBookingDrawer();
+  const navigate = useNavigate();
   const folio = useFolio(booking.id);
   const [tab, setTab] = useState<Tab>('overview');
   // A context menu's "Check in…" opens the inspector straight into the flow.
@@ -232,6 +234,18 @@ function BookingDetailView({ detail }: { detail: BookingDetail }) {
             <MoreHorizontal />
           </Button>
         </BookingDropdownMenu>
+        {booking.status !== 'cancelled' && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            tooltip="Show on tape chart"
+            aria-label="Show on tape chart"
+            // The new URL has no ?booking=, so the inspector closes on the way.
+            onClick={() => void navigate(tapeChartHref(booking))}
+          >
+            <CalendarRange />
+          </Button>
+        )}
         <Button
           variant="ghost"
           size="sm"

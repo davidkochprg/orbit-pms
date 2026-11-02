@@ -14,6 +14,7 @@ import {
   TAPE_MIN_DAY_WIDTH_MONTH,
   TAPE_ROOM_COLUMN,
   TAPE_ROW_HEIGHT,
+  tapeChartHref,
   tapeGeometry,
 } from './tape-chart';
 
@@ -180,6 +181,14 @@ describe('tapeGeometry', () => {
     // A wide screen grows the type to 110%: 74px days fit at 16px, not at 17.6px.
     const roomColumn = Math.round(TAPE_ROOM_COLUMN * 1.1);
     expect(tapeGeometry(roomColumn + 30 * 74, 30, 1.1).compactDays).toBe(true);
+  });
+});
+
+describe('tapeChartHref', () => {
+  it('opens the chart the day before arrival, on the booking', () => {
+    expect(tapeChartHref({ id: 'bkg_1', checkIn: '2026-11-01' })).toBe(
+      '/tape-chart?from=2026-10-31&focus=bkg_1',
+    );
   });
 });
 
