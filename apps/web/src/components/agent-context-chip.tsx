@@ -7,12 +7,14 @@ import {
   DoorOpen,
   Inbox,
   type LucideIcon,
+  ReceiptText,
   Tags,
   Wrench,
   X,
 } from 'lucide-react';
 import { GuestAvatar } from '@/components/guest-avatar';
 import {
+  useBills,
   useBookingDetail,
   useContacts,
   useGuest,
@@ -35,6 +37,7 @@ const kindIcons: Partial<Record<AgentContext['kind'], LucideIcon>> = {
   night: Tags,
   tape_chart: CalendarRange,
   report: ChartColumn,
+  bill: ReceiptText,
 };
 
 /** "Grace Lane · 210": who or what a context is about, read from hotel data. */
@@ -47,6 +50,7 @@ function useContextLabel(context: AgentContext): { name: string | null; detail: 
   const rooms = useRooms().data;
   const contacts = useContacts().data;
   const notes = useHotelInfo().data;
+  const bill = useBills().data?.find((b) => kind === 'bill' && b.id === id);
   const range = parseRangeId(id);
   switch (kind) {
     case 'booking':
@@ -71,6 +75,8 @@ function useContextLabel(context: AgentContext): { name: string | null; detail: 
     case 'tape_chart':
     case 'report':
       return { name: range ? formatRange(range.from, range.to) : null, detail: null };
+    case 'bill':
+      return { name: bill?.supplierName ?? null, detail: bill?.number ?? null };
   }
 }
 

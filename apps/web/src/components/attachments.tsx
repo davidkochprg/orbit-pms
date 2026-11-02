@@ -1,6 +1,6 @@
 import type { Attachment } from '@orbit/shared';
 import { Download, FileText, Image, Paperclip, X } from 'lucide-react';
-import { useRef } from 'react';
+import { type ReactNode, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { useUploadAttachment } from '@/lib/api';
 import { attachmentHref, formatBytes } from '@/lib/mail';
@@ -10,10 +10,13 @@ import { cn } from '@/lib/utils';
 export function AttachmentList({
   files,
   onRemove,
+  action,
   className,
 }: {
   files: Attachment[];
   onRemove?: (file: Attachment) => void;
+  /** Another button for a file, e.g. reading it as a bill. */
+  action?: (file: Attachment) => ReactNode;
   className?: string;
 }) {
   if (files.length === 0) return null;
@@ -38,6 +41,7 @@ export function AttachmentList({
             <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
               {formatBytes(f.size)}
             </span>
+            {action?.(f)}
             {onRemove ? (
               <Button
                 type="button"

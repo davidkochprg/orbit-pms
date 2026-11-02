@@ -280,6 +280,20 @@ describe('buildSeed', () => {
     }
   });
 
+  it('issues receipts for paid stays and keeps bills in every state', () => {
+    expect(seed.invoices.length).toBeGreaterThan(0);
+    for (const i of seed.invoices) {
+      const booking = seed.bookings.find((b) => b.id === i.bookingId);
+      expect(booking?.status).toBe('checked_out');
+      expect(i.issuedOn).toBe(booking?.checkOut);
+    }
+    expect(new Set(seed.supplierInvoices.map((b) => b.status))).toEqual(
+      new Set(['to_review', 'unpaid', 'paid']),
+    );
+    const read = seed.supplierInvoices.find((b) => b.status === 'to_review');
+    expect(seed.files.some((f) => f.attachment.id === read?.file?.id)).toBe(true);
+  });
+
   it('uses only example.com email addresses', () => {
     for (const g of seed.guests) expect(g.email).toMatch(/^[a-z.]+@example\.com$/);
   });

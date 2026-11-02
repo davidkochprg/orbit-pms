@@ -110,6 +110,29 @@ const optionalText = (max: number) =>
     .nullable()
     .transform((s) => (s === '' ? null : s));
 
+/** What invoices say about the hotel as the seller. */
+export const hotelBillingSchema = z.object({
+  /** The registered business name, when it differs from the hotel's. */
+  legalName: optionalText(120),
+  /** The registered address; the location when empty. */
+  address: optionalText(300),
+  /** The hotel's VAT or tax ID. */
+  taxId: optionalText(40),
+  /** Where guests pay invoices by bank transfer, e.g. an IBAN, or account and routing numbers. */
+  bankAccount: optionalText(120),
+  /** Days a guest has to pay an invoice by bank transfer. */
+  paymentTermDays: z.number().int().min(0).max(90),
+});
+export type HotelBilling = z.infer<typeof hotelBillingSchema>;
+
+export const defaultHotelBilling: HotelBilling = {
+  legalName: null,
+  address: null,
+  taxId: null,
+  bankAccount: null,
+  paymentTermDays: 14,
+};
+
 /**
  * The property as staff describe it in Settings. The agent's prompts are built from it, so every
  * fact the agent may tell a guest about the hotel comes from here.
@@ -146,5 +169,7 @@ export const hotelProfileSchema = z.object({
     .object({ latitude: z.number().min(-90).max(90), longitude: z.number().min(-180).max(180) })
     .nullable()
     .default(null),
+  /** The seller's details on invoices. Profiles saved before it existed have none yet. */
+  billing: hotelBillingSchema.default(defaultHotelBilling),
 });
 export type HotelProfile = z.infer<typeof hotelProfileSchema>;

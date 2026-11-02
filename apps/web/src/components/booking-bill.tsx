@@ -1,6 +1,7 @@
 import type {
   Booking,
   Folio,
+  InvoiceKind,
   FolioLine,
   PaymentKind,
   PaymentMethod,
@@ -10,6 +11,8 @@ import type {
 import { Plus, Trash2 } from 'lucide-react';
 import { type FormEvent, type ReactNode, useState } from 'react';
 import { ErrorNotice } from '@/components/error-notice';
+import { IssueInvoiceDialog } from '@/components/invoice-dialogs';
+import { BookingInvoiceRows } from '@/components/invoice-list';
 import { FormField } from '@/components/form-field';
 import { Segmented } from '@/components/segmented';
 import { Button } from '@/components/ui/button';
@@ -27,6 +30,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   useAddCharge,
   useFolio,
+  useGuest,
+  useInvoices,
   usePricing,
   useRecordPayment,
   useRemoveCharge,
@@ -41,6 +46,7 @@ import {
 } from '@/lib/billing';
 import { currencyMark, formatDate, formatMoney, paymentMethodLabels } from '@/lib/format';
 import { INLINE_EDITOR } from '@/lib/inline-edit';
+import { buyerFromGuest } from '@/lib/invoices';
 import { cn } from '@/lib/utils';
 
 const methods: { value: PaymentMethod; label: string }[] = [
@@ -139,6 +145,8 @@ export function BookingBill({ booking }: { booking: Booking }) {
 
       {bill.vat.length > 0 && <VatRecap folio={bill} />}
 
+      <Documents booking={booking} folio={bill} />
+
       <Dialog open={paying} onOpenChange={setPaying}>
         <DialogContent className="shadow-floating sm:max-w-sm">
           {paying && (
@@ -152,6 +160,55 @@ export function BookingBill({ booking }: { booking: Booking }) {
           )}
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/**
+ * Invoices and receipts issued for the bill, and buttons to issue one: an invoice while something
+ * is owed, a receipt once something was paid.
+ */
+function Documents({ booking, folio }: { booking: Booking; folio: Folio }) {
+  const invoices = useInvoices({ bookingId: booking.id });
+  const guest = useGuest(booking.guestId).data;
+  const [issuing, setIssuing] = useState<InvoiceKind | null>(null);
+  const current = (kind: InvoiceKind) =>
+    invoices.data?.some((i) => i.kind === kind && i.status === 'issued') ?? false;
+  const billable = booking.status !== 'hold' && folio.charged > 0;
+  const canInvoice = billable && !current('invoice');
+  const canReceipt = billable && folio.paid > 0 && !current('receipt');
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="flex h-7 items-center justify-between gap-2">
+        <h3 className="text-xs font-medium text-muted-foreground">Invoices</h3>
+        <span className="flex gap-1">
+          {canInvoice && (
+            <Button
+              variant={folio.balance > 0 ? 'outline' : 'ghost'}
+              size="xs"
+              onClick={() => setIssuing('invoice')}
+            >
+              <Plus /> Invoice
+            </Button>
+          )}
+          {canReceipt && (
+            <Button variant="ghost" size="xs" onClick={() => setIssuing('receipt')}>
+              <Plus /> Receipt
+            </Button>
+          )}
+        </span>
+      </div>
+      {invoices.data && invoices.data.length > 0 ? (
+        <BookingInvoiceRows invoices={invoices.data} />
+      ) : (
+        <p className="text-muted-foreground">None issued yet.</p>
+      )}
+      <IssueInvoiceDialog
+        bookingId={booking.id}
+        kind={issuing}
+        buyer={buyerFromGuest(guest ?? { name: '', email: null })}
+        onClose={() => setIssuing(null)}
+      />
     </div>
   );
 }

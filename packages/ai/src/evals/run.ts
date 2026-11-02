@@ -25,8 +25,10 @@ import { fileNote } from '../knowledge';
 import { draftRepairReply, draftWorkOrder, readTrade } from '../repairs';
 import { createRateReviewer } from '../revenue-review';
 import { readStayNotes } from '../stay-notes';
+import { readSupplierInvoice } from '../supplier-invoice';
 import { agentFixtures, buildAgentEvalHotel } from './agent';
 import { evalRoomNames, housekeepingNoteFixtures } from './housekeeping-notes';
+import { billFixtures, scoreBillReading } from './bills';
 import { idDocumentFixtures } from './id-documents';
 import { buildKnowledgeFixtures, evalNotes, scoreFiledNote } from './knowledge';
 import { arrivalNoteHotel, buildArrivalNoteFixtures, scoreArrivalNote } from './arrival-notes';
@@ -79,6 +81,7 @@ const suiteKeys = [
   'notes',
   'stays',
   'ids',
+  'bills',
   'knowledge',
   'trades',
   'agent',
@@ -276,6 +279,32 @@ const idsOk = vision
       })),
     )
   : (console.log('\nID scans skipped: set META_MODEL_VISION to run them.'), true);
+
+const billEffort = reasoning ?? reasoningEffort.supplierInvoice;
+const billsOk = await suite(
+  'bills',
+  'Supplier bills from PDF text',
+  billEffort,
+  META_MODEL_AGENT,
+  billFixtures.map((f) => ({
+    id: f.id,
+    run: async () => {
+      const { reading, tokens } = await readSupplierInvoice(
+        provider.agent,
+        { kind: 'text', text: f.text },
+        billEffort,
+      );
+      const problems = scoreBillReading(f.expected, reading);
+      return {
+        passed: problems.length === 0,
+        label: problems.join(', '),
+        detail: `      expected ${JSON.stringify(f.expected)}
+      actual   ${JSON.stringify(reading)}`,
+        tokens,
+      };
+    },
+  })),
+);
 
 const knowledgeEffort = reasoning ?? reasoningEffort.knowledge;
 const knowledgeOk = await suite(
@@ -605,6 +634,7 @@ process.exit(
     notesOk &&
     staysOk &&
     idsOk &&
+    billsOk &&
     knowledgeOk &&
     tradesOk &&
     agentOk &&

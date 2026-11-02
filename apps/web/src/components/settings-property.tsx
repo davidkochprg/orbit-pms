@@ -12,7 +12,10 @@ interface Props {
   onChange: (profile: HotelProfile) => void;
 }
 
-/** Name, description, country and language, contact details and check-in/out times. */
+/**
+ * Name, description, country and language, contact details, check-in/out times and what invoices
+ * say about the hotel.
+ */
 /** Every half hour of the day, plus `current` when it falls between. */
 function timeOptions(current: string): string[] {
   const slots = Array.from(
@@ -26,6 +29,10 @@ export function PropertySettings({ profile, onChange }: Props) {
   const set = <K extends keyof HotelProfile>(key: K, value: HotelProfile[K]) =>
     onChange({ ...profile, [key]: value });
   const optional = (value: string) => (value.trim() === '' ? null : value);
+  const setBilling = <K extends keyof HotelProfile['billing']>(
+    key: K,
+    value: HotelProfile['billing'][K],
+  ) => set('billing', { ...profile.billing, [key]: value });
   /** Clearing either field turns the forecast off. */
   const setCoordinate = (key: 'latitude' | 'longitude', raw: string) => {
     if (raw.trim() === '') return set('coordinates', null);
@@ -176,6 +183,63 @@ export function PropertySettings({ profile, onChange }: Props) {
               onChange={(e) => set('website', optional(e.target.value))}
             />
           </FormField>
+        </div>
+      </Section>
+
+      <Section title="Invoices">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <FormField label="Business name" htmlFor="legal-name">
+            <Input
+              id="legal-name"
+              placeholder={profile.name}
+              value={profile.billing.legalName ?? ''}
+              onChange={(e) => setBilling('legalName', optional(e.target.value))}
+            />
+          </FormField>
+          <FormField label="Tax ID" htmlFor="tax-id">
+            <Input
+              id="tax-id"
+              value={profile.billing.taxId ?? ''}
+              onChange={(e) => setBilling('taxId', optional(e.target.value))}
+              className="font-mono"
+            />
+          </FormField>
+          <FormField label="Registered address" htmlFor="billing-address">
+            <Textarea
+              id="billing-address"
+              rows={3}
+              placeholder={profile.location}
+              value={profile.billing.address ?? ''}
+              onChange={(e) => setBilling('address', optional(e.target.value))}
+            />
+          </FormField>
+          <div className="flex flex-col gap-4">
+            <FormField label="Bank account for transfers" htmlFor="bank-account">
+              <Input
+                id="bank-account"
+                value={profile.billing.bankAccount ?? ''}
+                onChange={(e) => setBilling('bankAccount', optional(e.target.value))}
+                className="font-mono"
+              />
+            </FormField>
+            <FormField label="Days to pay an invoice" htmlFor="payment-term">
+              <Input
+                id="payment-term"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={90}
+                value={profile.billing.paymentTermDays}
+                onChange={(e) => {
+                  const days = Number(e.target.value);
+                  if (Number.isInteger(days) && days >= 0 && days <= 90) {
+                    setBilling('paymentTermDays', days);
+                  }
+                }}
+                className="w-24 tabular-nums"
+              />
+            </FormField>
+          </div>
         </div>
       </Section>
     </div>

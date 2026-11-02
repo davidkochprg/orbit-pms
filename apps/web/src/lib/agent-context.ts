@@ -18,6 +18,8 @@ export function contextFromLocation(pathname: string, search: string): AgentCont
   if (repair) return { kind: 'repair', id: repair };
   const contact = pathname === '/contacts' && params.get('contact');
   if (contact) return { kind: 'contact', id: contact };
+  const bill = pathname === '/invoices' && params.get('bill');
+  if (bill) return { kind: 'bill', id: bill };
   const note = pathname === '/knowledge' && params.get('note');
   if (note) return { kind: 'note', id: note };
   return null;

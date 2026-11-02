@@ -13,6 +13,9 @@ import type {
   IdScan,
   InboxMessage,
   Inquiry,
+  Invoice,
+  InvoiceFilter,
+  InvoiceScan,
   IsoDate,
   LocalEvent,
   MailDraft,
@@ -28,6 +31,8 @@ import type {
   SavedStayReading,
   StaffMember,
   StayGuest,
+  SupplierInvoice,
+  SupplierInvoiceStatus,
 } from '@orbit/shared';
 
 export interface BookingFilter {
@@ -243,6 +248,40 @@ export interface ContactRepository {
   delete(id: string): Promise<void>;
 }
 
+/** Invoices and receipts issued for bookings' bills. */
+export interface InvoiceRepository {
+  /** Newest first. */
+  list(filter?: InvoiceFilter): Promise<Invoice[]>;
+  get(id: string): Promise<Invoice | null>;
+  create(invoice: Invoice): Promise<void>;
+  /** Replaces a stored invoice, e.g. to void it. */
+  update(invoice: Invoice): Promise<void>;
+  /**
+   * The highest number used so far in a series ("INV-2026-"), 0 for none. In a transaction the
+   * series stays locked until it ends, so two documents never get the same number.
+   */
+  lastSequence(series: string): Promise<number>;
+}
+
+/** Bills from suppliers and contractors. */
+export interface SupplierInvoiceRepository {
+  /** Newest first. */
+  list(filter?: { status?: SupplierInvoiceStatus[] }): Promise<SupplierInvoice[]>;
+  get(id: string): Promise<SupplierInvoice | null>;
+  /** Creates or replaces a bill. */
+  save(invoice: SupplierInvoice): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+
+/** Open links for photographing a bill with a phone. */
+export interface InvoiceScanRepository {
+  get(id: string): Promise<InvoiceScan | null>;
+  /** Creates or replaces a scan. */
+  save(scan: InvoiceScan): Promise<void>;
+  /** Removes scans that expired at or before `now` (ISO datetime). */
+  deleteExpired(now: string): Promise<void>;
+}
+
 export interface Repositories {
   rooms: RoomRepository;
   bookings: BookingRepository;
@@ -262,6 +301,9 @@ export interface Repositories {
   rateReview: RateReviewRepository;
   contacts: ContactRepository;
   mail: MailRepository;
+  invoices: InvoiceRepository;
+  supplierInvoices: SupplierInvoiceRepository;
+  invoiceScans: InvoiceScanRepository;
   /** Runs `fn` atomically; repositories passed to it share one transaction. */
   transaction<T>(fn: (repos: Repositories) => Promise<T>): Promise<T>;
 }

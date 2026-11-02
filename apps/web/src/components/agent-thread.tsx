@@ -12,6 +12,7 @@ import {
   CircleAlert,
   DoorOpen,
   FilePen,
+  FileText,
   History,
   IdCard,
   LogIn,
@@ -20,6 +21,7 @@ import {
   Mail,
   PartyPopper,
   Receipt,
+  ReceiptText,
   Search,
   Sun,
   Wrench,
@@ -98,6 +100,16 @@ const toolIcons: Record<string, LucideIcon> = {
   updateRoom: DoorOpen,
   getRateOutlook: ChartColumn,
   adjustRates: ChartColumn,
+  listInvoices: FileText,
+  issueInvoice: FileText,
+  voidInvoice: FileText,
+  emailInvoice: FileText,
+  listBills: ReceiptText,
+  addBill: ReceiptText,
+  updateBill: ReceiptText,
+  payBill: ReceiptText,
+  removeBill: ReceiptText,
+  readBillAttachment: ReceiptText,
 };
 
 const isDone = (p: ToolPart) => p.state === 'output-available' || p.state === 'output-error';

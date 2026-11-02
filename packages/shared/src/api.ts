@@ -97,6 +97,7 @@ export const agentContextKinds = [
   'night',
   'tape_chart',
   'report',
+  'bill',
 ] as const;
 
 /**

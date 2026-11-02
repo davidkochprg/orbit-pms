@@ -4,6 +4,7 @@ import { createBillingService } from './billing';
 import { createContactService } from './contacts';
 import { createGuestService } from './guests';
 import { createInboxService } from './inbox-service';
+import { createInvoiceService } from './invoices';
 import { createPendingActionService } from './pending-actions';
 import { hotelPolicy } from './policy';
 import { pricingConfig } from './pricing';
@@ -12,6 +13,7 @@ import { createSettingsService } from './settings';
 import { createRegistrationService } from './registration';
 import { createRevenueService } from './revenue-service';
 import { createHotelService } from './service';
+import { createSupplierInvoiceService } from './supplier-invoices';
 import { booking, czechProfile, double, plumber, room } from './test-fixtures';
 import { conversation, createMemoryRepositories } from './testing';
 
@@ -125,10 +127,30 @@ function setup() {
     newId,
   });
   const guests = createGuestService({ repos, newId });
+  const inbox = createInboxService({ repos, hotel, clock: () => now, newId });
+  const invoices = createInvoiceService({
+    repos,
+    pricing: pricingConfig,
+    inbox,
+    renderPdf: (invoice) =>
+      Promise.resolve(Uint8Array.from(invoice.number, (c) => c.charCodeAt(0))),
+    clock: () => now,
+    newId,
+  });
+  const bills = createSupplierInvoiceService({
+    repos,
+    pricing: pricingConfig,
+    scanMinutes: 15,
+    clock: () => now,
+    newId,
+    newToken: () => newId('tok'),
+  });
   return {
     repos,
     hotel,
     billing,
+    invoices,
+    bills,
     actions: createPendingActionService({
       repos,
       rates: createRatesService({ repos, defaults: pricingConfig, newId }),
@@ -137,9 +159,12 @@ function setup() {
       registrations,
       guests,
       settings: createSettingsService({ repos, clock: () => now }),
-      inbox: createInboxService({ repos, hotel, clock: () => now, newId }),
+      inbox,
       events: createRevenueService({ repos, defaults: pricingConfig, clock: () => now, newId }),
       contacts: createContactService({ repos, clock: () => now, newId }),
+      invoices,
+      bills,
+      readBill: null,
       clock: () => now,
       newId,
     }),
@@ -916,5 +941,63 @@ describe('pending actions', () => {
     await expect(
       actions.propose({ kind: 'update_room', input: { roomId: 'rm_2', name: '2B' } }),
     ).rejects.toMatchObject({ code: 'invalid_input' });
+  });
+});
+
+describe('invoices and bills from the agent', () => {
+  it('proposes an invoice with its number and what is to pay, and issues it on confirm', async () => {
+    const { repos, actions, billing } = setup();
+    const bookingId = 'bk_a';
+    await billing.addCharge(
+      bookingId,
+      { label: 'Sauna', quantity: 1, unitPrice: 300, vatBracket: 'standard' },
+      'user',
+    );
+    const action = await actions.propose({
+      kind: 'issue_invoice',
+      input: { bookingId, kind: 'invoice', buyer: null, note: null },
+    });
+    expect(action.summary).toMatch(/^Issue invoice INV-2026-0001 to .+ for /);
+    expect(action.details?.changes[0]).toEqual({
+      label: 'Invoice',
+      before: null,
+      after: { text: 'INV-2026-0001' },
+    });
+    expect(repos.state.invoices).toHaveLength(0);
+    await actions.confirm(action.id);
+    expect(repos.state.invoices).toMatchObject([{ number: 'INV-2026-0001', bookingId }]);
+  });
+
+  it('proposes paying a bill and marks it paid on confirm', async () => {
+    const { repos, actions, bills } = setup();
+    const bill = await bills.create(
+      {
+        contactId: null,
+        supplierName: 'Test Supplies',
+        supplierTaxId: null,
+        number: 'A-7',
+        issuedOn: null,
+        dueOn: null,
+        total: 500,
+        tax: null,
+        bankAccount: null,
+        paymentReference: null,
+        taskId: null,
+        note: null,
+      },
+      'user',
+    );
+    const action = await actions.propose({
+      kind: 'pay_supplier_invoice',
+      input: { supplierInvoiceId: bill.id, method: 'bank_transfer', paidOn: null },
+    });
+    expect(action.summary).toMatch(
+      /^Mark the bill from Test Supplies \(A-7\) paid: .+ by bank transfer/,
+    );
+    await actions.confirm(action.id);
+    expect(repos.state.supplierInvoices[0]).toMatchObject({
+      status: 'paid',
+      paidMethod: 'bank_transfer',
+    });
   });
 });

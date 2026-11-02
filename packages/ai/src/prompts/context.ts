@@ -57,6 +57,17 @@ export type ContextSubject =
       phone: string | null;
     }
   | { kind: 'note'; title: string; folder: string; until: IsoDate | null }
+  | {
+      kind: 'bill';
+      billId: string;
+      supplierName: string;
+      number: string | null;
+      /** The total, formatted in the hotel's currency. */
+      total: string;
+      status: 'to_review' | 'unpaid' | 'paid';
+      dueOn: IsoDate | null;
+      repair: string | null;
+    }
   | { kind: 'night'; date: IsoDate }
   | { kind: 'tape_chart' | 'report'; from: IsoDate; to: IsoDate };
 
@@ -135,6 +146,16 @@ export function contextNote(subject: ContextSubject): string {
       const trades = subject.trades.length > 0 ? ` (${subject.trades.join(', ')})` : '';
       const reach = [subject.email, subject.phone].filter(Boolean).join(', ');
       return `The staff member is looking at the contact ${subject.contactId}: ${subject.name}${trades}${reach ? `, ${reach}` : ''}.`;
+    }
+    case 'bill': {
+      const state = {
+        to_review: 'read by Orbit and not checked yet',
+        unpaid: subject.dueOn ? `to pay by ${subject.dueOn}` : 'to pay',
+        paid: 'paid',
+      }[subject.status];
+      const number = subject.number ? ` (${subject.number})` : '';
+      const repair = subject.repair ? `, for the repair "${subject.repair}"` : '';
+      return `The staff member is looking at the bill ${subject.billId} from ${subject.supplierName}${number}: ${subject.total}, ${state}${repair}. Use supplierInvoiceId ${subject.billId}.`;
     }
     case 'note': {
       const until = subject.until ? `, a notice until ${subject.until}` : '';

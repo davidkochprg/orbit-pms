@@ -224,6 +224,29 @@ An unknown, expired or already saved scan is `not_found`.
 - `previewCharge` / `previewPayment` run the same checks without saving and return the balance after, for agent proposals.
 - Audited on the booking as `folio.charge`, `folio.update_charge` (with the changed fields), `folio.remove_charge`, `folio.payment` and `folio.refund`.
 
+## Invoices and receipts
+
+`createInvoiceService` (`invoices.ts`) issues documents for a booking's bill ([ADR 0027](decisions/0027-invoices-and-supplier-bills.md)). `buildInvoice` copies the folio (its lines, with `isTax` for the lines a tax adds on top, the tax recap, payments, `total = charged`, `paid`, `due = balance`), the stay and room, the seller from the profile's billing details (`issuerFrom`: the business name or else the hotel's, the registered address or else the location, tax ID, bank account, email, phone, website) and the buyer into an `Invoice` that never changes.
+
+- **Kinds**: an `invoice` is due `billing.paymentTermDays` (14 by default) after it is issued, with the number's digits as `paymentReference` (`INV-2026-0007` → `20260007`); a `receipt` has neither.
+- **Numbers**: `INV-<year>-0001` and `RCT-<year>-0001`, a series per kind and year without gaps. `issue` takes the next number in a transaction where `lastSequence` locks the series (an advisory lock), so two documents can't get the same one.
+- **Rules** (`assertCanIssue`): not for a hold (`invalid_transition`), not for an empty bill, a receipt only once something was paid (`invalid_input`), and one current document of each kind per stay (`conflict`, naming it).
+- **Buyer**: the guest's name, email and registered address by default; or a company with its address and tax ID, and the guest as the person it is for.
+- **Void**: `void(id, { reason, reissue, buyer })` marks it `void` with the date and reason, keeping its number; with `reissue` it issues a new one of the same kind from the bill as it stands, for the same buyer unless another is given, and records it as `replacedBy`. A void document can't be voided or emailed again.
+- **How it stands** (`viewInvoice`, worked out when read): `settled` once the bill's balance is zero or less, `overdue` for an unsettled invoice past its due date, `outdated` when the bill's lines or total changed since it was issued.
+- **Email**: `email(id, { to, subject, body })` renders the PDF (the API's `renderPdf`, injected), keeps it with the mailbox's files and sends it in a new conversation linked to the booking (`InboxService.sendBookingEmail`), to the buyer unless another address is given.
+- Audited on the booking as `invoice.issue`, `invoice.void` and `invoice.email`. `previewIssue`, `previewVoid` and `previewEmail` run the same checks for agent proposals.
+
+## Supplier bills
+
+`createSupplierInvoiceService` (`supplier-invoices.ts`) keeps the bills suppliers and contractors send. A bill is `to_review` when Orbit read it and nobody checked it yet, `unpaid` once checked (or typed in), and `paid` with the date and method.
+
+- **Reading** (`fromReading`): the API reads a PDF's text or a photo with the model; `checkSupplierReading` turns the reading into a bill to check. Amounts are rounded to whole units (a warning says so when cents were dropped); dates must be real days and a due date before the issue date is dropped; the contact is matched by the email that sent it or the email printed on it, else by a name that fits exactly one contact (`matchContact`); the bill is linked to that contact's newest repair, open ones first (`repairFor`). Warnings: no supplier, no total, another currency than the hotel's, a bill with the same number from the same supplier already in the list. A reading that found no bill is `invalid_input`. The file is kept with the mailbox's files, or the email's own attachment is used.
+- `create` takes a bill typed in, already checked. `update` corrects fields; `checked: true` moves a bill to check to the bills to pay and clears its warnings. The contact and repair must exist; a due date can't be before the issue date. `pay` records the method and date (today by default, not in the future); a paid bill can't be paid again (`invalid_transition`). `remove` deletes it.
+- **Views** (`viewSupplierInvoice`): the contact's name, the repair as "Bathroom tap is dripping · Room 203", and `overdue` for an unpaid bill past its due date. `due()` lists bills to check, overdue bills and bills due within a week.
+- **Phone scans**: `startScan` opens a link like an ID scan (an unguessable token, 15 minutes); `beginScan`, `completeScan` (with the bill it became) and `failScan` follow the photo; a read running over 90 seconds counts as failed.
+- Audited on the bill as `supplier_invoice.read`, `.create`, `.update`, `.pay` and `.remove`.
+
 ## Reports
 
 `buildReport({ from, to }, data)` (`reports.ts`) measures the nights `[from, to)`, at most 366. `createReportService` loads the data for it.

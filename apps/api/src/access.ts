@@ -10,8 +10,12 @@ const COOKIE_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 const MAX_FAILED_ATTEMPTS = 10;
 const ATTEMPT_WINDOW_MS = 15 * 60 * 1000;
 
-/** Paths that stay open: the code check itself, and the phone scan page, keyed by its scan ID. */
-const openPaths = [/^\/api\/access$/, /^\/api\/scan\/[^/]+(\/photo)?$/];
+/** Paths that stay open: the code check itself, and the phone scan pages, keyed by their scan ID. */
+const openPaths = [
+  /^\/api\/access$/,
+  /^\/api\/scan\/[^/]+(\/photo)?$/,
+  /^\/api\/bill-scan\/[^/]+(\/photo)?$/,
+];
 
 function sameSecret(a: string, b: string) {
   const digest = (s: string) => createHash('sha256').update(s).digest();

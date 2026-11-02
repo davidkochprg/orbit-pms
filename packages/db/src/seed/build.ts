@@ -19,6 +19,7 @@ import type {
   Inquiry,
   IsoDate,
   LocalEvent,
+  Invoice,
   MailDraft,
   MailLabel,
   Payment,
@@ -27,9 +28,11 @@ import type {
   Room,
   RoomType,
   StaffMember,
+  SupplierInvoice,
 } from '@orbit/shared';
 import { buildActivity } from './activity';
 import { buildBilling } from './billing';
+import { buildInvoices } from './invoices';
 import { seedGuests, seedRooms } from './catalog';
 import { buildContacts } from './contacts';
 import { buildConversations } from './conversations';
@@ -62,6 +65,8 @@ export interface SeedData {
   labels: MailLabel[];
   drafts: MailDraft[];
   files: SeedFile[];
+  invoices: Invoice[];
+  supplierInvoices: SupplierInvoice[];
 }
 
 /** Share of rooms the seed books for the biggest event, leaving a few free for inbox requests. */
@@ -376,6 +381,20 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
           ),
         ]
       : [];
+  const invoicing = buildInvoices({
+    region,
+    bookings: linked,
+    guests,
+    rooms,
+    charges: billing.charges,
+    payments: billing.payments,
+    pricing,
+    profile: hotelProfile,
+    contacts,
+    tasks: housekeepingTasks,
+    today,
+    now,
+  });
   return {
     roomTypes: seedRoomTypes,
     rooms,
@@ -386,6 +405,7 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
       ...buildConversations(linked, guests, staff, hotelProfile, today, now),
       ...mail.inquiries,
       ...repairMail,
+      ...invoicing.inquiries,
     ],
     housekeepingTasks,
     hotelProfile,
@@ -398,7 +418,9 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
     contacts,
     labels: mail.labels,
     drafts: mail.drafts,
-    files: mail.files,
+    files: [...mail.files, ...invoicing.files],
+    invoices: invoicing.invoices,
+    supplierInvoices: invoicing.supplierInvoices,
   };
 }
 

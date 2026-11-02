@@ -8,6 +8,13 @@ export const czechHotelProfile: HotelProfile = {
   country: 'CZ',
   language: 'cs',
   coordinates: { latitude: 50.82, longitude: 15.25 },
+  billing: {
+    legalName: 'Orbit Demo Penzion s.r.o.',
+    address: 'Horská 1\n460 01 Liberec\nCzech Republic',
+    taxId: 'CZ12345678',
+    bankAccount: 'CZ65 0800 0000 1920 0014 5399',
+    paymentTermDays: 14,
+  },
   name: 'Orbit Demo Penzion',
   location: 'Jizera Mountains, Czech Republic',
   description:
@@ -150,6 +157,13 @@ export const usHotelProfile: HotelProfile = {
   country: 'US',
   language: 'en',
   coordinates: { latitude: 37.65, longitude: -118.97 },
+  billing: {
+    legalName: 'Orbit Demo Lodge LLC',
+    address: '100 Example Road\nMammoth Lakes, CA 93546\nUnited States',
+    taxId: '12-3456789',
+    bankAccount: 'Routing 000000000 · Account 0001234567',
+    paymentTermDays: 14,
+  },
   name: 'Orbit Demo Lodge',
   location: 'Sierra Nevada, California',
   description:

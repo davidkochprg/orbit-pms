@@ -659,6 +659,42 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
     },
 
     /**
+     * An email about a booking with files attached, e.g. an invoice: a new conversation linked to
+     * the booking, so the booking lists it.
+     */
+    async sendBookingEmail(
+      bookingId: string,
+      email: { to: Recipient; subject: string; body: string; attachmentIds: string[] },
+      author: string | null,
+      actor: AuditActor,
+    ): Promise<Inquiry> {
+      return repos.transaction(async (tx) => {
+        if (!(await tx.bookings.getBooking(bookingId))) {
+          throw new DomainError('not_found', `Booking ${bookingId} not found`);
+        }
+        const id = newId('inq');
+        const msg = message(id, 'out', email.body, author, {
+          to: [email.to],
+          attachments: await attachmentsFor(tx, email.attachmentIds),
+        });
+        const inquiry = startedByHotel(
+          id,
+          msg,
+          { subject: email.subject.trim(), name: email.to.name, address: email.to.address },
+          { bookingId, taskId: null },
+        );
+        await tx.inquiries.createInquiry(inquiry);
+        await tx.audit.append({
+          actor,
+          action: 'inquiry.booking_email',
+          subjectId: id,
+          payload: { bookingId, messageId: msg.id },
+        });
+        return inquiry;
+      });
+    },
+
+    /**
      * The email asking a contractor to fix a repair: a new conversation linked to the repair, so
      * the repair lists it and the contractor's answer opens the repair. The contractor counts as
      * asked, as with a call.

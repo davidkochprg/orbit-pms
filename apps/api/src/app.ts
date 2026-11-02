@@ -13,6 +13,7 @@ import {
   createRateReviewer,
   createRevenueBriefWriter,
   createIdScanReader,
+  createSupplierInvoiceReader,
   createInboxPipeline,
   createRequestReader,
   createTranslator,
@@ -32,6 +33,8 @@ import {
   createRevenueService,
   createIdScanService,
   createInboxService,
+  createInvoiceService,
+  createSupplierInvoiceService,
   createPendingActionService,
   createRatesService,
   createReportService,
@@ -52,6 +55,8 @@ import type { Health } from '@orbit/shared';
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { createDemoAccess } from './access';
+import { createBillReader } from './bills';
+import { renderInvoicePdf } from './pdf/invoice-pdf';
 import { errorBody, handleError } from './http';
 import { activityRoutes } from './routes/activity';
 import { arrivalNoteRoutes, createArrivalNoteDrafter } from './routes/arrival-notes';
@@ -65,6 +70,8 @@ import { revenueRoutes } from './routes/revenue';
 import type { WeatherSource } from './weather';
 import { idScanRoutes } from './routes/id-scans';
 import { inboxRoutes } from './routes/inbox';
+import { invoiceRoutes } from './routes/invoices';
+import { supplierInvoiceRoutes } from './routes/supplier-invoices';
 import { overviewRoutes } from './routes/overview';
 import { pendingActionRoutes } from './routes/pending-actions';
 import { knockOnRoutes } from './routes/knock-ons';
@@ -122,6 +129,35 @@ export function createApp({
   const revenue = createRevenueService({ repos, defaults: pricingConfig, clock, newId });
   const activity = createActivityService({ repos });
   const contacts = createContactService({ repos, clock, newId });
+  const invoices = createInvoiceService({
+    repos,
+    pricing: pricingConfig,
+    inbox,
+    renderPdf: renderInvoicePdf,
+    clock,
+    newId,
+  });
+  const bills = createSupplierInvoiceService({
+    repos,
+    pricing: pricingConfig,
+    scanMinutes: hotelPolicy.idScanMinutes,
+    clock,
+    newId,
+    newToken: newScanToken,
+  });
+  const billReader =
+    ai &&
+    createBillReader(
+      createSupplierInvoiceReader({
+        model: ai.agent,
+        modelId: ai.agentModelId,
+        vision: ai.vision ?? null,
+        visionModelId: ai.visionModelId ?? null,
+        usage,
+      }),
+      bills,
+      { mailbox, inbox },
+    );
   const actions = createPendingActionService({
     repos,
     rates,
@@ -133,6 +169,11 @@ export function createApp({
     inbox,
     events: revenue,
     contacts,
+    invoices,
+    bills,
+    readBill:
+      billReader &&
+      ((attachmentId, inquiryId) => billReader.readAttachment(attachmentId, inquiryId, 'agent')),
     clock,
     newId,
   });
@@ -257,6 +298,8 @@ export function createApp({
     ),
   );
   app.route('/api', billingRoutes(billing));
+  app.route('/api', invoiceRoutes({ invoices, identify: (id) => staff.identify(id) }));
+  app.route('/api', supplierInvoiceRoutes({ bills, reader: billReader }));
   app.route(
     '/api',
     reportRoutes({
@@ -352,6 +395,8 @@ export function createApp({
       arrivalNotesDue: (date) => arrivalNotes.due(date),
       // The agent asked about the guest: worth a reading if the history changed.
       guestMemory: remember,
+      invoices,
+      bills,
       // The agent's drafts are signed by the reception; the confirming staff member sends them.
       draftArrivalNote: draftArrivalNote && ((bookingId) => draftArrivalNote(bookingId, null)),
       draftWorkOrder:

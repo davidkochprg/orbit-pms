@@ -19,6 +19,7 @@ export const reasoningEffort = {
   guestMemory: 'minimal',
   rateReview: 'high',
   idScan: 'minimal',
+  supplierInvoice: 'minimal',
   translate: 'minimal',
   learn: 'minimal',
   knowledge: 'minimal',

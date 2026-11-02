@@ -11,6 +11,8 @@ import { GuestsPage } from '@/pages/guests';
 import { InboxPage } from '@/pages/inbox';
 import { HousekeepingPage } from '@/pages/housekeeping';
 import { ScanPage } from '@/pages/scan';
+import { BillScanPage } from '@/pages/bill-scan';
+import { InvoicesPage } from '@/pages/invoices';
 import { RatesPage } from '@/pages/rates';
 import { RoomsPage } from '@/pages/rooms';
 import { NotFoundPage } from '@/pages/sections';
@@ -22,6 +24,7 @@ import { WelcomePage } from '@/pages/welcome';
 export const router = createBrowserRouter([
   // Opened on a phone from the desk's QR code: no sign-in, no access code, no app chrome.
   { path: 'scan/:id', element: <ScanPage /> },
+  { path: 'bill-scan/:id', element: <BillScanPage /> },
   {
     element: <AccessGate />,
     children: [
@@ -47,6 +50,7 @@ export const router = createBrowserRouter([
               { path: 'activity', element: <ActivityPage /> },
               { path: 'knowledge', element: <KnowledgePage /> },
               { path: 'contacts', element: <ContactsPage /> },
+              { path: 'invoices', element: <InvoicesPage /> },
               { path: 'settings/:section?', element: <SettingsPage /> },
               { path: '*', element: <NotFoundPage /> },
             ],

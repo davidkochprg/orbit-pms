@@ -2,6 +2,8 @@ import {
   addDays,
   createActivityService,
   createInboxService,
+  createSupplierInvoiceService,
+  createInvoiceService,
   createBillingService,
   createContactService,
   createGuestService,
@@ -248,6 +250,70 @@ export function buildAgentEvalHotel(today: IsoDate) {
         postedOn: today,
         createdAt: now.toISOString(),
       })),
+      payments: [
+        {
+          id: 'pay_anna',
+          bookingId: 'bk_anna',
+          kind: 'payment',
+          method: 'card',
+          amount: 300,
+          note: 'Deposit',
+          paidOn: addDays(today, -1),
+          createdAt: now.toISOString(),
+        },
+      ],
+      supplierInvoices: [
+        {
+          id: 'sinv_plumbing',
+          status: 'to_review',
+          contactId: 'ct_plumbing',
+          supplierName: 'Example Plumbing',
+          supplierTaxId: null,
+          number: 'EP-118',
+          issuedOn: today,
+          dueOn: addDays(today, 14),
+          currency: 'USD',
+          total: 385,
+          tax: null,
+          lines: [{ label: 'Replace tap cartridge', amount: 385 }],
+          bankAccount: null,
+          paymentReference: null,
+          taskId: 'hk_tap',
+          note: null,
+          file: null,
+          source: 'upload',
+          inquiryId: null,
+          warnings: [],
+          paidOn: null,
+          paidMethod: null,
+          createdAt: now.toISOString(),
+        },
+        {
+          id: 'sinv_electric',
+          status: 'unpaid',
+          contactId: 'ct_electric',
+          supplierName: 'Example Electric',
+          supplierTaxId: null,
+          number: 'EE-2207',
+          issuedOn: addDays(today, -10),
+          dueOn: addDays(today, 4),
+          currency: 'USD',
+          total: 240,
+          tax: null,
+          lines: [{ label: 'Replace breaker', amount: 240 }],
+          bankAccount: null,
+          paymentReference: null,
+          taskId: null,
+          note: null,
+          file: null,
+          source: 'manual',
+          inquiryId: null,
+          warnings: [],
+          paidOn: null,
+          paidMethod: null,
+          createdAt: now.toISOString(),
+        },
+      ],
     },
     clock,
   );
@@ -265,6 +331,23 @@ export function buildAgentEvalHotel(today: IsoDate) {
   const inbox = createInboxService({ repos, hotel, clock, newId });
   const revenue = createRevenueService({ repos, defaults: usDemoPricing, clock, newId });
   const contacts = createContactService({ repos, clock, newId });
+  const invoices = createInvoiceService({
+    repos,
+    pricing: usDemoPricing,
+    inbox,
+    renderPdf: (invoice) =>
+      Promise.resolve(Uint8Array.from(invoice.number, (c) => c.charCodeAt(0))),
+    clock,
+    newId,
+  });
+  const bills = createSupplierInvoiceService({
+    repos,
+    pricing: usDemoPricing,
+    scanMinutes: 15,
+    clock,
+    newId,
+    newToken: () => newId('tok'),
+  });
   const actions = createPendingActionService({
     repos,
     rates: createRatesService({ repos, defaults: usDemoPricing, newId }),
@@ -276,6 +359,9 @@ export function buildAgentEvalHotel(today: IsoDate) {
     inbox,
     events: revenue,
     contacts,
+    invoices,
+    bills,
+    readBill: null,
     clock,
     newId,
   });
@@ -300,6 +386,8 @@ export function buildAgentEvalHotel(today: IsoDate) {
     statedAmounts: () => Promise.resolve([]),
     contacts,
     mailLabels: () => repos.mail.listLabels(),
+    invoices,
+    bills,
     // Repair emails are measured in their own suite; here the agent only passes one on.
     draftWorkOrder: () =>
       Promise.resolve({
@@ -471,6 +559,44 @@ export const agentFixtures: AgentFixture[] = [
         ? problems
         : [...problems, `to ${JSON.stringify(to)}`];
     },
+  },
+  {
+    id: 'invoice-company',
+    prompt:
+      'Anna Example needs an invoice for her stay made out to her company: Example Corp, 1 Test Street, Berlin, tax ID DE123456789.',
+    check: ({ hotel }) => {
+      const problems = proposed(hotel, 'issue_invoice', { bookingId: 'bk_anna', kind: 'invoice' });
+      const buyer = (
+        hotel.repos.state.pendingActions[0]?.input as { buyer?: Record<string, unknown> }
+      )?.buyer;
+      return buyer?.company === 'Example Corp' && buyer.taxId === 'DE123456789'
+        ? problems
+        : [...problems, `buyer ${JSON.stringify(buyer)}`];
+    },
+  },
+  {
+    id: 'receipt',
+    prompt: 'Give Anna Example a receipt for what she has paid.',
+    check: ({ hotel }) =>
+      proposed(hotel, 'issue_invoice', { bookingId: 'bk_anna', kind: 'receipt' }),
+  },
+  {
+    id: 'bills-to-check',
+    prompt: 'Which supplier bills still need checking?',
+    check: ({ hotel, calls, answer }) => [
+      ...readOnly(hotel),
+      ...called(calls, 'listBills'),
+      ...mentions(answer, ['Example Plumbing']),
+    ],
+  },
+  {
+    id: 'pay-bill',
+    prompt: "We paid Example Electric's bill by bank transfer today.",
+    check: ({ hotel }) =>
+      proposed(hotel, 'pay_supplier_invoice', {
+        supplierInvoiceId: 'sinv_electric',
+        method: 'bank_transfer',
+      }),
   },
   {
     id: 'add-contact',

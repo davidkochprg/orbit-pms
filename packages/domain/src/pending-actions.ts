@@ -20,8 +20,15 @@ import type {
   RoomBody,
   StaffMember,
   StayGuestPatch,
+  SupplierInvoice,
+  SupplierInvoicePatch,
 } from '@orbit/shared';
-import { formatMoney, hotelInfoCategoryLabels, tradeLabels } from '@orbit/shared';
+import {
+  formatMoney,
+  hotelInfoCategoryLabels,
+  invoiceKindLabels,
+  tradeLabels,
+} from '@orbit/shared';
 import type { BillingService } from './billing';
 import { changedBookingFields } from './bookings';
 import { contactFromProposal, type ContactService } from './contacts';
@@ -29,12 +36,14 @@ import { hotelToday, nightsBetween } from './dates';
 import { DomainError } from './errors';
 import { assertUniqueGuestEmail, type GuestService } from './guests';
 import type { InboxService } from './inbox-service';
+import type { InvoiceService } from './invoices';
 import { adjustmentChanges, applyAdjustments, type RatesService } from './rates';
 import type { RegistrationService } from './registration';
 import type { Repositories } from './repositories';
 import type { RevenueService } from './revenue-service';
 import type { HotelService } from './service';
 import type { SettingsService } from './settings';
+import type { SupplierInvoiceService } from './supplier-invoices';
 
 export interface PendingActionDeps {
   repos: Repositories;
@@ -62,6 +71,24 @@ export interface PendingActionDeps {
   >;
   events: Pick<RevenueService, 'listEvents' | 'createEvent' | 'deleteEvent'>;
   contacts: Pick<ContactService, 'get' | 'create' | 'update' | 'remove' | 'repair'>;
+  invoices: Pick<
+    InvoiceService,
+    'previewIssue' | 'issue' | 'previewVoid' | 'void' | 'previewEmail' | 'email'
+  >;
+  bills: Pick<
+    SupplierInvoiceService,
+    | 'get'
+    | 'previewCreate'
+    | 'create'
+    | 'previewUpdate'
+    | 'update'
+    | 'previewPay'
+    | 'pay'
+    | 'previewRemove'
+    | 'remove'
+  >;
+  /** Reads an email's attached file as a bill to check; null when AI can't read bills. */
+  readBill: ((attachmentId: string, inquiryId: string | null) => Promise<SupplierInvoice>) | null;
   clock: () => Date;
   newId: (prefix: string) => string;
 }
@@ -167,6 +194,88 @@ const contactLabels: Record<(typeof contactFields)[number], string> = {
 function contactValue(c: ContactBody | Contact, key: (typeof contactFields)[number]) {
   if (key === 'trades') return c.trades.map((t) => tradeLabels[t]).join(', ');
   return c[key];
+}
+
+/** "Example Corp, attn. Anna Novák, 2 Test Street" for a confirm card. */
+function billingPartyText(p: {
+  name: string;
+  company: string | null;
+  address: string | null;
+  taxId: string | null;
+}): string {
+  return [
+    p.company ? `${p.company}, attn. ${p.name}` : p.name,
+    p.address?.replace(/\s*\n\s*/g, ', '),
+    p.taxId && `tax ID ${p.taxId}`,
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
+/** The rows a new bill shows on a confirm card. */
+function billRows(bill: SupplierInvoice): Change[] {
+  return [
+    added('From', text(bill.supplierName)),
+    ...(bill.number ? [added('Number', text(bill.number))] : []),
+    ...(bill.issuedOn ? [added('Issued', text(bill.issuedOn))] : []),
+    ...(bill.dueOn ? [added('Due', text(bill.dueOn))] : []),
+  ];
+}
+
+const billFieldLabels: Partial<Record<keyof SupplierInvoicePatch, string>> = {
+  supplierName: 'Supplier',
+  supplierTaxId: 'Tax ID',
+  number: 'Number',
+  issuedOn: 'Issued',
+  dueOn: 'Due',
+  total: 'Total',
+  tax: 'Tax',
+  bankAccount: 'Bank account',
+  paymentReference: 'Payment reference',
+  note: 'Note',
+};
+
+/** One row per field a correction changes, plus the move to the bills to pay when checked. */
+function billChanges(
+  before: SupplierInvoice,
+  after: SupplierInvoice,
+  patch: SupplierInvoicePatch,
+  money: Money,
+): Change[] {
+  const show = (b: SupplierInvoice, key: keyof typeof billFieldLabels): PendingValue | null => {
+    const value = b[key as keyof SupplierInvoice];
+    if (value === null || value === undefined) return null;
+    const v = value as string | number;
+    return text(typeof v === 'number' ? money(v) : v);
+  };
+  const rows = (Object.keys(billFieldLabels) as (keyof typeof billFieldLabels)[])
+    .filter(
+      (key) =>
+        key in patch &&
+        before[key as keyof SupplierInvoice] !== after[key as keyof SupplierInvoice],
+    )
+    .map((key) => changed(billFieldLabels[key]!, show(before, key), show(after, key)));
+  if (patch.contactId !== undefined && before.contactId !== after.contactId) {
+    rows.push(
+      changed(
+        'Contact',
+        before.contactId ? text(before.contactId) : null,
+        after.contactId ? text(after.contactId) : null,
+      ),
+    );
+  }
+  if (patch.taskId !== undefined && before.taskId !== after.taskId) {
+    rows.push(
+      changed(
+        'Repair',
+        before.taskId ? text(before.taskId) : null,
+        after.taskId ? text(after.taskId) : null,
+      ),
+    );
+  }
+  if (before.status !== after.status)
+    rows.push(changed('Status', text('To check'), text('To pay')));
+  return rows;
 }
 
 interface Description {
@@ -333,6 +442,9 @@ export function createPendingActionService({
   inbox,
   events,
   contacts,
+  invoices,
+  bills,
+  readBill,
   clock,
   newId,
 }: PendingActionDeps) {
@@ -798,6 +910,129 @@ export function createPendingActionService({
           details: details([removed('Contact', text(contact.name))]),
         };
       }
+      case 'issue_invoice': {
+        const { bookingId, ...body } = action.input;
+        const invoice = await invoices.previewIssue(bookingId, body);
+        const label = invoiceKindLabels[invoice.kind];
+        const to = invoice.buyer.company ?? invoice.buyer.name;
+        return {
+          summary: `Issue ${label.toLowerCase()} ${invoice.number} to ${to} for ${money(invoice.total)}${invoice.dueOn ? `, ${money(Math.max(invoice.due, 0))} due by ${invoice.dueOn}` : ''}`,
+          details: details(
+            [
+              added(label, text(invoice.number)),
+              added('Made out to', text(billingPartyText(invoice.buyer))),
+              ...(invoice.dueOn ? [added('Due', text(invoice.dueOn))] : []),
+              ...(invoice.note ? [added('Note', text(invoice.note))] : []),
+            ],
+            {
+              label: invoice.kind === 'invoice' ? 'To pay' : 'Total',
+              before: null,
+              after: invoice.kind === 'invoice' ? Math.max(invoice.due, 0) : invoice.total,
+            },
+          ),
+        };
+      }
+      case 'void_invoice': {
+        const { invoiceId, ...body } = action.input;
+        const { invoice, replacement } = await invoices.previewVoid(invoiceId, body);
+        return {
+          summary: `Void ${invoice.number}${replacement ? ` and issue ${replacement.number} in its place` : ''}: ${body.reason}`,
+          details: details(
+            [
+              changed(invoiceKindLabels[invoice.kind], text(invoice.number), text('Void')),
+              added('Reason', text(body.reason)),
+              ...(replacement
+                ? [
+                    added('New document', text(replacement.number)),
+                    added('Made out to', text(billingPartyText(replacement.buyer))),
+                  ]
+                : []),
+            ],
+            replacement
+              ? { label: 'Total', before: invoice.total, after: replacement.total }
+              : null,
+          ),
+        };
+      }
+      case 'email_invoice': {
+        const { invoiceId, ...body } = action.input;
+        const { invoice, to, subject } = await invoices.previewEmail(invoiceId, body);
+        return {
+          summary: `Email ${invoice.number} to ${to.name ?? to.address}: "${excerpt(body.body)}"`,
+          details: details([
+            added('To', text(to.name ? `${to.name} <${to.address}>` : to.address)),
+            added('Subject', text(subject)),
+            added('Attached', text(`${invoice.number}.pdf`)),
+          ]),
+        };
+      }
+      case 'save_supplier_invoice': {
+        const bill = await bills.previewCreate(action.input);
+        return {
+          summary: `Add a bill from ${bill.supplierName}${bill.number ? ` (${bill.number})` : ''} for ${money(bill.total)}${bill.dueOn ? `, due ${bill.dueOn}` : ''}`,
+          details: details(billRows(bill), { label: 'To pay', before: null, after: bill.total }),
+        };
+      }
+      case 'update_supplier_invoice': {
+        const { supplierInvoiceId, ...patch } = action.input;
+        const { invoice, updated } = await bills.previewUpdate(supplierInvoiceId, patch);
+        const rows = billChanges(invoice, updated, patch, money);
+        return {
+          summary: `Update the bill from ${invoice.supplierName}${invoice.number ? ` (${invoice.number})` : ''}: ${rows.map((r) => r.label.toLowerCase()).join(', ')}`,
+          details: details(
+            rows,
+            invoice.total !== updated.total
+              ? { label: 'To pay', before: invoice.total, after: updated.total }
+              : null,
+          ),
+        };
+      }
+      case 'pay_supplier_invoice': {
+        const { supplierInvoiceId, ...body } = action.input;
+        const { invoice, paid } = await bills.previewPay(supplierInvoiceId, body);
+        const method = paid.paidMethod?.replace('_', ' ') ?? '';
+        return {
+          summary: `Mark the bill from ${invoice.supplierName}${invoice.number ? ` (${invoice.number})` : ''} paid: ${money(invoice.total)} by ${method} on ${paid.paidOn}`,
+          details: details(
+            [
+              changed(
+                'Status',
+                text(invoice.status === 'to_review' ? 'To check' : 'To pay'),
+                text('Paid'),
+              ),
+              added('Paid', text(`${money(invoice.total)} by ${method} on ${paid.paidOn}`)),
+            ],
+            null,
+            invoice.status === 'to_review'
+              ? 'Orbit read this bill and nobody has checked it yet.'
+              : null,
+          ),
+        };
+      }
+      case 'remove_supplier_invoice': {
+        const bill = await bills.previewRemove(action.input.supplierInvoiceId);
+        return {
+          summary: `Delete the bill from ${bill.supplierName}${bill.number ? ` (${bill.number})` : ''} for ${money(bill.total)}`,
+          details: details([removed('Bill', text(`${bill.supplierName}, ${money(bill.total)}`))]),
+        };
+      }
+      case 'read_bill': {
+        if (!readBill)
+          throw new DomainError('invalid_input', 'Reading bills needs AI to be configured');
+        const [file] = await repos.mail.getAttachments([action.input.attachmentId]);
+        if (!file) throw new DomainError('not_found', 'That file is no longer there');
+        const from = action.input.inquiryId
+          ? await repos.inquiries.getInquiry(action.input.inquiryId)
+          : null;
+        return {
+          summary: `Read ${file.name}${from ? ` from ${sender(from)}` : ''} as a bill to check`,
+          details: details(
+            [added('File', text(file.name))],
+            null,
+            'Staff check what was read before it is paid.',
+          ),
+        };
+      }
       case 'update_room': {
         const { room, before, after, fields, show } = await roomUpdate(action.input);
         return {
@@ -966,6 +1201,40 @@ export function createPendingActionService({
       case 'update_room': {
         const { after } = await roomUpdate(action.input);
         await rates.updateRoom(action.input.roomId, after, by, 'agent');
+        return null;
+      }
+      case 'issue_invoice': {
+        const { bookingId, ...body } = action.input;
+        return (await invoices.issue(bookingId, body, 'agent', by?.name ?? null)).bookingId;
+      }
+      case 'void_invoice': {
+        const { invoiceId, ...body } = action.input;
+        return (await invoices.void(invoiceId, body, 'agent', by?.name ?? null)).voided.bookingId;
+      }
+      case 'email_invoice': {
+        const { invoiceId, ...body } = action.input;
+        return (await invoices.email(invoiceId, body, by?.name ?? null, 'agent')).bookingId;
+      }
+      case 'save_supplier_invoice':
+        await bills.create(action.input, 'agent');
+        return null;
+      case 'update_supplier_invoice': {
+        const { supplierInvoiceId, ...patch } = action.input;
+        await bills.update(supplierInvoiceId, patch, 'agent');
+        return null;
+      }
+      case 'pay_supplier_invoice': {
+        const { supplierInvoiceId, ...body } = action.input;
+        await bills.pay(supplierInvoiceId, body, 'agent');
+        return null;
+      }
+      case 'remove_supplier_invoice':
+        await bills.remove(action.input.supplierInvoiceId, 'agent');
+        return null;
+      case 'read_bill': {
+        if (!readBill)
+          throw new DomainError('invalid_input', 'Reading bills needs AI to be configured');
+        await readBill(action.input.attachmentId, action.input.inquiryId);
         return null;
       }
     }

@@ -19,6 +19,7 @@ export * from './revenue-brief';
 export * from './revenue-review';
 export * from './speech';
 export * from './stay-notes';
+export * from './supplier-invoice';
 export * from './tools';
 export * from './transcribe';
 export * from './translate';

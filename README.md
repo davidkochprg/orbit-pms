@@ -48,6 +48,10 @@ The booking panel keeps the guest book per person. "Scan ID" shows a QR code: a 
 
 ![A booking open on the tape chart with its guest book: the main guest read from a scanned ID, and the QR code that scans the second guest's document with a phone](docs/images/id-scan.png)
 
+### Invoices out, bills in
+
+The booking's bill issues an invoice for a guest paying by bank transfer, or a receipt for one who paid at the desk, made out to the guest or their company. Each is a numbered PDF that never changes; a mistake is voided and reissued, and the PDF goes out from the mailbox in one click. Bills from suppliers come the other way: upload the PDF, photograph the paper with a phone, or press "Read as a bill" on the plumber's email. Muse Spark reads the supplier, number, dates and total, Orbit matches the contractor and the repair it was for, and staff check it beside the file before it joins the bills to pay. Today lists bills to check and anything overdue. The agent does all of it, each change on a confirm card.
+
 ### Rates that read the weeks ahead
 
 Rates opens on the next 60 nights: how full each night is against what's usual for that weekday, local events, and the weather forecast for the hotel (Open-Meteo). The domain suggests a change per night from small, labelled rules ("Busier than a usual Friday +10%, Ski area opening weekend +15%"), and a manager takes it, sets another percent, or applies them all, with Undo. Whenever bookings, events, the forecast or the inbox change, Muse Spark reviews the 60 nights at high reasoning for what the rules can't see: a team asking for eight rooms in an email, Thanksgiving week, several requests for the same weekend. It grades each as a slight, moderate or strong signal with its reason, and the domain turns the grade into a percent, so the suggestions move with the hotel while the model never sets a number. Muse Spark summarises the outlook in a few sentences, checked so it states no number the outlook doesn't, and the agent can read it and propose changes ("raise next weekend by the suggested amount"). The same page lists this week's arrivals most likely not to come, from how they booked and the guest's own history, never from who the guest is.
@@ -75,6 +79,7 @@ Every AI feature runs on Meta's models through the Vercel AI SDK: Muse Spark on 
 | Guest memory        | `muse-spark-1.3`                                    | Reads a returning guest's earlier stays and messages into what to remember                        | Changes a booking, or keeps judgements or sensitive details                    |
 | Spoken questions    | `muse-voice-transcribe-1.0`                         | Turns a question asked out loud in ⌘K into text, listening for guests' names                      | Acts on it: the agent answers it like a typed one, with the same confirmations |
 | ID scans            | `muse-spark-1.3` (vision)                           | Reads a phone photo of an ID card or passport into guest-book fields                              | Saves them: staff review every value; the photo is never stored                |
+| Supplier bills      | `muse-spark-1.3`, photos with vision                | Reads a PDF's text or a photo of a bill into supplier, number, dates, total and lines             | Pays them: staff check each bill beside its file first                         |
 | Stay notes          | `muse-spark-1.3`                                    | Reads booking notes and guest messages for pets, mess and things to set up                        | Decides the cleaning order: the domain scores it                               |
 | Rate summary        | `muse-spark-1.3`                                    | Writes two or three sentences of advice on the coming nights                                      | Works out a rate: every percent must be one the domain computed                |
 | Report summary      | `muse-spark-1.3`                                    | Three sentences on a period against the one before: what moved, why, what to do                   | Works out a figure: every number must be one the domain computed               |
@@ -103,7 +108,8 @@ More in [docs/ai.md](docs/ai.md).
 | Housekeeping notes  | 10 notes in four languages, including spelled-out room numbers, an unknown room and a vague note                               | 10/10 (100%) |
 | Stay notes          | 12 stays in five languages: dogs, a cot, an allergy, muddy bikes, and notes that aren't for cleaning                           | 12/12 (100%) |
 | ID scans            | 3 synthetic specimen documents: a Czech-style ID card, a German-style passport and a receipt                                   | 3/3 (100%)   |
-| Agent tools         | 22 staff requests run through the real agent and tools, checked by their effect                                                | 22/22 (100%) |
+| Supplier bills      | 4 bills as PDF text: US net terms, a Czech decimal comma, German VAT, and a quote that is not a bill                           | 4/4 (100%)   |
+| Agent tools         | 29 staff requests run through the real agent and tools, checked by their effect                                                | 29/29 (100%) |
 | Reply drafts        | 18 replies with real quotes (one a block of rooms for a group), checked by the price guard                                     | 18/18 (100%) |
 | Translations        | 4 drafts and guest messages between Czech, German, English and Polish, amounts kept                                            | 4/4 (100%)   |
 | Contractor replies  | 4 answers about a repair: a time that works, one while a guest is in the room, in Czech, and a price to agree to               | 4/4 (100%)   |
@@ -178,7 +184,7 @@ Open **http://localhost:5173** and click **Enter demo**. The API's first log lin
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `META_API_KEY`               | Every AI feature. Without it Orbit runs with the AI off and ⌘K says "Agent not configured".                 |
 | `META_MODEL_VOICE` (preset)  | Voice notes on the housekeeping board. Typed notes work without it.                                         |
-| `META_MODEL_VISION` (preset) | Reading ID scans.                                                                                           |
+| `META_MODEL_VISION` (preset) | Reading ID scans and photographed bills.                                                                    |
 | `BASETEN_API_KEY` (optional) | Reply drafts and translations on Muse Spark Open, Meta's open-weight model. Without it they use Muse Spark. |
 
 The other values in `.env.example` work as they are. The API never sends the keys to the browser. AI spend is recorded in the database; Orbit sets no limit on it.

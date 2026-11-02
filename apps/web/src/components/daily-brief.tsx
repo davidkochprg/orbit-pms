@@ -10,6 +10,8 @@ import {
   type LucideIcon,
   MailCheck,
   OctagonAlert,
+  ReceiptText,
+  FileText,
   ScanLine,
   Wrench,
 } from 'lucide-react';
@@ -22,7 +24,14 @@ import { Panel, ScrollBox } from '@/components/panel';
 import { RelocateDialog } from '@/components/relocate-dialog';
 import { RepairDialog } from '@/components/repair-panel';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
-import { useArrivalNotes, useHealth, useKnockOns, useRefreshInboxRooms } from '@/lib/api';
+import {
+  useArrivalNotes,
+  useBills,
+  useHealth,
+  useInvoices,
+  useKnockOns,
+  useRefreshInboxRooms,
+} from '@/lib/api';
 import { type AttentionItem, type AttentionKind, attentionItems, gapItems } from '@/lib/brief';
 import { cn } from '@/lib/utils';
 
@@ -35,6 +44,8 @@ const kindIcons: Record<AttentionKind, { icon: LucideIcon; className: string }> 
   welcome: { icon: MailCheck, className: 'text-primary-text' },
   out_of_order: { icon: OctagonAlert, className: 'text-destructive' },
   maintenance: { icon: Wrench, className: 'text-muted-foreground' },
+  bill: { icon: ReceiptText, className: 'text-warning' },
+  invoice: { icon: FileText, className: 'text-destructive' },
   gap: { icon: CalendarX2, className: 'text-muted-foreground' },
 };
 
@@ -49,7 +60,9 @@ export function AttentionPanel({ brief, className }: { brief: DailyBrief; classN
   // Notes before a stay are written by the model, so the row only shows when AI is on.
   const aiOn = health.data?.ai.configured ?? false;
   const arrivalNotes = useArrivalNotes(aiOn);
-  const items = attentionItems(brief, knockOns.data, arrivalNotes.data);
+  const bills = useBills().data;
+  const invoices = useInvoices({ kind: 'invoice', status: 'issued' }).data;
+  const items = attentionItems(brief, knockOns.data, arrivalNotes.data, { bills, invoices });
   return (
     <Panel
       title="Needs attention"

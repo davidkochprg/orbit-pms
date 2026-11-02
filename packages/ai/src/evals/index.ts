@@ -1,4 +1,5 @@
 export * from './agent';
+export * from './bills';
 export * from './housekeeping-notes';
 export * from './id-documents';
 export * from './inquiries';

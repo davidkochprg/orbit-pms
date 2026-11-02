@@ -1,4 +1,11 @@
-import type { Booking, BookingSummary, DailyBrief, KnockOn } from '@orbit/shared';
+import type {
+  InvoiceView,
+  SupplierInvoiceView,
+  Booking,
+  BookingSummary,
+  DailyBrief,
+  KnockOn,
+} from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { attentionItems, doneOf, gapItems, occupancyPercent } from './brief';
 
@@ -239,6 +246,39 @@ describe('attentionItems with knock-ons', () => {
     expect(attentionItems(brief, [], { ...notes, due: [] }).some((i) => i.kind === 'welcome')).toBe(
       false,
     );
+  });
+
+  it('asks to check bills Orbit read and flags what is overdue', () => {
+    const bill = (id: string, o: Partial<SupplierInvoiceView>) =>
+      ({
+        id,
+        supplierName: 'Test Plumbing',
+        total: 400,
+        status: 'to_review',
+        overdue: false,
+        dueOn: '2026-10-20',
+        repairLabel: null,
+        ...o,
+      }) as SupplierInvoiceView;
+    const invoice = {
+      id: 'inv_1',
+      number: 'INV-2026-0003',
+      buyer: { company: null },
+      guestName: 'Mia Wagner',
+      bookingId: 'bk_9',
+      overdue: true,
+      due: 250,
+      dueOn: '2026-10-25',
+    } as InvoiceView;
+    const items = attentionItems(brief, [], undefined, {
+      bills: [bill('sinv_1', {}), bill('sinv_2', { status: 'unpaid', overdue: true })],
+      invoices: [invoice],
+    }).filter((i) => i.kind === 'bill' || i.kind === 'invoice');
+    expect(items.map((i) => [i.title, i.target])).toEqual([
+      ['Check the bill from Test Plumbing', { path: '/invoices?tab=bills&bill=sinv_1' }],
+      ['Bill from Test Plumbing is overdue', { path: '/invoices?tab=bills&bill=sinv_2' }],
+      ["Mia Wagner hasn't paid INV-2026-0003", { bookingId: 'bk_9' }],
+    ]);
   });
 
   it('leaves rows as they are when their knock-on is gone', () => {

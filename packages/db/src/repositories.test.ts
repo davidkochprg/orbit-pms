@@ -1,4 +1,5 @@
 import { addDays } from '@orbit/domain';
+import type { Invoice, SupplierInvoice } from '@orbit/shared';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createDb } from './client';
 import { createRepositories } from './repositories';
@@ -374,6 +375,101 @@ describe('billing (PGlite)', () => {
     };
     await repos.billing.createPayment(payment);
     expect(await repos.billing.listPayments({ bookingId })).toContainEqual(payment);
+  });
+});
+
+describe('invoices (PGlite)', () => {
+  const invoice = (id: string, number: string): Invoice => ({
+    id,
+    number,
+    kind: 'invoice',
+    status: 'issued',
+    bookingId: seed.bookings[0]!.id,
+    guestId: seed.bookings[0]!.guestId,
+    issuedOn: '2026-10-27',
+    dueOn: '2026-11-10',
+    stay: { checkIn: '2026-10-25', checkOut: '2026-10-27', roomName: '101' },
+    issuer: {
+      name: 'Test',
+      address: null,
+      taxId: null,
+      bankAccount: null,
+      email: null,
+      phone: null,
+      website: null,
+    },
+    buyer: { name: 'Guest', company: null, address: null, taxId: null, email: null },
+    lines: [],
+    vat: [],
+    taxMode: 'inclusive',
+    currency: 'CZK',
+    total: 100,
+    paid: 0,
+    due: 100,
+    payments: [],
+    paymentReference: number.replace(/\D/g, ''),
+    note: null,
+    issuedBy: null,
+    voidedOn: null,
+    voidReason: null,
+    replacedBy: null,
+    createdAt: `2026-10-27T09:00:0${number.at(-1)}.000Z`,
+  });
+
+  it('numbers within a series, lists newest first and voids in place', async () => {
+    expect(await repos.invoices.lastSequence('INV-2030-')).toBe(0);
+    await repos.transaction(async (tx) => {
+      await tx.invoices.create(invoice('inv_a', 'INV-2030-0001'));
+      await tx.invoices.create(invoice('inv_b', 'INV-2030-0012'));
+    });
+    expect(await repos.invoices.lastSequence('INV-2030-')).toBe(12);
+    expect(await repos.invoices.lastSequence('RCT-2030-')).toBe(0);
+    await expect(repos.invoices.create(invoice('inv_c', 'INV-2030-0001'))).rejects.toThrow();
+    const voided = { ...invoice('inv_a', 'INV-2030-0001'), status: 'void' as const };
+    await repos.invoices.update(voided);
+    expect(await repos.invoices.get('inv_a')).toEqual(voided);
+    expect((await repos.invoices.list({ status: 'void' })).map((i) => i.id)).toEqual(['inv_a']);
+  });
+});
+
+describe('supplier invoices (PGlite)', () => {
+  it('round-trips bills and filters by status', async () => {
+    const bill: SupplierInvoice = {
+      id: 'sinv_test',
+      status: 'to_review',
+      contactId: null,
+      supplierName: 'Test Supplies',
+      supplierTaxId: null,
+      number: 'A-1',
+      issuedOn: '2026-10-20',
+      dueOn: '2026-11-03',
+      currency: 'CZK',
+      total: 1200,
+      tax: 208,
+      lines: [{ label: 'Towels', amount: 1200 }],
+      bankAccount: null,
+      paymentReference: null,
+      taskId: null,
+      note: null,
+      file: null,
+      source: 'upload',
+      inquiryId: null,
+      warnings: ['Check the total.'],
+      paidOn: null,
+      paidMethod: null,
+      createdAt: '2026-10-27T09:00:00.000Z',
+    };
+    await repos.supplierInvoices.save(bill);
+    expect(await repos.supplierInvoices.get('sinv_test')).toEqual(bill);
+    await repos.supplierInvoices.save({ ...bill, status: 'unpaid', warnings: [] });
+    expect(await repos.supplierInvoices.list({ status: ['to_review'] })).not.toContainEqual(
+      expect.objectContaining({ id: 'sinv_test' }),
+    );
+    expect(await repos.supplierInvoices.list({ status: ['unpaid'] })).toContainEqual(
+      expect.objectContaining({ id: 'sinv_test' }),
+    );
+    await repos.supplierInvoices.delete('sinv_test');
+    expect(await repos.supplierInvoices.get('sinv_test')).toBeNull();
   });
 });
 

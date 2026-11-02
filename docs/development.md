@@ -27,7 +27,7 @@ Read from `.env` at the repo root by the API and the db scripts, and validated w
 | `META_API_BASE_URL`    | `https://api.meta.ai/v1` | OpenAI-compatible base URL                                          |
 | `META_MODEL_AGENT`     | –                        | Model for the agent loop and tool calling                           |
 | `META_MODEL_VOICE`     | –                        | Transcription model for voice notes                                 |
-| `META_MODEL_VISION`    | –                        | Vision model for ID scans                                           |
+| `META_MODEL_VISION`    | –                        | Vision model for ID scans and photographed bills                    |
 | `META_MODEL_TRANSLATE` | `META_MODEL_AGENT`       | Model for translating messages and drafts                           |
 | `HOTEL_TIMEZONE`       | `America/Los_Angeles`    | The hotel's IANA time zone; decides "today"                         |
 | `SEED_REGION`          | `us`                     | `pnpm db:seed` preset: `us` (demo lodge) or `cz` (Czech guesthouse) |
@@ -121,6 +121,6 @@ To try the function without deploying, run `pnpm build:vercel`, then serve `.ver
 
 ## Scanning IDs with a phone
 
-The ID scan link opens on a phone, which can't reach `localhost`. Start Orbit with `pnpm dev:lan` instead of `pnpm dev`: it runs the API and the web app like `pnpm dev`, with the web app also listening on the local network. Open Orbit on the computer by the network address Vite prints (e.g. `http://192.168.1.20:5173`), and scan the QR code with a phone on the same Wi-Fi. Without a phone, "Upload a photo instead" in the scan dialog sends a photo from the computer; the synthetic documents in `packages/ai/src/evals/id-documents/` work for trying it.
+The ID scan link, and the link for photographing a supplier's bill, open on a phone, which can't reach `localhost`. Start Orbit with `pnpm dev:lan` instead of `pnpm dev`: it runs the API and the web app like `pnpm dev`, with the web app also listening on the local network. Open Orbit on the computer by the network address Vite prints (e.g. `http://192.168.1.20:5173`), and scan the QR code with a phone on the same Wi-Fi. Without a phone, "Upload a photo instead" in the scan dialog sends a photo from the computer; the synthetic documents in `packages/ai/src/evals/id-documents/` work for trying it.
 
 On Windows, the firewall rule Node.js adds when first asked lets other devices connect only on a network set to Private. If the scan page stays blank or black on the phone, the computer's network is probably set to Public: in Settings → Network & internet, open the Wi-Fi or Ethernet connection and set its network profile to Private.

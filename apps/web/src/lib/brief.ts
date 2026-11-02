@@ -1,4 +1,11 @@
-import type { ArrivalNotes, BookingSummary, DailyBrief, KnockOn } from '@orbit/shared';
+import type {
+  ArrivalNotes,
+  BookingSummary,
+  DailyBrief,
+  InvoiceView,
+  KnockOn,
+  SupplierInvoiceView,
+} from '@orbit/shared';
 import { formatDate, formatDateTime, formatMoney, formatRange } from '@/lib/format';
 import { contactName } from '@/lib/repairs';
 import { roomStatusLabels } from '@/lib/status';
@@ -12,6 +19,8 @@ export type AttentionKind =
   | 'welcome'
   | 'out_of_order'
   | 'maintenance'
+  | 'bill'
+  | 'invoice'
   | 'gap';
 
 /** One line in the brief's "needs attention" list, with where to go to deal with it. */
@@ -82,10 +91,63 @@ function nameList(names: string[]): string {
   return `${names.slice(0, 2).join(', ')} and ${names.length - 2} more`;
 }
 
+/** Money matters for today: bills Orbit read to check, bills and guests' invoices gone overdue. */
+export interface MoneyMatters {
+  bills?: SupplierInvoiceView[];
+  invoices?: InvoiceView[];
+}
+
+/** A bill's own page: the bills tab with it open. */
+const billPath = (id: string) => `/invoices?tab=bills&bill=${encodeURIComponent(id)}`;
+
+function moneyItems({ bills = [], invoices = [] }: MoneyMatters): AttentionItem[] {
+  const items: AttentionItem[] = [];
+  const toCheck = bills.filter((b) => b.status === 'to_review');
+  if (toCheck.length === 1) {
+    const b = toCheck[0]!;
+    items.push({
+      id: `bill:${b.id}`,
+      kind: 'bill',
+      title: `Check the bill from ${b.supplierName}`,
+      detail: [formatMoney(b.total), b.repairLabel].filter(Boolean).join(', '),
+      target: { path: billPath(b.id) },
+    });
+  } else if (toCheck.length > 1) {
+    items.push({
+      id: 'bills:check',
+      kind: 'bill',
+      title: `${plural(toCheck.length, 'bill')} to check`,
+      detail: nameList([...new Set(toCheck.map((b) => b.supplierName))]),
+      target: { path: '/invoices?tab=bills' },
+    });
+  }
+  for (const b of bills.filter((x) => x.overdue)) {
+    items.push({
+      id: `bill-late:${b.id}`,
+      kind: 'bill',
+      title: `Bill from ${b.supplierName} is overdue`,
+      detail: `${formatMoney(b.total)}, was due ${b.dueOn ? formatDate(b.dueOn) : ''}`.trim(),
+      target: { path: billPath(b.id) },
+    });
+  }
+  for (const i of invoices.filter((x) => x.overdue)) {
+    items.push({
+      id: `invoice-late:${i.id}`,
+      kind: 'invoice',
+      title: `${i.buyer.company ?? i.guestName} hasn't paid ${i.number}`,
+      detail:
+        `${formatMoney(Math.max(i.due, 0))}, was due ${i.dueOn ? formatDate(i.dueOn) : ''}`.trim(),
+      target: { bookingId: i.bookingId },
+    });
+  }
+  return items;
+}
+
 export function attentionItems(
   brief: DailyBrief,
   knockOns: KnockOn[] = [],
   arrivalNotes?: ArrivalNotes,
+  money: MoneyMatters = {},
 ): AttentionItem[] {
   const items: AttentionItem[] = [];
   for (const r of brief.roomsToPrepare) {
@@ -208,6 +270,7 @@ export function attentionItems(
       target: { taskId: t.taskId },
     });
   }
+  items.push(...moneyItems(money));
   return items;
 }
 

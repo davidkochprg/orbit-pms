@@ -125,6 +125,16 @@ const toolLabels: Record<string, [running: string, done: string]> = {
   sendRepairEmail: ['Preparing the email', 'Prepared the email'],
   saveContact: ['Preparing the contact', 'Prepared the contact'],
   removeContact: ['Preparing to delete the contact', 'Prepared to delete the contact'],
+  listInvoices: ['Checking invoices', 'Checked invoices'],
+  issueInvoice: ['Preparing the invoice', 'Prepared the invoice'],
+  voidInvoice: ['Preparing to void the invoice', 'Prepared to void the invoice'],
+  emailInvoice: ['Preparing the email', 'Prepared the email'],
+  listBills: ['Checking bills', 'Checked bills'],
+  addBill: ['Preparing the bill', 'Prepared the bill'],
+  updateBill: ['Preparing the correction', 'Prepared the correction'],
+  payBill: ['Preparing the payment', 'Prepared the payment'],
+  removeBill: ['Preparing to delete the bill', 'Prepared to delete the bill'],
+  readBillAttachment: ['Preparing to read the bill', 'Prepared to read the bill'],
   organizeConversations: ['Filing the conversations', 'Filed the conversations'],
   getArrivalNotes: ["Checking tomorrow's arrivals", "Checked tomorrow's arrivals"],
   draftArrivalNote: ['Writing the note before the stay', 'Wrote the note before the stay'],
@@ -182,6 +192,8 @@ export function toolResultSummary(toolName: string, output: unknown): string | n
       listConversations: ['conversation', 'conversations'],
       getActivity: ['change', 'changes'],
       getLocalEvents: ['event', 'events'],
+      listInvoices: ['document', 'documents'],
+      listBills: ['bill', 'bills'],
     };
     const [one, many] = noun[toolName] ?? ['result', 'results'];
     return output.length === 0 ? `No ${many}` : count(output.length, one, many);
@@ -281,6 +293,7 @@ const contextQuestions: Record<AgentContext['kind'], string[]> = {
     'Mark this repair done.',
   ],
   contact: ['Which open repairs could they fix?', 'Write to them.'],
+  bill: ['Does this bill match the repair?', 'Mark it paid by bank transfer.'],
   note: ['Is anything in this note out of date?', 'Shorten this note.'],
   night: [
     'Why is this night priced like this?',
@@ -320,6 +333,7 @@ const pageQuestions: Record<string, string[]> = {
     'Which booking sources brought the most revenue?',
   ],
   '/contacts': ['Who fixes plumbing?', 'Which open repairs is nobody fixing yet?'],
+  '/invoices': ['Which bills are due this week?', 'Who left without paying in full?'],
   '/knowledge': ['Which notices end this week?', 'Note that the sauna is closed until Friday.'],
 };
 

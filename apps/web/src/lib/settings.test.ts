@@ -1,4 +1,4 @@
-import type { HotelInfoEntry, HotelProfile } from '@orbit/shared';
+import { defaultHotelBilling, type HotelInfoEntry, type HotelProfile } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import {
   fromPercent,
@@ -54,6 +54,7 @@ describe('sameSettings', () => {
     checkInFrom: '15:00',
     checkOutBy: '10:00',
     entries: [entry('x')],
+    billing: defaultHotelBilling,
   };
 
   it('compares by value', () => {

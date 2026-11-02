@@ -8,6 +8,8 @@ import {
   idScanStatuses,
   inquiryChannels,
   inquiryStatuses,
+  invoiceKinds,
+  invoiceStatuses,
   languages,
   messageDirections,
   paymentKinds,
@@ -16,11 +18,14 @@ import {
   roomKinds,
   roomStatuses,
   staffRoles,
+  supplierInvoiceStatuses,
   type Attachment,
   type HotelProfile,
   type IdScanResult,
   type InquiryExtraction,
   type InquirySuggestion,
+  type Invoice,
+  type SupplierInvoice,
   type EventImpact,
   type PendingActionDetails,
   type PendingActionInput,
@@ -76,6 +81,9 @@ export const documentType = pgEnum('document_type', documentTypes);
 export const paymentMethod = pgEnum('payment_method', paymentMethods);
 export const vatBracket = pgEnum('vat_bracket', vatBrackets);
 export const idScanStatus = pgEnum('id_scan_status', idScanStatuses);
+export const invoiceKind = pgEnum('invoice_kind', invoiceKinds);
+export const invoiceStatus = pgEnum('invoice_status', invoiceStatuses);
+export const supplierInvoiceStatus = pgEnum('supplier_invoice_status', supplierInvoiceStatuses);
 
 const createdAt = () => timestamp('created_at', { withTimezone: true }).notNull().defaultNow();
 
@@ -449,4 +457,52 @@ export const aiUsage = pgTable(
     createdAt: createdAt(),
   },
   (t) => [index('ai_usage_created_idx').on(t.createdAt)],
+);
+
+/**
+ * Invoices and receipts for bookings' bills. The whole document is kept as issued in `document`;
+ * the columns beside it are what lists filter and sort by, and change only when it is voided.
+ */
+export const invoices = pgTable(
+  'invoices',
+  {
+    id: text('id').primaryKey(),
+    /** Unique, so two documents can never share a number even if the series lock were skipped. */
+    number: text('number').notNull().unique(),
+    kind: invoiceKind('kind').notNull(),
+    status: invoiceStatus('status').notNull(),
+    bookingId: text('booking_id')
+      .notNull()
+      .references(() => bookings.id),
+    document: jsonb('document').$type<Invoice>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('invoices_booking_idx').on(t.bookingId)],
+);
+
+/** Bills from suppliers and contractors; the bill itself is in `document`. */
+export const supplierInvoices = pgTable(
+  'supplier_invoices',
+  {
+    id: text('id').primaryKey(),
+    status: supplierInvoiceStatus('status').notNull(),
+    document: jsonb('document').$type<SupplierInvoice>().notNull(),
+    createdAt: createdAt(),
+  },
+  (t) => [index('supplier_invoices_status_idx').on(t.status, t.createdAt)],
+);
+
+/** Open links for photographing a bill with a phone; the bill read is a supplier invoice. */
+export const invoiceScans = pgTable(
+  'invoice_scans',
+  {
+    id: text('id').primaryKey(),
+    status: idScanStatus('status').notNull(),
+    supplierInvoiceId: text('supplier_invoice_id'),
+    error: text('error'),
+    readingSince: timestamp('reading_since', { withTimezone: true }),
+    createdAt: createdAt(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  },
+  (t) => [index('invoice_scans_expires_idx').on(t.expiresAt)],
 );

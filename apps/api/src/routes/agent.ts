@@ -24,11 +24,13 @@ import {
   type HotelService,
   type HousekeepingService,
   type InboxService,
+  type InvoiceService,
   type PendingActionService,
   type RegistrationService,
   type ReportService,
   type Repositories,
   type RevenueService,
+  type SupplierInvoiceService,
 } from '@orbit/domain';
 import {
   type AgentContext,
@@ -43,6 +45,7 @@ import {
   type AgentMessageMetadata,
   agentMessageMetadataSchema,
   agentRequestSchema,
+  formatMoney,
   hotelInfoCategoryLabels,
   isoDateSchema,
   tradeLabels,
@@ -90,6 +93,8 @@ export interface AgentRouteDeps {
   draftWorkOrder?: ((taskId: string, contactId: string) => Promise<WorkOrder>) | null;
   /** What was remembered about a guest, as last read. */
   guestMemory: (guestId: string) => Promise<GuestMemory>;
+  invoices: Pick<InvoiceService, 'list'>;
+  bills: Pick<SupplierInvoiceService, 'list' | 'get'>;
   clock: () => Date;
   usage: UsageStore;
 }
@@ -120,6 +125,8 @@ export function agentRoutes({
   draftArrivalNote,
   draftWorkOrder = null,
   guestMemory,
+  invoices,
+  bills,
   clock,
   usage,
 }: AgentRouteDeps) {
@@ -149,6 +156,8 @@ export function agentRoutes({
     draftArrivalNote,
     draftWorkOrder,
     guestMemory,
+    invoices,
+    bills,
   });
 
   /** What the staff member was looking at, from the hotel's own data; null if it is gone. */
@@ -226,6 +235,19 @@ export function agentRoutes({
             trades: contact.trades.map((t) => tradeLabels[t].toLowerCase()),
             email: contact.email,
             phone: contact.phone,
+          });
+        }
+        case 'bill': {
+          const bill = await bills.get(context.id);
+          return contextNote({
+            kind: 'bill',
+            billId: bill.id,
+            supplierName: bill.supplierName,
+            number: bill.number,
+            total: formatMoney(bill.total, bill.currency),
+            status: bill.status,
+            dueOn: bill.dueOn,
+            repair: bill.repairLabel,
           });
         }
         case 'note': {

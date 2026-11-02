@@ -51,6 +51,15 @@ export const activityLabels: Record<string, string> = {
   'settings.pricing': 'Changed the rates',
   'staff.create': 'Added a team member',
   'staff.update': 'Changed a team member',
+  'invoice.issue': 'Issued an invoice',
+  'invoice.void': 'Voided an invoice',
+  'invoice.email': 'Emailed an invoice',
+  'inquiry.booking_email': 'Wrote an email',
+  'supplier_invoice.read': 'Read a bill',
+  'supplier_invoice.create': 'Added a bill',
+  'supplier_invoice.update': 'Edited a bill',
+  'supplier_invoice.pay': 'Paid a bill',
+  'supplier_invoice.remove': 'Removed a bill',
 };
 
 const repairPayload = z.union([
@@ -83,6 +92,13 @@ const contactPayload = z.union([
   z.object({ name: z.string() }).transform((p) => p.name),
 ]);
 const askedPayload = z.object({ contactName: z.string(), issue: z.string().nullable() });
+const invoicePayload = z.object({
+  number: z.string(),
+  total: z.number().optional(),
+  reason: z.string().optional(),
+  to: z.string().optional(),
+});
+const billPayload = z.object({ supplierName: z.string(), total: z.number() });
 
 const words = (s: string) => s.replaceAll('_', ' ');
 
@@ -115,6 +131,19 @@ export function activityDetail(action: string, payload: unknown): string | null 
     if (!p.success) return null;
     if (p.data.scanned) return 'From an ID scan';
     return p.data.fields.length > 0 ? `Changed ${fieldWords(p.data.fields)}` : null;
+  }
+  if (action.startsWith('invoice.')) {
+    const p = invoicePayload.safeParse(payload);
+    if (!p.success) return null;
+    if (action === 'invoice.void') return [p.data.number, p.data.reason].filter(Boolean).join(': ');
+    if (action === 'invoice.email') return [p.data.number, p.data.to].filter(Boolean).join(' to ');
+    return p.data.total === undefined
+      ? p.data.number
+      : `${p.data.number}, ${formatMoney(p.data.total)}`;
+  }
+  if (action.startsWith('supplier_invoice.')) {
+    const p = billPayload.safeParse(payload);
+    return p.success ? `${p.data.supplierName}, ${formatMoney(p.data.total)}` : null;
   }
   if (action.startsWith('contact.')) {
     const p = contactPayload.safeParse(payload);

@@ -5,6 +5,7 @@ import { arrivalNoteSchema } from './arrival-notes';
 import { contactProposalSchema, workOrderBodySchema } from './contacts';
 import { isoDateSchema } from './dates';
 import { hotelInfoProposalSchema } from './hotel';
+import { emailInvoiceBodySchema, issueInvoiceBodySchema, voidInvoiceBodySchema } from './invoices';
 import {
   bookingPatchSchema,
   createHoldInputSchema,
@@ -15,6 +16,12 @@ import { moneySchema } from './quote';
 import { newStayGuestBodySchema, stayGuestPatchSchema } from './registration';
 import { roomBodySchema } from './rates';
 import { adjustRatesBodySchema, localEventBodySchema } from './revenue';
+import {
+  paySupplierInvoiceBodySchema,
+  supplierInvoiceBodySchema,
+  supplierInvoiceFromAttachmentSchema,
+  supplierInvoicePatchSchema,
+} from './supplier-invoices';
 
 const stayGuestRef = z.object({ bookingId: z.string(), stayGuestId: z.string() });
 const chargeRef = z.object({ bookingId: z.string(), chargeId: z.string() });
@@ -92,6 +99,32 @@ export const pendingActionInputSchema = z.discriminatedUnion('kind', [
     kind: z.literal('update_room'),
     input: roomBodySchema.partial().extend({ roomId: z.string() }),
   }),
+  z.object({
+    kind: z.literal('issue_invoice'),
+    input: issueInvoiceBodySchema.extend({ bookingId: z.string() }),
+  }),
+  z.object({
+    kind: z.literal('void_invoice'),
+    input: voidInvoiceBodySchema.extend({ invoiceId: z.string() }),
+  }),
+  z.object({
+    kind: z.literal('email_invoice'),
+    input: emailInvoiceBodySchema.extend({ invoiceId: z.string() }),
+  }),
+  z.object({ kind: z.literal('save_supplier_invoice'), input: supplierInvoiceBodySchema }),
+  z.object({
+    kind: z.literal('update_supplier_invoice'),
+    input: supplierInvoicePatchSchema.extend({ supplierInvoiceId: z.string() }),
+  }),
+  z.object({
+    kind: z.literal('pay_supplier_invoice'),
+    input: paySupplierInvoiceBodySchema.extend({ supplierInvoiceId: z.string() }),
+  }),
+  z.object({
+    kind: z.literal('remove_supplier_invoice'),
+    input: z.object({ supplierInvoiceId: z.string() }),
+  }),
+  z.object({ kind: z.literal('read_bill'), input: supplierInvoiceFromAttachmentSchema }),
 ]);
 export type PendingActionInput = z.infer<typeof pendingActionInputSchema>;
 export type PendingActionKind = PendingActionInput['kind'];

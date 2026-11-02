@@ -6,10 +6,12 @@ import {
   type HotelService,
   type HousekeepingService,
   type InboxService,
+  type InvoiceService,
   normalizeText,
   type PendingActionService,
   type RegistrationService,
   type ReportService,
+  type SupplierInvoiceService,
 } from '@orbit/domain';
 import {
   type ArrivalNote,
@@ -34,6 +36,17 @@ import {
   type Guest,
   type GuestBook,
   emailProposalSchema,
+  emailInvoiceBodySchema,
+  invoiceKindSchema,
+  invoiceStatusSchema,
+  type InvoiceView,
+  issueInvoiceBodySchema,
+  paySupplierInvoiceBodySchema,
+  supplierInvoiceBodySchema,
+  supplierInvoicePatchSchema,
+  supplierInvoiceStatusSchema,
+  type SupplierInvoiceView,
+  voidInvoiceBodySchema,
   guestPatchSchema,
   type HousekeepingBoard,
   housekeepingTaskStatusSchema,
@@ -117,6 +130,10 @@ export interface ToolDeps {
   guestMemory?: (guestId: string) => Promise<GuestMemory>;
   /** Writes the email asking a contractor to fix a repair; null when drafting is off. */
   draftWorkOrder?: ((taskId: string, contactId: string) => Promise<WorkOrder>) | null;
+  /** Invoices and receipts issued for bookings. */
+  invoices: Pick<InvoiceService, 'list'>;
+  /** Bills from suppliers and contractors. */
+  bills: Pick<SupplierInvoiceService, 'list'>;
 }
 
 export interface ToolError {
@@ -237,6 +254,13 @@ function conversationDetail(i: Inquiry) {
       from: m.direction === 'out' ? (m.author ?? 'hotel') : 'guest',
       sentAt: m.sentAt,
       body: m.body,
+      ...(m.attachments.length > 0 && {
+        attachments: m.attachments.map((a) => ({
+          attachmentId: a.id,
+          name: a.name,
+          contentType: a.contentType,
+        })),
+      }),
     })),
     roomOptions: (i.suggestion?.options ?? []).map((o) => ({
       roomId: o.roomId,
@@ -299,6 +323,56 @@ function toProposal(action: PendingAction): ProposalResult {
 }
 
 const bookingIdSchema = z.object({ bookingId: z.string().describe('Booking ID, e.g. "bk_012".') });
+const invoiceIdSchema = z.object({
+  invoiceId: z.string().describe('The invoiceId of an invoice or receipt, from listInvoices.'),
+});
+const billIdSchema = z.object({
+  supplierInvoiceId: z.string().describe('The supplierInvoiceId of a bill, from listBills.'),
+});
+
+/** An issued invoice or receipt as the model sees it. */
+const compactInvoice = (i: InvoiceView) => ({
+  invoiceId: i.id,
+  number: i.number,
+  kind: i.kind,
+  status: i.status,
+  bookingId: i.bookingId,
+  guestName: i.guestName,
+  madeOutTo: i.buyer.company ?? i.buyer.name,
+  buyerEmail: i.buyer.email,
+  issuedOn: i.issuedOn,
+  dueOn: i.dueOn,
+  total: i.total,
+  /** What was still to pay when it was issued. */
+  due: Math.max(i.due, 0),
+  settled: i.settled,
+  overdue: i.overdue,
+  /** The bill changed since: void and reissue to bring it up to date. */
+  outdated: i.outdated,
+  ...(i.voidReason && { voidReason: i.voidReason }),
+});
+
+/** A supplier's bill as the model sees it. */
+const compactBill = (b: SupplierInvoiceView) => ({
+  supplierInvoiceId: b.id,
+  status: b.status,
+  supplierName: b.supplierName,
+  contactId: b.contactId,
+  number: b.number,
+  issuedOn: b.issuedOn,
+  dueOn: b.dueOn,
+  overdue: b.overdue,
+  total: b.total,
+  tax: b.tax,
+  lines: b.lines,
+  repair: b.taskId ? { taskId: b.taskId, label: b.repairLabel } : null,
+  bankAccount: b.bankAccount,
+  paymentReference: b.paymentReference,
+  ...(b.warnings.length > 0 && { warnings: b.warnings }),
+  ...(b.paidOn && { paidOn: b.paidOn, paidMethod: b.paidMethod }),
+  ...(b.file && { file: b.file.name }),
+  ...(b.note && { note: b.note }),
+});
 const chargeRefSchema = bookingIdSchema.extend({
   chargeId: z.string().describe('The chargeId of an extra on the bill, from getBill.'),
 });
@@ -344,6 +418,14 @@ export const proposalToolNames = [
   'updateRoom',
   'saveContact',
   'removeContact',
+  'issueInvoice',
+  'voidInvoice',
+  'emailInvoice',
+  'addBill',
+  'updateBill',
+  'payBill',
+  'removeBill',
+  'readBillAttachment',
 ] as const;
 
 /** Tools that change data straight away: housekeeping is low-risk and reversible (ADR 0006). */
@@ -396,6 +478,8 @@ export function createAgentTools({
   statedAmounts,
   contacts,
   mailLabels,
+  invoices,
+  bills,
 }: ToolDeps) {
   const propose = (input: PendingActionInput) =>
     safely(async () => toProposal(await actions.propose(input)));
@@ -890,6 +974,73 @@ export function createAgentTools({
         "Propose removing an extra from a booking's bill, e.g. one posted by mistake. Get the chargeId from getBill. Stay lines and city tax are not extras and can't be removed. The user must confirm.",
       inputSchema: chargeRefSchema,
       execute: (input) => propose({ kind: 'remove_charge', input }),
+    }),
+    listInvoices: tool({
+      description:
+        'Invoices and receipts issued for bookings, newest first: number, kind, who it is made out to, dates, total, what was due, and whether the bill is settled, overdue or changed since (outdated). Filter by booking, kind or status ("issued" or "void").',
+      inputSchema: z.object({
+        bookingId: z.string().optional(),
+        kind: invoiceKindSchema.optional(),
+        status: invoiceStatusSchema.optional(),
+      }),
+      execute: (filter) => safely(async () => (await invoices.list(filter)).map(compactInvoice)),
+    }),
+    issueInvoice: tool({
+      description:
+        'Propose issuing a document for a booking\'s bill: an "invoice" asks for what is still owed by bank transfer by a due date; a "receipt" confirms what the guest paid at the property by cash or card (take the payment first). The bill, the hotel\'s details and the number are filled in by the system; never state amounts yourself. Leave buyer null for the guest; for a company give the guest\'s name, the company, its address and tax ID as the staff member said them. One current invoice and one receipt per stay: to change one, use voidInvoice with reissue. The user must confirm.',
+      inputSchema: issueInvoiceBodySchema.extend(bookingIdSchema.shape),
+      execute: (input) => propose({ kind: 'issue_invoice', input }),
+    }),
+    voidInvoice: tool({
+      description:
+        'Propose voiding an issued invoice or receipt, e.g. made out to the wrong company or issued before the bill changed. The number stays used. With reissue true, a new document is issued from the bill as it stands, to the same buyer unless you give another. The user must confirm.',
+      inputSchema: voidInvoiceBodySchema.extend(invoiceIdSchema.shape),
+      execute: (input) => propose({ kind: 'void_invoice', input }),
+    }),
+    emailInvoice: tool({
+      description:
+        "Propose emailing an issued invoice or receipt as a PDF, to the buyer's email unless the staff member gave another. Write a short body in the guest's language, signed by the hotel; the PDF carries the amounts, so don't repeat them. Subject null for the default. The user must confirm.",
+      inputSchema: emailInvoiceBodySchema.extend(invoiceIdSchema.shape),
+      execute: (input) => propose({ kind: 'email_invoice', input }),
+    }),
+    listBills: tool({
+      description:
+        'Bills from suppliers and contractors, to check first ("to_review": Orbit read them and nobody checked yet), then to pay ("unpaid"), then paid: supplier, number, dates, total, lines, the repair it bills, warnings from the reading, and whether it is overdue. Filter by status.',
+      inputSchema: z.object({ status: supplierInvoiceStatusSchema.optional() }),
+      execute: ({ status }) => safely(async () => (await bills.list({ status })).map(compactBill)),
+    }),
+    addBill: tool({
+      description:
+        "Propose adding a supplier's bill the staff member describes (no file): supplier, number, dates and total exactly as they said. Match the supplier to a contact (listContacts) and, for a repair, give its taskId. It goes straight to the bills to pay. The user must confirm.",
+      inputSchema: supplierInvoiceBodySchema,
+      execute: (input) => propose({ kind: 'save_supplier_invoice', input }),
+    }),
+    updateBill: tool({
+      description:
+        'Propose correcting a bill (send only what changes), or checked: true to confirm a bill Orbit read so it moves to the bills to pay. The user must confirm.',
+      inputSchema: supplierInvoicePatchSchema.extend(billIdSchema.shape),
+      execute: (input) => propose({ kind: 'update_supplier_invoice', input }),
+    }),
+    payBill: tool({
+      description:
+        'Propose marking a bill paid, by bank transfer, cash or card, today unless the staff member gave the date. The user must confirm.',
+      inputSchema: paySupplierInvoiceBodySchema.extend(billIdSchema.shape),
+      execute: (input) => propose({ kind: 'pay_supplier_invoice', input }),
+    }),
+    removeBill: tool({
+      description:
+        'Propose deleting a bill, e.g. a duplicate or a file that was not a bill. The user must confirm.',
+      inputSchema: billIdSchema,
+      execute: (input) => propose({ kind: 'remove_supplier_invoice', input }),
+    }),
+    readBillAttachment: tool({
+      description:
+        "Propose reading a PDF or photo attached to an email (attachmentId from getConversation) as a supplier's bill. Once confirmed, Orbit reads it into a bill to check, matched to the contact and their repair. The user must confirm.",
+      inputSchema: z.object({
+        attachmentId: z.string(),
+        inquiryId: z.string().nullable().describe('The conversation the file came with.'),
+      }),
+      execute: (input) => propose({ kind: 'read_bill', input }),
     }),
     getGuestBook: tool({
       description:

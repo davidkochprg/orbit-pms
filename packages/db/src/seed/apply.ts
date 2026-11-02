@@ -9,6 +9,8 @@ import {
   housekeepingTasks,
   inboxMessages,
   inquiries,
+  invoiceScans,
+  invoices,
   payments,
   pendingActions,
   pricing,
@@ -18,6 +20,7 @@ import {
   staff,
   stayGuests,
   stayReadings,
+  supplierInvoices,
   guestMemories,
   localEvents,
   rateReviews,
@@ -31,6 +34,9 @@ import type { SeedData } from './build';
 export async function applySeed(db: Db, seed: SeedData): Promise<void> {
   await db.transaction(async (tx) => {
     await tx.delete(pendingActions);
+    await tx.delete(invoices);
+    await tx.delete(supplierInvoices);
+    await tx.delete(invoiceScans);
     await tx.delete(mailDrafts);
     await tx.delete(mailLabels);
     await tx.delete(mailAttachments);
@@ -111,6 +117,29 @@ export async function applySeed(db: Db, seed: SeedData): Promise<void> {
       await tx
         .insert(mailAttachments)
         .values(seed.files.map((f) => ({ ...f.attachment, data: f.bytes })));
+    }
+    if (seed.invoices.length > 0) {
+      await tx.insert(invoices).values(
+        seed.invoices.map((i) => ({
+          id: i.id,
+          number: i.number,
+          kind: i.kind,
+          status: i.status,
+          bookingId: i.bookingId,
+          document: i,
+          createdAt: new Date(i.createdAt),
+        })),
+      );
+    }
+    if (seed.supplierInvoices.length > 0) {
+      await tx.insert(supplierInvoices).values(
+        seed.supplierInvoices.map((i) => ({
+          id: i.id,
+          status: i.status,
+          document: i,
+          createdAt: new Date(i.createdAt),
+        })),
+      );
     }
     if (seed.drafts.length > 0) {
       await tx

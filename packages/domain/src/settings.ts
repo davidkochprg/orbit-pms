@@ -9,7 +9,7 @@ import type {
   IsoDate,
   StaffMember,
 } from '@orbit/shared';
-import { renameLinks, sameNoteTitle } from '@orbit/shared';
+import { defaultHotelBilling, renameLinks, sameNoteTitle } from '@orbit/shared';
 import { DomainError } from './errors';
 import type { Repositories } from './repositories';
 import { hotelToday } from './dates';
@@ -29,6 +29,7 @@ export const emptyHotelProfile: HotelProfile = {
   country: 'US',
   language: 'en',
   coordinates: null,
+  billing: defaultHotelBilling,
 };
 
 /**

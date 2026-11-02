@@ -110,6 +110,23 @@ describe('contextNote', () => {
     );
   });
 
+  it('describes a bill with where it stands and the repair it is for', () => {
+    expect(
+      contextNote({
+        kind: 'bill',
+        billId: 'sinv_1',
+        supplierName: 'Test Plumbing',
+        number: 'TP-7',
+        total: '$385',
+        status: 'unpaid',
+        dueOn: '2026-11-12',
+        repair: 'Bathroom tap is dripping · Room 203',
+      }),
+    ).toBe(
+      'The staff member is looking at the bill sinv_1 from Test Plumbing (TP-7): $385, to pay by 2026-11-12, for the repair "Bathroom tap is dripping · Room 203". Use supplierInvoiceId sinv_1.',
+    );
+  });
+
   it('names a night and a range of nights', () => {
     expect(contextNote({ kind: 'night', date: '2026-11-06' })).toBe(
       'The staff member is looking at the night of 2026-11-06 on the rate outlook.',

@@ -40,9 +40,13 @@ const result = await build({
   format: 'esm',
   target: 'node24',
   plugins: [withoutPglite],
-  // Some bundled CommonJS dependencies still call require() for Node built-ins.
+  // Some bundled CommonJS dependencies still call require() for Node built-ins. The invoice
+  // PDFs' fonts are copied beside the bundle (below), which ORBIT_FONTS_DIR points to.
   banner: {
-    js: "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
+    js: [
+      "import { createRequire } from 'node:module'; const require = createRequire(import.meta.url);",
+      "import { fileURLToPath as orbitPath } from 'node:url'; process.env.ORBIT_FONTS_DIR ??= orbitPath(new URL('./fonts/', import.meta.url));",
+    ].join(' '),
   },
   legalComments: 'none',
   metafile: true,
@@ -66,6 +70,9 @@ await writeFile(
   ),
 );
 
+await cp(path.join(repoRoot, 'apps/api/assets/fonts'), path.join(functionDir, 'fonts'), {
+  recursive: true,
+});
 await cp(webDist, path.join(output, 'static'), { recursive: true });
 
 const securityHeaders = {

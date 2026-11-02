@@ -15,6 +15,20 @@ import {
   type BookingAction,
   type BookingListQuery,
   type ChargePatch,
+  type EmailInvoiceBody,
+  type InvoiceFilter,
+  invoiceSchema,
+  invoiceScanPhoneViewSchema,
+  invoiceScanSchema,
+  invoiceViewSchema,
+  type IssueInvoiceBody,
+  type PaySupplierInvoiceBody,
+  type SupplierInvoiceBody,
+  type SupplierInvoicePatch,
+  supplierInvoiceSchema,
+  type SupplierInvoiceStatus,
+  supplierInvoiceViewSchema,
+  type VoidInvoiceBody,
   attachmentSchema,
   type BulkBody,
   type ComposeBody,
@@ -1139,4 +1153,142 @@ export function useUpdateGuest() {
   return useRefreshingMutation(({ id, patch }: { id: string; patch: GuestPatch }) =>
     apiPost(`/api/guests/${encodeURIComponent(id)}`, patch, guestSchema, 'PATCH'),
   );
+}
+
+/** Invoices and receipts, newest first, with how each bill stands now. */
+export function useInvoices(filter: InvoiceFilter = {}) {
+  return useQuery({
+    queryKey: ['invoices', filter],
+    queryFn: () => apiGet(`/api/invoices${toSearch(filter)}`, z.array(invoiceViewSchema)),
+  });
+}
+
+export function useIssueInvoice(bookingId: string) {
+  return useRefreshingMutation((body: IssueInvoiceBody) =>
+    apiPost(`${bookingPath(bookingId)}/invoices`, body, invoiceSchema),
+  );
+}
+
+export function useVoidInvoice() {
+  return useRefreshingMutation(({ id, body }: { id: string; body: VoidInvoiceBody }) =>
+    apiPost(
+      `/api/invoices/${encodeURIComponent(id)}/void`,
+      body,
+      z.object({ voided: invoiceSchema, replacement: invoiceSchema.nullable() }),
+    ),
+  );
+}
+
+export function useEmailInvoice() {
+  return useRefreshingMutation(({ id, body }: { id: string; body: EmailInvoiceBody }) =>
+    apiPost(`/api/invoices/${encodeURIComponent(id)}/email`, body, inquirySchema),
+  );
+}
+
+/** The document as a PDF: shown in the browser, or saved with `download`. */
+export function invoicePdfUrl(id: string, download = false): string {
+  return `/api/invoices/${encodeURIComponent(id)}/pdf${download ? '?download' : ''}`;
+}
+
+/** Bills from suppliers: to check, then to pay, then paid. */
+export function useBills(status?: SupplierInvoiceStatus) {
+  return useQuery({
+    queryKey: ['bills', status ?? 'all'],
+    queryFn: () =>
+      apiGet(`/api/supplier-invoices${toSearch({ status })}`, z.array(supplierInvoiceViewSchema)),
+  });
+}
+
+export function useCreateBill() {
+  return useRefreshingMutation((body: SupplierInvoiceBody) =>
+    apiPost('/api/supplier-invoices', body, supplierInvoiceSchema),
+  );
+}
+
+/** A PDF or photo of a bill, read into a bill to check. */
+export function useUploadBill() {
+  return useRefreshingMutation((file: Blob & { name?: string }) => {
+    const form = new FormData();
+    form.append('file', file, file.name ?? 'bill');
+    return apiPostForm('/api/supplier-invoices/upload', form, supplierInvoiceSchema);
+  });
+}
+
+/** A file attached to an email, read as a bill. */
+export function useBillFromAttachment() {
+  return useRefreshingMutation((body: { attachmentId: string; inquiryId: string | null }) =>
+    apiPost('/api/supplier-invoices/from-attachment', body, supplierInvoiceSchema),
+  );
+}
+
+export function useUpdateBill() {
+  return useRefreshingMutation(({ id, patch }: { id: string; patch: SupplierInvoicePatch }) =>
+    apiPost(
+      `/api/supplier-invoices/${encodeURIComponent(id)}`,
+      patch,
+      supplierInvoiceSchema,
+      'PATCH',
+    ),
+  );
+}
+
+export function usePayBill() {
+  return useRefreshingMutation(({ id, body }: { id: string; body: PaySupplierInvoiceBody }) =>
+    apiPost(`/api/supplier-invoices/${encodeURIComponent(id)}/pay`, body, supplierInvoiceSchema),
+  );
+}
+
+export function useRemoveBill() {
+  return useRefreshingMutation((id: string) =>
+    apiDelete(`/api/supplier-invoices/${encodeURIComponent(id)}`),
+  );
+}
+
+/** The file a bill was read from. */
+export function billFileUrl(id: string): string {
+  return `/api/supplier-invoices/${encodeURIComponent(id)}/file`;
+}
+
+export function useStartBillScan() {
+  return useMutation({
+    mutationFn: () => apiPost('/api/supplier-invoices/scans', {}, invoiceScanSchema),
+  });
+}
+
+/** The desk's view of a bill scan, polled until the photo has been read. */
+export function useBillScan(scanId: string | null) {
+  return useQuery({
+    queryKey: ['bill-scan', scanId],
+    queryFn: () =>
+      apiGet(`/api/supplier-invoices/scans/${encodeURIComponent(scanId ?? '')}`, invoiceScanSchema),
+    enabled: scanId !== null,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'done' || query.state.error ? false : 1500,
+  });
+}
+
+/** The phone's view of a bill scan link. */
+export function usePhoneBillScan(scanId: string) {
+  return useQuery({
+    queryKey: ['phone-bill-scan', scanId],
+    queryFn: () =>
+      apiGet(`/api/bill-scan/${encodeURIComponent(scanId)}`, invoiceScanPhoneViewSchema),
+    retry: false,
+  });
+}
+
+export function usePhoneBillUpload(scanId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (photo: Blob) => {
+      const form = new FormData();
+      form.append('photo', photo, 'bill.jpg');
+      return apiPostForm(
+        `/api/bill-scan/${encodeURIComponent(scanId)}/photo`,
+        form,
+        invoiceScanPhoneViewSchema,
+      );
+    },
+    onSuccess: (view) => queryClient.setQueryData(['phone-bill-scan', scanId], view),
+  });
 }

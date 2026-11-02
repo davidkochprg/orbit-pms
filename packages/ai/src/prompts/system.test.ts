@@ -1,5 +1,5 @@
 import { hotelPolicy, pricingConfig, usDemoPricing } from '@orbit/domain';
-import type { HotelProfile } from '@orbit/shared';
+import { defaultHotelBilling, type HotelProfile } from '@orbit/shared';
 import { describe, expect, it } from 'vitest';
 import { enforcedRules, hotelFacts, pricesSentence, timeOfDay } from './hotel';
 import { buildSystemPrompt } from './system';
@@ -16,6 +16,7 @@ const profile: HotelProfile = {
   country: 'CZ',
   language: 'cs',
   coordinates: null,
+  billing: defaultHotelBilling,
   entries: [
     { id: 'quiet', category: 'policies', title: 'Quiet hours', details: 'From 22:00.' },
     {

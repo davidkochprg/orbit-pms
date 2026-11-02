@@ -2,6 +2,8 @@ import {
   createActivityService,
   createArrivalNoteService,
   createInboxService,
+  createSupplierInvoiceService,
+  createInvoiceService,
   createHotelService,
   emptyHotelProfile,
   createBillingService,
@@ -106,6 +108,23 @@ export function setup({
   const inbox = createInboxService({ repos, hotel, clock, newId });
   const revenue = createRevenueService({ repos, defaults: pricingConfig, clock, newId });
   const contacts = createContactService({ repos, clock, newId });
+  const invoices = createInvoiceService({
+    repos,
+    pricing: pricingConfig,
+    inbox,
+    renderPdf: (invoice) =>
+      Promise.resolve(Uint8Array.from(invoice.number, (c) => c.charCodeAt(0))),
+    clock,
+    newId,
+  });
+  const bills = createSupplierInvoiceService({
+    repos,
+    pricing: pricingConfig,
+    scanMinutes: 15,
+    clock,
+    newId,
+    newToken: () => newId('tok'),
+  });
   const actions = createPendingActionService({
     repos,
     rates: createRatesService({ repos, defaults: pricingConfig, newId }),
@@ -117,6 +136,9 @@ export function setup({
     inbox,
     events: revenue,
     contacts,
+    invoices,
+    bills,
+    readBill: null,
     clock,
     newId,
   });
@@ -144,6 +166,8 @@ export function setup({
     statedAmounts: () => Promise.resolve([]),
     contacts,
     mailLabels: () => repos.mail.listLabels(),
+    invoices,
+    bills,
     arrivalNotesDue: (date) => createArrivalNoteService({ repos, clock }).due(date),
     draftArrivalNote,
     draftWorkOrder,

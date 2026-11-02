@@ -17,8 +17,11 @@
     "@orbit/db": "workspace:*",
     "@orbit/domain": "workspace:*",
     "@orbit/shared": "workspace:*",
+    "@pdf-lib/fontkit": "^1.1.1",
     "ai": "^7.0.153",
     "hono": "^4.13.14",
+    "pdf-lib": "^1.17.1",
+    "unpdf": "^1.9.1",
     "zod": "^4.6.7"
   },
   "devDependencies": {

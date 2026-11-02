@@ -143,6 +143,27 @@ The booking's bill (`Folio`): `lines` (`{ kind: 'stay' | 'city_tax' | 'extra' | 
 
 Takes `{ kind?: 'payment' | 'refund', method: 'cash' | 'card' | 'bank_transfer', amount, note? }` (amount positive, whole units) and returns `201` with the updated `Folio`. A cancelled booking takes refunds only (`409`); a refund larger than what was paid is `400 invalid_input`.
 
+### Invoices and receipts
+
+- `GET /api/invoices?bookingId=&kind=&status=` lists documents newest first as `InvoiceView`s: the `Invoice` (`number`, `kind`: `invoice` | `receipt`, `status`: `issued` | `void`, `issuedOn`, `dueOn`, `stay`, `issuer`, `buyer`, `lines`, `vat`, `total`, `paid`, `due`, `payments`, `paymentReference`, `note`, `voidReason`, `replacedBy`) with `guestName`, `settled`, `overdue` and `outdated`. `GET /api/invoices/:id` returns one.
+- `POST /api/bookings/:id/invoices` takes `{ kind, buyer?, note? }` (`buyer`: `{ name, company, address, taxId, email }`, the guest when left out) and returns `201` with the `Invoice`. `409 invalid_transition` for a hold, `409 conflict` when one of that kind is current, `400` for an empty bill or a receipt with nothing paid.
+- `POST /api/invoices/:id/void` takes `{ reason, reissue?, buyer? }` and returns `{ voided, replacement }`.
+- `GET /api/invoices/:id/pdf` returns the PDF, inline, or as a download with `?download`.
+- `POST /api/invoices/:id/email` takes `{ body, to?, subject? }` and returns `201` with the new conversation, linked to the booking, with the PDF attached.
+
+The signed-in staff member (`x-staff-id`) is named as who issued or sent it. See [domain.md](domain.md#invoices-and-receipts).
+
+### Supplier bills
+
+- `GET /api/supplier-invoices?status=` lists bills (`to_review`, then `unpaid`, then `paid`) as `SupplierInvoiceView`s: `supplierName`, `contactId`, `number`, `issuedOn`, `dueOn`, `currency`, `total`, `tax`, `lines`, `bankAccount`, `paymentReference`, `taskId`, `note`, `file`, `source`, `inquiryId`, `warnings`, `paidOn`, `paidMethod`, plus `contactName`, `repairLabel` and `overdue`. `GET /api/supplier-invoices/:id` returns one, `GET /api/supplier-invoices/:id/file` the file it was read from.
+- `POST /api/supplier-invoices` takes a bill typed in (`{ supplierName, total, contactId?, number?, issuedOn?, dueOn?, tax?, bankAccount?, paymentReference?, taskId?, note? }`) and returns `201`.
+- `POST /api/supplier-invoices/upload` takes a multipart `file` (a PDF, or a JPEG, PNG or WebP photo, at most 4 MB) and returns `201` with the bill to check. A PDF is read by its text; a scanned PDF without text is `400`. A photo needs a vision model.
+- `POST /api/supplier-invoices/from-attachment` takes `{ attachmentId, inquiryId? }`: a file on an email, read the same way, from the email's sender.
+- `PATCH /api/supplier-invoices/:id` takes any of the fields, and `checked: true` to move a bill to check to the bills to pay. `POST /api/supplier-invoices/:id/pay` takes `{ method, paidOn? }`. `DELETE /api/supplier-invoices/:id` returns `204`.
+- Phone scans: `POST /api/supplier-invoices/scans` opens one (`503` without a vision model) and `GET /api/supplier-invoices/scans/:scanId` is the desk's view, with `supplierInvoiceId` once read. The phone uses `GET /api/bill-scan/:scanId` and `POST /api/bill-scan/:scanId/photo` (multipart `photo`), with no access code, and sees only `{ status, error, expiresAt }`.
+
+Reading needs AI: `503 ai_not_configured` without it. See [domain.md](domain.md#supplier-bills) and [ai.md](ai.md#supplier-bills).
+
 ### `GET /api/guests`, `GET /api/guests/:id`
 
 `Guest[]` ordered by name, or one `Guest`: `id`, `name`, `email`, `phone`, `language`, `notes`.

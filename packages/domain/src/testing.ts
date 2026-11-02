@@ -9,6 +9,8 @@ import type {
   HousekeepingTask,
   IdScan,
   Inquiry,
+  Invoice,
+  InvoiceScan,
   LocalEvent,
   RateReview,
   MailDraft,
@@ -22,6 +24,7 @@ import type {
   SavedStayReading,
   StaffMember,
   StayGuest,
+  SupplierInvoice,
 } from '@orbit/shared';
 import { rangesOverlap } from './dates';
 import type { BillingFilter, Repositories } from './repositories';
@@ -98,6 +101,9 @@ export interface MemoryState {
   drafts: MailDraft[];
   /** Files as plain numbers, so the state stays plain JSON. */
   files: { attachment: Attachment; bytes: number[] }[];
+  invoices: Invoice[];
+  supplierInvoices: SupplierInvoice[];
+  invoiceScans: InvoiceScan[];
 }
 
 function inBilling<T extends { bookingId: string }>(
@@ -144,6 +150,9 @@ export function createMemoryRepositories(
     labels: [],
     drafts: [],
     files: [],
+    invoices: [],
+    supplierInvoices: [],
+    invoiceScans: [],
     ...clone(initial),
   };
 
@@ -484,6 +493,73 @@ export function createMemoryRepositories(
         return Promise.resolve(
           file ? { attachment: file.attachment, bytes: new Uint8Array(file.bytes) } : null,
         );
+      },
+    },
+    invoices: {
+      list: ({ bookingId, kind, status } = {}) =>
+        Promise.resolve(
+          state.invoices
+            .filter(
+              (i) =>
+                (!bookingId || i.bookingId === bookingId) &&
+                (!kind || i.kind === kind) &&
+                (!status || i.status === status),
+            )
+            .sort(
+              (a, b) => b.createdAt.localeCompare(a.createdAt) || b.number.localeCompare(a.number),
+            ),
+        ),
+      get: (id) => Promise.resolve(state.invoices.find((i) => i.id === id) ?? null),
+      create: (invoice) => {
+        if (state.invoices.some((i) => i.number === invoice.number)) {
+          return Promise.reject(new Error(`Invoice number ${invoice.number} is taken`));
+        }
+        state.invoices.push(invoice);
+        return Promise.resolve();
+      },
+      update: (invoice) => {
+        state.invoices = state.invoices.map((i) => (i.id === invoice.id ? invoice : i));
+        return Promise.resolve();
+      },
+      lastSequence: (series) =>
+        Promise.resolve(
+          Math.max(
+            0,
+            ...state.invoices
+              .filter((i) => i.number.startsWith(series))
+              .map((i) => Number(i.number.slice(series.length))),
+          ),
+        ),
+    },
+    supplierInvoices: {
+      list: ({ status } = {}) =>
+        Promise.resolve(
+          state.supplierInvoices
+            .filter((i) => !status || status.includes(i.status))
+            .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+        ),
+      get: (id) => Promise.resolve(state.supplierInvoices.find((i) => i.id === id) ?? null),
+      save: (invoice) => {
+        state.supplierInvoices = [
+          ...state.supplierInvoices.filter((i) => i.id !== invoice.id),
+          invoice,
+        ];
+        return Promise.resolve();
+      },
+      delete: (id) => {
+        state.supplierInvoices = state.supplierInvoices.filter((i) => i.id !== id);
+        return Promise.resolve();
+      },
+    },
+    invoiceScans: {
+      get: (id) => Promise.resolve(state.invoiceScans.find((s) => s.id === id) ?? null),
+      save: (scan) => {
+        state.invoiceScans = [...state.invoiceScans.filter((s) => s.id !== scan.id), scan];
+        return Promise.resolve();
+      },
+      deleteExpired: (at) => {
+        state.invoiceScans = state.invoiceScans.filter((s) => s.expiresAt > at);
+        return Promise.resolve();
       },
     },
     async transaction(fn) {

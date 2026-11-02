@@ -18,6 +18,7 @@ export const aiFeatures = [
   'arrival_note',
   'report_summary',
   'guest_memory',
+  'invoice_read',
 ] as const;
 export type AiFeature = (typeof aiFeatures)[number];
 

@@ -57,6 +57,14 @@ const titles: Record<PendingAction['kind'], string> = {
   update_room: 'Change the room',
   save_contact: 'Save a contact',
   remove_contact: 'Delete a contact',
+  issue_invoice: 'Issue a document',
+  void_invoice: 'Void a document',
+  email_invoice: 'Email a document',
+  save_supplier_invoice: 'Add a bill',
+  update_supplier_invoice: 'Update a bill',
+  pay_supplier_invoice: 'Mark a bill paid',
+  remove_supplier_invoice: 'Delete a bill',
+  read_bill: 'Read a bill',
 };
 
 /** The conversation an action is about, to open once it is done. */

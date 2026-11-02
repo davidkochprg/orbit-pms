@@ -9,6 +9,8 @@ import type {
   GuestRepository,
   HousekeepingRepository,
   InquiryRepository,
+  InvoiceRepository,
+  InvoiceScanRepository,
   PendingActionRepository,
   IdScanRepository,
   StayGuestRepository,
@@ -21,6 +23,7 @@ import type {
   RoomRepository,
   SettingsRepository,
   StaffRepository,
+  SupplierInvoiceRepository,
 } from '@orbit/domain';
 import {
   type AuditLogEntry,
@@ -30,6 +33,8 @@ import {
   type HousekeepingTask,
   type InboxMessage,
   type Inquiry,
+  type InvoiceScan,
+  invoiceSchema,
   type PendingAction,
   type Payment,
   type IdScan,
@@ -37,6 +42,7 @@ import {
   pendingActionSchema,
   pricingConfigSchema,
   rateSignalSchema,
+  supplierInvoiceSchema,
 } from '@orbit/shared';
 import {
   and,
@@ -47,10 +53,12 @@ import {
   gte,
   inArray,
   isNotNull,
+  like,
   lt,
   lte,
   ne,
   type SQL,
+  sql,
 } from 'drizzle-orm';
 import type { PgColumn } from 'drizzle-orm/pg-core';
 import type { Db } from './client';
@@ -64,6 +72,8 @@ import {
   housekeepingTasks,
   inboxMessages,
   inquiries,
+  invoiceScans,
+  invoices,
   payments,
   pendingActions,
   pricing,
@@ -71,6 +81,7 @@ import {
   rateReviews,
   stayGuests,
   stayReadings,
+  supplierInvoices,
   guestMemories,
   localEvents,
   mailAttachments,
@@ -630,6 +641,136 @@ function idScanRepository(db: Db): IdScanRepository {
   };
 }
 
+function invoiceRepository(db: Db): InvoiceRepository {
+  // Validated on read: the document is plain JSON.
+  const parse = (row: { document: unknown }) => invoiceSchema.parse(row.document);
+  const columns = (invoice: {
+    id: string;
+    number: string;
+    kind: 'invoice' | 'receipt';
+    status: 'issued' | 'void';
+    bookingId: string;
+    createdAt: string;
+  }) => ({
+    id: invoice.id,
+    number: invoice.number,
+    kind: invoice.kind,
+    status: invoice.status,
+    bookingId: invoice.bookingId,
+    createdAt: new Date(invoice.createdAt),
+  });
+  return {
+    async list({ bookingId, kind, status } = {}) {
+      const where: SQL[] = [];
+      if (bookingId) where.push(eq(invoices.bookingId, bookingId));
+      if (kind) where.push(eq(invoices.kind, kind));
+      if (status) where.push(eq(invoices.status, status));
+      const rows = await db
+        .select({ document: invoices.document })
+        .from(invoices)
+        .where(and(...where))
+        .orderBy(desc(invoices.createdAt), desc(invoices.number));
+      return rows.map(parse);
+    },
+    async get(id) {
+      const [row] = await db
+        .select({ document: invoices.document })
+        .from(invoices)
+        .where(eq(invoices.id, id));
+      return row ? parse(row) : null;
+    },
+    async create(invoice) {
+      await db.insert(invoices).values({ ...columns(invoice), document: invoice });
+    },
+    async update(invoice) {
+      await db
+        .update(invoices)
+        .set({ status: invoice.status, document: invoice })
+        .where(eq(invoices.id, invoice.id));
+    },
+    async lastSequence(series) {
+      // Held until the transaction ends; outside one it is released straight away.
+      await db.execute(sql`select pg_advisory_xact_lock(hashtext(${series}))`);
+      const rows = await db
+        .select({ number: invoices.number })
+        .from(invoices)
+        .where(like(invoices.number, `${series}%`));
+      return Math.max(0, ...rows.map((r) => Number(r.number.slice(series.length)) || 0));
+    },
+  };
+}
+
+function supplierInvoiceRepository(db: Db): SupplierInvoiceRepository {
+  const parse = (row: { document: unknown }) => supplierInvoiceSchema.parse(row.document);
+  return {
+    async list({ status } = {}) {
+      const rows = await db
+        .select({ document: supplierInvoices.document })
+        .from(supplierInvoices)
+        .where(status ? inArray(supplierInvoices.status, status) : undefined)
+        .orderBy(desc(supplierInvoices.createdAt), desc(supplierInvoices.id));
+      return rows.map(parse);
+    },
+    async get(id) {
+      const [row] = await db
+        .select({ document: supplierInvoices.document })
+        .from(supplierInvoices)
+        .where(eq(supplierInvoices.id, id));
+      return row ? parse(row) : null;
+    },
+    async save(invoice) {
+      const row = {
+        id: invoice.id,
+        status: invoice.status,
+        document: invoice,
+        createdAt: new Date(invoice.createdAt),
+      };
+      await db
+        .insert(supplierInvoices)
+        .values(row)
+        .onConflictDoUpdate({ target: supplierInvoices.id, set: row });
+    },
+    async delete(id) {
+      await db.delete(supplierInvoices).where(eq(supplierInvoices.id, id));
+    },
+  };
+}
+
+function invoiceScanRepository(db: Db): InvoiceScanRepository {
+  const toScan = ({
+    readingSince,
+    createdAt,
+    expiresAt,
+    ...row
+  }: typeof invoiceScans.$inferSelect): InvoiceScan => ({
+    ...row,
+    readingSince: readingSince?.toISOString() ?? null,
+    createdAt: createdAt.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+  });
+  return {
+    async get(id) {
+      const [row] = await db.select().from(invoiceScans).where(eq(invoiceScans.id, id));
+      return row ? toScan(row) : null;
+    },
+    async save(scan) {
+      const row = {
+        ...scan,
+        readingSince: scan.readingSince ? new Date(scan.readingSince) : null,
+        createdAt: new Date(scan.createdAt),
+        expiresAt: new Date(scan.expiresAt),
+      };
+      await db
+        .insert(invoiceScans)
+        .values(row)
+        .onConflictDoUpdate({ target: invoiceScans.id, set: row });
+    },
+    async deleteExpired(now) {
+      await db.delete(invoiceScans).where(lte(invoiceScans.expiresAt, new Date(now)));
+    },
+  };
+}
+
 function stayReadingRepository(db: Db): StayReadingRepository {
   return {
     async list(bookingIds) {
@@ -756,6 +897,9 @@ export function createRepositories(db: Db): Repositories {
     rateReview: rateReviewRepository(db),
     contacts: contactRepository(db),
     mail: mailRepository(db),
+    invoices: invoiceRepository(db),
+    supplierInvoices: supplierInvoiceRepository(db),
+    invoiceScans: invoiceScanRepository(db),
     transaction: (fn) => db.transaction((tx) => fn(createRepositories(tx))),
   };
 }

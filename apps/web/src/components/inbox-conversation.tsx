@@ -1,4 +1,5 @@
 import {
+  type Attachment,
   type BookingDetail,
   hotelInfoCategoryLabels,
   type InboxMessage,
@@ -23,9 +24,11 @@ import {
   Copy,
   Forward,
   Languages,
+  LoaderCircle,
   Mail,
   MessageSquarePlus,
   PenLine,
+  ReceiptText,
   RotateCw,
   Send,
   Star,
@@ -57,6 +60,7 @@ import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useSession } from '@/hooks/use-session';
 import { useToast } from '@/hooks/use-toast';
 import {
+  useBillFromAttachment,
   useBookingDetail,
   useDeclineInquiry,
   useDeleteDraft,
@@ -699,9 +703,51 @@ function Message({
           )}
         </div>
       )}
-      <AttachmentList files={message.attachments} />
+      <AttachmentList
+        files={message.attachments}
+        action={
+          message.direction === 'in'
+            ? (file) => <ReadBillButton file={file} inquiryId={inquiry.id} />
+            : undefined
+        }
+      />
       {translate.error && <ErrorNotice message={translate.error.message} />}
     </li>
+  );
+}
+
+/**
+ * Reads a PDF or photo someone sent as a supplier's bill, then opens it to check. Shown only when
+ * AI can read the file: PDFs need the agent model, photos the vision model.
+ */
+function ReadBillButton({ file, inquiryId }: { file: Attachment; inquiryId: string }) {
+  const ai = useHealth().data?.ai;
+  const read = useBillFromAttachment();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const pdf = file.contentType === 'application/pdf';
+  const photo = /^image\/(jpeg|png|webp)$/.test(file.contentType);
+  if (!ai?.configured || !(pdf || (photo && ai.vision))) return null;
+  return (
+    <Button
+      variant="ghost"
+      size="icon-xs"
+      tooltip="Read as a bill"
+      aria-label={`Read ${file.name} as a bill`}
+      disabled={read.isPending}
+      onClick={() =>
+        read.mutate(
+          { attachmentId: file.id, inquiryId },
+          {
+            onSuccess: (bill) =>
+              void navigate(`/invoices?tab=bills&bill=${encodeURIComponent(bill.id)}`),
+            onError: (err) => toast({ title: err.message }),
+          },
+        )
+      }
+    >
+      {read.isPending ? <LoaderCircle className="animate-spin" /> : <ReceiptText />}
+    </Button>
   );
 }
 
