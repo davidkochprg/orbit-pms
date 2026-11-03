@@ -1,7 +1,6 @@
 import type { NightOutlook } from '@orbit/shared';
 import { Check, PanelRight, RotateCcw } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { ArrivalRisks } from '@/components/arrival-risks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorNotice } from '@/components/error-notice';
 import { LocalEvents } from '@/components/local-events';
@@ -77,14 +76,7 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
     );
   }
 
-  const {
-    nights,
-    events,
-    arrivalRisks,
-    today,
-    weatherAvailable,
-    review: lastReview,
-  } = outlook.data;
+  const { nights, events, today, weatherAvailable, review: lastReview } = outlook.data;
   const toApply = suggestions(nights);
   const selected = nights.find((n) => n.date === picked) ?? toApply[0] ?? nights[0] ?? null;
 
@@ -128,104 +120,93 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
       )}
 
       {/* Columns follow the page's width, not the window's, so an open sidebar counts. Wide: the
-          calendar with arrivals under it, and the night with events beside it. Narrow: one column,
-          with the night right under the calendar that picks it. */}
+          calendar, with the night it picks and the events beside it. Narrow: one column. */}
       <div className="@container">
         <div className="grid items-start gap-4 @5xl:grid-cols-[minmax(0,1fr)_21rem]">
-          <div className="contents @5xl:flex @5xl:min-w-0 @5xl:flex-col @5xl:gap-4">
-            <Panel
-              className="order-1"
-              title={`Next ${DAYS} nights`}
-              actions={
-                <>
-                  <span
-                    className="mr-1 text-xs text-subtle-foreground max-md:hidden"
-                    aria-live="polite"
+          <Panel
+            title={`Next ${DAYS} nights`}
+            actions={
+              <>
+                <span
+                  className="mr-1 text-xs text-subtle-foreground max-md:hidden"
+                  aria-live="polite"
+                >
+                  {review.isPending ? (
+                    <span className="animate-pulse">Reviewing {DAYS} nights…</span>
+                  ) : (
+                    lastReview.reviewedAt && `Reviewed ${formatRecent(lastReview.reviewedAt)} · `
+                  )}
+                  {!review.isPending &&
+                    (weatherAvailable ? 'Forecast by Open-Meteo' : 'No forecast')}
+                </span>
+                {aiOn && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    disabled={brief.isPending}
+                    onClick={() => brief.mutate(DAYS)}
                   >
-                    {review.isPending ? (
-                      <span className="animate-pulse">Reviewing {DAYS} nights…</span>
-                    ) : (
-                      lastReview.reviewedAt && `Reviewed ${formatRecent(lastReview.reviewedAt)} · `
-                    )}
-                    {!review.isPending &&
-                      (weatherAvailable ? 'Forecast by Open-Meteo' : 'No forecast')}
-                  </span>
-                  {aiOn && (
-                    <Button
-                      variant="ghost"
-                      size="xs"
-                      disabled={brief.isPending}
-                      onClick={() => brief.mutate(DAYS)}
-                    >
-                      {brief.isPending ? 'Reading the outlook…' : 'Summarize'}
-                    </Button>
-                  )}
-                  {canManage && toApply.length > 0 && (
-                    <Button
-                      size="xs"
-                      disabled={adjust.isPending}
-                      onClick={() => setConfirmAll(true)}
-                    >
-                      Apply {toApply.length} suggestion{toApply.length === 1 ? '' : 's'}
-                    </Button>
-                  )}
-                </>
-              }
-            >
-              <RateCalendar
-                nights={nights}
-                selected={selected?.date ?? null}
-                menu={(night, cell) => (
-                  <ContextMenu>
-                    <ContextMenuTrigger asChild>{cell}</ContextMenuTrigger>
-                    <ContextMenuContent className="w-56">
-                      <ContextMenuLabel>{formatDate(night.date)}</ContextMenuLabel>
-                      <ContextMenuItem onSelect={() => setPicked(night.date)}>
-                        <PanelRight /> Show this night
-                      </ContextMenuItem>
-                      {ask && (
-                        <ContextMenuItem onSelect={() => ask({ kind: 'night', id: night.date })}>
-                          <LogoMark /> Ask Orbit
-                        </ContextMenuItem>
-                      )}
-                      {canManage && night.suggestedPercent !== night.currentPercent && (
-                        <ContextMenuItem
-                          disabled={adjust.isPending}
-                          onSelect={() => set([night], (n) => n.suggestedPercent)}
-                        >
-                          <Check /> Take the suggestion, {signed(night.suggestedPercent)}
-                        </ContextMenuItem>
-                      )}
-                      {canManage && night.currentPercent !== 0 && (
-                        <ContextMenuItem
-                          disabled={adjust.isPending}
-                          onSelect={() => set([night], () => 0)}
-                        >
-                          <RotateCcw /> Go back to the season rate
-                        </ContextMenuItem>
-                      )}
-                    </ContextMenuContent>
-                  </ContextMenu>
+                    {brief.isPending ? 'Reading the outlook…' : 'Summarize'}
+                  </Button>
                 )}
-                onSelect={(date, via) => {
-                  setPicked(date);
-                  // Below the calendar on narrower screens: bring a clicked night into view.
-                  if (via === 'click') {
-                    nightPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                  }
-                }}
-              />
-            </Panel>
-            <Panel title="Arrivals at risk" count={arrivalRisks.length} className="order-4">
-              <ArrivalRisks risks={arrivalRisks} />
-            </Panel>
-          </div>
-          <div className="contents @5xl:flex @5xl:flex-col @5xl:gap-4">
+                {canManage && toApply.length > 0 && (
+                  <Button size="xs" disabled={adjust.isPending} onClick={() => setConfirmAll(true)}>
+                    Apply {toApply.length} suggestion{toApply.length === 1 ? '' : 's'}
+                  </Button>
+                )}
+              </>
+            }
+          >
+            <RateCalendar
+              nights={nights}
+              selected={selected?.date ?? null}
+              menu={(night, cell) => (
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>{cell}</ContextMenuTrigger>
+                  <ContextMenuContent className="w-56">
+                    <ContextMenuLabel>{formatDate(night.date)}</ContextMenuLabel>
+                    <ContextMenuItem onSelect={() => setPicked(night.date)}>
+                      <PanelRight /> Show this night
+                    </ContextMenuItem>
+                    {ask && (
+                      <ContextMenuItem onSelect={() => ask({ kind: 'night', id: night.date })}>
+                        <LogoMark /> Ask Orbit
+                      </ContextMenuItem>
+                    )}
+                    {canManage && night.suggestedPercent !== night.currentPercent && (
+                      <ContextMenuItem
+                        disabled={adjust.isPending}
+                        onSelect={() => set([night], (n) => n.suggestedPercent)}
+                      >
+                        <Check /> Take the suggestion, {signed(night.suggestedPercent)}
+                      </ContextMenuItem>
+                    )}
+                    {canManage && night.currentPercent !== 0 && (
+                      <ContextMenuItem
+                        disabled={adjust.isPending}
+                        onSelect={() => set([night], () => 0)}
+                      >
+                        <RotateCcw /> Go back to the season rate
+                      </ContextMenuItem>
+                    )}
+                  </ContextMenuContent>
+                </ContextMenu>
+              )}
+              onSelect={(date, via) => {
+                setPicked(date);
+                // Below the calendar on narrower screens: bring a clicked night into view.
+                if (via === 'click') {
+                  nightPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+              }}
+            />
+          </Panel>
+          <div className="flex flex-col gap-4">
             {selected && (
               <Panel
                 ref={nightPanel}
                 title={formatLongDate(selected.date)}
-                className="order-2 scroll-mt-4"
+                className="scroll-mt-4"
                 contentClassName="p-0"
               >
                 <RateNightPanel
@@ -237,7 +218,7 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
                 />
               </Panel>
             )}
-            <Panel title="Local events" count={events.length} className="order-3">
+            <Panel title="Local events" count={events.length}>
               <LocalEvents events={events} canManage={canManage} today={today} />
             </Panel>
           </div>

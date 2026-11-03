@@ -1,5 +1,6 @@
 import type {
   ArrivalNotes,
+  ArrivalRisk,
   BookingSummary,
   DailyBrief,
   InvoiceView,
@@ -9,11 +10,13 @@ import type {
 import { formatDate, formatDateTime, formatMoney, formatRange } from '@/lib/format';
 import { contactName } from '@/lib/repairs';
 import { roomStatusLabels } from '@/lib/status';
+import { addDaysIso } from '@/lib/tape-chart';
 
 export type AttentionKind =
   | 'prepare'
   | 'ids'
   | 'hold'
+  | 'no_show'
   | 'opening'
   | 'messages'
   | 'welcome'
@@ -97,6 +100,41 @@ export interface MoneyMatters {
   invoices?: InvoiceView[];
 }
 
+/** Arrivals today and tomorrow this likely to leave their room empty make the list. */
+const NO_SHOW_FROM = 0.15;
+/** At most this many, the likeliest first, so Today stays one screen. */
+const NO_SHOW_MAX = 3;
+
+/** The arrivals of today and tomorrow most likely not to come: worth a deposit or a call. */
+function noShowItems(risks: ArrivalRisk[], today: string): AttentionItem[] {
+  const tomorrow = addDaysIso(today, 1);
+  const soon = risks
+    .filter((r) => r.checkIn >= today && r.checkIn <= tomorrow && r.chance >= NO_SHOW_FROM)
+    .sort((a, b) => b.chance - a.chance)
+    .slice(0, NO_SHOW_MAX);
+  const items = soon.map((r): AttentionItem => {
+    const why = r.reasons.map((x, i) => (i === 0 ? x : x.charAt(0).toLowerCase() + x.slice(1)));
+    return {
+      id: `no_show:${r.bookingId}`,
+      kind: 'no_show',
+      title: `${r.guestName} may not show`,
+      detail: [
+        `Room ${r.roomName}, arrives ${r.checkIn === today ? 'today' : 'tomorrow'}`,
+        why.join(', '),
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      target: { bookingId: r.bookingId },
+    };
+  });
+  return grouped(
+    items,
+    'no_show',
+    `${plural(items.length, 'arrival')} may not show`,
+    soon.map((r) => r.roomName),
+  );
+}
+
 /** A bill's own page: the bills tab with it open. */
 const billPath = (id: string) => `/invoices?tab=bills&bill=${encodeURIComponent(id)}`;
 
@@ -148,6 +186,7 @@ export function attentionItems(
   knockOns: KnockOn[] = [],
   arrivalNotes?: ArrivalNotes,
   money: MoneyMatters = {},
+  arrivalRisks: ArrivalRisk[] = [],
 ): AttentionItem[] {
   const items: AttentionItem[] = [];
   for (const r of brief.roomsToPrepare) {
@@ -202,6 +241,7 @@ export function attentionItems(
       brief.holds.map((h) => h.summary.roomName),
     ),
   );
+  items.push(...noShowItems(arrivalRisks, brief.date));
   for (const k of knockOns) {
     if (k.kind !== 'opening') continue;
     items.push({

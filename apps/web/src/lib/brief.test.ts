@@ -1,4 +1,5 @@
 import type {
+  ArrivalRisk,
   InvoiceView,
   SupplierInvoiceView,
   Booking,
@@ -279,6 +280,58 @@ describe('attentionItems with knock-ons', () => {
       ['Bill from Test Plumbing is overdue', { path: '/invoices?tab=bills&bill=sinv_2' }],
       ["Mia Wagner hasn't paid INV-2026-0003", { bookingId: 'bk_9' }],
     ]);
+  });
+
+  it('lists the likeliest no-shows of today and tomorrow, opening the booking', () => {
+    const risk = (id: string, checkIn: string, chance: number): ArrivalRisk => ({
+      bookingId: id,
+      guestName: `Guest ${id}`,
+      roomName: id.slice(3),
+      checkIn,
+      source: 'ota',
+      chance,
+      reasons: ['No deposit', 'Cancelled a stay before'],
+    });
+    const risks = [
+      risk('bk_301', '2026-10-28', 0.18),
+      risk('bk_302', '2026-10-27', 0.23),
+      // Too unlikely, and too far out.
+      risk('bk_303', '2026-10-27', 0.1),
+      risk('bk_304', '2026-10-29', 0.4),
+    ];
+    const rows = attentionItems(brief, [], undefined, {}, risks).filter(
+      (i) => i.kind === 'no_show',
+    );
+    expect(rows.map((i) => [i.title, i.detail, i.target])).toEqual([
+      [
+        'Guest bk_302 may not show',
+        'Room 302, arrives today · No deposit, cancelled a stay before',
+        { bookingId: 'bk_302' },
+      ],
+      [
+        'Guest bk_301 may not show',
+        'Room 301, arrives tomorrow · No deposit, cancelled a stay before',
+        { bookingId: 'bk_301' },
+      ],
+    ]);
+  });
+
+  it('folds three no-shows into one row', () => {
+    const risks = ['401', '402', '403', '404'].map((room): ArrivalRisk => ({
+      bookingId: `bk_${room}`,
+      guestName: `Guest ${room}`,
+      roomName: room,
+      checkIn: '2026-10-27',
+      source: 'email',
+      chance: 0.2,
+      reasons: [],
+    }));
+    const rows = attentionItems(brief, [], undefined, {}, risks).filter(
+      (i) => i.kind === 'no_show',
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.title).toBe('3 arrivals may not show');
+    expect(rows[0]!.detail).toBe('Rooms 401, 402, 403');
   });
 
   it('leaves rows as they are when their knock-on is gone', () => {

@@ -13,6 +13,7 @@ import {
   ReceiptText,
   FileText,
   ScanLine,
+  UserX,
   Wrench,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -31,6 +32,7 @@ import {
   useInvoices,
   useKnockOns,
   useRefreshInboxRooms,
+  useRevenueOutlook,
 } from '@/lib/api';
 import { type AttentionItem, type AttentionKind, attentionItems, gapItems } from '@/lib/brief';
 import { cn } from '@/lib/utils';
@@ -39,6 +41,7 @@ const kindIcons: Record<AttentionKind, { icon: LucideIcon; className: string }> 
   prepare: { icon: BrushCleaning, className: 'text-warning' },
   ids: { icon: ScanLine, className: 'text-warning' },
   hold: { icon: Clock, className: 'text-status-hold' },
+  no_show: { icon: UserX, className: 'text-warning' },
   opening: { icon: CalendarCheck, className: 'text-primary-text' },
   messages: { icon: Inbox, className: 'text-primary-text' },
   welcome: { icon: MailCheck, className: 'text-primary-text' },
@@ -62,7 +65,9 @@ export function AttentionPanel({ brief, className }: { brief: DailyBrief; classN
   const arrivalNotes = useArrivalNotes(aiOn);
   const bills = useBills().data;
   const invoices = useInvoices({ kind: 'invoice', status: 'issued' }).data;
-  const items = attentionItems(brief, knockOns.data, arrivalNotes.data, { bills, invoices });
+  // The same outlook the Rates page reads, so the two share one request.
+  const risks = useRevenueOutlook().data?.arrivalRisks;
+  const items = attentionItems(brief, knockOns.data, arrivalNotes.data, { bills, invoices }, risks);
   return (
     <Panel
       title="Needs attention"
