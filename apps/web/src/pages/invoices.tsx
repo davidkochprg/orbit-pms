@@ -1,14 +1,15 @@
-import { invoiceKindLabels, type SupplierInvoiceView } from '@orbit/shared';
+import { invoiceKindLabels, type InvoiceView, type SupplierInvoiceView } from '@orbit/shared';
 import {
   BedDouble,
   FilePlus2,
   FileText,
   Plus,
   ReceiptText,
+  SearchX,
   Smartphone,
   Upload,
 } from 'lucide-react';
-import { useCallback, useRef } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ActionMenu } from '@/components/action-menu';
 import { BillDialog } from '@/components/bill-dialog';
@@ -18,33 +19,58 @@ import { ErrorNotice } from '@/components/error-notice';
 import { InvoiceMenuButton } from '@/components/invoice-list';
 import { LogoMark } from '@/components/logo-mark';
 import { PageHeader } from '@/components/page-header';
+import { Rail, RailHeading, RailItem } from '@/components/rail';
+import { SearchField } from '@/components/search-field';
 import { Segmented } from '@/components/segmented';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAskOrbit } from '@/hooks/use-ask-orbit';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { useInvoiceDialogs } from '@/hooks/use-invoice-dialogs';
 import { useToast } from '@/hooks/use-toast';
 import { useBills, useHealth, useInvoices, useUploadBill } from '@/lib/api';
-import { formatDate, formatMoney } from '@/lib/format';
-import { billState, invoiceActions, invoiceState, openInvoicePdf, toneText } from '@/lib/invoices';
+import { currencyMark, formatDate, formatMoney, hotelTodayIso } from '@/lib/format';
+import {
+  type BillFolder,
+  billDate,
+  billFolderLabels,
+  billFolders,
+  buyerOf,
+  type DocumentFilter,
+  inBillFolder,
+  inIssuedFolder,
+  type InvoiceTab,
+  isFiltered,
+  type IssuedFolder,
+  issuedFolderLabels,
+  issuedFolders,
+  matchesBill,
+  matchesIssued,
+  noFilter,
+  partyCounts,
+  periodLabels,
+  periods,
+} from '@/lib/invoice-filters';
+import { billState, invoiceActions, invoiceState, parseAmount, toneText } from '@/lib/invoices';
 import { BILL_PHOTO_MAX_EDGE, prepareIdPhoto } from '@/lib/photo';
 import { cn, labelCaps } from '@/lib/utils';
 
-type Tab = 'issued' | 'bills';
-
-const tabs: { value: Tab; label: string }[] = [
+const tabs: { value: InvoiceTab; label: string }[] = [
   { value: 'issued', label: 'Issued' },
   { value: 'bills', label: 'Bills' },
 ];
+
+/** The most parties listed in the rail; search finds the rest. */
+const PARTIES = 8;
 
 function Head({ columns }: { columns: { label: string; className?: string }[] }) {
   return (
     <thead className="sticky top-0 z-10 bg-surface-sunken/90 backdrop-blur-md">
       <tr className="border-b">
-        {columns.map((c) => (
+        {columns.map((c, i) => (
           <th
-            key={c.label}
+            key={c.label || i}
             className={cn(labelCaps, 'h-10 px-4 text-left first:pl-6 last:pr-6', c.className)}
           >
             {c.label}
@@ -57,40 +83,53 @@ function Head({ columns }: { columns: { label: string; className?: string }[] })
 
 /**
  * Invoicing: the invoices and receipts issued for guests' bills, and the bills from suppliers to
- * check and pay. `?tab=bills` shows the bills, `?bill=<id>` opens one and `?new=bill` a new one.
+ * check and pay. A rail beside the list picks where they stand, and narrows them by date, amount
+ * and who they are for or from. `?tab=bills` shows the bills, `?show=` a folder, `?bill=<id>`
+ * opens a bill and `?new=bill` a new one; an issued document opens from `?invoice=<id>`.
  */
 export function InvoicesPage() {
   const [params, setParams] = useSearchParams();
-  const tab: Tab = params.get('tab') === 'bills' ? 'bills' : 'issued';
+  const tab: InvoiceTab = params.get('tab') === 'bills' ? 'bills' : 'issued';
+  const shown = params.get('show');
+  const issuedFolder: IssuedFolder = issuedFolders.find((f) => f === shown) ?? 'all';
+  const billFolder: BillFolder = billFolders.find((f) => f === shown) ?? 'all';
+  const [filter, setFilter] = useState<DocumentFilter>(noFilter);
+  const today = hotelTodayIso();
+  const invoices = useInvoices();
+  const bills = useBills();
+
   const setParam = useCallback(
-    (key: string, value: string | null) =>
+    (patch: Record<string, string | null>) =>
       setParams(
         (p) => {
-          if (value === null) p.delete(key);
-          else p.set(key, value);
+          for (const [key, value] of Object.entries(patch)) {
+            if (value === null) p.delete(key);
+            else p.set(key, value);
+          }
           return p;
         },
         { replace: true },
       ),
     [setParams],
   );
+  /** Another tab or folder; the party picked belongs to one tab, so it goes. */
+  const go = (next: InvoiceTab, folder: string) => {
+    if (next !== tab) setFilter((f) => ({ ...f, party: null }));
+    setParam({ tab: next === 'bills' ? 'bills' : null, show: folder === 'all' ? null : folder });
+  };
+
+  const clear = () => {
+    setFilter(noFilter);
+    setParam({ show: null });
+  };
+
   const health = useHealth().data;
   const upload = useUploadBill();
   const { toast } = useToast();
   const file = useRef<HTMLInputElement>(null);
-  const scanning = params.get('scan') === 'bill';
   const openBill = useCallback(
-    (id: string) =>
-      setParams(
-        (p) => {
-          p.set('tab', 'bills');
-          p.set('bill', id);
-          p.delete('scan');
-          return p;
-        },
-        { replace: true },
-      ),
-    [setParams],
+    (id: string) => setParam({ tab: 'bills', bill: id, scan: null }),
+    [setParam],
   );
 
   async function onFile(input: HTMLInputElement) {
@@ -111,10 +150,36 @@ export function InvoicesPage() {
     upload.mutate(named, { onSuccess: (bill) => openBill(bill.id) });
   }
 
+  const issuedShown = useMemo(
+    () => (invoices.data ?? []).filter((i) => matchesIssued(i, issuedFolder, filter, today)),
+    [invoices.data, issuedFolder, filter, today],
+  );
+  const billsShown = useMemo(
+    () => (bills.data ?? []).filter((b) => matchesBill(b, billFolder, filter, today)),
+    [bills.data, billFolder, filter, today],
+  );
+  const total = (tab === 'issued' ? invoices.data : bills.data)?.length;
+  const count = tab === 'issued' ? issuedShown.length : billsShown.length;
+  const meta =
+    total === undefined
+      ? undefined
+      : count === total
+        ? `${total} ${tab === 'issued' ? 'issued' : total === 1 ? 'bill' : 'bills'}`
+        : `${count} of ${total}`;
+  const search = (
+    <SearchField
+      label={tab === 'issued' ? 'Search issued documents' : 'Search bills'}
+      placeholder={tab === 'issued' ? 'Number, guest, company, amount' : 'Supplier, number, amount'}
+      value={filter.query}
+      onChange={(query) => setFilter((f) => ({ ...f, query }))}
+    />
+  );
+
   return (
     <>
       <PageHeader
         title="Invoices"
+        meta={meta}
         actions={
           <>
             <Segmented
@@ -122,7 +187,8 @@ export function InvoicesPage() {
               size="sm"
               value={tab}
               options={tabs}
-              onChange={(t) => setParam('tab', t === 'bills' ? 'bills' : null)}
+              onChange={(t) => go(t, 'all')}
+              className="xl:hidden"
             />
             {tab === 'bills' && (
               <>
@@ -140,11 +206,11 @@ export function InvoicesPage() {
                   </Button>
                 )}
                 {health?.ai.vision && (
-                  <Button variant="outline" size="sm" onClick={() => setParam('scan', 'bill')}>
+                  <Button variant="outline" size="sm" onClick={() => setParam({ scan: 'bill' })}>
                     <Smartphone /> <span className="hidden sm:inline">Scan with phone</span>
                   </Button>
                 )}
-                <Button size="sm" onClick={() => setParam('new', 'bill')}>
+                <Button size="sm" onClick={() => setParam({ new: 'bill' })}>
                   <Plus /> <span className="hidden sm:inline">New bill</span>
                 </Button>
               </>
@@ -152,9 +218,84 @@ export function InvoicesPage() {
           </>
         }
       />
-      {upload.error && <ErrorNotice message={upload.error.message} className="mx-4 mt-4 md:mx-6" />}
-      <div className="min-h-0 flex-1 overflow-auto">
-        {tab === 'issued' ? <IssuedTable /> : <BillsTable onOpen={openBill} />}
+      <div className="flex min-h-0 flex-1">
+        <Rail label="Invoices" className="w-60">
+          <div className="mb-2">{search}</div>
+          <RailHeading>Issued</RailHeading>
+          {issuedFolders.map((f) => (
+            <RailItem
+              key={f}
+              active={tab === 'issued' && issuedFolder === f}
+              onClick={() => go('issued', f)}
+              count={(invoices.data ?? []).filter((i) => inIssuedFolder(i, f)).length}
+              strong={f === 'overdue' && (invoices.data ?? []).some((i) => i.overdue)}
+            >
+              {issuedFolderLabels[f]}
+            </RailItem>
+          ))}
+          <RailHeading>Bills</RailHeading>
+          {billFolders.map((f) => (
+            <RailItem
+              key={f}
+              active={tab === 'bills' && billFolder === f}
+              onClick={() => go('bills', f)}
+              count={(bills.data ?? []).filter((b) => inBillFolder(b, f)).length}
+              strong={f === 'to_review' && (bills.data ?? []).some((b) => b.status === 'to_review')}
+            >
+              {billFolderLabels[f]}
+            </RailItem>
+          ))}
+
+          <RailHeading>Date</RailHeading>
+          {periods.map((p) => (
+            <RailItem
+              key={p}
+              active={filter.period === p}
+              onClick={() => setFilter((f) => ({ ...f, period: p }))}
+            >
+              {periodLabels[p]}
+            </RailItem>
+          ))}
+
+          <RailHeading>Amount, {currencyMark()}</RailHeading>
+          <AmountRange filter={filter} onChange={setFilter} />
+
+          <Parties
+            title={tab === 'issued' ? 'Made out to' : 'Suppliers'}
+            names={
+              tab === 'issued'
+                ? (invoices.data ?? []).map(buyerOf)
+                : (bills.data ?? []).map((b) => b.supplierName)
+            }
+            active={filter.party}
+            onPick={(party) => setFilter((f) => ({ ...f, party }))}
+          />
+        </Rail>
+
+        <div className="flex min-w-0 flex-1 flex-col">
+          <div className="border-b px-4 py-2 md:px-6 xl:hidden">{search}</div>
+          {upload.error && (
+            <ErrorNotice message={upload.error.message} className="mx-4 mt-4 md:mx-6" />
+          )}
+          <div className="min-h-0 flex-1 overflow-auto">
+            {tab === 'issued' ? (
+              <IssuedTable
+                query={invoices}
+                shown={issuedShown}
+                onClear={clear}
+                filtered={isFiltered(filter) || issuedFolder !== 'all'}
+              />
+            ) : (
+              <BillsTable
+                query={bills}
+                shown={billsShown}
+                onOpen={openBill}
+                onClear={clear}
+                filtered={isFiltered(filter) || billFolder !== 'all'}
+              />
+            )}
+          </div>
+        </div>
       </div>
       <input
         ref={file}
@@ -165,53 +306,171 @@ export function InvoicesPage() {
         onChange={(e) => void onFile(e.currentTarget)}
       />
       <BillScanDialog
-        open={scanning}
-        onOpenChange={(open) => !open && setParam('scan', null)}
+        open={params.get('scan') === 'bill'}
+        onOpenChange={(open) => !open && setParam({ scan: null })}
         onRead={openBill}
       />
       <OpenBill
+        bills={bills.data}
         id={params.get('bill')}
         creating={params.get('new') === 'bill'}
-        onClose={() =>
-          setParams(
-            (p) => {
-              p.delete('bill');
-              p.delete('new');
-              return p;
-            },
-            { replace: true },
-          )
-        }
+        onClose={() => setParam({ bill: null, new: null })}
       />
     </>
   );
 }
 
+/** Lowest and highest total, typed as whole amounts. */
+function AmountRange({
+  filter,
+  onChange,
+}: {
+  filter: DocumentFilter;
+  onChange: (update: (f: DocumentFilter) => DocumentFilter) => void;
+}) {
+  const field = (key: 'min' | 'max', label: string) => (
+    <label className="min-w-0 flex-1">
+      <span className="sr-only">{label}</span>
+      <Input
+        inputMode="numeric"
+        placeholder={label}
+        value={filter[key] ?? ''}
+        onChange={(e) => {
+          const value = e.target.value.trim() ? parseAmount(e.target.value) : null;
+          onChange((f) => ({ ...f, [key]: value }));
+        }}
+        className="h-8 tabular-nums"
+      />
+    </label>
+  );
+  return (
+    <div className="flex items-center gap-1.5 px-1 py-1">
+      {field('min', 'From')}
+      <span className="text-muted-foreground">–</span>
+      {field('max', 'To')}
+    </div>
+  );
+}
+
+/** Who the documents are made out to or from, the most first; a second click shows everyone. */
+function Parties({
+  title,
+  names,
+  active,
+  onPick,
+}: {
+  title: string;
+  names: string[];
+  active: string | null;
+  onPick: (party: string | null) => void;
+}) {
+  const parties = partyCounts(names);
+  if (parties.length < 2) return null;
+  const listed = parties.slice(0, PARTIES);
+  if (active && !listed.some((p) => p.name === active)) {
+    const picked = parties.find((p) => p.name === active);
+    if (picked) listed.push(picked);
+  }
+  return (
+    <>
+      <RailHeading>{title}</RailHeading>
+      {listed.map((p) => (
+        <RailItem
+          key={p.name}
+          active={active === p.name}
+          onClick={() => onPick(active === p.name ? null : p.name)}
+          count={p.count}
+        >
+          {p.name}
+        </RailItem>
+      ))}
+    </>
+  );
+}
+
 function OpenBill({
+  bills,
   id,
   creating,
   onClose,
 }: {
+  bills: SupplierInvoiceView[] | undefined;
   id: string | null;
   creating: boolean;
   onClose: () => void;
 }) {
-  const bills = useBills();
-  const bill = id ? (bills.data?.find((b) => b.id === id) ?? null) : null;
+  const bill = id ? (bills?.find((b) => b.id === id) ?? null) : null;
   return <BillDialog bill={bill} open={creating || bill !== null} onClose={onClose} />;
 }
 
-function IssuedTable() {
-  const invoices = useInvoices();
+interface ListQuery<T> {
+  data?: T[];
+  isError: boolean;
+  error: Error | null;
+}
+
+/** The list's loading, error and empty states; null once there are rows to show. */
+function ListState<T>({
+  query,
+  shown,
+  filtered,
+  onClear,
+  icon,
+  empty,
+}: {
+  query: ListQuery<T>;
+  shown: T[];
+  filtered: boolean;
+  onClear: () => void;
+  icon: typeof FileText;
+  empty: string;
+}) {
+  if (query.isError) {
+    return <ErrorNotice message={query.error?.message ?? ''} className="m-4 md:m-6" />;
+  }
+  if (!query.data) return <Skeleton className="m-4 h-64 md:m-6" />;
+  if (query.data.length === 0) return <EmptyState icon={icon} title={empty} className="mt-16" />;
+  if (shown.length === 0) {
+    return (
+      <EmptyState
+        icon={SearchX}
+        title={filtered ? 'Nothing matches' : empty}
+        className="mt-16"
+        action={
+          <Button variant="outline" size="sm" onClick={onClear}>
+            Clear filters
+          </Button>
+        }
+      />
+    );
+  }
+  return null;
+}
+
+function IssuedTable({
+  query,
+  shown,
+  filtered,
+  onClear,
+}: {
+  query: ListQuery<InvoiceView>;
+  shown: InvoiceView[];
+  filtered: boolean;
+  onClear: () => void;
+}) {
   const { open: openBooking } = useBookingDrawer();
   const { on, dialogs } = useInvoiceDialogs();
-  if (invoices.isError) {
-    return <ErrorNotice message={invoices.error.message} className="m-4 md:m-6" />;
-  }
-  if (!invoices.data) return <Skeleton className="m-4 h-64 md:m-6" />;
-  if (invoices.data.length === 0) {
-    return <EmptyState icon={FileText} title="No invoices or receipts yet" className="mt-16" />;
-  }
+  const placeholder = (
+    <ListState
+      query={query}
+      shown={shown}
+      filtered={filtered}
+      onClear={onClear}
+      icon={FileText}
+      empty="No invoices or receipts yet"
+    />
+  );
+  if (!query.data || shown.length === 0) return placeholder;
   return (
     <>
       <table className="w-full text-sm">
@@ -226,7 +485,7 @@ function IssuedTable() {
           ]}
         />
         <tbody>
-          {invoices.data.map((i) => {
+          {shown.map((i) => {
             const state = invoiceState(i);
             const actions = [
               ...invoiceActions(i, on),
@@ -241,7 +500,7 @@ function IssuedTable() {
               <ActionMenu key={i.id} label={i.number} actions={actions}>
                 <tr
                   className="cursor-pointer border-b border-grid-line hover:bg-accent"
-                  onClick={() => openInvoicePdf(i.id)}
+                  onClick={() => on.view(i.id)}
                 >
                   <td className="py-2.5 pr-4 pl-6">
                     <span className="flex flex-col">
@@ -260,7 +519,7 @@ function IssuedTable() {
                   </td>
                   <td className="px-4">
                     <span className="flex flex-col">
-                      <span className="max-w-56 truncate">{i.buyer.company ?? i.buyer.name}</span>
+                      <span className="max-w-56 truncate">{buyerOf(i)}</span>
                       {i.buyer.company && (
                         <span className="max-w-56 truncate text-xs text-muted-foreground">
                           {i.guestName}
@@ -292,27 +551,45 @@ function IssuedTable() {
   );
 }
 
-function BillsTable({ onOpen }: { onOpen: (id: string) => void }) {
-  const bills = useBills();
+function BillsTable({
+  query,
+  shown,
+  filtered,
+  onOpen,
+  onClear,
+}: {
+  query: ListQuery<SupplierInvoiceView>;
+  shown: SupplierInvoiceView[];
+  filtered: boolean;
+  onOpen: (id: string) => void;
+  onClear: () => void;
+}) {
   const ask = useAskOrbit();
-  if (bills.isError) return <ErrorNotice message={bills.error.message} className="m-4 md:m-6" />;
-  if (!bills.data) return <Skeleton className="m-4 h-64 md:m-6" />;
-  if (bills.data.length === 0) {
-    return <EmptyState icon={ReceiptText} title="No bills" className="mt-16" />;
-  }
+  const placeholder = (
+    <ListState
+      query={query}
+      shown={shown}
+      filtered={filtered}
+      onClear={onClear}
+      icon={ReceiptText}
+      empty="No bills"
+    />
+  );
+  if (!query.data || shown.length === 0) return placeholder;
   return (
     <table className="w-full text-sm">
       <Head
         columns={[
           { label: 'From' },
-          { label: 'For', className: 'max-md:hidden' },
+          { label: 'For', className: 'max-lg:hidden' },
+          { label: 'Issued', className: 'max-md:hidden' },
           { label: 'Due', className: 'max-sm:hidden' },
           { label: 'Total', className: 'text-right' },
           { label: 'Status' },
         ]}
       />
       <tbody>
-        {bills.data.map((b: SupplierInvoiceView) => {
+        {shown.map((b) => {
           const state = billState(b);
           return (
             <ActionMenu
@@ -320,7 +597,7 @@ function BillsTable({ onOpen }: { onOpen: (id: string) => void }) {
               label={b.supplierName}
               actions={[
                 {
-                  label: b.status === 'to_review' ? 'Check…' : 'Open…',
+                  label: b.status === 'to_review' ? 'Check…' : 'Open',
                   icon: FilePlus2,
                   onSelect: () => onOpen(b.id),
                 },
@@ -343,10 +620,18 @@ function BillsTable({ onOpen }: { onOpen: (id: string) => void }) {
                     )}
                   </span>
                 </td>
-                <td className="max-w-64 truncate px-4 text-muted-foreground max-md:hidden">
+                <td className="max-w-64 truncate px-4 text-muted-foreground max-lg:hidden">
                   {b.repairLabel ?? b.lines[0]?.label ?? b.note ?? '–'}
                 </td>
-                <td className="px-4 whitespace-nowrap text-muted-foreground max-sm:hidden">
+                <td className="px-4 whitespace-nowrap text-muted-foreground max-md:hidden">
+                  {formatDate(billDate(b))}
+                </td>
+                <td
+                  className={cn(
+                    'px-4 whitespace-nowrap max-sm:hidden',
+                    b.overdue ? 'text-destructive' : 'text-muted-foreground',
+                  )}
+                >
                   {b.dueOn ? formatDate(b.dueOn) : '–'}
                 </td>
                 <td className="px-4 text-right font-mono whitespace-nowrap tabular-nums">

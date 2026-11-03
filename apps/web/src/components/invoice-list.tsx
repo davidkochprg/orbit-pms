@@ -12,7 +12,7 @@ import {
 import { Tip } from '@/components/ui/tooltip';
 import { useInvoiceDialogs } from '@/hooks/use-invoice-dialogs';
 import { formatDate, formatMoney } from '@/lib/format';
-import { invoiceActions, invoiceState, openInvoicePdf, toneText } from '@/lib/invoices';
+import { invoiceActions, invoiceState, toneText } from '@/lib/invoices';
 import { cn } from '@/lib/utils';
 
 /** The "…" button with a document's actions. */
@@ -55,7 +55,7 @@ export function InvoiceMenuButton({ actions }: { actions: MenuAction[] }) {
   );
 }
 
-/** A booking's documents: number, kind, date, total and where each stands; a click opens the PDF. */
+/** A booking's documents: number, kind, date, total and where each stands; a click opens one. */
 export function BookingInvoiceRows({ invoices }: { invoices: InvoiceView[] }) {
   const { on, dialogs } = useInvoiceDialogs();
   return (
@@ -69,7 +69,7 @@ export function BookingInvoiceRows({ invoices }: { invoices: InvoiceView[] }) {
               <li className="-mx-1.5 flex items-center gap-3 rounded-md px-1.5 py-1 hover:bg-accent">
                 <button
                   type="button"
-                  onClick={() => openInvoicePdf(i.id)}
+                  onClick={() => on.view(i.id)}
                   className="flex min-w-0 flex-1 items-baseline gap-2 text-left outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span

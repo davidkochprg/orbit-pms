@@ -20,19 +20,18 @@ export const toneText: Record<Tone, string> = {
   destructive: 'text-destructive',
 };
 
-/** Opens the document's PDF in a new tab. */
-export function openInvoicePdf(id: string) {
-  window.open(invoicePdfUrl(id), '_blank', 'noopener');
+/** What a list of documents can open: the document itself, and the dialogs to email or void it. */
+export interface InvoiceHandlers {
+  view: (id: string) => void;
+  email: (i: InvoiceView) => void;
+  void: (i: InvoiceView) => void;
 }
 
 /** What can be done with an issued document: open, download, email, void. */
-export function invoiceActions(
-  invoice: InvoiceView,
-  on: { email: (i: InvoiceView) => void; void: (i: InvoiceView) => void },
-): MenuAction[] {
+export function invoiceActions(invoice: InvoiceView, on: InvoiceHandlers): MenuAction[] {
   const issued = invoice.status === 'issued';
   return [
-    { label: 'Open PDF', icon: FileText, onSelect: () => openInvoicePdf(invoice.id) },
+    { label: 'Open', icon: FileText, onSelect: () => on.view(invoice.id) },
     { label: 'Download', icon: Download, href: invoicePdfUrl(invoice.id, true) },
     ...(issued
       ? [

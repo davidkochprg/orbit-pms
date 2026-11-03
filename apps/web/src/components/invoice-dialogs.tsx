@@ -19,10 +19,11 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useInvoiceViewer } from '@/hooks/use-invoice-viewer';
 import { useToast } from '@/hooks/use-toast';
 import { useEmailInvoice, useIssueInvoice, useVoidInvoice } from '@/lib/api';
 import { formatMoney } from '@/lib/format';
-import { invoiceEmailBody, openInvoicePdf } from '@/lib/invoices';
+import { invoiceEmailBody } from '@/lib/invoices';
 
 /** Who a document is made out to: the guest, or a company with its address and tax ID. */
 function BuyerFields({
@@ -138,6 +139,7 @@ function IssueForm({
 }) {
   const issue = useIssueInvoice(bookingId);
   const { toast } = useToast();
+  const { open: view } = useInvoiceViewer();
   const [buyer, setBuyer] = useState(initial);
   const [note, setNote] = useState('');
 
@@ -154,7 +156,7 @@ function IssueForm({
           onClose();
           toast({
             title: `${invoiceKindLabels[kind]} ${invoice.number} issued`,
-            action: { label: 'Open PDF', run: () => openInvoicePdf(invoice.id) },
+            action: { label: 'Open', run: () => view(invoice.id) },
           });
         },
       },
@@ -201,6 +203,7 @@ export function VoidInvoiceDialog({
 }) {
   const voiding = useVoidInvoice();
   const { toast } = useToast();
+  const { open: view } = useInvoiceViewer();
   const [reason, setReason] = useState('');
 
   function run(reissue: boolean) {
@@ -215,7 +218,7 @@ export function VoidInvoiceDialog({
             replacement
               ? {
                   title: `${invoice.number} void, ${replacement.number} issued`,
-                  action: { label: 'Open PDF', run: () => openInvoicePdf(replacement.id) },
+                  action: { label: 'Open', run: () => view(replacement.id) },
                 }
               : { title: `${invoice.number} void` },
           );
