@@ -5,6 +5,7 @@ import { Link } from 'react-router';
 import { BookingRow } from '@/components/agent-mention';
 import { Count } from '@/components/panel';
 import { Button } from '@/components/ui/button';
+import { MailPreview } from '@/components/mail-proposal';
 import { Kbd } from '@/components/ui/kbd';
 import { Tip } from '@/components/ui/tooltip';
 import { useCommandPalette } from '@/hooks/use-command-palette';
@@ -15,6 +16,7 @@ import {
   useResolvePendingActions,
 } from '@/lib/api';
 import { formatMoney, formatRange } from '@/lib/format';
+import { isMailAction } from '@/lib/mail';
 import { modShortcut } from '@/lib/platform';
 import { cn } from '@/lib/utils';
 import { useGuestDrawer } from '@/hooks/use-guest-drawer';
@@ -124,24 +126,22 @@ export function PendingActionCard({
               <BookingRow id={bookingId} />
             </div>
           )}
-          {current.kind === 'send_reply' ? (
-            <p className="rounded-lg bg-ink/4 px-3 py-2 text-sm leading-6 whitespace-pre-line">
-              {current.input.body}
-            </p>
-          ) : current.kind === 'send_arrival_note' ||
-            current.kind === 'send_work_order' ||
-            current.kind === 'send_email' ? (
+          {isMailAction(current) ? (
             <>
-              {current.kind === 'send_work_order' && <Details details={details} />}
-              {current.kind === 'send_email' && (
+              {current.kind === 'send_work_order' && (
                 <Details
-                  details={{ ...details, changes: details.changes.filter((c) => c.label === 'To') }}
+                  details={{ ...details, changes: details.changes.filter((c) => c.label !== 'To') }}
                 />
               )}
-              <div className="rounded-lg bg-ink/4 px-3 py-2 text-sm leading-6">
-                <p className="font-medium">{current.input.subject}</p>
-                <p className="whitespace-pre-line">{current.input.body}</p>
-              </div>
+              <MailPreview
+                action={current}
+                lines={10}
+                onEdit={
+                  current.status === 'pending' && !resolve.isPending
+                    ? () => resolve.mutate('reject')
+                    : undefined
+                }
+              />
             </>
           ) : (
             <Details details={details} />
@@ -322,6 +322,7 @@ export function PendingActionBatch({
   const failed = actions.filter((a) => a?.status === 'failed').length;
   const rejected = actions.filter((a) => a?.status === 'rejected').length;
   const busy = resolveAll.isPending;
+  const mail = actions.some((a) => a && isMailAction(a));
 
   return (
     <div
@@ -376,7 +377,12 @@ export function PendingActionBatch({
           )}
         </div>
       </div>
-      <ul className="scroll-fade flex max-h-[min(24rem,45vh)] flex-col overflow-y-auto p-1">
+      <ul
+        className={cn(
+          'scroll-fade flex flex-col overflow-y-auto p-1',
+          mail ? 'max-h-[min(36rem,60vh)]' : 'max-h-[min(24rem,45vh)]',
+        )}
+      >
         {proposals.map((p, i) => (
           <BatchRow
             key={p.pendingActionId}
@@ -421,6 +427,74 @@ function BatchRow({
     .filter(Boolean)
     .join(' · ');
 
+  const buttons = (
+    <div className="flex shrink-0 items-center justify-end gap-0.5">
+      {current?.status === 'pending' ? (
+        <>
+          {current.details?.note && (
+            <Tip label={current.details.note}>
+              <span className="mr-1 flex">
+                <CircleAlert className="size-3.5 text-warning" />
+              </span>
+            </Tip>
+          )}
+          <Tip label="Reject">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Reject"
+              disabled={locked || resolve.isPending}
+              onClick={() => resolve.mutate('reject')}
+            >
+              <X />
+            </Button>
+          </Tip>
+          <Tip label="Confirm">
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label="Confirm"
+              disabled={locked || resolve.isPending}
+              onClick={() => resolve.mutate('confirm')}
+            >
+              <Check />
+            </Button>
+          </Tip>
+        </>
+      ) : result && current ? (
+        <Tip label={current.error ? `${result.text}: ${current.error}` : result.text}>
+          <span className="flex px-2">
+            <result.icon className={cn('size-4', result.className)} aria-label={result.text} />
+          </span>
+        </Tip>
+      ) : (
+        <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
+      )}
+    </div>
+  );
+
+  if (current && isMailAction(current)) {
+    return (
+      <li
+        className={cn(
+          'border-b border-border/60 px-2.5 py-3 last:border-b-0',
+          current.status === 'rejected' && 'opacity-60',
+        )}
+      >
+        <MailPreview
+          action={current}
+          lines={4}
+          actions={buttons}
+          onEdit={
+            current.status === 'pending' && !locked && !resolve.isPending
+              ? () => resolve.mutate('reject')
+              : undefined
+          }
+        />
+      </li>
+    );
+  }
+
   return (
     <li className={cn('flex items-center gap-1', current?.status === 'rejected' && 'opacity-60')}>
       <div className="min-w-0 flex-1">
@@ -433,49 +507,7 @@ function BatchRow({
           </p>
         )}
       </div>
-      <div className="flex w-16 shrink-0 items-center justify-end gap-0.5 pr-1.5">
-        {current?.status === 'pending' ? (
-          <>
-            {current.details?.note && (
-              <Tip label={current.details.note}>
-                <span className="mr-1 flex">
-                  <CircleAlert className="size-3.5 text-warning" />
-                </span>
-              </Tip>
-            )}
-            <Tip label="Reject">
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Reject"
-                disabled={locked || resolve.isPending}
-                onClick={() => resolve.mutate('reject')}
-              >
-                <X />
-              </Button>
-            </Tip>
-            <Tip label="Confirm">
-              <Button
-                size="icon-sm"
-                variant="ghost"
-                aria-label="Confirm"
-                disabled={locked || resolve.isPending}
-                onClick={() => resolve.mutate('confirm')}
-              >
-                <Check />
-              </Button>
-            </Tip>
-          </>
-        ) : result && current ? (
-          <Tip label={current.error ? `${result.text}: ${current.error}` : result.text}>
-            <span className="flex px-2">
-              <result.icon className={cn('size-4', result.className)} aria-label={result.text} />
-            </span>
-          </Tip>
-        ) : (
-          <LoaderCircle className="size-4 animate-spin text-muted-foreground" />
-        )}
-      </div>
+      <div className="w-16 shrink-0 pr-1.5">{buttons}</div>
     </li>
   );
 }

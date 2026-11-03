@@ -1,4 +1,4 @@
-import type { Contact, Guest, Inquiry, Recipient } from '@orbit/shared';
+import type { Contact, Guest, Inquiry, PendingAction, Recipient } from '@orbit/shared';
 import { formatDateTime } from '@/lib/format';
 import { senderLabel } from '@/lib/inbox';
 
@@ -208,4 +208,19 @@ export function forwardLink(id: string, search: string): string {
   const p = new URLSearchParams(stripCompose(search));
   p.set('forward', id);
   return `/inbox/new?${p.toString()}`;
+}
+
+/** A proposed change that sends an email: shown as the email it sends. */
+export type MailAction = Extract<
+  PendingAction,
+  { kind: 'send_reply' | 'send_email' | 'send_arrival_note' | 'send_work_order' }
+>;
+
+export function isMailAction(action: PendingAction): action is MailAction {
+  return (
+    action.kind === 'send_reply' ||
+    action.kind === 'send_email' ||
+    action.kind === 'send_arrival_note' ||
+    action.kind === 'send_work_order'
+  );
 }

@@ -145,6 +145,8 @@ export function Conversation({ id }: { id: string }) {
   const removeDraft = useDeleteDraft();
   const hotelAddress = useHotelProfile().data?.email ?? null;
   const savedDraft = drafts.data?.find((d) => d.inquiryId === id && !d.forwardOf);
+  // A reply the agent proposed, brought here to edit: the reply box starts again from it.
+  const handoff = (useLocation().state as { draft?: string } | null)?.draft ?? '';
   const aiOn = health.data?.ai.configured ?? false;
   const myLanguage: Language = current?.language ?? 'en';
   const m = inquiry.data;
@@ -225,7 +227,7 @@ export function Conversation({ id }: { id: string }) {
       {m.status !== 'declined' && !drafts.data && <Skeleton className="h-56" />}
       {m.status !== 'declined' && drafts.data && (
         <ReplyEditor
-          key={draftKey}
+          key={`${draftKey}|${handoff}`}
           inquiry={m}
           savedDraft={savedDraft}
           hotelAddress={hotelAddress}

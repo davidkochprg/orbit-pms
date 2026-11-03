@@ -8,6 +8,7 @@ import {
   formatRecipient,
   forwardBody,
   forwardSubject,
+  isMailAction,
   newDraftId,
   parseRecipients,
   replyAllCc,
@@ -136,5 +137,16 @@ describe('compose links', () => {
       { name: 'Ada Plumbing', address: 'ada@example.com' },
     ]);
     expect(stripCompose(`${search}&folder=sent`)).toBe('?folder=sent');
+  });
+});
+
+describe('proposals that send mail', () => {
+  const action = (kind: string) => ({ kind }) as Parameters<typeof isMailAction>[0];
+
+  it('knows the changes that send an email', () => {
+    for (const kind of ['send_reply', 'send_email', 'send_arrival_note', 'send_work_order']) {
+      expect(isMailAction(action(kind))).toBe(true);
+    }
+    expect(isMailAction(action('create_hold'))).toBe(false);
   });
 });
