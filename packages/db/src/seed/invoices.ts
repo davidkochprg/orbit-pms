@@ -15,7 +15,8 @@ import type {
   SupplierInvoice,
 } from '@orbit/shared';
 import { thread } from './conversations';
-import { type SeedFile, textPdf } from './mail';
+import { type BillPdf, billPdf } from './bill-pdf';
+import type { SeedFile } from './mail';
 import type { SeedRegion } from './regions';
 
 export interface SeedInvoices {
@@ -111,29 +112,112 @@ export function buildInvoices(input: {
     plumber && input.tasks.find((t) => t.type === 'maintenance' && t.trade === 'plumbing');
   const files: SeedFile[] = [];
   const supplierInvoices: SupplierInvoice[] = [];
+  const words: BillPdf['words'] = czech
+    ? {
+        billTo: 'ODBERATEL',
+        number: 'Cislo faktury',
+        issued: 'Datum vystaveni',
+        due: 'Splatnost',
+        description: 'POPIS',
+        amount: 'CASTKA',
+        subtotal: 'Zaklad',
+        total: 'Celkem k uhrade',
+        payTo: 'BANKOVNI UCET',
+        reference: 'VARIABILNI SYMBOL',
+        taxId: 'DIC',
+        thanks: 'Dekujeme za spolupraci.',
+      }
+    : {
+        billTo: 'BILL TO',
+        number: 'Invoice no.',
+        issued: 'Issued',
+        due: 'Due',
+        description: 'DESCRIPTION',
+        amount: 'AMOUNT',
+        subtotal: 'Subtotal',
+        total: 'Total due',
+        payTo: 'PAY TO',
+        reference: 'REFERENCE',
+        taxId: 'Tax ID',
+        thanks: 'Thank you for your business.',
+      };
+  const billTo = { name: issuer.name, address: (issuer.address ?? '').split('\n').filter(Boolean) };
+  /** A supplier's letterhead, with a synthetic address and tax ID for each. */
+  const letterhead = (contact: Contact, i: number) => ({
+    name: contact.name,
+    address: czech
+      ? [`Prikladova ${12 + i * 7}`, '460 01 Liberec']
+      : [`${120 + i * 45} Example Avenue`, 'Bishop, CA 93514'],
+    taxId: czech ? `CZ${40211870 + i * 1103}` : `94-${3381020 + i * 517}`,
+    email: contact.email,
+  });
+  const payTo = (i: number) =>
+    czech ? `${2400118 + i * 31}/2010` : `Routing 121000358, account ${48201 + i * 7}`;
+  /** The bill as the supplier sent it, as a PDF. */
+  const printed = (
+    id: string,
+    contact: Contact,
+    i: number,
+    bill: Pick<BillPdf, 'number' | 'issuedOn' | 'dueOn' | 'lines' | 'tax'>,
+  ): SeedFile => {
+    const bytes = billPdf({
+      ...bill,
+      supplier: letterhead(contact, i),
+      billTo,
+      title: czech ? 'Faktura' : 'Invoice',
+      currency: pricing.currency,
+      payTo: payTo(i),
+      reference: bill.number.replace(/\D/g, ''),
+      words,
+    });
+    const file: SeedFile = {
+      attachment: {
+        id,
+        name: `${bill.number}.pdf`,
+        contentType: 'application/pdf',
+        size: bytes.length,
+      },
+      bytes,
+    };
+    files.push(file);
+    return file;
+  };
+  /** A bill with the PDF it was read from; its lines are the ones printed. */
   const bill = (
     id: string,
     contact: Contact | undefined,
-    fields: Partial<SupplierInvoice> & Pick<SupplierInvoice, 'total' | 'status'>,
+    i: number,
+    fields: Omit<Partial<SupplierInvoice>, 'lines'> & {
+      status: SupplierInvoice['status'];
+      number: string;
+      issuedOn: IsoDate;
+      dueOn: IsoDate;
+      lines: { label: string; amount: number }[];
+    },
   ) => {
     if (!contact) return;
+    const tax = fields.tax ?? null;
+    const pdf = printed(`att_seed_${id.replace(/^sinv_seed_/, '')}_bill`, contact, i, {
+      number: fields.number,
+      issuedOn: fields.issuedOn,
+      dueOn: fields.dueOn,
+      lines: fields.lines,
+      tax: tax === null ? null : { label: czech ? 'DPH 21 %' : 'Sales tax', amount: tax },
+    });
     supplierInvoices.push({
       id,
       contactId: contact.id,
       supplierName: contact.name,
-      supplierTaxId: null,
-      number: null,
-      issuedOn: null,
-      dueOn: null,
+      supplierTaxId: letterhead(contact, i).taxId,
       currency: pricing.currency,
-      tax: null,
-      lines: [],
-      bankAccount: null,
-      paymentReference: null,
+      total: fields.lines.reduce((s, l) => s + l.amount, 0) + (tax ?? 0),
+      tax,
+      bankAccount: payTo(i),
+      paymentReference: fields.number.replace(/\D/g, ''),
       taskId: null,
       note: null,
-      file: null,
-      source: 'manual',
+      file: pdf.attachment,
+      source: 'upload',
       inquiryId: null,
       warnings: [],
       paidOn: null,
@@ -144,82 +228,62 @@ export function buildInvoices(input: {
   };
 
   if (plumber) {
-    const lines = czech
-      ? ['Vymena kartuse baterie', 'Vyjezd technika']
-      : ['Replace bathroom tap cartridge', 'Call-out fee'];
-    const prices = [amount(region, 240), amount(region, 145)];
-    const total = prices[0]! + prices[1]!;
-    const number = czech ? 'FV-2026-0318' : 'RP-4471';
-    const pdf: SeedFile = {
-      attachment: {
-        id: 'att_seed_plumber_bill',
-        name: `${number}.pdf`,
-        contentType: 'application/pdf',
-        size: 0,
-      },
-      bytes: textPdf([
-        `${czech ? 'Faktura' : 'Invoice'} ${number}`,
-        plumber.name,
-        `${czech ? 'Odberatel' : 'Bill to'}: ${profile.name}`,
-        `${lines[0]}: ${prices[0]}`,
-        `${lines[1]}: ${prices[1]}`,
-        `${czech ? 'Celkem' : 'Total'}: ${total} ${pricing.currency}`,
-        `${czech ? 'Splatnost' : 'Due'}: ${addDays(today, 12)}`,
-      ]),
-    };
-    pdf.attachment.size = pdf.bytes.length;
-    files.push(pdf);
-    bill('sinv_seed_plumber', plumber, {
+    bill('sinv_seed_plumber', plumber, 0, {
       status: 'to_review',
-      number,
+      number: czech ? 'FV-2026-0318' : 'RP-4471',
       issuedOn: addDays(today, -1),
       dueOn: addDays(today, 12),
-      total,
-      lines: lines.map((label, i) => ({ label, amount: prices[i]! })),
+      lines: [
+        {
+          label: czech ? 'Vymena kartuse baterie' : 'Replace bathroom tap cartridge',
+          amount: amount(region, 240),
+        },
+        { label: czech ? 'Vyjezd technika' : 'Call-out fee', amount: amount(region, 145) },
+      ],
       taskId: repair?.id ?? null,
-      file: pdf.attachment,
-      source: 'upload',
       createdAt: new Date(now.getTime() - 3 * 3600_000).toISOString(),
     });
   }
-  bill('sinv_seed_linen', linen, {
+  bill('sinv_seed_linen', linen, 1, {
     status: 'unpaid',
     number: czech ? '2026/1047' : 'SLS-2026-10',
     issuedOn: addDays(today, -9),
     dueOn: addDays(today, 4),
-    total: amount(region, 1180),
     tax: amount(region, 97),
     lines: [
       {
-        label: czech ? 'Praní prádla, říjen' : 'Linen service, October',
-        amount: amount(region, 1180),
+        label: czech ? 'Prani pradla, rijen' : 'Linen service, October',
+        amount: amount(region, 1083),
       },
     ],
+    source: 'email',
     createdAt: new Date(now.getTime() - 9 * 86_400_000).toISOString(),
   });
-  bill('sinv_seed_heating', heating, {
+  bill('sinv_seed_heating', heating, 2, {
     status: 'unpaid',
     number: czech ? 'FA-77812' : 'SHA-77812',
     issuedOn: addDays(today, -24),
     dueOn: addDays(today, -3),
-    total: amount(region, 460),
-    lines: [{ label: czech ? 'Servis kotle' : 'Boiler service', amount: amount(region, 460) }],
+    lines: [
+      { label: czech ? 'Servis kotle' : 'Boiler service', amount: amount(region, 380) },
+      { label: czech ? 'Tesneni a filtr' : 'Gasket and filter', amount: amount(region, 80) },
+    ],
     createdAt: new Date(now.getTime() - 24 * 86_400_000).toISOString(),
   });
-  bill('sinv_seed_electric', electric, {
+  bill('sinv_seed_electric', electric, 3, {
     status: 'paid',
     number: czech ? '260211' : 'AE-260211',
     issuedOn: addDays(today, -30),
     dueOn: addDays(today, -16),
-    total: amount(region, 320),
     lines: [
       {
-        label: czech ? 'Výměna jističe' : 'Replace breaker, room 108',
+        label: czech ? 'Vymena jistice, pokoj 108' : 'Replace breaker, room 108',
         amount: amount(region, 320),
       },
     ],
     paidOn: addDays(today, -18),
     paidMethod: 'bank_transfer',
+    source: 'phone',
     createdAt: new Date(now.getTime() - 30 * 86_400_000).toISOString(),
   });
 
@@ -228,29 +292,19 @@ export function buildInvoices(input: {
   const inquiries: Inquiry[] = [];
   if (bakery?.email) {
     const number = czech ? 'PU-2026-112' : 'FB-2026-112';
-    const total = amount(region, 742);
-    const pdf: SeedFile = {
-      attachment: {
-        id: 'att_seed_bakery_bill',
-        name: `${number}.pdf`,
-        contentType: 'application/pdf',
-        size: 0,
-      },
-      bytes: textPdf([
-        `${czech ? 'Faktura' : 'Invoice'} ${number}`,
-        bakery.name,
-        `${czech ? 'Odberatel' : 'Bill to'}: ${profile.name}`,
-        `${czech ? 'Datum vystaveni' : 'Issued'}: ${today}`,
-        czech
-          ? 'Pecivo na snidane, rijen: ' + amount(region, 690)
-          : `Breakfast bread and pastries, October: ${amount(region, 690)}`,
-        czech ? 'Doprava: ' + amount(region, 52) : `Delivery: ${amount(region, 52)}`,
-        `${czech ? 'Celkem k uhrade' : 'Total due'}: ${total} ${pricing.currency}`,
-        `${czech ? 'Splatnost' : 'Due by'}: ${addDays(today, 14)}`,
-      ]),
-    };
-    pdf.attachment.size = pdf.bytes.length;
-    files.push(pdf);
+    const pdf = printed('att_seed_bakery_bill', bakery, 4, {
+      number,
+      issuedOn: today,
+      dueOn: addDays(today, 14),
+      lines: [
+        {
+          label: czech ? 'Pecivo na snidane, rijen' : 'Breakfast bread and pastries, October',
+          amount: amount(region, 690),
+        },
+        { label: czech ? 'Doprava' : 'Delivery', amount: amount(region, 52) },
+      ],
+      tax: null,
+    });
     inquiries.push(
       thread(
         'inq_seed_bakery_bill',

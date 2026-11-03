@@ -78,6 +78,7 @@ A PGlite directory can only be open in one process at a time; two processes writ
 - Three conversations with history (`packages/db/src/seed/conversations.ts`): a Booking.com exchange about a late arrival, linked to its booking; an archived thank-you about a lost charger; and a welcome email the hotel wrote first.
 - The team reads English (Czech for `cz`), so drafts and guest messages translate into it; change it per person in Settings › Team. Guests stay multinational either way.
 - Bills: extras on past and current stays, deposits by bank transfer on some bookings, and settled bills for guests who left. Guests leaving today still owe something. Extra prices are placeholders.
+- Supplier bills: one Orbit read and nobody checked, one due this week, one overdue and one paid, each with the PDF it was read from, plus the bakery's bill on an email still to read.
 - Guest-book registrations for every stay that has started, with synthetic `DEMO-` document numbers and placeholder addresses. Today's arrivals are not registered yet; returning guests prefill from an earlier stay.
 - Housekeeping tasks: turnovers for today's departures, stayovers for in-house guests, one maintenance task.
 - Two departures today that clean very differently: a one-guest work trip in 102, and a family with a dog and muddy boots in A4. Today's family arrival in A2 asks for a cot. The board reads these notes on first open, so seeded stays have no stored readings.

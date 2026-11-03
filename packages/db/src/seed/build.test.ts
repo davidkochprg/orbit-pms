@@ -280,7 +280,7 @@ describe('buildSeed', () => {
     }
   });
 
-  it('issues receipts for paid stays and keeps bills in every state', () => {
+  it('issues receipts for paid stays and keeps bills in every state, each with its PDF', () => {
     expect(seed.invoices.length).toBeGreaterThan(0);
     for (const i of seed.invoices) {
       const booking = seed.bookings.find((b) => b.id === i.bookingId);
@@ -290,8 +290,13 @@ describe('buildSeed', () => {
     expect(new Set(seed.supplierInvoices.map((b) => b.status))).toEqual(
       new Set(['to_review', 'unpaid', 'paid']),
     );
-    const read = seed.supplierInvoices.find((b) => b.status === 'to_review');
-    expect(seed.files.some((f) => f.attachment.id === read?.file?.id)).toBe(true);
+    // Every bill keeps the PDF it was read from, and its lines and tax add up to its total.
+    for (const b of seed.supplierInvoices) {
+      const file = seed.files.find((f) => f.attachment.id === b.file?.id);
+      expect(new TextDecoder().decode(file?.bytes.subarray(0, 5))).toBe('%PDF-');
+      const lines = b.lines.reduce((s, l) => s + (l.amount ?? 0), 0);
+      expect(lines + (b.tax ?? 0)).toBe(b.total);
+    }
   });
 
   it('uses only example.com email addresses', () => {
