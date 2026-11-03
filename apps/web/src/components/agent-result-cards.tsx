@@ -29,7 +29,7 @@ import {
   type HousekeepingChangeResult,
   HousekeepingCard,
 } from '@/components/agent-housekeeping-card';
-import { Mention, RoomBadge } from '@/components/agent-mention';
+import { BookingRow, Mention, RoomBadge } from '@/components/agent-mention';
 import { RepairContacts, RepairMeta } from '@/components/repair-panel';
 import { Button } from '@/components/ui/button';
 import { useBookingEditor } from '@/hooks/use-booking-editor';
@@ -159,9 +159,11 @@ export function ResultCards({
       {quotes.map((q) => (
         <QuoteCard key={q.key} quote={q.quote} roomId={q.roomId} />
       ))}
-      {[...bills.values()].map((folio) => (
-        <BillCard key={folio.bookingId} folio={folio} />
-      ))}
+      {bills.size === 1 ? (
+        [...bills.values()].map((folio) => <BillCard key={folio.bookingId} folio={folio} />)
+      ) : bills.size > 1 ? (
+        <BillListCard folios={[...bills.values()]} />
+      ) : null}
       {housekeeping.length > 0 && <HousekeepingCard changes={housekeeping} />}
       {[...guestBooks].map((bookingId) => (
         <GuestBookCard key={bookingId} bookingId={bookingId} />
@@ -230,6 +232,53 @@ function QuoteCard({ quote, roomId }: { quote: Quote; roomId: string | null }) {
   );
 }
 
+/** "$313 due", "$110 owed back" or "Paid in full", colored by which. */
+function Balance({ folio, className }: { folio: Folio; className?: string }) {
+  return (
+    <span
+      className={cn(
+        'shrink-0 font-mono tabular-nums',
+        folio.balance > 0
+          ? 'text-warning'
+          : folio.balance < 0
+            ? 'text-primary-text'
+            : 'text-success',
+        className,
+      )}
+    >
+      {folio.balance > 0
+        ? `${formatMoney(folio.balance)} due`
+        : folio.balance < 0
+          ? `${formatMoney(-folio.balance)} owed back`
+          : 'Paid in full'}
+    </span>
+  );
+}
+
+/** Several bills as one list: who, what was charged and paid, and the balance; a row opens it. */
+function BillListCard({ folios }: { folios: Folio[] }) {
+  return (
+    <AgentCard>
+      <AgentCardHeader
+        icon={Receipt}
+        title="Bills"
+        aside={<span className="text-xs text-muted-foreground tabular-nums">{folios.length}</span>}
+      />
+      <div className="-mx-1.5 flex flex-col">
+        {folios.map((f) => (
+          <BookingRow
+            key={f.bookingId}
+            id={f.bookingId}
+            aside={<Balance folio={f} className="text-sm" />}
+          >
+            Charged {formatMoney(f.charged)} · paid {formatMoney(f.paid)}
+          </BookingRow>
+        ))}
+      </div>
+    </AgentCard>
+  );
+}
+
 function BillCard({ folio }: { folio: Folio }) {
   const { openBooking } = useCommandPalette();
   const extras = folio.lines.filter((l) => l.kind === 'extra');
@@ -238,24 +287,7 @@ function BillCard({ folio }: { folio: Folio }) {
       <AgentCardHeader
         icon={Receipt}
         title={<Mention id={folio.bookingId} />}
-        aside={
-          <span
-            className={cn(
-              'shrink-0 font-mono text-base tabular-nums',
-              folio.balance > 0
-                ? 'text-warning'
-                : folio.balance < 0
-                  ? 'text-primary-text'
-                  : 'text-success',
-            )}
-          >
-            {folio.balance > 0
-              ? `${formatMoney(folio.balance)} due`
-              : folio.balance < 0
-                ? `${formatMoney(-folio.balance)} owed back`
-                : 'Paid in full'}
-          </span>
-        }
+        aside={<Balance folio={folio} className="text-base" />}
       />
       <Amounts
         lines={[

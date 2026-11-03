@@ -210,7 +210,16 @@ export function Mention({ id }: { id: string }) {
  * A list item that leads with a booking: the guest, room, dates and status from hotel data, and
  * what the agent said about it underneath. Click opens the booking; right-click has its actions.
  */
-export function BookingRow({ id, children }: { id: string; children?: ReactNode }) {
+export function BookingRow({
+  id,
+  children,
+  aside,
+}: {
+  id: string;
+  children?: ReactNode;
+  /** In place of the status, room and dates on the right, e.g. a bill's balance. */
+  aside?: ReactNode;
+}) {
   const b = useBooking(id);
   const openBooking = useOpenBooking();
   return (
@@ -228,23 +237,25 @@ export function BookingRow({ id, children }: { id: string; children?: ReactNode 
               (b.adults !== undefined && b.childAges ? formatParty(b.adults, b.childAges) : null)}
           </span>
         </span>
-        <span className="flex shrink-0 flex-col items-end gap-1">
-          <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            {b.status && (
-              <Tip label={statusLabels[b.status]}>
-                <span className="flex">
-                  <StatusDot className={bookingStatusColor[b.status]} />
-                </span>
-              </Tip>
-            )}
-            {b.roomName && <RoomBadge name={b.roomName} />}
-          </span>
-          {b.checkIn && b.checkOut && (
-            <span className="text-[0.6875rem] text-subtle-foreground tabular-nums">
-              {formatRange(b.checkIn, b.checkOut)}
+        {aside ?? (
+          <span className="flex shrink-0 flex-col items-end gap-1">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              {b.status && (
+                <Tip label={statusLabels[b.status]}>
+                  <span className="flex">
+                    <StatusDot className={bookingStatusColor[b.status]} />
+                  </span>
+                </Tip>
+              )}
+              {b.roomName && <RoomBadge name={b.roomName} />}
             </span>
-          )}
-        </span>
+            {b.checkIn && b.checkOut && (
+              <span className="text-[0.6875rem] text-subtle-foreground tabular-nums">
+                {formatRange(b.checkIn, b.checkOut)}
+              </span>
+            )}
+          </span>
+        )}
       </button>
     </BookingContextMenu>
   );
