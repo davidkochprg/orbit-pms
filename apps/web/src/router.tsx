@@ -1,57 +1,120 @@
 import { createBrowserRouter } from 'react-router';
 import { AccessGate } from '@/components/access-gate';
-import { AppLayout } from '@/components/app-layout';
 import { AppError, PageError } from '@/components/route-error';
-import { DashboardPage } from '@/pages/dashboard';
-import { ReportsPage } from '@/pages/reports';
-import { ActivityPage } from '@/pages/activity';
-import { ContactsPage } from '@/pages/contacts';
-import { GuestRedirect, GuestsPage } from '@/pages/guests';
-import { InboxPage } from '@/pages/inbox';
-import { HousekeepingPage } from '@/pages/housekeeping';
-import { ScanPage } from '@/pages/scan';
-import { BillScanPage } from '@/pages/bill-scan';
-import { InvoicesPage } from '@/pages/invoices';
-import { RatesPage } from '@/pages/rates';
-import { RoomsPage } from '@/pages/rooms';
-import { NotFoundPage } from '@/pages/sections';
-import { KnowledgePage } from '@/pages/knowledge';
-import { SettingsPage } from '@/pages/settings';
-import { TapeChartPage } from '@/pages/tape-chart';
-import { WelcomePage } from '@/pages/welcome';
+
+/**
+ * Pages load on first visit, so the phone scan pages and the first screen don't download the
+ * whole app. A blank page in the app's background shows while the first one loads.
+ */
+const loading = <div className="min-h-svh bg-background" />;
 
 export const router = createBrowserRouter([
-  // Opened on a phone from the desk's QR code: no sign-in, no access code, no app chrome.
-  { path: 'scan/:id', element: <ScanPage /> },
-  { path: 'bill-scan/:id', element: <BillScanPage /> },
   {
-    element: <AccessGate />,
+    hydrateFallbackElement: loading,
     children: [
-      { path: 'welcome', element: <WelcomePage /> },
+      // Opened on a phone from the desk's QR code: no sign-in, no access code, no app chrome.
       {
-        element: <AppLayout />,
-        errorElement: <AppError />,
+        path: 'scan/:id',
+        lazy: () => import('@/pages/scan').then((m) => ({ Component: m.ScanPage })),
+      },
+      {
+        path: 'bill-scan/:id',
+        lazy: () => import('@/pages/bill-scan').then((m) => ({ Component: m.BillScanPage })),
+      },
+      {
+        element: <AccessGate />,
         children: [
           {
-            // Catches page crashes inside the workspace; navigating away clears it.
-            errorElement: <PageError />,
+            path: 'welcome',
+            lazy: () => import('@/pages/welcome').then((m) => ({ Component: m.WelcomePage })),
+          },
+          {
+            lazy: () => import('@/components/app-layout').then((m) => ({ Component: m.AppLayout })),
+            errorElement: <AppError />,
             children: [
-              { index: true, element: <DashboardPage /> },
-              { path: 'tape-chart', element: <TapeChartPage /> },
-              { path: 'inbox', element: <InboxPage /> },
-              { path: 'inbox/:id', element: <InboxPage /> },
-              { path: 'housekeeping', element: <HousekeepingPage /> },
-              { path: 'guests', element: <GuestsPage /> },
-              { path: 'guests/:id', element: <GuestRedirect /> },
-              { path: 'rooms', element: <RoomsPage /> },
-              { path: 'rates', element: <RatesPage /> },
-              { path: 'reports', element: <ReportsPage /> },
-              { path: 'activity', element: <ActivityPage /> },
-              { path: 'knowledge', element: <KnowledgePage /> },
-              { path: 'contacts', element: <ContactsPage /> },
-              { path: 'invoices', element: <InvoicesPage /> },
-              { path: 'settings/:section?', element: <SettingsPage /> },
-              { path: '*', element: <NotFoundPage /> },
+              {
+                // Catches page crashes inside the workspace; navigating away clears it.
+                errorElement: <PageError />,
+                children: [
+                  {
+                    index: true,
+                    lazy: () =>
+                      import('@/pages/dashboard').then((m) => ({ Component: m.DashboardPage })),
+                  },
+                  {
+                    path: 'tape-chart',
+                    lazy: () =>
+                      import('@/pages/tape-chart').then((m) => ({ Component: m.TapeChartPage })),
+                  },
+                  {
+                    path: 'inbox',
+                    lazy: () => import('@/pages/inbox').then((m) => ({ Component: m.InboxPage })),
+                  },
+                  {
+                    path: 'inbox/:id',
+                    lazy: () => import('@/pages/inbox').then((m) => ({ Component: m.InboxPage })),
+                  },
+                  {
+                    path: 'housekeeping',
+                    lazy: () =>
+                      import('@/pages/housekeeping').then((m) => ({
+                        Component: m.HousekeepingPage,
+                      })),
+                  },
+                  {
+                    path: 'guests',
+                    lazy: () => import('@/pages/guests').then((m) => ({ Component: m.GuestsPage })),
+                  },
+                  {
+                    path: 'guests/:id',
+                    lazy: () =>
+                      import('@/pages/guests').then((m) => ({ Component: m.GuestRedirect })),
+                  },
+                  {
+                    path: 'rooms',
+                    lazy: () => import('@/pages/rooms').then((m) => ({ Component: m.RoomsPage })),
+                  },
+                  {
+                    path: 'rates',
+                    lazy: () => import('@/pages/rates').then((m) => ({ Component: m.RatesPage })),
+                  },
+                  {
+                    path: 'reports',
+                    lazy: () =>
+                      import('@/pages/reports').then((m) => ({ Component: m.ReportsPage })),
+                  },
+                  {
+                    path: 'activity',
+                    lazy: () =>
+                      import('@/pages/activity').then((m) => ({ Component: m.ActivityPage })),
+                  },
+                  {
+                    path: 'knowledge',
+                    lazy: () =>
+                      import('@/pages/knowledge').then((m) => ({ Component: m.KnowledgePage })),
+                  },
+                  {
+                    path: 'contacts',
+                    lazy: () =>
+                      import('@/pages/contacts').then((m) => ({ Component: m.ContactsPage })),
+                  },
+                  {
+                    path: 'invoices',
+                    lazy: () =>
+                      import('@/pages/invoices').then((m) => ({ Component: m.InvoicesPage })),
+                  },
+                  {
+                    path: 'settings/:section?',
+                    lazy: () =>
+                      import('@/pages/settings').then((m) => ({ Component: m.SettingsPage })),
+                  },
+                  {
+                    path: '*',
+                    lazy: () =>
+                      import('@/pages/sections').then((m) => ({ Component: m.NotFoundPage })),
+                  },
+                ],
+              },
             ],
           },
         ],
