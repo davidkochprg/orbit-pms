@@ -6,7 +6,7 @@ import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ErrorNotice } from '@/components/error-notice';
 import { LocalEvents } from '@/components/local-events';
 import { LogoMark } from '@/components/logo-mark';
-import { Panel, ScrollBox } from '@/components/panel';
+import { Panel } from '@/components/panel';
 import { RateCalendar } from '@/components/rate-calendar';
 import { RateNightPanel } from '@/components/rate-night-panel';
 import { Button } from '@/components/ui/button';
@@ -36,8 +36,9 @@ const DAYS = 60;
 /**
  * The next 60 nights: how full each is, the rate suggested from demand, events, the forecast and
  * the model's review, and why; a manager takes suggestions one night at a time or all at once.
- * Below, the events behind them and this week's arrivals most likely not to come. With AI on, the
- * outlook is reviewed again whenever what the review read has changed.
+ * Beside them, or below on narrower screens, the events behind them and this week's arrivals most
+ * likely not to come. With AI on, the outlook is reviewed again whenever what the review read has
+ * changed.
  */
 export function RateOutlook({ canManage }: { canManage: boolean }) {
   const outlook = useRevenueOutlook(DAYS);
@@ -126,93 +127,95 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
         <ErrorNotice message={review.error.message} onDismiss={() => review.reset()} />
       )}
 
-      <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_20rem] xl:items-stretch">
-        <Panel
-          title={`Next ${DAYS} nights`}
-          actions={
-            <>
-              <span
-                className="mr-1 text-xs text-subtle-foreground max-md:hidden"
-                aria-live="polite"
-              >
-                {review.isPending ? (
-                  <span className="animate-pulse">Reviewing {DAYS} nights…</span>
-                ) : (
-                  lastReview.reviewedAt && `Reviewed ${formatRecent(lastReview.reviewedAt)} · `
-                )}
-                {!review.isPending && (weatherAvailable ? 'Forecast by Open-Meteo' : 'No forecast')}
-              </span>
-              {aiOn && (
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  disabled={brief.isPending}
-                  onClick={() => brief.mutate(DAYS)}
-                >
-                  {brief.isPending ? 'Reading the outlook…' : 'Summarize'}
-                </Button>
-              )}
-              {canManage && toApply.length > 0 && (
-                <Button size="xs" disabled={adjust.isPending} onClick={() => setConfirmAll(true)}>
-                  Apply {toApply.length} suggestion{toApply.length === 1 ? '' : 's'}
-                </Button>
-              )}
-            </>
-          }
-        >
-          <RateCalendar
-            nights={nights}
-            selected={selected?.date ?? null}
-            menu={(night, cell) => (
-              <ContextMenu>
-                <ContextMenuTrigger asChild>{cell}</ContextMenuTrigger>
-                <ContextMenuContent className="w-56">
-                  <ContextMenuLabel>{formatDate(night.date)}</ContextMenuLabel>
-                  <ContextMenuItem onSelect={() => setPicked(night.date)}>
-                    <PanelRight /> Show this night
-                  </ContextMenuItem>
-                  {ask && (
-                    <ContextMenuItem onSelect={() => ask({ kind: 'night', id: night.date })}>
-                      <LogoMark /> Ask Orbit
-                    </ContextMenuItem>
-                  )}
-                  {canManage && night.suggestedPercent !== night.currentPercent && (
-                    <ContextMenuItem
-                      disabled={adjust.isPending}
-                      onSelect={() => set([night], (n) => n.suggestedPercent)}
-                    >
-                      <Check /> Take the suggestion, {signed(night.suggestedPercent)}
-                    </ContextMenuItem>
-                  )}
-                  {canManage && night.currentPercent !== 0 && (
-                    <ContextMenuItem
-                      disabled={adjust.isPending}
-                      onSelect={() => set([night], () => 0)}
-                    >
-                      <RotateCcw /> Go back to the season rate
-                    </ContextMenuItem>
-                  )}
-                </ContextMenuContent>
-              </ContextMenu>
-            )}
-            onSelect={(date, via) => {
-              setPicked(date);
-              // Below the calendar on narrower screens: bring a clicked night into view.
-              if (via === 'click' && !window.matchMedia('(min-width: 80rem)').matches) {
-                nightPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-              }
-            }}
-          />
-        </Panel>
-        {selected && (
+      {/* Columns follow the page's width, not the window's, so an open sidebar counts. The night
+          keeps its own height and stays in view while the page scrolls. */}
+      <div className="@container">
+        <div className="grid items-start gap-4 @5xl:grid-cols-[minmax(0,1fr)_21rem] @[104rem]:grid-cols-[minmax(0,1fr)_21rem_26rem]">
           <Panel
-            ref={nightPanel}
-            title={formatLongDate(selected.date)}
-            className="scroll-mt-4"
-            contentClassName="p-0"
+            title={`Next ${DAYS} nights`}
+            actions={
+              <>
+                <span
+                  className="mr-1 text-xs text-subtle-foreground max-md:hidden"
+                  aria-live="polite"
+                >
+                  {review.isPending ? (
+                    <span className="animate-pulse">Reviewing {DAYS} nights…</span>
+                  ) : (
+                    lastReview.reviewedAt && `Reviewed ${formatRecent(lastReview.reviewedAt)} · `
+                  )}
+                  {!review.isPending &&
+                    (weatherAvailable ? 'Forecast by Open-Meteo' : 'No forecast')}
+                </span>
+                {aiOn && (
+                  <Button
+                    variant="ghost"
+                    size="xs"
+                    disabled={brief.isPending}
+                    onClick={() => brief.mutate(DAYS)}
+                  >
+                    {brief.isPending ? 'Reading the outlook…' : 'Summarize'}
+                  </Button>
+                )}
+                {canManage && toApply.length > 0 && (
+                  <Button size="xs" disabled={adjust.isPending} onClick={() => setConfirmAll(true)}>
+                    Apply {toApply.length} suggestion{toApply.length === 1 ? '' : 's'}
+                  </Button>
+                )}
+              </>
+            }
           >
-            {/* As tall as the calendar beside it; scrolls when the night needs more. */}
-            <ScrollBox className="xl:absolute xl:inset-0">
+            <RateCalendar
+              nights={nights}
+              selected={selected?.date ?? null}
+              menu={(night, cell) => (
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>{cell}</ContextMenuTrigger>
+                  <ContextMenuContent className="w-56">
+                    <ContextMenuLabel>{formatDate(night.date)}</ContextMenuLabel>
+                    <ContextMenuItem onSelect={() => setPicked(night.date)}>
+                      <PanelRight /> Show this night
+                    </ContextMenuItem>
+                    {ask && (
+                      <ContextMenuItem onSelect={() => ask({ kind: 'night', id: night.date })}>
+                        <LogoMark /> Ask Orbit
+                      </ContextMenuItem>
+                    )}
+                    {canManage && night.suggestedPercent !== night.currentPercent && (
+                      <ContextMenuItem
+                        disabled={adjust.isPending}
+                        onSelect={() => set([night], (n) => n.suggestedPercent)}
+                      >
+                        <Check /> Take the suggestion, {signed(night.suggestedPercent)}
+                      </ContextMenuItem>
+                    )}
+                    {canManage && night.currentPercent !== 0 && (
+                      <ContextMenuItem
+                        disabled={adjust.isPending}
+                        onSelect={() => set([night], () => 0)}
+                      >
+                        <RotateCcw /> Go back to the season rate
+                      </ContextMenuItem>
+                    )}
+                  </ContextMenuContent>
+                </ContextMenu>
+              )}
+              onSelect={(date, via) => {
+                setPicked(date);
+                // Below the calendar on narrower screens: bring a clicked night into view.
+                if (via === 'click') {
+                  nightPanel.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+              }}
+            />
+          </Panel>
+          {selected && (
+            <Panel
+              ref={nightPanel}
+              title={formatLongDate(selected.date)}
+              className="scroll-mt-4 @5xl:sticky @5xl:top-0"
+              contentClassName="p-0"
+            >
               <RateNightPanel
                 key={selected.date}
                 night={selected}
@@ -220,18 +223,17 @@ export function RateOutlook({ canManage }: { canManage: boolean }) {
                 busy={adjust.isPending}
                 onSet={(percent) => set([selected], () => percent)}
               />
-            </ScrollBox>
-          </Panel>
-        )}
-      </div>
-
-      <div className="grid items-start gap-4 lg:grid-cols-2">
-        <Panel title="Local events" count={events.length}>
-          <LocalEvents events={events} canManage={canManage} today={today} />
-        </Panel>
-        <Panel title="Arrivals at risk" count={arrivalRisks.length}>
-          <ArrivalRisks risks={arrivalRisks} />
-        </Panel>
+            </Panel>
+          )}
+          <div className="grid items-start gap-4 lg:grid-cols-2 @5xl:col-span-2 @[104rem]:col-span-1 @[104rem]:grid-cols-1">
+            <Panel title="Local events" count={events.length}>
+              <LocalEvents events={events} canManage={canManage} today={today} />
+            </Panel>
+            <Panel title="Arrivals at risk" count={arrivalRisks.length}>
+              <ArrivalRisks risks={arrivalRisks} />
+            </Panel>
+          </div>
+        </div>
       </div>
 
       <ConfirmDialog

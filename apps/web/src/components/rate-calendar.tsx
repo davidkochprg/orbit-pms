@@ -188,7 +188,7 @@ function NightCell({
       onClick={onSelect}
       onKeyDown={onKeyDown}
       className={cn(
-        'relative flex h-[4.75rem] min-w-0 flex-col gap-1 overflow-hidden rounded-stage bg-background p-1.5 text-left sm:p-2 ring-1 ring-ink/6 transition-[box-shadow,background-color] duration-150 ease-snap ring-inset hover:bg-surface-raised',
+        'relative flex h-[4.75rem] min-w-0 flex-col sm:h-[5.5rem] gap-1 overflow-hidden rounded-stage bg-background p-1.5 text-left sm:p-2 ring-1 ring-ink/6 transition-[box-shadow,background-color] duration-150 ease-snap ring-inset hover:bg-surface-raised',
         outside && !selected && 'bg-transparent opacity-60 hover:opacity-100',
         selected && 'ring-2 ring-primary',
       )}
