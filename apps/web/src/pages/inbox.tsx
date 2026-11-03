@@ -312,7 +312,7 @@ export function InboxPage() {
         }
       />
       <div className="flex min-h-0 flex-1">
-        <Rail label="Folders">
+        <Rail label="Folders" className="hidden xl:flex">
           {folders.map((f) => (
             <RailItem
               key={f.id}

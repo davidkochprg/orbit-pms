@@ -21,6 +21,7 @@ import { NewNote } from '@/components/knowledge-new';
 import { NoteView } from '@/components/knowledge-note';
 import { LogoMark } from '@/components/logo-mark';
 import { PageHeader } from '@/components/page-header';
+import { Rail, RailCount, RailHeading, railRow } from '@/components/rail';
 import { SearchField } from '@/components/search-field';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,7 +37,7 @@ import {
   tagHref,
   vaultFolders,
 } from '@/lib/knowledge';
-import { cn, labelCaps } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 /**
  * Knowledge: the notes staff and the agent tell guests from, as a vault. The tree on the left
@@ -72,47 +73,45 @@ export function KnowledgePage() {
         }
       />
       <div className="flex min-h-0 flex-1">
-        <aside
-          className={cn(
-            'flex w-full shrink-0 flex-col border-r bg-surface-sunken lg:w-72',
-            // Below lg the tree and the note take turns, as on a phone.
-            paneOpen && 'hidden lg:flex',
-          )}
-        >
-          <div className="flex flex-col gap-2 border-b p-2">
-            <SearchField
-              label="Search notes"
-              placeholder="Search notes and tags"
-              value={query}
-              onChange={setQuery}
-            />
-            {tag && (
-              <Link
-                to="/knowledge"
-                aria-label={`Show all notes, not only #${tag}`}
-                className="flex h-6 items-center gap-1 self-start rounded-full bg-ink pr-1.5 pl-2.5 text-xs text-background outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                #{tag} <X className="size-3" />
-              </Link>
-            )}
-          </div>
-          <div className="scroll-fade min-h-0 flex-1 overflow-y-auto">
-            {info.isError && <ErrorNotice message={info.error.message} className="m-3" />}
-            {!info.data && !info.isError && <Skeleton className="m-3 h-64" />}
-            {info.data && (
-              <VaultTree
-                notes={notes}
-                shown={notes.filter(
-                  (n) => matchesNote(n, query) && (!tag || (n.tags ?? []).includes(tag)),
-                )}
-                activeId={noteId}
-                today={today}
-                tag={tag}
-                filtering={query.trim() !== '' || tag !== null}
+        <Rail
+          label="Notes"
+          // Below lg the tree and the note take turns, as on a phone.
+          className={cn('flex max-lg:w-full', paneOpen && 'hidden lg:flex')}
+          header={
+            <>
+              <SearchField
+                label="Search notes"
+                placeholder="Search notes and tags"
+                value={query}
+                onChange={setQuery}
               />
-            )}
-          </div>
-        </aside>
+              {tag && (
+                <Link
+                  to="/knowledge"
+                  aria-label={`Show all notes, not only #${tag}`}
+                  className="flex h-6 items-center gap-1 self-start rounded-full bg-ink pr-1.5 pl-2.5 text-xs text-background outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  #{tag} <X className="size-3" />
+                </Link>
+              )}
+            </>
+          }
+        >
+          {info.isError && <ErrorNotice message={info.error.message} />}
+          {!info.data && !info.isError && <Skeleton className="h-64" />}
+          {info.data && (
+            <VaultTree
+              notes={notes}
+              shown={notes.filter(
+                (n) => matchesNote(n, query) && (!tag || (n.tags ?? []).includes(tag)),
+              )}
+              activeId={noteId}
+              today={today}
+              tag={tag}
+              filtering={query.trim() !== '' || tag !== null}
+            />
+          )}
+        </Rail>
 
         <section className={cn('min-w-0 flex-1 overflow-y-auto', !paneOpen && 'hidden lg:block')}>
           {adding ? (
@@ -232,7 +231,7 @@ function VaultTree({
     return <EmptyState icon={BookOpenText} title="Nothing matches" className="py-12" />;
   }
   return (
-    <nav aria-label="Notes" className="flex flex-col gap-0.5 p-1.5">
+    <>
       {notices.length > 0 && (
         <TreeGroup
           icon={CalendarClock}
@@ -255,11 +254,13 @@ function VaultTree({
         />
       ))}
       {tags.length > 0 && (
-        <section aria-labelledby="vault-tags" className="mt-4 flex flex-col gap-2 px-2.5 pb-3">
-          <h2 id="vault-tags" className={labelCaps}>
-            Tags
-          </h2>
-          <div className="flex flex-wrap gap-1">
+        <>
+          <RailHeading id="vault-tags">Tags</RailHeading>
+          <div
+            role="group"
+            aria-labelledby="vault-tags"
+            className="flex flex-wrap gap-1 px-2.5 pt-1"
+          >
             {tags.map((t) => (
               <Link
                 key={t.tag}
@@ -277,9 +278,9 @@ function VaultTree({
               </Link>
             ))}
           </div>
-        </section>
+        </>
       )}
-    </nav>
+    </>
   );
 }
 
@@ -309,7 +310,7 @@ function TreeGroup({
         type="button"
         aria-expanded={open}
         onClick={() => setFolded(open)}
-        className="flex h-8 w-full items-center gap-2 rounded-lg px-2 text-left text-[0.8125rem] font-medium outline-none transition-colors duration-150 ease-snap hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring"
+        className={railRow}
       >
         <ChevronRight
           className={cn(
@@ -317,14 +318,12 @@ function TreeGroup({
             open && 'rotate-90',
           )}
         />
-        <Icon className="size-4 text-muted-foreground" />
-        <span className="flex-1 truncate">{label}</span>
-        <span className="text-xs font-normal text-muted-foreground tabular-nums">
-          {notes.length}
-        </span>
+        <Icon className="size-4" />
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        <RailCount>{notes.length}</RailCount>
       </button>
       {open && (
-        <ul className="mb-1 ml-[0.9375rem] flex flex-col border-l border-ink/8 pl-1.5">
+        <ul className="mb-1 ml-[1.0625rem] flex flex-col border-l border-ink/8 pl-1.5">
           {notes.map((n) => {
             const ended = Boolean(n.until && today && n.until < today);
             return (
@@ -360,7 +359,7 @@ function TreeGroup({
                     to={noteHref(n.id)}
                     aria-current={n.id === activeId ? 'page' : undefined}
                     className={cn(
-                      'flex h-7 items-center gap-2 rounded-md px-2 text-[0.8125rem] text-muted-foreground outline-none transition-colors duration-150 ease-snap hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
+                      'flex h-8 items-center gap-2 rounded-lg px-2.5 text-sm text-muted-foreground outline-none transition-colors duration-150 ease-snap hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
                       n.id === activeId && 'bg-sidebar-accent text-foreground',
                       ended && 'opacity-60',
                     )}

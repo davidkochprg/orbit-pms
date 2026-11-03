@@ -219,8 +219,7 @@ export function InvoicesPage() {
         }
       />
       <div className="flex min-h-0 flex-1">
-        <Rail label="Invoices" className="w-60">
-          <div className="mb-2">{search}</div>
+        <Rail label="Invoices" header={search} className="hidden xl:flex">
           <RailHeading>Issued</RailHeading>
           {issuedFolders.map((f) => (
             <RailItem
