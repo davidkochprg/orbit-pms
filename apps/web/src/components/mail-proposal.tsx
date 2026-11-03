@@ -227,20 +227,25 @@ function EditInInbox({
       onEdit();
       closePalette();
       void navigate(`/inbox/${encodeURIComponent(inquiryId)}`, { state: { draft: id } });
+    } catch {
+      // The save's error is shown beside the button.
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <button
-      type="button"
-      disabled={busy || !drafts.data}
-      onClick={() => void edit()}
-      className="flex items-center gap-1 hover:text-foreground disabled:opacity-60"
-    >
-      {busy ? <LoaderCircle className="size-3 animate-spin" /> : <PenLine className="size-3" />}
-      Edit in inbox
-    </button>
+    <>
+      <button
+        type="button"
+        disabled={busy || !drafts.data}
+        onClick={() => void edit()}
+        className="flex items-center gap-1 hover:text-foreground disabled:opacity-60"
+      >
+        {busy ? <LoaderCircle className="size-3 animate-spin" /> : <PenLine className="size-3" />}
+        Edit in inbox
+      </button>
+      {save.error && <span className="text-destructive">{save.error.message}</span>}
+    </>
   );
 }
