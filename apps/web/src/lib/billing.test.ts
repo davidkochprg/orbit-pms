@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { balanceLabel, canCharge, vatRateLabel } from './billing';
 
 describe('canCharge', () => {
-  it('allows extras on confirmed and in-house stays only', () => {
+  it('allows extras on confirmed and in-house stays, and fees on cancelled ones', () => {
     expect(canCharge({ status: 'confirmed' })).toBe(true);
     expect(canCharge({ status: 'checked_in' })).toBe(true);
+    expect(canCharge({ status: 'cancelled' })).toBe(true);
     expect(canCharge({ status: 'hold' })).toBe(false);
     expect(canCharge({ status: 'checked_out' })).toBe(false);
-    expect(canCharge({ status: 'cancelled' })).toBe(false);
   });
 });
 

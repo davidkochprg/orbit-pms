@@ -169,27 +169,43 @@ export function buildFolio(
   };
 }
 
-/** Extras go on confirmed and in-house stays; a hold is not a sale yet, and a checked-out bill is closed. */
+/**
+ * Extras go on confirmed and in-house stays, and on a cancelled booking, whose bill then holds a
+ * late-cancellation or no-show fee. A hold is not a sale yet, and a checked-out bill is closed.
+ */
 export function assertCanCharge(booking: Booking): void {
-  if (booking.status === 'confirmed' || booking.status === 'checked_in') return;
+  if (
+    booking.status === 'confirmed' ||
+    booking.status === 'checked_in' ||
+    booking.status === 'cancelled'
+  ) {
+    return;
+  }
   const reason = {
     hold: 'Confirm the booking before adding charges',
     checked_out: 'The guest has checked out; the bill is closed for charges',
-    cancelled: 'The booking is cancelled',
   }[booking.status];
   throw new DomainError('invalid_transition', reason);
 }
 
 /**
- * Payments are taken at any point before or after the stay; a cancelled booking only takes
- * refunds. A refund can't exceed what was paid.
+ * Payments are taken at any point before or after the stay; a cancelled booking takes them only
+ * while a fee on it is owed, and up to that. A refund can't exceed what was paid.
  */
 export function assertCanPay(booking: Booking, folio: Folio, body: NewPaymentBody): void {
   if (body.kind === 'payment' && booking.status === 'cancelled') {
-    throw new DomainError(
-      'invalid_transition',
-      'The booking is cancelled; only refunds are possible',
-    );
+    if (folio.balance <= 0) {
+      throw new DomainError(
+        'invalid_transition',
+        'The booking is cancelled and nothing is owed; only refunds are possible',
+      );
+    }
+    if (body.amount > folio.balance) {
+      throw new DomainError(
+        'invalid_input',
+        `Only ${formatMoney(folio.balance, folio.currency)} is owed on the cancelled booking`,
+      );
+    }
   }
   if (body.kind === 'refund' && body.amount > folio.paid) {
     throw new DomainError(

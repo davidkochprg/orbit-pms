@@ -213,14 +213,14 @@ An unknown, expired or already saved scan is `not_found`.
 
 1. **Stay**: the booking's `priceSnapshot` lines, verbatim. A cancelled booking has no stay lines.
 2. **City tax**: `cityTax.perPersonPerNight` × paying guests × nights, at the current rate. Every adult pays; children pay from `cityTax.minAge` (default 18, so children don't). No line when the rate is 0. It is billed on the folio, not in `quote()`.
-3. **Extras**: charges staff or the agent posted, e.g. sauna or minibar.
+3. **Extras**: charges staff or the agent posted, e.g. sauna or minibar, or on a cancelled booking a late-cancellation or no-show fee.
 
 `charged` is the sum of the lines, `paid` is payments minus refunds, and `balance = charged - paid` (negative: the guest is owed money).
 
 **Tax.** Every line carries a `vatBracket` and its `vatRate` from the rates' `tax`: `reduced` is the lodging bracket (accommodation, child and long-stay discounts, extra beds: the Czech reduced VAT, or a US occupancy tax), `standard` everything else (wellness and dogs, to be confirmed for Czechia, and extras by default: standard VAT, or a US sales tax), `none` outside tax (city tax). Each bracket has a name and a rate with up to two decimals. With `tax.mode` `inclusive` (VAT) the prices include tax and `vatSummary` takes it out of each bracket's total: `vat = round(gross × rate / (100 + rate))`, `net = gross − vat`. With `exclusive` (US) the prices are before tax: `vat = round(net × rate / 100)`, `gross = net + vat`, and the bill adds one `tax` line per bracket, e.g. "Occupancy tax 12%". Either way the rounding happens once per bracket in whole units, half away from zero so a discount's tax mirrors a charge's. The folio states its `taxMode` and `currency`.
 
-- `addCharge` / `updateCharge` / `removeCharge` need a `confirmed` or `checked_in` booking (`invalid_transition`): a hold isn't a sale yet, and a checked-out bill is closed. A charge is posted on the hotel's today. `updateCharge` changes the label, quantity, unit price or tax bracket in place and recomputes the amount. Previews give the balance after the change with its taxes.
-- `recordPayment` takes payments in any status except `cancelled`, where only refunds are possible. A refund can't exceed what was paid (`invalid_input`).
+- `addCharge` / `updateCharge` / `removeCharge` need a `confirmed`, `checked_in` or `cancelled` booking (`invalid_transition`): a hold isn't a sale yet, and a checked-out bill is closed. On a cancelled booking the charge is the fee the cancellation policy allows, set off against any deposit. A charge is posted on the hotel's today. `updateCharge` changes the label, quantity, unit price or tax bracket in place and recomputes the amount. Previews give the balance after the change with its taxes.
+- `recordPayment` takes payments in any status. On a `cancelled` booking a payment needs a balance still owed, from a fee (`invalid_transition`), and can't exceed it (`invalid_input`); otherwise only refunds. A refund can't exceed what was paid (`invalid_input`).
 - `previewCharge` / `previewPayment` run the same checks without saving and return the balance after, for agent proposals.
 - Audited on the booking as `folio.charge`, `folio.update_charge` (with the changed fields), `folio.remove_charge`, `folio.payment` and `folio.refund`.
 

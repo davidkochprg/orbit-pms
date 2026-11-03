@@ -205,10 +205,11 @@ describe('buildFolio', () => {
 });
 
 describe('assertCanCharge', () => {
-  it('allows confirmed and in-house stays only', () => {
+  it('allows confirmed and in-house stays, and cancellation fees on cancelled ones', () => {
     expect(() => assertCanCharge({ ...stay, status: 'confirmed' })).not.toThrow();
     expect(() => assertCanCharge(stay)).not.toThrow();
-    for (const status of ['hold', 'checked_out', 'cancelled'] as const) {
+    expect(() => assertCanCharge({ ...stay, status: 'cancelled' })).not.toThrow();
+    for (const status of ['hold', 'checked_out'] as const) {
       expect(() => assertCanCharge({ ...stay, status })).toThrow();
     }
   });
@@ -217,13 +218,20 @@ describe('assertCanCharge', () => {
 describe('assertCanPay', () => {
   const folio = buildFolio(stay, [], [payment()], pricing);
 
-  it('takes payments except on cancelled bookings', () => {
+  it('takes payments on a cancelled booking only while a fee is owed, up to it', () => {
     const body = { kind: 'payment' as const, method: 'cash' as const, amount: 100, note: null };
     expect(() => assertCanPay({ ...stay, status: 'hold' }, folio, body)).not.toThrow();
     expect(() => assertCanPay({ ...stay, status: 'checked_out' }, folio, body)).not.toThrow();
-    expect(() => assertCanPay({ ...stay, status: 'cancelled' }, folio, body)).toThrow(
-      /only refunds/,
-    );
+    const cancelled = { ...stay, status: 'cancelled' as const };
+    // Paid 2000, nothing charged: owed back, so only refunds.
+    const owedBack = buildFolio(cancelled, [], [payment()], pricing);
+    expect(() => assertCanPay(cancelled, owedBack, body)).toThrow(/only refunds/);
+    // A 3000 fee against 2000 paid leaves 1000 to pay.
+    const fee = charge({ amount: 3000, unitPrice: 3000, quantity: 1, vatBracket: 'none' });
+    const owed = buildFolio(cancelled, [fee], [payment()], pricing);
+    expect(owed.balance).toBe(1000);
+    expect(() => assertCanPay(cancelled, owed, { ...body, amount: 1000 })).not.toThrow();
+    expect(() => assertCanPay(cancelled, owed, { ...body, amount: 1001 })).toThrow(/owed/);
   });
 
   it('refunds at most what was paid', () => {

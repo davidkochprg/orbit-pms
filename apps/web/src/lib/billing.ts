@@ -1,8 +1,15 @@
 import type { Booking, TaxConfig, VatBracket } from '@orbit/shared';
 
-/** Extras can be posted while the stay is confirmed or in house; the domain checks the same. */
+/**
+ * Extras can be posted while the stay is confirmed or in house, and a fee on a cancelled booking;
+ * the domain checks the same.
+ */
 export function canCharge(booking: Pick<Booking, 'status'>): boolean {
-  return booking.status === 'confirmed' || booking.status === 'checked_in';
+  return (
+    booking.status === 'confirmed' ||
+    booking.status === 'checked_in' ||
+    booking.status === 'cancelled'
+  );
 }
 
 /** What the last line of a bill says about its balance. */

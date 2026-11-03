@@ -77,6 +77,7 @@ export function BookingBill({ booking }: { booking: Booking }) {
   if (!folio.data) return <Skeleton className="h-64" />;
   const bill = folio.data;
   const chargeable = canCharge(booking);
+  const refundOnly = booking.status === 'cancelled' && bill.balance <= 0;
   const stay = bill.lines.filter((l) => l.kind === 'stay');
   const tax = bill.lines.filter((l) => l.kind === 'city_tax');
   const extras = bill.lines.filter((l) => l.kind === 'extra');
@@ -137,9 +138,9 @@ export function BookingBill({ booking }: { booking: Booking }) {
 
       <Payments
         folio={bill}
-        // A cancelled booking only pays back what was paid for it.
-        canPay={booking.status !== 'cancelled' || bill.paid > 0}
-        refundOnly={booking.status === 'cancelled'}
+        // A cancelled booking pays back what was paid, or takes payment of a fee still owed.
+        canPay={booking.status !== 'cancelled' || bill.paid > 0 || bill.balance > 0}
+        refundOnly={refundOnly}
         onPay={() => setPaying(true)}
       />
 
@@ -153,7 +154,7 @@ export function BookingBill({ booking }: { booking: Booking }) {
             <PaymentForm
               bookingId={booking.id}
               balance={bill.balance}
-              refundOnly={booking.status === 'cancelled'}
+              refundOnly={refundOnly}
               onDone={() => setPaying(false)}
               onCancel={() => setPaying(false)}
             />
