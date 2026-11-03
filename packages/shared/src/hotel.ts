@@ -78,8 +78,23 @@ export const hotelInfoDraftSchema = z.object({
   category: hotelInfoCategorySchema,
   title: z.string().trim().min(1).max(80),
   details: z.string().trim().min(1).max(1000),
-  tags: hotelInfoTagsSchema.default([]),
-  until: isoDateSchema.nullable(),
+  /** Tags as a list; one comma-separated string is read as a list too. */
+  tags: z
+    .preprocess(
+      (value) => (typeof value === 'string' ? value.split(',').filter((t) => t.trim()) : value),
+      hotelInfoTagsSchema,
+    )
+    .default([]),
+  /**
+   * A notice's last day; null for a note that always applies. Left out, empty or "null" also
+   * mean always, so a model that skips the field saves on the first try.
+   */
+  until: z
+    .preprocess(
+      (value) => (value === '' || value === 'null' ? null : value),
+      isoDateSchema.nullable(),
+    )
+    .default(null),
 });
 export type HotelInfoDraft = z.infer<typeof hotelInfoDraftSchema>;
 

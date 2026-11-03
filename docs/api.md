@@ -307,7 +307,7 @@ Requests are signed in with the `x-staff-id` header: the ID of an active staff m
 
 ### `GET /api/hotel-info`, `POST /api/hotel-info`, `PUT /api/hotel-info/:id`, `DELETE /api/hotel-info/:id`
 
-Knowledge: the profile's entries, as notes. `GET` returns them; `POST` (201) and `PUT` take `{ category, title, details, tags, until }` (`details` up to 1000 characters, with `[[Title]]` links to other notes and `- ` list lines; `tags` up to six, tidied to lowercase without `#` or repeats, default `[]`; `until` a date or null) and return the entry with `source: "staff"` and `updatedAt`; `DELETE` returns 204. Any active staff member (`x-staff-id`), otherwise 403 `forbidden`. 409 `conflict` for a title another entry has, 400 `invalid_input` for a new end date in the past or a 101st entry, 404 for an unknown ID. Renaming a note points the links to it in other notes at the new title.
+Knowledge: the profile's entries, as notes. `GET` returns them; `POST` (201) and `PUT` take `{ category, title, details, tags, until }` (`details` up to 1000 characters, with `[[Title]]` links to other notes and `- ` list lines; `tags` up to six, tidied to lowercase without `#` or repeats, default `[]`, a comma-separated string read as a list; `until` a date, or null, empty or left out for a note that always applies) and return the entry with `source: "staff"` and `updatedAt`; `DELETE` returns 204. Any active staff member (`x-staff-id`), otherwise 403 `forbidden`. 409 `conflict` for a title another entry has, 400 `invalid_input` for a new end date in the past or a 101st entry, 404 for an unknown ID. Renaming a note points the links to it in other notes at the new title.
 
 ### `POST /api/hotel-info/file`
 
