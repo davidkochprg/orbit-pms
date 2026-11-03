@@ -24,9 +24,9 @@ describe('isSettingsSection', () => {
     expect(isSettingsSection('property')).toBe(true);
     expect(isSettingsSection('amenity')).toBe(false);
     expect(isSettingsSection('billing')).toBe(false);
-    // Rooms and rates have their own pages.
-    expect(isSettingsSection('rooms')).toBe(false);
-    expect(isSettingsSection('rates')).toBe(false);
+    // Set up once, so they live here; the rate outlook stays on Rates.
+    expect(isSettingsSection('rooms')).toBe(true);
+    expect(isSettingsSection('rates')).toBe(true);
     expect(isSettingsSection(undefined)).toBe(false);
   });
 });

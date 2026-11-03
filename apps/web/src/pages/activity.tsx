@@ -176,7 +176,10 @@ function Subject({
     case 'room_type':
     case 'staff':
       return (
-        <Link to={subject.kind === 'staff' ? '/settings/team' : '/rooms'} className={linkClass}>
+        <Link
+          to={subject.kind === 'staff' ? '/settings/team' : '/settings/rooms'}
+          className={linkClass}
+        >
           {subject.label}
         </Link>
       );

@@ -1,4 +1,4 @@
-import { createBrowserRouter } from 'react-router';
+import { createBrowserRouter, Navigate } from 'react-router';
 import { AccessGate } from '@/components/access-gate';
 import { AppError, PageError } from '@/components/route-error';
 
@@ -70,10 +70,8 @@ export const router = createBrowserRouter([
                     lazy: () =>
                       import('@/pages/guests').then((m) => ({ Component: m.GuestRedirect })),
                   },
-                  {
-                    path: 'rooms',
-                    lazy: () => import('@/pages/rooms').then((m) => ({ Component: m.RoomsPage })),
-                  },
+                  // Rooms moved into Settings; old links still land there.
+                  { path: 'rooms', element: <Navigate to="/settings/rooms" replace /> },
                   {
                     path: 'rates',
                     lazy: () => import('@/pages/rates').then((m) => ({ Component: m.RatesPage })),

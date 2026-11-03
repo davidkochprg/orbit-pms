@@ -1,27 +1,37 @@
-import type { HotelProfile } from '@orbit/shared';
+import type { HotelProfile, PricingConfig } from '@orbit/shared';
 import { useState } from 'react';
 import { Navigate, NavLink, useParams } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { PageHeader } from '@/components/page-header';
+import { RatesEditor } from '@/components/rates-editor';
+import { RoomsEditor } from '@/components/rooms-editor';
 import { ReadOnlyNotice, SaveBar } from '@/components/save-bar';
 import { PropertySettings } from '@/components/settings-property';
 import { TeamSettings } from '@/components/settings-team';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useSession } from '@/hooks/use-session';
-import { useHotelProfile, useSaveHotelProfile } from '@/lib/api';
+import { useHotelProfile, usePricing, useSaveHotelProfile, useSavePricing } from '@/lib/api';
 import { isEntrySection, isSettingsSection, sameSettings, settingsSections } from '@/lib/settings';
 import { cn } from '@/lib/utils';
+
+const readOnlyWhat = {
+  property: 'settings',
+  rooms: 'rooms',
+  rates: 'the rates',
+  team: 'settings',
+} as const;
 
 export function SettingsPage() {
   const { section } = useParams();
   const profile = useHotelProfile();
   const save = useSaveHotelProfile();
+  const pricing = usePricing();
+  const savePricing = useSavePricing();
   const session = useSession();
-  // Edits across the profile tabs share one draft, saved together.
+  // Drafts live here, so moving between tabs keeps them until they are saved or discarded.
   const [draft, setDraft] = useState<HotelProfile | null>(null);
+  const [pricingDraft, setPricingDraft] = useState<PricingConfig | null>(null);
 
-  // Rooms and rates have their own pages now; old links still land there.
-  if (section === 'rooms' || section === 'rates') return <Navigate to={`/${section}`} replace />;
   if (isEntrySection(section)) return <Navigate to="/knowledge" replace />;
   if (!isSettingsSection(section)) return <Navigate to="/settings/property" replace />;
 
@@ -32,6 +42,11 @@ export function SettingsPage() {
     setDraft(next);
   };
   const dirty = draft !== null && profile.data !== undefined && !sameSettings(draft, profile.data);
+  const currentPricing = pricingDraft ?? pricing.data;
+  const pricingDirty =
+    pricingDraft !== null &&
+    pricing.data !== undefined &&
+    !sameSettings(pricingDraft, pricing.data);
 
   return (
     <>
@@ -45,7 +60,10 @@ export function SettingsPage() {
             <NavLink
               key={s.id}
               to={`/settings/${s.id}`}
-              onClick={() => !save.isPending && save.reset()}
+              onClick={() => {
+                if (!save.isPending) save.reset();
+                if (!savePricing.isPending) savePricing.reset();
+              }}
               className={({ isActive }) =>
                 cn(
                   'flex h-8 shrink-0 items-center rounded-lg px-2.5 text-sm text-muted-foreground outline-none transition-colors duration-150 ease-snap hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
@@ -60,14 +78,34 @@ export function SettingsPage() {
 
         <div className="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 overflow-auto px-4 py-6 md:px-6">
-            <div className="flex max-w-3xl flex-col gap-6">
-              <ReadOnlyNotice what="settings" />
+            {/* Rooms fill the width, so types sit beside the rooms; forms keep a readable width. */}
+            <div className={cn('flex flex-col gap-6', section !== 'rooms' && 'max-w-3xl')}>
+              <ReadOnlyNotice what={readOnlyWhat[section]} />
               {section === 'team' ? (
                 <TeamSettings
                   staff={session.staff}
                   currentId={session.current?.id ?? null}
                   readOnly={readOnly}
                 />
+              ) : section === 'rooms' ? (
+                <RoomsEditor readOnly={readOnly} />
+              ) : section === 'rates' ? (
+                pricing.isError ? (
+                  <ErrorNotice message={pricing.error.message} />
+                ) : !currentPricing ? (
+                  <Skeleton className="h-80" />
+                ) : (
+                  <fieldset disabled={readOnly} className="min-w-0">
+                    <RatesEditor
+                      pricing={currentPricing}
+                      onChange={(next) => {
+                        savePricing.reset();
+                        setPricingDraft(next);
+                      }}
+                      readOnly={readOnly}
+                    />
+                  </fieldset>
+                )
               ) : profile.isError ? (
                 <ErrorNotice message={profile.error.message} />
               ) : !current ? (
@@ -80,12 +118,26 @@ export function SettingsPage() {
             </div>
           </div>
 
-          {section !== 'team' && (
+          {section === 'property' && (
             <SaveBar
               save={save}
               dirty={dirty}
               onSave={() => draft && save.mutate(draft, { onSuccess: () => setDraft(null) })}
               onDiscard={() => setDraft(null)}
+              unsaved="Unsaved changes"
+              saved="Saved"
+              keepWithin="/settings"
+            />
+          )}
+          {section === 'rates' && (
+            <SaveBar
+              save={savePricing}
+              dirty={pricingDirty}
+              onSave={() =>
+                pricingDraft &&
+                savePricing.mutate(pricingDraft, { onSuccess: () => setPricingDraft(null) })
+              }
+              onDiscard={() => setPricingDraft(null)}
               unsaved="Unsaved changes"
               saved="Saved"
               keepWithin="/settings"

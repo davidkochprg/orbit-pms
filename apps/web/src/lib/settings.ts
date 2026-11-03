@@ -1,10 +1,15 @@
 import type { Season } from '@orbit/shared';
 
-/** The property details and the team. What guests are told is in Knowledge. */
-export type SettingsSection = 'property' | 'team';
+/**
+ * What is set up once and seldom changed: the property, its rooms, the rules every quote reads and
+ * the team. What guests are told is in Knowledge; the rate outlook is on Rates.
+ */
+export type SettingsSection = 'property' | 'rooms' | 'rates' | 'team';
 
 export const settingsSections: { id: SettingsSection; label: string }[] = [
   { id: 'property', label: 'Property' },
+  { id: 'rooms', label: 'Rooms' },
+  { id: 'rates', label: 'Rates' },
   { id: 'team', label: 'Team' },
 ];
 
