@@ -264,7 +264,9 @@ function inquiryRepository(db: Db): InquiryRepository {
       const rows = await db.select().from(inquiries).orderBy(desc(inquiries.lastMessageAt));
       const byInquiry = new Map<string, InboxMessage[]>();
       for (const m of await messagesOf()) {
-        byInquiry.set(m.inquiryId, [...(byInquiry.get(m.inquiryId) ?? []), m]);
+        const list = byInquiry.get(m.inquiryId);
+        if (list) list.push(m);
+        else byInquiry.set(m.inquiryId, [m]);
       }
       return rows.map((row) => toInquiry(row, byInquiry.get(row.id) ?? []));
     },
