@@ -380,17 +380,24 @@ export function createInboxService({ repos, hotel, clock, newId }: InboxDeps) {
           bcc: reply.bcc ?? [],
           attachments: await attachmentsFor(tx, reply.attachmentIds ?? []),
         });
-        const updated = await append(tx, inquiry, msg, {
-          unread: false,
-          trashedAt: null,
-          status: SETTLED.includes(inquiry.status) ? inquiry.status : 'replied',
-          suggestion: inquiry.suggestion && {
-            ...inquiry.suggestion,
-            draft: null,
-            draftLanguage: null,
-            draftTranslation: null,
+        // What staff wrote in their own language, so the thread reads back in it.
+        const translation = reply.translation?.text.trim() ? reply.translation : null;
+        const updated = await append(
+          tx,
+          inquiry,
+          { ...msg, translation },
+          {
+            unread: false,
+            trashedAt: null,
+            status: SETTLED.includes(inquiry.status) ? inquiry.status : 'replied',
+            suggestion: inquiry.suggestion && {
+              ...inquiry.suggestion,
+              draft: null,
+              draftLanguage: null,
+              draftTranslation: null,
+            },
           },
-        });
+        );
         if (reply.draftId) await tx.mail.deleteDraft(reply.draftId);
         await tx.audit.append({
           actor,

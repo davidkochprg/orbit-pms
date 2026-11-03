@@ -7,6 +7,7 @@ import {
   inquiryChannelSchema,
   languageSchema,
 } from './enums';
+import { translationSchema } from './inquiry';
 import { MAX_ATTACHMENTS, recipientSchema, recipientsSchema } from './mail';
 
 /** Query string for `GET /api/bookings`. `status` is comma-separated. */
@@ -181,6 +182,8 @@ export const replyBodySchema = z.object({
   bcc: recipientsSchema.default([]),
   attachmentIds: z.array(z.string()).max(MAX_ATTACHMENTS).default([]),
   draftId: z.string().nullable().default(null),
+  /** The reply in the staff member's language, when they wrote it in theirs: kept to read back. */
+  translation: translationSchema.nullable().default(null),
 });
 export type ReplyBody = z.infer<typeof replyBodySchema>;
 

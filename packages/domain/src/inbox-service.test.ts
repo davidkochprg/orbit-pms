@@ -317,6 +317,20 @@ describe('inbox service', () => {
     });
   });
 
+  it("keeps the reply in the staff member's language when they wrote in theirs", async () => {
+    const { inbox, msg } = await processed();
+    const translation = { language: 'en' as const, text: 'Hello, gladly!' };
+    const sent = await inbox.send(msg.id, { body: 'Guten Tag, gerne!', translation }, null, 'user');
+    expect(sent.messages.at(-1)).toMatchObject({ body: 'Guten Tag, gerne!', translation });
+    const blank = await inbox.send(
+      msg.id,
+      { body: 'Bis bald', translation: { language: 'en', text: '  ' } },
+      null,
+      'user',
+    );
+    expect(blank.messages.at(-1)?.translation).toBeNull();
+  });
+
   it('brings a conversation back when the guest writes again', async () => {
     const { inbox, msg } = await processed();
     await inbox.send(msg.id, { body: 'Guten Tag' }, null, 'user');

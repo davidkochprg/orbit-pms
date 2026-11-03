@@ -10,7 +10,9 @@ import type {
 
 const HOUR = 3600_000;
 
-export interface Line extends Partial<Pick<InboxMessage, 'to' | 'cc' | 'attachments'>> {
+export interface Line extends Partial<
+  Pick<InboxMessage, 'to' | 'cc' | 'attachments' | 'translation'>
+> {
   direction: InboxMessage['direction'];
   body: string;
   hoursAgo: number;
@@ -43,7 +45,7 @@ export function thread(
     body: l.body,
     sentAt: new Date(now.getTime() - l.hoursAgo * HOUR).toISOString(),
     author: l.author ?? null,
-    translation: null,
+    translation: l.translation ?? null,
     to: l.to ?? [],
     cc: l.cc ?? [],
     bcc: [],
@@ -113,17 +115,30 @@ export function buildConversations(
             direction: 'in',
             hoursAgo: 30,
             body: `Guten Tag,\nwir kommen erst gegen 22 Uhr an. Ist das ein Problem? Gibt es eine Möglichkeit, den Schlüssel später abzuholen?\nViele Grüße\n${g.name}`,
+            translation: {
+              language: 'en',
+              text: `Hello,\nwe won't arrive until around 10 PM. Is that a problem? Is there a way to pick up the key later?\nBest regards\n${g.name}`,
+            },
           },
           {
             direction: 'out',
             hoursAgo: 28,
             ...(desk[0] && { author: desk[0] }),
             body: `Guten Tag,\n\nkein Problem: Die Rezeption ist bis 22:30 besetzt. Sollten Sie später kommen, hinterlegen wir Ihren Schlüssel in der Schlüsselbox neben dem Eingang und schicken Ihnen den Code am Anreisetag.\n\nMit freundlichen Grüßen\nIhre Rezeption`,
+            // Written in English at the desk and sent in German.
+            translation: {
+              language: 'en',
+              text: `Hello,\n\nno problem: reception is staffed until 10:30 PM. If you arrive later, we'll leave your key in the key box next to the entrance and send you the code on the day of arrival.\n\nKind regards\nReception`,
+            },
           },
           {
             direction: 'in',
             hoursAgo: 26,
             body: 'Vielen Dank, das ist sehr hilfreich! Bis bald.',
+            translation: {
+              language: 'en',
+              text: 'Thank you very much, that is very helpful! See you soon.',
+            },
           },
         ],
         {
