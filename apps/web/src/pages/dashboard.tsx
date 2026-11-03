@@ -11,14 +11,14 @@ import { useBookingEditor } from '@/hooks/use-booking-editor';
 import { useDailyBrief, useDayOverview, useHousekeeping } from '@/lib/api';
 import { formatDate, formatLongDate, formatParty } from '@/lib/format';
 
+/** A list's box: a fixed height when the panels stack, the rest of the screen when they don't. */
+const listBox = 'h-72 xl:absolute xl:inset-0 xl:h-auto';
+
 /**
  * The day on one screen: tonight's figures and house map with what needs attention beside them,
  * then today's arrivals, departures, guests in house and nights to sell. Long lists scroll in
  * their panels instead of the page.
  */
-/** A list's box: a fixed height when the panels stack, the rest of the screen when they don't. */
-const listBox = 'h-72 xl:absolute xl:inset-0 xl:h-auto';
-
 export function DashboardPage() {
   const day = useDayOverview();
   const brief = useDailyBrief();

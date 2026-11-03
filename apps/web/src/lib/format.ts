@@ -163,7 +163,6 @@ export const languageLabels: Record<Language, string> = {
   pl: 'Polish',
 };
 
-/** Up to two initials for an avatar: "Jana Nováková" → "JN". */
 /**
  * A stable hue turn for a person's avatar orb, from -36 to 36 degrees, so neighbours in a list
  * differ a little while every orb stays in the same cool family.
@@ -174,6 +173,7 @@ export function orbShift(name: string): number {
   return (Math.abs(hash) % 9) * 9 - 36;
 }
 
+/** Up to two initials for an avatar: "Jana Nováková" → "JN". */
 export function initials(name: string): string {
   const words = name.trim().split(/\s+/).filter(Boolean);
   const letters = words.length > 1 ? [words[0], words.at(-1)] : words;
