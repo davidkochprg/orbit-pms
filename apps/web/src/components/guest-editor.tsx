@@ -1,6 +1,6 @@
 import { type Guest, type Language, languages } from '@orbit/shared';
 import { type FormEvent, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useGuestDrawer } from '@/hooks/use-guest-drawer';
 import { ErrorNotice } from '@/components/error-notice';
 import { FormField } from '@/components/form-field';
 import { Button } from '@/components/ui/button';
@@ -44,7 +44,7 @@ function GuestForm({ guest, onDone }: { guest: Guest | undefined; onDone: () => 
   const [notes, setNotes] = useState(guest?.notes ?? '');
   const create = useCreateGuest();
   const update = useUpdateGuest();
-  const navigate = useNavigate();
+  const { open } = useGuestDrawer();
   const error = create.error ?? update.error;
 
   function submit(e: FormEvent) {
@@ -58,7 +58,7 @@ function GuestForm({ guest, onDone }: { guest: Guest | undefined; onDone: () => 
         {
           onSuccess: (created) => {
             onDone();
-            void navigate(`/guests/${created.id}`);
+            open(created.id);
           },
         },
       );

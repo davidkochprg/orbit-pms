@@ -13,6 +13,7 @@ import { useBookingDrawer } from '@/hooks/use-booking-drawer';
 import { activityDetail, activityLabel, repairOf } from '@/lib/activity';
 import { useActivity } from '@/lib/api';
 import { displayRegion, formatLongDate } from '@/lib/format';
+import { useGuestDrawer } from '@/hooks/use-guest-drawer';
 
 type Filter = 'all' | AuditActor;
 
@@ -143,6 +144,7 @@ function Subject({
   repair: string | null;
 }) {
   const { open } = useBookingDrawer();
+  const { open: openGuest } = useGuestDrawer();
   switch (subject.kind) {
     case 'booking':
       return (
@@ -152,9 +154,9 @@ function Subject({
       );
     case 'guest':
       return (
-        <Link to={`/guests/${subject.id}`} className={linkClass}>
+        <button type="button" onClick={() => openGuest(subject.id)} className={linkClass}>
           {subject.label}
-        </Link>
+        </button>
       );
     case 'inquiry':
       return (

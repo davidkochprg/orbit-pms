@@ -35,6 +35,7 @@ import {
   useSyncExternalStore,
 } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router';
+import { useGuestDrawer } from '@/hooks/use-guest-drawer';
 import { AgentStatus } from '@/components/agent-status';
 import { AgentContextChip } from '@/components/agent-context-chip';
 import { FollowUps } from '@/components/agent-follow-ups';
@@ -324,6 +325,7 @@ function SearchView({
 }) {
   const navigate = useNavigate();
   const { open: openBooking } = useBookingDrawer();
+  const { open: openGuest } = useGuestDrawer();
   const { openNew } = useBookingEditor();
   const { setTheme } = useTheme();
   const health = useHealth();
@@ -462,7 +464,7 @@ function SearchView({
               <Item
                 key={g.id}
                 value={`${g.name} ${g.email ?? ''} ${g.id}`}
-                onSelect={run(() => void navigate(`/guests/${g.id}`))}
+                onSelect={run(() => openGuest(g.id))}
               >
                 <GuestAvatar name={g.name} className="size-4 text-[0.5rem]" />
                 <span className="truncate">{g.name}</span>

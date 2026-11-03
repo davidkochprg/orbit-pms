@@ -1,7 +1,6 @@
 import type { DocumentType, StayGuestPatch, StayGuestView } from '@orbit/shared';
 import { AlertTriangle, CircleCheck, CircleDashed, ScanLine, Trash2, UserPlus } from 'lucide-react';
 import { type FormEvent, useState } from 'react';
-import { Link } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { IdScanDialog } from '@/components/id-scan-dialog';
@@ -26,6 +25,7 @@ import {
 } from '@/lib/registration';
 import { INLINE_EDITOR } from '@/lib/inline-edit';
 import { cn } from '@/lib/utils';
+import { useGuestDrawer } from '@/hooks/use-guest-drawer';
 
 const documentOptions: { value: DocumentType; label: string }[] = [
   { value: 'id_card', label: documentTypeLabels.id_card },
@@ -148,6 +148,7 @@ function StayGuestCard({
   const update = useUpdateStayGuest(bookingId);
   const rename = useUpdateGuest();
   const remove = useRemoveStayGuest(bookingId);
+  const { open: openGuest } = useGuestDrawer();
   const save = (patch: StayGuestPatch) => update.mutateAsync({ id: guest.id, patch });
   const has = (f: StayGuestView['missing'][number]) => guest.missing.includes(f);
   const error = update.error ?? rename.error ?? remove.error;
@@ -180,9 +181,13 @@ function StayGuestCard({
           </div>
           <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             {guest.primary ? (
-              <Link to={`/guests/${guest.guestId}`} className="hover:text-foreground">
+              <button
+                type="button"
+                onClick={() => openGuest(guest.guestId!)}
+                className="hover:text-foreground"
+              >
                 Main guest
-              </Link>
+              </button>
             ) : (
               `Guest ${position}`
             )}

@@ -3,14 +3,14 @@ import { contextFromLocation, parseRangeId, rangeId } from './agent-context';
 
 describe('contextFromLocation', () => {
   it('prefers an open booking inspector over the page under it', () => {
-    expect(contextFromLocation('/guests/gst_1', '?booking=bk_9')).toEqual({
+    expect(contextFromLocation('/guests', '?guest=gst_1&booking=bk_9')).toEqual({
       kind: 'booking',
       id: 'bk_9',
     });
   });
 
   it('reads a guest profile and an inbox conversation, but not a new email', () => {
-    expect(contextFromLocation('/guests/gst_1', '')).toEqual({ kind: 'guest', id: 'gst_1' });
+    expect(contextFromLocation('/inbox', '?guest=gst_1')).toEqual({ kind: 'guest', id: 'gst_1' });
     expect(contextFromLocation('/inbox/inq_4', '')).toEqual({ kind: 'inquiry', id: 'inq_4' });
     expect(contextFromLocation('/inbox/new', '?draft=drf_1')).toBeNull();
   });

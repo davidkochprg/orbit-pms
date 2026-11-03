@@ -17,6 +17,7 @@ import {
 import { formatMoney, formatRange } from '@/lib/format';
 import { modShortcut } from '@/lib/platform';
 import { cn } from '@/lib/utils';
+import { useGuestDrawer } from '@/hooks/use-guest-drawer';
 
 const outcome = {
   confirmed: { icon: Check, text: 'Done', className: 'text-success' },
@@ -98,6 +99,7 @@ export function PendingActionCard({
   const action = usePendingAction(id);
   const resolve = useResolvePendingAction(id);
   const { closePalette, openBooking } = useCommandPalette();
+  const { open: openGuest } = useGuestDrawer();
   const current = resolve.data ?? action.data;
   const result = current && current.status !== 'pending' ? outcome[current.status] : null;
   const details = current?.details ?? null;
@@ -199,13 +201,16 @@ export function PendingActionCard({
           </Button>
         )}
         {current?.kind === 'update_guest' && current.status === 'confirmed' && (
-          <Button size="sm" variant="ghost" className="ml-auto" asChild>
-            <Link
-              to={`/guests/${encodeURIComponent(current.input.guestId)}`}
-              onClick={closePalette}
-            >
-              Open profile
-            </Link>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="ml-auto"
+            onClick={() => {
+              closePalette();
+              openGuest(current.input.guestId);
+            }}
+          >
+            Open profile
           </Button>
         )}
       </div>

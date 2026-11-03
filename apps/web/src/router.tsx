@@ -3,11 +3,10 @@ import { AccessGate } from '@/components/access-gate';
 import { AppLayout } from '@/components/app-layout';
 import { AppError, PageError } from '@/components/route-error';
 import { DashboardPage } from '@/pages/dashboard';
-import { GuestDetailPage } from '@/pages/guest-detail';
 import { ReportsPage } from '@/pages/reports';
 import { ActivityPage } from '@/pages/activity';
 import { ContactsPage } from '@/pages/contacts';
-import { GuestsPage } from '@/pages/guests';
+import { GuestRedirect, GuestsPage } from '@/pages/guests';
 import { InboxPage } from '@/pages/inbox';
 import { HousekeepingPage } from '@/pages/housekeeping';
 import { ScanPage } from '@/pages/scan';
@@ -43,7 +42,7 @@ export const router = createBrowserRouter([
               { path: 'inbox/:id', element: <InboxPage /> },
               { path: 'housekeeping', element: <HousekeepingPage /> },
               { path: 'guests', element: <GuestsPage /> },
-              { path: 'guests/:id', element: <GuestDetailPage /> },
+              { path: 'guests/:id', element: <GuestRedirect /> },
               { path: 'rooms', element: <RoomsPage /> },
               { path: 'rates', element: <RatesPage /> },
               { path: 'reports', element: <ReportsPage /> },

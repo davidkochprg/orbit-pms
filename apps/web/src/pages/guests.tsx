@@ -12,7 +12,8 @@ import {
   useTable,
 } from '@tanstack/react-table';
 import { ArrowDown, ArrowUp, CalendarPlus, ExternalLink, Plus, Users } from 'lucide-react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { Navigate, useParams, useSearchParams } from 'react-router';
+import { guestHref, useGuestDrawer } from '@/hooks/use-guest-drawer';
 import { ActionMenu } from '@/components/action-menu';
 import { EmptyState } from '@/components/empty-state';
 import { ErrorNotice } from '@/components/error-notice';
@@ -65,7 +66,7 @@ const noGuests: Guest[] = [];
 export function GuestsPage() {
   const guests = useGuests();
   const { openNew } = useBookingEditor();
-  const navigate = useNavigate();
+  const { open } = useGuestDrawer();
   // `?new=guest` opens the form, so the command bar can link to it.
   const [params, setParams] = useSearchParams();
   const creating = params.get('new') === 'guest';
@@ -159,7 +160,7 @@ export function GuestsPage() {
                     {
                       label: 'Open profile',
                       icon: ExternalLink,
-                      onSelect: () => void navigate(`/guests/${row.original.id}`),
+                      onSelect: () => open(row.original.id),
                     },
                     {
                       label: 'New booking…',
@@ -170,7 +171,7 @@ export function GuestsPage() {
                 >
                   <tr
                     className="cursor-pointer border-b border-grid-line hover:bg-accent"
-                    onClick={() => void navigate(`/guests/${row.original.id}`)}
+                    onClick={() => open(row.original.id)}
                   >
                     {row.getAllCells().map((cell) => (
                       <td
@@ -193,4 +194,10 @@ export function GuestsPage() {
       <GuestEditorDialog open={creating} onOpenChange={setCreating} />
     </>
   );
+}
+
+/** Old guest links (`/guests/:id`) open the guest's drawer over the guests list. */
+export function GuestRedirect() {
+  const { id = '' } = useParams();
+  return <Navigate to={guestHref(id)} replace />;
 }

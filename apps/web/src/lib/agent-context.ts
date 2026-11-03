@@ -9,8 +9,8 @@ export function contextFromLocation(pathname: string, search: string): AgentCont
   const params = new URLSearchParams(search);
   const booking = params.get('booking');
   if (booking) return { kind: 'booking', id: booking };
-  const guest = /^\/guests\/([^/]+)$/.exec(pathname);
-  if (guest) return { kind: 'guest', id: decodeURIComponent(guest[1]!) };
+  const guest = params.get('guest');
+  if (guest) return { kind: 'guest', id: guest };
   const inquiry = /^\/inbox\/([^/]+)$/.exec(pathname);
   if (inquiry && inquiry[1] !== 'new')
     return { kind: 'inquiry', id: decodeURIComponent(inquiry[1]!) };

@@ -1,6 +1,7 @@
 import { BrushCleaning, CalendarPlus, CalendarRange, Mail } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useNavigate } from 'react-router';
+import { useGuestDrawer } from '@/hooks/use-guest-drawer';
 import { BookingContextMenu } from '@/components/booking-menu';
 import { GuestAvatar } from '@/components/guest-avatar';
 import { StatusDot } from '@/components/status-dot';
@@ -150,14 +151,14 @@ function RoomChip({ id }: { id: string }) {
 
 function GuestChip({ id }: { id: string }) {
   const known = useAgentEntity(id) as GuestEntity | undefined;
-  const navigate = useNavigate();
+  const { open } = useGuestDrawer();
   const { closePalette } = useCommandPalette();
   return (
     <button
       type="button"
       onClick={() => {
         closePalette();
-        void navigate(`/guests/${encodeURIComponent(id)}`);
+        open(id);
       }}
       className={chip}
     >

@@ -2,7 +2,7 @@ import type { BookingAction } from '@orbit/shared';
 import { Ban, ExternalLink, LoaderCircle, Pencil, User } from 'lucide-react';
 import { LogoMark } from '@/components/logo-mark';
 import { type ComponentType, type ReactElement, type ReactNode, useState } from 'react';
-import { useNavigate } from 'react-router';
+import { useGuestDrawer } from '@/hooks/use-guest-drawer';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import {
   ContextMenu,
@@ -104,7 +104,7 @@ function BookingMenuItems({
   const { open } = useBookingDrawer();
   const { openEdit } = useBookingEditor();
   const ask = useAskOrbit();
-  const navigate = useNavigate();
+  const { open: openGuest } = useGuestDrawer();
   const d = detail.data;
   const steps =
     d?.allowedActions.filter((a): a is Exclude<BookingAction, 'cancel'> => a !== 'cancel') ?? [];
@@ -147,7 +147,7 @@ function BookingMenuItems({
       )}
       <Separator />
       {d && (
-        <Item onSelect={() => void navigate(`/guests/${d.guest.id}`)}>
+        <Item onSelect={() => openGuest(d.guest.id)}>
           <User /> Open guest profile
         </Item>
       )}

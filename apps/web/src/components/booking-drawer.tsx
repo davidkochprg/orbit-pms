@@ -8,7 +8,7 @@ import type {
 import { CalendarRange, CircleDashed, MoreHorizontal, Pencil, ScanLine } from 'lucide-react';
 import { LogoMark } from '@/components/logo-mark';
 import { type ReactNode, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useNavigate } from 'react-router';
 import { BookingBill, PaymentForm } from '@/components/booking-bill';
 import { BookingGuests } from '@/components/booking-guests';
 import { BookingDropdownMenu, CancelBookingDialog } from '@/components/booking-menu';
@@ -65,6 +65,7 @@ import { keepOpenWhileEditing } from '@/lib/inline-edit';
 import { tapeChartHref } from '@/lib/tape-chart';
 import { guestBookProgress } from '@/lib/registration';
 import { cn } from '@/lib/utils';
+import { useGuestDrawer } from '@/hooks/use-guest-drawer';
 
 const sourceLabels: Record<BookingSource, string> = {
   email: 'Email',
@@ -372,14 +373,15 @@ function EmailsSection({ detail }: { detail: BookingDetail }) {
 function ContactSection({ detail }: { detail: BookingDetail }) {
   const { guest } = detail;
   const update = useUpdateGuest();
+  const { open: openGuest } = useGuestDrawer();
   const save = (patch: Parameters<typeof update.mutateAsync>[0]['patch']) =>
     update.mutateAsync({ id: guest.id, patch });
   return (
     <Section
       title="Main guest"
       actions={
-        <Button variant="ghost" size="xs" asChild>
-          <Link to={`/guests/${guest.id}`}>Profile</Link>
+        <Button variant="ghost" size="xs" onClick={() => openGuest(guest.id)}>
+          Profile
         </Button>
       }
     >

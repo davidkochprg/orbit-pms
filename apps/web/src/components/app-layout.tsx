@@ -1,6 +1,7 @@
 import { Navigate, Outlet, useLocation } from 'react-router';
 import { AppSidebar } from '@/components/app-sidebar';
 import { BookingDrawer } from '@/components/booking-drawer';
+import { GuestDrawer } from '@/components/guest-drawer';
 import { BookingEditorProvider } from '@/components/booking-editor';
 import { CommandPaletteProvider } from '@/components/command-palette';
 import { RegionProvider } from '@/components/region-provider';
@@ -31,6 +32,7 @@ export function AppLayout() {
               <Outlet />
             </SidebarInset>
             <BookingDrawer />
+            <GuestDrawer />
           </SidebarProvider>
         </CommandPaletteProvider>
       </BookingEditorProvider>
