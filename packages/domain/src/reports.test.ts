@@ -191,15 +191,98 @@ describe('buildReport', () => {
     expect(report.cancellations).toBe(1);
   });
 
-  it('slices by source and room type', () => {
+  it('slices by source and room type, each with its ADR', () => {
     expect(report.bySource).toEqual([
-      { source: 'email', roomNights: 3, roomRevenue: 1000 },
-      { source: 'phone', roomNights: 2, roomRevenue: 1000 },
+      { source: 'email', roomNights: 3, roomRevenue: 1000, adr: 333 },
+      { source: 'phone', roomNights: 2, roomRevenue: 1000, adr: 500 },
     ]);
     expect(report.byRoomType).toEqual([
-      expect.objectContaining({ roomTypeId: double.id, roomNights: 3, occupancy: 3 / 8 }),
-      expect.objectContaining({ roomTypeId: apartment.id, roomNights: 2, occupancy: 2 / 4 }),
+      expect.objectContaining({ roomTypeId: double.id, roomNights: 3, occupancy: 3 / 8, adr: 333 }),
+      expect.objectContaining({
+        roomTypeId: apartment.id,
+        roomNights: 2,
+        occupancy: 2 / 4,
+        adr: 500,
+      }),
     ]);
+  });
+
+  it('adds extras and add-ons to the revenue per available room night', () => {
+    expect(report.trevpar).toBe(Math.round((2000 + 300 + 150) / 12));
+  });
+
+  it('counts the share of bookings cancelled', () => {
+    // Two sold stays with nights in the period, one cancelled; the hold counts for neither.
+    expect(report.cancellationRate).toBe(1 / 3);
+  });
+
+  it('runs each weekday of the period, Monday first', () => {
+    // Fri 1 May to Mon 4 May: Fri and Sat 2 rooms each, Sun 1, Mon none.
+    expect(report.byWeekday.map((w) => [w.weekday, w.nights, w.roomNights])).toEqual([
+      [1, 1, 0],
+      [5, 1, 2],
+      [6, 1, 2],
+      [7, 1, 1],
+    ]);
+    const friday = report.byWeekday.find((w) => w.weekday === 5)!;
+    expect(friday).toMatchObject({ occupancy: 2 / 3, adr: 417, revpar: 278 });
+    const twoWeeks = buildReport({ from: '2026-05-01', to: '2026-05-15' }, data());
+    expect(twoWeeks.byWeekday.every((w) => w.nights === 2)).toBe(true);
+    expect(twoWeeks.byWeekday.reduce((n, w) => n + w.roomNights, 0)).toBe(twoWeeks.roomNightsSold);
+  });
+
+  it('groups arrivals by length of stay and counts families and returning guests', () => {
+    const extra = [
+      booking({
+        id: 'one',
+        roomId: 'rm_2',
+        guestId: 'g2',
+        checkIn: '2026-05-03',
+        checkOut: '2026-05-04',
+        childAges: [7],
+        status: 'confirmed',
+      }),
+      booking({
+        id: 'long',
+        roomId: 'rm_a',
+        guestId: 'g3',
+        checkIn: '2026-05-04',
+        checkOut: '2026-05-12',
+        status: 'confirmed',
+      }),
+    ];
+    const r = buildReport(query, data({ bookings: [...stays, ...extra] }));
+    expect(r.stayLengths).toEqual([
+      { minNights: 1, maxNights: 1, arrivals: 1 },
+      { minNights: 2, maxNights: 2, arrivals: 0 },
+      { minNights: 3, maxNights: 4, arrivals: 1 },
+      { minNights: 5, maxNights: 6, arrivals: 0 },
+      { minNights: 7, maxNights: null, arrivals: 1 },
+    ]);
+    expect(r.arrivalsWithChildren).toBe(1);
+    // g2 stayed from 29 April; g1 and g3 are new, unless their history says otherwise.
+    expect(r.returningArrivals).toBe(1);
+    const before = booking({
+      id: 'old',
+      roomId: 'rm_1',
+      guestId: 'g3',
+      checkIn: '2025-08-01',
+      checkOut: '2025-08-03',
+      status: 'checked_out',
+    });
+    const cancelled = booking({
+      id: 'old2',
+      roomId: 'rm_1',
+      guestId: 'g1',
+      checkIn: '2025-09-01',
+      checkOut: '2025-09-03',
+      status: 'cancelled',
+    });
+    const withHistory = buildReport(
+      query,
+      data({ bookings: [...stays, ...extra], history: [...stays, ...extra, before, cancelled] }),
+    );
+    expect(withHistory.returningArrivals).toBe(2);
   });
 
   it('lists departed guests who still owe, largest first', () => {

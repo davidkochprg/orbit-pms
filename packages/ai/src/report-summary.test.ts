@@ -28,12 +28,23 @@ function report(overrides: Partial<Report> = {}): Report {
     cityTax: 0,
     adr: 200,
     revpar: 97,
+    trevpar: 105,
     arrivals: 12,
     averageStay: 2.8,
     cancellations: 2,
+    cancellationRate: 0.125,
+    returningArrivals: 3,
+    arrivalsWithChildren: 2,
+    stayLengths: [
+      { minNights: 1, maxNights: 1, arrivals: 3 },
+      { minNights: 2, maxNights: 2, arrivals: 3 },
+      { minNights: 3, maxNights: 4, arrivals: 6 },
+      { minNights: 5, maxNights: 6, arrivals: 0 },
+      { minNights: 7, maxNights: null, arrivals: 0 },
+    ],
     bySource: [
-      { source: 'ota', roomNights: 20, roomRevenue: 4200 },
-      { source: 'email', roomNights: 14, roomRevenue: 2600 },
+      { source: 'ota', roomNights: 20, roomRevenue: 4200, adr: 210 },
+      { source: 'email', roomNights: 14, roomRevenue: 2600, adr: 186 },
     ],
     byRoomType: [
       {
@@ -42,6 +53,7 @@ function report(overrides: Partial<Report> = {}): Report {
         occupancy: 34 / 70,
         roomNights: 34,
         roomRevenue: 6800,
+        adr: 200,
       },
     ],
     payments: [],
@@ -55,6 +67,14 @@ function report(overrides: Partial<Report> = {}): Report {
       occupancy: o,
       roomRevenue: 0,
     })),
+    byWeekday: occupancy.map((o, i) => ({
+      weekday: i + 1,
+      nights: 1,
+      roomNights: Math.round(o * 10),
+      occupancy: o,
+      adr: 180 + i * 10,
+      revpar: Math.round(o * (180 + i * 10)),
+    })),
     ...overrides,
   };
 }
@@ -66,8 +86,8 @@ const previous = report({
   roomRevenue: 5320,
   roomNightsSold: 28,
   bySource: [
-    { source: 'ota', roomNights: 12, roomRevenue: 2280 },
-    { source: 'email', roomNights: 16, roomRevenue: 3040 },
+    { source: 'ota', roomNights: 12, roomRevenue: 2280, adr: 190 },
+    { source: 'email', roomNights: 16, roomRevenue: 3040, adr: 190 },
   ],
 });
 
@@ -79,13 +99,24 @@ describe('reportFacts', () => {
       'Occupancy 49% (34 of 70 room nights), +9 pts vs the 7 nights before (40%)',
     );
     expect(facts).toContain('ADR $200, +5% vs before (was $190)');
-    expect(facts).toContain('OTA 59% ($4,200, +16 pts); Email 41% ($2,600, -16 pts)');
+    expect(facts).toContain(
+      'OTA 59% ($4,200, ADR $210, +16 pts); Email 41% ($2,600, ADR $186, -16 pts)',
+    );
+    expect(facts).toContain('Cancellations 2, 13% of bookings (was 2, 13%).');
   });
 
   it('gives the weekday pattern, the busiest and quietest nights and money owed', () => {
-    expect(facts).toContain('By weekday, average occupancy: Sat 90%; Fri 80%; Sun 50%');
+    expect(facts).toContain('By weekday, occupancy and ADR: Sat 90% at $230; Fri 80% at $220');
+    expect(facts).toContain('Queen room 49% at $200');
     expect(facts).toContain('Busiest night Sat, Oct 10 at 90%; quietest Tue, Oct 6 at 20%.');
     expect(facts).toContain('2 guests left owing $200 together.');
+  });
+
+  it('describes the guests: returning, families and how long they stay', () => {
+    expect(facts).toContain(
+      'Guests: 3 of 12 arrivals had stayed before (25%, was 25%); 2 came with children. Stays by length: 1 night 25%; 2 nights 25%; 3–4 nights 50%.',
+    );
+    expect(facts).toContain('(TRevPAR) $105.');
   });
 
   it('says when the nights are still ahead', () => {

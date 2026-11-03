@@ -254,9 +254,11 @@ An unknown, expired or already saved scan is `not_found`.
 - **Sold** stays are `confirmed`, `checked_in` and `checked_out`; holds and cancellations don't count.
 - **Room nights**: available = rooms × nights; sold = nights of sold stays inside the period. Occupancy = sold / available, as a fraction.
 - **Revenue** comes from each booking's `priceSnapshot`, spread evenly over its nights in whole units so the nightly shares add up exactly (`nightlyShare`). A stay that crosses the period's edge counts only its nights inside. Room revenue is accommodation after child and long-stay discounts; add-on revenue is wellness, extra beds and dogs. Extras are the charges posted in the period. City tax is reported apart: it is collected for the town.
-- **ADR** = room revenue / room nights sold; **RevPAR** = room revenue / room nights available. Both rounded to whole units.
-- Guest nights, arrivals in the period and their average stay, and cancellations with a night in the period.
-- Room nights and room revenue by booking source and by room type (with each type's occupancy), payments minus refunds by method on days in the period, departed guests (check-out inside the period) who still owe, and a daily series of rooms sold, occupancy and room revenue.
+- **ADR** = room revenue / room nights sold; **RevPAR** = room revenue / room nights available; **TRevPAR** = room, add-on and extras revenue / room nights available. All rounded to whole units.
+- Guest nights, arrivals in the period and their average stay, and cancellations with a night in the period. The cancellation rate is cancellations / (cancellations + sold stays with a night in the period).
+- Arrivals by length of stay (1, 2, 3–4, 5–6 and 7+ nights), arrivals with children, and returning arrivals: the guest has an earlier sold stay (the service passes every booking as `history`).
+- **By weekday** (`isoWeekday`, 1 = Monday): for each weekday in the period, how many nights fall on it, room nights sold, occupancy, ADR and RevPAR.
+- Room nights, room revenue and ADR by booking source and by room type (with each type's occupancy), payments minus refunds by method on days in the period, departed guests (check-out inside the period) who still owe, and a daily series of rooms sold, occupancy and room revenue.
 - `previousPeriod(query)` is the same length right before, for comparisons.
 
 ## Rates and rooms

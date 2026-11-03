@@ -1,6 +1,7 @@
 import type {
   Booking,
   BookingSource,
+  IsoDate,
   Charge,
   Folio,
   Guest,
@@ -28,6 +29,14 @@ const roomLineKinds: QuoteLine['kind'][] = [
   'long_stay_discount',
 ];
 const sources: BookingSource[] = ['email', 'phone', 'web', 'ota', 'walk_in'];
+/** Stay lengths as a report groups arrivals: one night, two, three to four, five to six, a week+. */
+const stayLengthBuckets: [number, number | null][] = [
+  [1, 1],
+  [2, 2],
+  [3, 4],
+  [5, 6],
+  [7, null],
+];
 const methods: PaymentMethod[] = ['card', 'cash', 'bank_transfer'];
 
 /** Stays that count as sold: confirmed, in house or completed. Holds and cancellations don't. */
@@ -55,6 +64,16 @@ function sumLines(booking: Booking, kinds: QuoteLine['kind'][]): number {
 
 const ratio = (part: number, whole: number) => (whole === 0 ? 0 : part / whole);
 
+/** ISO weekday of a date: 1 is Monday, 7 is Sunday. */
+export function isoWeekday(date: IsoDate): number {
+  return ((new Date(`${date}T12:00:00Z`).getUTCDay() + 6) % 7) + 1;
+}
+
+/** A slice with the ADR its room nights and room revenue give. */
+function withAdr<T extends { roomNights: number; roomRevenue: number }>(slice: T) {
+  return { ...slice, adr: Math.round(ratio(slice.roomRevenue, slice.roomNights)) };
+}
+
 export interface ReportData {
   rooms: Room[];
   roomTypes: RoomType[];
@@ -68,6 +87,8 @@ export interface ReportData {
   /** Bills of guests who checked out in the period. */
   departedFolios: Folio[];
   pricing: PricingConfig;
+  /** Every booking, to tell returning guests; `bookings` when absent. */
+  history?: Booking[];
 }
 
 /** Performance over `[from, to)`. See `reportSchema` for what each figure means. */
@@ -86,13 +107,25 @@ export function buildReport({ from, to }: ReportQuery, data: ReportData): Report
   let cityTax = 0;
   let guestNights = 0;
   let cancellations = 0;
+  let soldBookings = 0;
+  let returningArrivals = 0;
+  let arrivalsWithChildren = 0;
   const arrivalLengths: number[] = [];
+  const history = (data.history ?? data.bookings).filter(isSold);
 
   for (const b of data.bookings) {
-    if (b.status === 'cancelled' && b.checkIn < to && b.checkOut > from) cancellations++;
+    const inPeriod = b.checkIn < to && b.checkOut > from;
+    if (b.status === 'cancelled' && inPeriod) cancellations++;
     if (!isSold(b)) continue;
-    if (b.checkIn >= from && b.checkIn < to)
+    if (inPeriod) soldBookings++;
+    if (b.checkIn >= from && b.checkIn < to) {
       arrivalLengths.push(nightsBetween(b.checkIn, b.checkOut));
+      if (b.childAges.length > 0) arrivalsWithChildren++;
+      const stayedBefore = history.some(
+        (h) => h.guestId === b.guestId && h.id !== b.id && h.checkIn < b.checkIn,
+      );
+      if (stayedBefore) returningArrivals++;
+    }
     const stayNights = eachNight(b);
     const room = sumLines(b, roomLineKinds);
     const addons = (b.priceSnapshot?.total ?? 0) - room;
@@ -120,6 +153,16 @@ export function buildReport({ from, to }: ReportQuery, data: ReportData): Report
   const roomNightsAvailable = data.rooms.length * periodNights.length;
   const guestName = new Map(data.guests.map((g) => [g.id, g.name]));
   const bookingById = new Map(data.bookings.map((b) => [b.id, b]));
+  const extrasRevenue = data.charges.reduce((sum, c) => sum + c.amount, 0);
+  const weekdays = new Map<number, { nights: number; roomNights: number; roomRevenue: number }>();
+  for (const d of days) {
+    const weekday = isoWeekday(d.date);
+    const w = weekdays.get(weekday) ?? { nights: 0, roomNights: 0, roomRevenue: 0 };
+    w.nights += 1;
+    w.roomNights += d.roomsSold;
+    w.roomRevenue += d.roomRevenue;
+    weekdays.set(weekday, w);
+  }
 
   return {
     from,
@@ -132,10 +175,11 @@ export function buildReport({ from, to }: ReportQuery, data: ReportData): Report
     guestNights,
     roomRevenue,
     addonRevenue,
-    extrasRevenue: data.charges.reduce((sum, c) => sum + c.amount, 0),
+    extrasRevenue,
     cityTax,
     adr: Math.round(ratio(roomRevenue, roomNightsSold)),
     revpar: Math.round(ratio(roomRevenue, roomNightsAvailable)),
+    trevpar: Math.round(ratio(roomRevenue + addonRevenue + extrasRevenue, roomNightsAvailable)),
     arrivals: arrivalLengths.length,
     averageStay:
       Math.round(
@@ -145,8 +189,28 @@ export function buildReport({ from, to }: ReportQuery, data: ReportData): Report
         ) * 10,
       ) / 10,
     cancellations,
+    cancellationRate: ratio(cancellations, cancellations + soldBookings),
+    returningArrivals,
+    arrivalsWithChildren,
+    stayLengths: stayLengthBuckets.map(([minNights, maxNights]) => ({
+      minNights,
+      maxNights,
+      arrivals: arrivalLengths.filter(
+        (n) => n >= minNights && (maxNights === null || n <= maxNights),
+      ).length,
+    })),
+    byWeekday: [...weekdays.entries()]
+      .sort(([a], [b]) => a - b)
+      .map(([weekday, w]) => ({
+        weekday,
+        nights: w.nights,
+        roomNights: w.roomNights,
+        occupancy: ratio(w.roomNights, w.nights * data.rooms.length),
+        adr: Math.round(ratio(w.roomRevenue, w.roomNights)),
+        revpar: Math.round(ratio(w.roomRevenue, w.nights * data.rooms.length)),
+      })),
     bySource: sources
-      .map((source) => ({ source, ...bySource.get(source)! }))
+      .map((source) => withAdr({ source, ...bySource.get(source)! }))
       .filter((s) => s.roomNights > 0),
     byRoomType: data.roomTypes.map((t) => {
       const slice = byType.get(t.id)!;
@@ -154,7 +218,7 @@ export function buildReport({ from, to }: ReportQuery, data: ReportData): Report
       return {
         roomTypeId: t.id,
         roomTypeName: t.name,
-        ...slice,
+        ...withAdr(slice),
         occupancy: ratio(slice.roomNights, rooms * periodNights.length),
       };
     }),
@@ -217,6 +281,7 @@ export function createReportService({ repos, pricing }: ReportDeps) {
         payments: await repos.billing.listPayments({ from, to }),
         departedFolios,
         pricing: rates,
+        history: await repos.bookings.listBookings(),
       });
     },
   };
