@@ -13,6 +13,7 @@ import {
   Baby,
   Bath,
   CalendarPlus,
+  CalendarX2,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -238,6 +239,10 @@ function TapeChart({ today }: { today: string }) {
   };
 
   const guestName = (id: string) => guests.data?.find((g) => g.id === id)?.name ?? 'Unknown guest';
+  // Off the chart, but still worth opening: a fee to post, a deposit to pay back.
+  const cancelled = (bookings.data ?? []).filter(
+    (b) => b.status === 'cancelled' && b.checkOut > start,
+  );
   const visible = (bookings.data ?? [])
     .filter((b) => b.status !== 'cancelled')
     .map((b) =>
@@ -424,6 +429,14 @@ function TapeChart({ today }: { today: string }) {
       </div>
 
       <footer className="flex h-10 shrink-0 items-center gap-4 border-t bg-surface-sunken px-4 text-xs text-muted-foreground md:px-6">
+        {cancelled.length > 0 && (
+          <CancelledList
+            bookings={cancelled}
+            guestName={guestName}
+            roomName={(id) => rooms.data?.find((r) => r.id === id)?.name ?? id}
+            onOpen={open}
+          />
+        )}
         <Legend />
       </footer>
     </>
@@ -874,6 +887,55 @@ const iconKey: { icon: LucideIcon; label: string }[] = [
   { icon: Globe, label: 'Booked via OTA' },
   { icon: StickyNote, label: 'Has notes' },
 ];
+
+/** The cancelled stays in the window, which the chart leaves out; a row opens the booking. */
+function CancelledList({
+  bookings,
+  guestName,
+  roomName,
+  onOpen,
+}: {
+  bookings: Booking[];
+  guestName: (guestId: string) => string;
+  roomName: (roomId: string) => string;
+  onOpen: (bookingId: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const sorted = [...bookings].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="flex shrink-0 items-center gap-1.5 rounded px-1 outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <CalendarX2 className="size-3.5" /> {bookings.length} cancelled
+        </button>
+      </PopoverTrigger>
+      <PopoverContent side="top" align="start" className="w-72 p-1">
+        <ul className="scroll-fade flex max-h-72 flex-col overflow-auto">
+          {sorted.map((b) => (
+            <li key={b.id}>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  onOpen(b.id);
+                }}
+                className="flex w-full items-center gap-3 rounded-control px-2.5 py-1.5 text-left text-[0.8125rem] outline-none hover:bg-accent focus-visible:bg-accent"
+              >
+                <span className="min-w-0 flex-1 truncate">{guestName(b.guestId)}</span>
+                <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                  {roomName(b.roomId)} · {formatRange(b.checkIn, b.checkOut)}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </PopoverContent>
+    </Popover>
+  );
+}
 
 const legendStatuses: VisibleStatus[] = ['hold', 'confirmed', 'checked_in', 'checked_out'];
 
