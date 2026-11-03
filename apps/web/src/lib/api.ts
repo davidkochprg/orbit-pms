@@ -443,11 +443,16 @@ export function usePendingAction(id: string) {
   });
 }
 
-/** Confirms or rejects a proposed change. A failed confirm comes back as the action, "failed". */
+/**
+ * Confirms or rejects a proposed change. A failed confirm comes back as the action, "failed".
+ * The signed-in staff member confirms: replies are signed with their name, and manager-only
+ * changes check them.
+ */
 async function resolvePendingAction(id: string, decision: 'confirm' | 'reject') {
+  const staffId = storedStaffId();
   const res = await fetch(`/api/pending-actions/${encodeURIComponent(id)}/${decision}`, {
     method: 'POST',
-    headers: { accept: 'application/json' },
+    headers: { accept: 'application/json', ...(staffId && { [STAFF_HEADER]: staffId }) },
   });
   // A failed confirm comes back as 409 with the action (status "failed") as the body.
   const body: unknown = await res.json().catch(() => null);
