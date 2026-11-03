@@ -50,7 +50,14 @@ import { Panel } from '@/components/panel';
 import { RecipientField } from '@/components/recipient-field';
 import { RepairDialog } from '@/components/repair-panel';
 import { Button } from '@/components/ui/button';
-import { Select } from '@/components/ui/select';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { useBookingDrawer } from '@/hooks/use-booking-drawer';
@@ -120,9 +127,10 @@ import { cn } from '@/lib/utils';
 import { Tip } from '@/components/ui/tooltip';
 
 /**
- * One conversation: its history, Orbit's help when asked for, and the reply. Preparing reads the
- * request and shows its rooms first, then writes the reply; holding a room rewrites the reply to
- * say so, unless staff have edited it, when they are asked first.
+ * One conversation: its history, Orbit's help when asked for, and the reply box, the same for every
+ * conversation. Drafting a reply to a guest reads the request and shows its rooms first, then
+ * writes the reply; holding a room rewrites the reply to say so, unless staff have edited it, when
+ * they are asked first.
  */
 export function Conversation({ id }: { id: string }) {
   const inquiry = useInquiry(id);
@@ -146,7 +154,6 @@ export function Conversation({ id }: { id: string }) {
   const edited = editedKey === draftKey;
   // A room held after staff edited the reply: the reply doesn't say so until they update it.
   const [heldSinceEdit, setHeldSinceEdit] = useState<string | null>(null);
-  const [writing, setWriting] = useState(false);
 
   // Opening a conversation reads it, as in any mail client.
   const marked = useRef(false);
@@ -179,16 +186,9 @@ export function Conversation({ id }: { id: string }) {
   const read = m.taskId
     ? m.processedAt !== null && !m.processingError && Boolean(m.suggestion?.draft)
     : isRead(m);
-  const busy = reading.isPending || drafting.isPending;
-  // Before Orbit has read the guest's latest message, preparing is the main step; the empty
-  // reply box waits behind "Write it yourself".
-  // A supplier's mail isn't a request to read; a repair's is answered with the repair in hand.
-  const offerPrepare =
-    m.status !== 'declined' &&
-    aiOn &&
-    !read &&
-    (m.taskId !== null || !contactOf(m, contacts.data ?? [])) &&
-    m.messages.at(-1)?.direction === 'in';
+  // A guest's request is read before a reply is drafted; a repair's is answered with the repair in
+  // hand. A supplier's mail isn't a request to read.
+  const canDraft = aiOn && (m.taskId !== null || !contactOf(m, contacts.data ?? []));
 
   return (
     <article className="mx-auto flex max-w-4xl flex-col gap-6 px-4 py-6 md:px-6">
@@ -205,13 +205,6 @@ export function Conversation({ id }: { id: string }) {
         ))}
       </ol>
       {learn.data && <LearnedFact key={learn.data.id} action={learn.data} />}
-      {offerPrepare && (
-        <Prepare
-          reading={reading.isPending}
-          onPrepare={prepare}
-          onWrite={writing ? undefined : () => setWriting(true)}
-        />
-      )}
       {read && m.suggestion?.note && m.suggestion.options.length === 0 && !m.suggestion.block && (
         <p className="rounded-stage bg-background px-4 py-3 text-sm text-muted-foreground shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit">
           {m.suggestion.note}
@@ -229,29 +222,24 @@ export function Conversation({ id }: { id: string }) {
       {read && m.suggestion?.block && (
         <Block inquiry={m} block={m.suggestion.block} locked={drafting.isPending} onHeld={onHeld} />
       )}
-      {m.status !== 'declined' &&
-        (!offerPrepare || writing || reading.isPending || savedDraft) &&
-        !drafts.data && <Skeleton className="h-56" />}
-      {m.status !== 'declined' &&
-        (!offerPrepare || writing || reading.isPending || savedDraft) &&
-        drafts.data && (
-          <ReplyEditor
-            key={draftKey}
-            inquiry={m}
-            savedDraft={savedDraft}
-            hotelAddress={hotelAddress}
-            myLanguage={myLanguage}
-            aiOn={aiOn}
-            drafting={drafting.isPending}
-            busy={busy}
-            error={reading.error ?? drafting.error}
-            heldSinceEdit={heldSinceEdit}
-            onEdit={() => setEditedKey(draftKey)}
-            onDraft={read ? draft : prepare}
-            // What staff wrote themselves may hold something the hotel information lacks.
-            onSent={() => aiOn && !m.taskId && (edited || !m.suggestion?.draft) && learn.mutate()}
-          />
-        )}
+      {m.status !== 'declined' && !drafts.data && <Skeleton className="h-56" />}
+      {m.status !== 'declined' && drafts.data && (
+        <ReplyEditor
+          key={draftKey}
+          inquiry={m}
+          savedDraft={savedDraft}
+          hotelAddress={hotelAddress}
+          myLanguage={myLanguage}
+          aiOn={aiOn}
+          working={reading.isPending ? 'reading' : drafting.isPending ? 'drafting' : null}
+          error={reading.error ?? drafting.error}
+          heldSinceEdit={heldSinceEdit}
+          onEdit={() => setEditedKey(draftKey)}
+          onDraft={canDraft ? (read ? draft : prepare) : undefined}
+          // What staff wrote themselves may hold something the hotel information lacks.
+          onSent={() => aiOn && !m.taskId && (edited || !m.suggestion?.draft) && learn.mutate()}
+        />
+      )}
     </article>
   );
 }
@@ -320,40 +308,6 @@ function LearnedFact({ action }: { action: PendingAction }) {
           {was ? 'Update' : 'Save'}
         </Button>
       </span>
-    </section>
-  );
-}
-
-/** Before Orbit has read the latest message: the buttons to draft a reply or write one. */
-function Prepare({
-  reading,
-  onPrepare,
-  onWrite,
-}: {
-  reading: boolean;
-  onPrepare: () => void;
-  /** Opens the reply box without Orbit; absent once it is open. */
-  onWrite?: () => void;
-}) {
-  return (
-    <section aria-label="Prepare a reply" className="flex min-h-8 items-center justify-end gap-1.5">
-      {reading ? (
-        <p role="status" className="flex items-center gap-3 text-sm text-muted-foreground">
-          <ThinkingOrb state="searching" size={20} aria-hidden />
-          Reading the message…
-        </p>
-      ) : (
-        <>
-          {onWrite && (
-            <Button variant="ghost" size="sm" onClick={onWrite}>
-              Write it yourself
-            </Button>
-          )}
-          <Button size="sm" onClick={onPrepare}>
-            <PenLine /> Prepare reply
-          </Button>
-        </>
-      )}
     </section>
   );
 }
@@ -619,7 +573,11 @@ function IconButton({
   );
 }
 
-/** A message in the thread. A guest's can be translated into the reader's language on request. */
+/**
+ * A message in the thread, in the reader's language when it has been put into it: a guest's once
+ * translated, the hotel's own when staff wrote it in theirs. Either can be translated on request,
+ * once; the original is a click away.
+ */
 function Message({
   inquiry,
   message,
@@ -636,9 +594,10 @@ function Message({
   const translated = message.translation?.language === myLanguage ? message.translation : null;
   const [showOriginal, setShowOriginal] = useState(false);
   const name = fromGuest ? senderLabel(inquiry) : (message.author ?? 'Reception');
-  // A message already in the reader's language needs no translation.
-  const offerTranslation =
-    fromGuest && canTranslate && !translated && guestLanguage(inquiry) !== myLanguage;
+  // Both sides write in the guest's language; a message already in the reader's needs nothing.
+  const original = guestLanguage(inquiry);
+  const offerTranslation = canTranslate && !translated && original !== myLanguage;
+  const originalName = original && original !== myLanguage ? languageLabels[original] : null;
 
   return (
     <li
@@ -670,8 +629,13 @@ function Message({
             onClick={() => setShowOriginal(true)}
             className="flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
           >
-            <Languages className="size-3" /> Translated into {languageLabels[myLanguage]} · Show
-            original
+            <Languages className="size-3" />
+            {originalName
+              ? fromGuest
+                ? `Translated from ${originalName}`
+                : `Sent in ${originalName}`
+              : 'Translated'}{' '}
+            · Show original
           </button>
         </div>
       ) : (
@@ -683,7 +647,7 @@ function Message({
               onClick={() => setShowOriginal(false)}
               className="flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
             >
-              <Languages className="size-3" /> Show the {languageLabels[myLanguage]} translation
+              <Languages className="size-3" /> Show in {languageLabels[myLanguage]}
             </button>
           )}
           {offerTranslation && (
@@ -975,10 +939,11 @@ function heldFirst(options: StayOption[], held: BookingDetail | undefined): Stay
 type Side = 'theirs' | 'mine';
 
 /**
- * The reply: one text in the guest's language, which is what is sent. When the staff member
- * reads another language, a tab shows the same reply in theirs to read or write in; either side
- * translates into the other, and sending waits until edits in the staff's language are in the
- * guest's text. A draft is written only when asked for.
+ * The reply box, the same for every conversation. What is sent is the text in the guest's
+ * language; a staff member who reads another language writes and reads in theirs, and the side
+ * edited last is translated into the other when the other is opened or the reply is sent. The
+ * staff member's text is kept with the sent message, so the thread reads back in their language.
+ * Orbit drafts a reply only when asked, and says what it is doing in the box itself.
  */
 function ReplyEditor({
   inquiry: m,
@@ -986,8 +951,7 @@ function ReplyEditor({
   hotelAddress,
   myLanguage,
   aiOn,
-  drafting,
-  busy,
+  working,
   error: prepareError,
   heldSinceEdit,
   onEdit,
@@ -1001,16 +965,15 @@ function ReplyEditor({
   hotelAddress: string | null;
   myLanguage: Language;
   aiOn: boolean;
-  /** A draft is being written; it replaces the text. */
-  drafting: boolean;
-  /** Reading or drafting: sending waits. */
-  busy: boolean;
+  /** Orbit reading the request or writing the draft, which replaces the text. */
+  working: 'reading' | 'drafting' | null;
   error: Error | null;
   /** What was held after the staff member edited the reply, e.g. "room 104", not in it yet. */
   heldSinceEdit: string | null;
   /** The staff member changed the reply. */
   onEdit: () => void;
-  onDraft: () => void;
+  /** Drafts the reply; absent where Orbit doesn't draft, e.g. a supplier's mail. */
+  onDraft?: () => void;
   onSent: () => void;
 }) {
   const suggestion = m.suggestion;
@@ -1028,23 +991,37 @@ function ReplyEditor({
   const [files, setFiles] = useState(savedDraft?.attachments ?? []);
   // Saved only once staff change something themselves, not for Orbit's own draft.
   const [touched, setTouched] = useState(savedDraft !== undefined);
-  const [sent, setSent] = useState(false);
+  const [sending, setSending] = useState(false);
   const textarea = useRef<HTMLTextAreaElement>(null);
-  const contacts = useContacts();
   const [theirLanguage, setTheirLanguage] = useState<Language>(guestLanguage(m) ?? myLanguage);
   const [theirs, setTheirs] = useState(savedDraft?.body ?? suggestion?.draft ?? '');
+  const [mine, setMine] = useState(
+    !savedDraft && suggestion?.draftTranslation?.language === myLanguage
+      ? suggestion.draftTranslation.text
+      : '',
+  );
+  // The side changed since the two last matched; the other one is behind. A saved draft keeps
+  // only the guest's text, so that is the side to translate from.
+  const [edited, setEdited] = useState<Side | null>(savedDraft ? 'theirs' : null);
+  const bilingual = aiOn && theirLanguage !== myLanguage;
+  // A reply opens in the staff member's language, so they can read and write in it; a saved
+  // draft opens as it was written.
+  const [view, setView] = useState<Side>(mine || !theirs.trim() ? 'mine' : 'theirs');
+  const showing: Side = bilingual ? view : 'theirs';
+  const translating = toTheirs.isPending || toMine.isPending;
+  const theirName = languageLabels[theirLanguage];
+  const myName = languageLabels[myLanguage];
   const replyAll = canReplyAll(m, hotelAddress);
   const allCc = replyAll ? replyAllCc(m, hotelAddress) : [];
   const toAll = replyAll && allCc.every((r) => cc.some((c) => c.address === r.address));
+  const empty = !theirs.trim() && !mine.trim();
+  const busy = working !== null || translating || sending;
+
   useAutosave(
     { inquiryId: m.id, cc, bcc, body: theirs, attachmentIds: files.map((f) => f.id) },
     (body) => save.mutate({ id: draftId, body }),
-    touched && !sent,
+    touched && !sending,
   );
-  const change = () => {
-    setTouched(true);
-    onEdit();
-  };
   const startReply = (all: boolean) => {
     if (all) {
       setCc((c) => [...c, ...allCc.filter((r) => !c.some((x) => x.address === r.address))]);
@@ -1069,71 +1046,88 @@ function ReplyEditor({
     return () => window.removeEventListener(REPLY_EVENT, listener);
   }, []);
 
-  const sendNow = () => {
-    if (!theirs.trim() || send.isPending) return;
-    setSent(true);
-    send.mutate(
-      {
-        body: theirs,
-        cc: email ? cc : [],
-        bcc: email ? bcc : [],
-        attachmentIds: files.map((f) => f.id),
-        draftId,
-      },
-      { onSuccess: onSent, onError: () => setSent(false) },
-    );
+  /** Brings one side up to date with the other, if it is behind. */
+  const sync = async (into: Side): Promise<{ theirs: string; mine: string }> => {
+    if (into === 'theirs' && edited === 'mine' && mine.trim()) {
+      const { text } = await toTheirs.mutateAsync({ text: mine, to: theirLanguage });
+      setTheirs(text);
+      setEdited(null);
+      return { theirs: text, mine };
+    }
+    if (into === 'mine' && theirs.trim() && (edited === 'theirs' || !mine.trim())) {
+      const { text } = await toMine.mutateAsync({ text: theirs, to: myLanguage });
+      setMine(text);
+      setEdited(null);
+      return { theirs, mine: text };
+    }
+    return { theirs, mine };
+  };
+  // The staff member's text carries over to the new language; the guest's side follows from it.
+  const changeLanguage = (language: Language) => {
+    const myText = bilingual ? mine : theirs;
+    setTheirLanguage(language);
+    if (aiOn && language !== myLanguage) {
+      setMine(myText);
+      setView('mine');
+      setEdited(myText.trim() ? 'mine' : null);
+    } else {
+      setTheirs(myText);
+      setEdited(null);
+    }
+  };
+  const open = (side: Side) => {
+    setView(side);
+    if (!translating) void sync(side).catch(() => {});
+  };
+
+  const sendNow = async () => {
+    if (empty || busy || send.isPending) return;
+    setSending(true);
+    try {
+      // The guest gets their language; the staff member's version is kept to read back.
+      let text = { theirs, mine };
+      if (bilingual) {
+        text = await sync('theirs');
+        text = await sync('mine');
+      }
+      if (!text.theirs.trim()) return setSending(false);
+      send.mutate(
+        {
+          body: text.theirs,
+          cc: email ? cc : [],
+          bcc: email ? bcc : [],
+          attachmentIds: files.map((f) => f.id),
+          draftId,
+          translation:
+            bilingual && text.mine.trim() ? { language: myLanguage, text: text.mine } : null,
+        },
+        { onSuccess: onSent, onError: () => setSending(false) },
+      );
+    } catch {
+      setSending(false);
+    }
   };
   const discardDraft = () => {
     discard.mutate(draftId);
     setTheirs('');
     setMine('');
+    setEdited(null);
     setCc([]);
     setBcc([]);
     setFiles([]);
     setTouched(false);
   };
-  const [mine, setMine] = useState(
-    suggestion?.draftTranslation?.language === myLanguage ? suggestion.draftTranslation.text : '',
-  );
-  // The side changed since the two last matched; the other one is behind.
-  const [edited, setEdited] = useState<Side | null>(null);
-  const bilingual = aiOn && theirLanguage !== myLanguage;
-  // A draft opens in the staff member's language, so they can read it first.
-  const [view, setView] = useState<Side>(mine ? 'mine' : 'theirs');
-  const showing: Side = bilingual ? view : 'theirs';
-  const translating = toTheirs.isPending || toMine.isPending;
-  // Edits in the staff's language that the guest's text doesn't have yet.
-  const behind = bilingual && edited === 'mine';
-  const theirName = languageLabels[theirLanguage];
-  const myName = languageLabels[myLanguage];
-
-  const translateToTheirs = () =>
-    toTheirs.mutate(
-      { text: mine, to: theirLanguage },
-      {
-        onSuccess: (r) => {
-          setTheirs(r.text);
-          setEdited(null);
-        },
-      },
-    );
-  const translateToMine = () =>
-    toMine.mutate(
-      { text: theirs, to: myLanguage },
-      {
-        onSuccess: (r) => {
-          setMine(r.text);
-          setEdited(null);
-        },
-      },
-    );
-  // Opening the staff's tab when it has nothing current translates the reply into it.
-  const openMine = () => {
-    setView('mine');
-    if (theirs.trim() && (!mine.trim() || edited === 'theirs') && !translating) translateToMine();
-  };
 
   const error = prepareError ?? toTheirs.error ?? toMine.error ?? send.error;
+  const status =
+    working === 'reading'
+      ? 'Reading the message…'
+      : working === 'drafting'
+        ? 'Writing the reply…'
+        : (showing === 'mine' ? toMine.isPending : toTheirs.isPending)
+          ? `Translating into ${showing === 'mine' ? myName : theirName}…`
+          : null;
+  const behindHere = bilingual && edited !== null && edited !== showing;
 
   return (
     <section
@@ -1141,20 +1135,7 @@ function ReplyEditor({
       className="flex flex-col rounded-card bg-surface-sunken p-1 ring-1 ring-ink/5 ring-inset"
     >
       <div className="flex min-h-9 flex-wrap items-center gap-2 px-2 pt-0.5 pb-1">
-        {bilingual ? (
-          <div role="tablist" aria-label="Reply language" className="flex items-center gap-0.5">
-            <LanguageTab selected={showing === 'theirs'} onClick={() => setView('theirs')}>
-              {theirName}
-              <span className="text-subtle-foreground">· sent</span>
-            </LanguageTab>
-            <LanguageTab selected={showing === 'mine'} onClick={openMine}>
-              {myName}
-              {edited === 'theirs' && mine && (
-                <span aria-label="out of date" className="size-1.5 rounded-full bg-warning" />
-              )}
-            </LanguageTab>
-          </div>
-        ) : replyAll ? (
+        {replyAll ? (
           <div role="tablist" aria-label="Reply to" className="flex items-center gap-0.5">
             <LanguageTab selected={!toAll} onClick={() => startReply(false)}>
               Reply
@@ -1167,20 +1148,20 @@ function ReplyEditor({
           <h3 className="px-1 text-[0.8125rem] text-muted-foreground">Reply</h3>
         )}
         {aiOn && (
-          <label className="ml-auto flex items-center gap-2 text-xs text-muted-foreground">
-            {m.taskId || contactOf(m, contacts.data ?? []) ? 'Writes' : 'Guest writes'}
-            <Select
-              value={theirLanguage}
-              onValueChange={(value) => setTheirLanguage(value as Language)}
-              className="h-7 w-32 text-xs"
-            >
-              {languages.map((l) => (
-                <option key={l} value={l}>
-                  {languageLabels[l]}
-                </option>
-              ))}
-            </Select>
-          </label>
+          <div className="ml-auto flex items-center gap-1">
+            {bilingual && (
+              <div role="tablist" aria-label="Reply language" className="flex items-center gap-0.5">
+                <LanguageTab selected={showing === 'mine'} onClick={() => open('mine')}>
+                  {myName}
+                </LanguageTab>
+                <LanguageTab selected={showing === 'theirs'} onClick={() => open('theirs')}>
+                  {theirName}
+                  <Send aria-label="sent" className="size-3 text-subtle-foreground" />
+                </LanguageTab>
+              </div>
+            )}
+            <ReplyLanguageMenu value={theirLanguage} onChange={changeLanguage} />
+          </div>
         )}
       </div>
 
@@ -1189,9 +1170,11 @@ function ReplyEditor({
           <span className="min-w-0 flex-1">
             Your reply doesn&apos;t mention {heldSinceEdit} yet.
           </span>
-          <Button size="xs" variant="outline" disabled={busy} onClick={onDraft}>
-            <RotateCw /> Rewrite for {heldSinceEdit}
-          </Button>
+          {onDraft && (
+            <Button size="xs" variant="outline" disabled={busy} onClick={onDraft}>
+              <RotateCw /> Rewrite for {heldSinceEdit}
+            </Button>
+          )}
         </div>
       )}
       <div className="relative flex flex-col rounded-stage bg-background shadow-[0_1px_2px_var(--shadow-soft)] stroke-lit">
@@ -1238,45 +1221,47 @@ function ReplyEditor({
             )}
           </>
         )}
-        {/* While a draft is written, it covers the old text, which it is about to replace. */}
+        {/* While Orbit works, it covers the text, which a new draft is about to replace. */}
         <div className="relative flex flex-col">
           <Textarea
             ref={textarea}
             onKeyDown={(e) => {
-              if (
-                e.key === 'Enter' &&
-                (e.metaKey || e.ctrlKey) &&
-                !behind &&
-                !translating &&
-                !busy
-              ) {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
                 e.preventDefault();
-                sendNow();
+                void sendNow();
               }
             }}
-            aria-label={
-              showing === 'mine' ? `Reply in ${myName}` : `Reply to the guest in ${theirName}`
-            }
+            aria-label={showing === 'mine' ? `Reply in ${myName}` : `Reply in ${theirName}`}
             value={showing === 'mine' ? mine : theirs}
             onChange={(e) => {
               if (showing === 'mine') setMine(e.target.value);
               else setTheirs(e.target.value);
               setEdited(showing);
-              change();
+              setTouched(true);
+              onEdit();
             }}
-            placeholder={
-              drafting ? undefined : showing === 'mine' ? `Write in ${myName}…` : 'Write a reply…'
-            }
-            disabled={drafting || (showing === 'mine' && toMine.isPending)}
+            placeholder={status ? undefined : 'Write a reply…'}
+            disabled={status !== null || sending}
             className="min-h-56 resize-none rounded-stage border-0 bg-transparent px-4 py-3 leading-relaxed shadow-none focus-visible:ring-0 disabled:bg-transparent"
           />
-          {drafting && (
+          {status && (
             <div
               role="status"
               className="absolute inset-0 flex items-start gap-3 rounded-t-stage bg-background/90 px-4 py-3 text-sm text-muted-foreground"
             >
-              <ThinkingOrb state="composing" size={20} aria-hidden />
-              Writing the reply…
+              <ThinkingOrb
+                state={working === 'reading' ? 'searching' : 'composing'}
+                size={20}
+                aria-hidden
+              />
+              {status}
+            </div>
+          )}
+          {!status && empty && onDraft && (
+            <div className="pointer-events-none absolute inset-x-0 bottom-3 flex justify-center">
+              <Button variant="outline" size="sm" className="pointer-events-auto" onClick={onDraft}>
+                <PenLine /> Draft reply
+              </Button>
             </div>
           )}
         </div>
@@ -1292,11 +1277,12 @@ function ReplyEditor({
         <div className="flex items-center gap-2 border-t px-2 py-2">
           <Button
             size="sm"
-            disabled={!theirs.trim() || send.isPending || behind || translating || busy}
-            tooltip={behind ? `Translate your ${myName} changes first` : undefined}
-            onClick={sendNow}
+            disabled={empty || busy || send.isPending}
+            tooltip={bilingual ? `Sends the ${theirName} reply` : undefined}
+            onClick={() => void sendNow()}
           >
-            <Send /> {sendLabel(m)}
+            {sending && translating ? <LoaderCircle className="animate-spin" /> : <Send />}
+            {sendLabel(m)}
           </Button>
           <AttachButton
             onAttached={(f) => {
@@ -1307,49 +1293,33 @@ function ReplyEditor({
           <Button
             variant="ghost"
             size="sm"
-            disabled={!theirs.trim()}
+            disabled={!theirs.trim() || (bilingual && edited === 'mine')}
+            tooltip={bilingual && edited === 'mine' ? `Open ${theirName} first` : undefined}
             // The clipboard is missing on plain-HTTP addresses, e.g. the app opened over the LAN.
             onClick={() => void navigator.clipboard?.writeText(theirs).catch(() => {})}
           >
-            <Copy /> Copy
+            <Copy /> Copy {bilingual && theirName}
           </Button>
           <span className="flex min-w-0 flex-1 items-center justify-end gap-2 text-xs text-muted-foreground">
-            {translating ? (
-              <>
-                <ThinkingOrb state="composing" size={20} className="size-4" aria-hidden />
-                Translating…
-              </>
-            ) : behind ? (
-              <>
-                <span className="truncate">Not in the {theirName} reply yet</span>
-                <Button
-                  variant="outline"
-                  size="xs"
-                  disabled={!mine.trim()}
-                  onClick={translateToTheirs}
-                >
-                  <Languages /> Translate into {theirName}
-                </Button>
-              </>
-            ) : showing === 'mine' && edited === 'theirs' && mine ? (
-              <>
-                <span className="truncate">The {theirName} reply changed</span>
-                <Button variant="ghost" size="xs" onClick={translateToMine}>
-                  <RotateCw /> Update
-                </Button>
-              </>
-            ) : (
-              showing === 'mine' && (
-                <span className="truncate">Only the {theirName} reply is sent</span>
-              )
-            )}
-            {aiOn && m.suggestion?.draft && (
-              <Button variant="ghost" size="xs" disabled={busy} onClick={onDraft}>
-                <RotateCw /> Redraft
+            {behindHere && !translating && (
+              <Button variant="ghost" size="xs" onClick={() => void sync(showing).catch(() => {})}>
+                <RotateCw /> Update from {showing === 'mine' ? theirName : myName}
               </Button>
             )}
             {touched &&
               (save.isPending ? 'Saving…' : save.isSuccess || savedDraft ? 'Draft saved' : null)}
+            {onDraft && !empty && suggestion?.draft && (
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="Redraft"
+                tooltip="Redraft"
+                disabled={busy}
+                onClick={onDraft}
+              >
+                <RotateCw />
+              </Button>
+            )}
             {touched && (
               <Button
                 variant="ghost"
@@ -1368,6 +1338,43 @@ function ReplyEditor({
         <ErrorNotice message={error?.message ?? m.processingError ?? ''} className="mt-1" />
       )}
     </section>
+  );
+}
+
+/** The language the reply goes out in, the guest's unless staff pick another. */
+function ReplyLanguageMenu({
+  value,
+  onChange,
+}: {
+  value: Language;
+  onChange: (language: Language) => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label="Reply language"
+          tooltip="Reply language"
+          className="text-muted-foreground"
+        >
+          <Languages />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-44">
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+          Reply in
+        </DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v as Language)}>
+          {languages.map((l) => (
+            <DropdownMenuRadioItem key={l} value={l}>
+              {languageLabels[l]}
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
