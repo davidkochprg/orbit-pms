@@ -38,7 +38,7 @@ Read from `.env` at the repo root by the API and the db scripts, and validated w
 | Command            | What it does                                                                                  |
 | ------------------ | --------------------------------------------------------------------------------------------- |
 | `pnpm dev`         | API (`tsx watch`) and web (Vite) in parallel                                                  |
-| `pnpm dev:lan`     | Same, with the web app open to the local network (phone scans)                                |
+| `pnpm dev:lan`     | Same, with the web app open to the local network over HTTPS (phone scans, voice)              |
 | `pnpm build`       | Production build of the web app                                                               |
 | `pnpm typecheck`   | `tsc --noEmit` in every package                                                               |
 | `pnpm lint`        | ESLint (type-aware) and Prettier check                                                        |
@@ -121,6 +121,6 @@ To try the function without deploying, run `pnpm build:vercel`, then serve `.ver
 
 ## Scanning IDs with a phone
 
-The ID scan link, and the link for photographing a supplier's bill, open on a phone, which can't reach `localhost`. Start Orbit with `pnpm dev:lan` instead of `pnpm dev`: it runs the API and the web app like `pnpm dev`, with the web app also listening on the local network. Open Orbit on the computer by the network address Vite prints (e.g. `http://192.168.1.20:5173`), and scan the QR code with a phone on the same Wi-Fi. Without a phone, "Upload a photo instead" in the scan dialog sends a photo from the computer; the synthetic documents in `packages/ai/src/evals/id-documents/` work for trying it.
+The ID scan link, and the link for photographing a supplier's bill, open on a phone, which can't reach `localhost`. Start Orbit with `pnpm dev:lan` instead of `pnpm dev`: it runs the API and the web app like `pnpm dev`, with the web app also listening on the local network. The web app is served over HTTPS with a self-signed certificate (`@vitejs/plugin-basic-ssl`): browsers allow the microphone, the camera and the clipboard only on HTTPS pages and `localhost`, so over plain HTTP a network address would lose voice notes and questions. Open Orbit on the computer by the network address Vite prints (e.g. `https://192.168.1.20:5173`), accept the certificate warning once on the computer and once on the phone, and scan the QR code with a phone on the same Wi-Fi. Without a phone, "Upload a photo instead" in the scan dialog sends a photo from the computer; the synthetic documents in `packages/ai/src/evals/id-documents/` work for trying it.
 
 On Windows, the firewall rule Node.js adds when first asked lets other devices connect only on a network set to Private. If the scan page stays blank or black on the phone, the computer's network is probably set to Public: in Settings → Network & internet, open the Wi-Fi or Ethernet connection and set its network profile to Private.

@@ -194,7 +194,7 @@ The other values in `.env.example` work as they are. The API never sends the key
 - **"Agent not configured" or `ai: off`**: `.env` must be at the repo root, next to `package.json`, with the key after `META_API_KEY=`. Restart `pnpm dev` after editing it.
 - **A port is in use**: set `PORT` in `.env` for the API (the web app follows it). If 5173 is taken, the web app picks the next free port and prints it.
 - **Start over with fresh data**: stop `pnpm dev`, then `pnpm db:reset`. The demo is dated around the day you seed it.
-- **Scanning with a real phone**: start with `pnpm dev:lan` and open Orbit by the network address it prints, so a phone on the same Wi-Fi can open the scan link. On Windows, set the computer's network profile to Private (Settings → Network & internet), or the firewall keeps the phone out and the page stays blank.
+- **Scanning with a real phone**: start with `pnpm dev:lan` and open Orbit by the `https://` network address it prints, so a phone on the same Wi-Fi can open the scan link; the certificate is self-signed, so accept the browser's warning once on each device. HTTPS keeps voice notes working at that address too. On Windows, set the computer's network profile to Private (Settings → Network & internet), or the firewall keeps the phone out and the page stays blank.
 
 More in [docs/development.md](docs/development.md).
 
