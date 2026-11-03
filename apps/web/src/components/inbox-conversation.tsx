@@ -1085,11 +1085,8 @@ function ReplyEditor({
     setSending(true);
     try {
       // The guest gets their language; the staff member's version is kept to read back.
-      let text = { theirs, mine };
-      if (bilingual) {
-        text = await sync('theirs');
-        text = await sync('mine');
-      }
+      // Only one side is ever behind: the one not edited last.
+      const text = bilingual ? await sync(edited === 'mine' ? 'theirs' : 'mine') : { theirs, mine };
       if (!text.theirs.trim()) return setSending(false);
       send.mutate(
         {
