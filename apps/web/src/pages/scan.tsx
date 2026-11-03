@@ -58,25 +58,20 @@ export function ScanPage() {
           </div>
         ) : !view.data ? (
           <LoaderCircle className="mx-auto size-6 animate-spin text-muted-foreground" />
+        ) : busy ? (
+          <div className="flex flex-col items-center gap-3 text-center">
+            <LoaderCircle className="size-10 animate-spin text-primary-text" />
+            <h1 className="text-xl font-semibold tracking-tight">Reading the document…</h1>
+          </div>
         ) : status === 'done' ? (
           <div className="flex flex-col items-center gap-3 text-center">
             <CircleCheck className="size-12 text-success" />
             <h1 className="text-xl font-semibold tracking-tight">Sent to the desk</h1>
             <p className="text-muted-foreground">You can close this page.</p>
             {unreadable && problem && <ErrorNotice message={problem} />}
-            <Button
-              variant="ghost"
-              size="sm"
-              disabled={busy}
-              onClick={() => camera.current?.click()}
-            >
+            <Button variant="ghost" size="sm" onClick={() => camera.current?.click()}>
               Retake the photo
             </Button>
-          </div>
-        ) : busy ? (
-          <div className="flex flex-col items-center gap-3 text-center">
-            <LoaderCircle className="size-10 animate-spin text-primary-text" />
-            <h1 className="text-xl font-semibold tracking-tight">Reading the document…</h1>
           </div>
         ) : (
           <>

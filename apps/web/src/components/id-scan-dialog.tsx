@@ -4,6 +4,7 @@ import { type FormEvent, useEffect, useRef, useState } from 'react';
 import { ErrorNotice } from '@/components/error-notice';
 import { FormField } from '@/components/form-field';
 import { QrCode } from '@/components/qr-code';
+import { ScanExpiry } from '@/components/scan-expiry';
 import { Segmented } from '@/components/segmented';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Button } from '@/components/ui/button';
@@ -25,7 +26,7 @@ import {
   useUpdateStayGuest,
   useUploadIdPhoto,
 } from '@/lib/api';
-import { hotelTodayIso } from '@/lib/format';
+import { formatFullDate, hotelTodayIso } from '@/lib/format';
 import { prepareIdPhoto } from '@/lib/photo';
 import { countrySuggestions, documentTypeLabels, needsAddress } from '@/lib/registration';
 import { SuggestInput } from '@/components/ui/suggest-input';
@@ -118,11 +119,22 @@ function ScanFlow({
       {start.error ? (
         <ErrorNotice message={start.error.message} />
       ) : scan.error ? (
-        <ErrorNotice message={scan.error.message} />
+        // The link expired (or the scan is gone): offer a new one rather than a dead end.
+        <div className="flex flex-col items-start gap-3">
+          <ErrorNotice message={scan.error.message} />
+          <Button
+            variant="outline"
+            disabled={start.isPending}
+            onClick={() => mutate(stayGuest?.id ?? null)}
+          >
+            New code
+          </Button>
+        </div>
       ) : (
         <WaitForPhone
           bookingId={bookingId}
           scanId={scanId}
+          expiresAt={start.data?.expiresAt ?? null}
           status={scan.data?.status ?? 'waiting'}
           error={scan.data?.error ?? null}
         />
@@ -139,11 +151,13 @@ function ScanFlow({
 function WaitForPhone({
   bookingId,
   scanId,
+  expiresAt,
   status,
   error,
 }: {
   bookingId: string;
   scanId: string | null;
+  expiresAt: string | null;
   status: 'waiting' | 'reading' | 'done' | 'failed';
   error: string | null;
 }) {
@@ -190,7 +204,7 @@ function WaitForPhone({
               </>
             )}
           </p>
-          <p className="text-muted-foreground">Expires in 15 minutes</p>
+          <ScanExpiry expiresAt={expiresAt} />
           {url && (
             <a
               href={url}
@@ -352,7 +366,7 @@ function ReviewForm({
       <FormField
         label="Document number"
         htmlFor="scan-document"
-        hint={result.expiresOn ? `Valid until ${result.expiresOn}` : undefined}
+        hint={result.expiresOn ? `Valid until ${formatFullDate(result.expiresOn)}` : undefined}
       >
         <Input
           id="scan-document"

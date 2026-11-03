@@ -68,7 +68,7 @@ describe('checkReading', () => {
     expect(result.documentType).toBe(null);
     expect(result.warnings).toEqual([
       'The date of birth is not in the past.',
-      'The document expired on 2026-05-09.',
+      'The document has expired.',
       'This is not an ID card or passport. Ask for one of those.',
     ]);
   });

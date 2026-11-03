@@ -59,7 +59,7 @@ export function checkReading(reading: IdDocumentReading, today: IsoDate): IdScan
   const name = reading.fullName ? tidyName(reading.fullName).slice(0, 120) : null;
 
   if (dateOfBirth && dateOfBirth >= today) warnings.push('The date of birth is not in the past.');
-  if (expiresOn && expiresOn < today) warnings.push(`The document expired on ${expiresOn}.`);
+  if (expiresOn && expiresOn < today) warnings.push('The document has expired.');
   if (reading.documentType === 'other') {
     warnings.push('This is not an ID card or passport. Ask for one of those.');
   }

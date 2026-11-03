@@ -2,6 +2,7 @@ import { LoaderCircle, Smartphone } from 'lucide-react';
 import { useEffect, useRef } from 'react';
 import { ErrorNotice } from '@/components/error-notice';
 import { QrCode } from '@/components/qr-code';
+import { ScanExpiry } from '@/components/scan-expiry';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -63,6 +64,17 @@ function WaitForPhone({ onRead }: { onRead: (billId: string) => void }) {
   const url = start.data ? billScanUrl(window.location.origin, start.data.id) : null;
   const reading = scan.data?.status === 'reading';
   if (start.error) return <ErrorNotice message={start.error.message} />;
+  // The link expired (or the scan is gone): offer a new one rather than waiting forever.
+  if (scan.error) {
+    return (
+      <div className="flex flex-col items-start gap-3">
+        <ErrorNotice message={scan.error.message} />
+        <Button variant="outline" disabled={start.isPending} onClick={() => mutate()}>
+          New code
+        </Button>
+      </div>
+    );
+  }
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div className="flex min-w-0 items-center gap-4 rounded-stage bg-surface-sunken p-3 ring-1 ring-ink/5 ring-inset">
@@ -85,7 +97,7 @@ function WaitForPhone({ onRead }: { onRead: (billId: string) => void }) {
               </>
             )}
           </p>
-          <p className="text-muted-foreground">Expires in 15 minutes</p>
+          <ScanExpiry expiresAt={start.data?.expiresAt ?? null} />
           {url && (
             <a
               href={url}
