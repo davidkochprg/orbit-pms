@@ -9,7 +9,7 @@ import {
   useSensors,
 } from '@dnd-kit/core';
 import { type HousekeepingRoom, type HousekeepingTask, type RoomStatus } from '@orbit/shared';
-import { Keyboard, Mic, Plus } from 'lucide-react';
+import { Mic, PenLine, Plus } from 'lucide-react';
 import { type ComponentProps, type Ref, useCallback, useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router';
 import { ErrorNotice } from '@/components/error-notice';
@@ -185,7 +185,7 @@ export function HousekeepingPage() {
                   aria-label="Type a note"
                   onClick={() => openNote('text')}
                 >
-                  <Keyboard /> <span className="hidden sm:inline">Type a note</span>
+                  <PenLine /> <span className="hidden sm:inline">Type a note</span>
                 </Button>
                 {voiceOn && (
                   <Button size="sm" onClick={() => openNote('voice')}>

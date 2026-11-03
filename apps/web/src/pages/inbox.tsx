@@ -10,7 +10,7 @@ import {
   MailOpen,
   MoreHorizontal,
   Paperclip,
-  PenSquare,
+  MailPlus,
   Plus,
   Reply,
   Send,
@@ -300,11 +300,11 @@ export function InboxPage() {
               tooltip="Add a guest message"
               onClick={() => setAdding(true)}
             >
-              <Plus /> <span className="hidden sm:inline">Add a guest message</span>
+              <MailPlus /> <span className="hidden sm:inline">Add a guest message</span>
             </Button>
             <Button size="sm" asChild>
-              <Link to={keep('/inbox/new')}>
-                <PenSquare /> Compose
+              <Link to={keep('/inbox/new')} aria-label="New email">
+                <Plus /> <span className="hidden sm:inline">New email</span>
               </Link>
             </Button>
           </>

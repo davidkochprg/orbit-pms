@@ -78,7 +78,7 @@ export function typingIn(target: EventTarget | null): boolean {
 
 /** Gmail's keys, as the inbox understands them. */
 export const mailShortcuts: { keys: string[]; does: string }[] = [
-  { keys: ['c'], does: 'Compose' },
+  { keys: ['c'], does: 'New email' },
   { keys: ['/'], does: 'Search' },
   { keys: ['j'], does: 'Next conversation' },
   { keys: ['k'], does: 'Previous conversation' },
