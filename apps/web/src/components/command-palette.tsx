@@ -5,6 +5,7 @@ import {
   tradeLabels,
   withoutLinks,
 } from '@orbit/shared';
+import { useQueryClient } from '@tanstack/react-query';
 import { DefaultChatTransport, type UIMessage } from 'ai';
 import { Command as CommandPrimitive } from 'cmdk';
 import {
@@ -112,6 +113,15 @@ export function CommandPaletteProvider({ children }: { children: ReactNode }) {
   // Words arrive every 20ms; drawing the thread a little less often keeps the answer steady.
   const chat = useChat({ chat: instance, throttle: 50 });
   const working = chat.status === 'submitted' || chat.status === 'streaming';
+
+  // Some tools change data straight away (a room's status, a task): once an answer is finished,
+  // the page under the bar shows what it did.
+  const queryClient = useQueryClient();
+  const wasWorking = useRef(false);
+  useEffect(() => {
+    if (wasWorking.current && !working) void queryClient.invalidateQueries();
+    wasWorking.current = working;
+  }, [working, queryClient]);
 
   /** Shows another conversation; the one left behind stops answering. */
   const current = useRef(instance);
