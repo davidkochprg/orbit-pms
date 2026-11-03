@@ -46,6 +46,29 @@ describe('revenue service', () => {
     ]);
   });
 
+  it('gives the review the past eight weeks as the report tells them, once there are any', async () => {
+    const { repos, service } = setup();
+    expect((await service.reviewInput(null)).input.recent).toBeUndefined();
+    await repos.bookings.createBooking(
+      booking({
+        id: 'past',
+        roomId: 'r1',
+        checkIn: '2026-05-01',
+        checkOut: '2026-05-03',
+        status: 'checked_out',
+      }),
+    );
+    const { recent } = (await service.reviewInput(null)).input;
+    expect(recent).toMatchObject({
+      from: '2026-03-15',
+      to: '2026-05-10',
+      arrivals: 1,
+      averageStay: 2,
+      currency: pricingConfig.currency,
+    });
+    expect(recent?.byWeekday).toHaveLength(7);
+  });
+
   it('lets a manager add and remove events, which the outlook then counts', async () => {
     const { repos, service } = setup();
     const created = await service.createEvent(

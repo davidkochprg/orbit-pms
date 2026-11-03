@@ -16,6 +16,8 @@ import type {
   Room,
   RoomType,
   WeatherDay,
+  Currency,
+  Report,
 } from '@orbit/shared';
 import { addDays } from './dates';
 import { adjustmentFor, nightlyRate } from './pricing/quote';
@@ -54,6 +56,8 @@ const REVIEW_MESSAGE_CHARS = 800;
 
 /** Weeks of past nights that set how full a weekday usually ends up. */
 export const TYPICAL_WEEKS = 8;
+/** Past nights a rate review reads the report of. */
+export const RECENT_NIGHTS = TYPICAL_WEEKS * 7;
 /** Nights ahead the arrival-risk list covers. */
 export const RISK_DAYS = 7;
 
@@ -386,6 +390,56 @@ export function openInquiries(inquiries: Inquiry[]): OpenInquiry[] {
 }
 
 /** What the model reviews: the outlook by the rules alone, local events and open requests. */
+/**
+ * How the hotel actually sold over a past period, from its report: each weekday's occupancy and
+ * rate, how long guests stay, where bookings come from and how many cancel.
+ */
+export type RecentPerformance = Pick<
+  Report,
+  | 'from'
+  | 'to'
+  | 'occupancy'
+  | 'adr'
+  | 'byWeekday'
+  | 'arrivals'
+  | 'averageStay'
+  | 'stayLengths'
+  | 'returningArrivals'
+  | 'bySource'
+  | 'cancellationRate'
+> & { currency: Currency };
+
+/** The parts of a report a rate review reads. */
+export function recentPerformance(report: Report, currency: Currency): RecentPerformance {
+  const {
+    from,
+    to,
+    occupancy,
+    adr,
+    byWeekday,
+    arrivals,
+    averageStay,
+    stayLengths,
+    returningArrivals,
+    bySource,
+    cancellationRate,
+  } = report;
+  return {
+    from,
+    to,
+    occupancy,
+    adr,
+    byWeekday,
+    arrivals,
+    averageStay,
+    stayLengths,
+    returningArrivals,
+    bySource,
+    cancellationRate,
+    currency,
+  };
+}
+
 export interface RateReviewInput {
   today: IsoDate;
   hotel: Pick<HotelProfile, 'name' | 'location' | 'country'>;
@@ -393,6 +447,8 @@ export interface RateReviewInput {
   nights: NightOutlook[];
   events: LocalEvent[];
   inquiries: OpenInquiry[];
+  /** The last `TYPICAL_WEEKS` weeks as the report tells them; absent without history. */
+  recent?: RecentPerformance;
 }
 
 /**

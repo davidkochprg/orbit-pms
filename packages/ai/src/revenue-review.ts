@@ -1,5 +1,5 @@
-import type { RateReviewInput } from '@orbit/domain';
-import { type RateSignal, rateReviewOutputSchema } from '@orbit/shared';
+import type { RateReviewInput, RecentPerformance } from '@orbit/domain';
+import { formatMoney, type RateSignal, rateReviewOutputSchema } from '@orbit/shared';
 import { generateText, type LanguageModel, Output } from 'ai';
 import { fromSdkUsage, tokenCostMicroUsd } from './cost';
 import { amountsInText } from './price-guard';
@@ -9,6 +9,48 @@ import type { UsageStore } from './usage';
 
 const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const weekday = (date: string) => weekdays[new Date(`${date}T12:00:00Z`).getUTCDay()]!;
+/** ISO weekdays, 1 for Monday, as the report numbers them. */
+const isoWeekdays = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+/**
+ * The past weeks as the model reads them: rooms rather than percents, like the nights ahead, and
+ * rates in the hotel's currency.
+ */
+function recentWeeks(r: RecentPerformance, rooms: number) {
+  const sold = (share: number) => `${Math.round(share * rooms)} of ${rooms} rooms`;
+  const money = (amount: number) => formatMoney(amount, r.currency);
+  return {
+    from: r.from,
+    until: r.to,
+    soldOnAverage: sold(r.occupancy),
+    averageRate: money(r.adr),
+    byWeekday: r.byWeekday.map((w) => ({
+      weekday: isoWeekdays[w.weekday],
+      soldOnAverage: sold(w.occupancy),
+      averageRate: w.roomNights > 0 ? money(w.adr) : null,
+    })),
+    arrivals: r.arrivals,
+    averageStayNights: r.averageStay,
+    staysByLength: r.stayLengths
+      .filter((s) => s.arrivals > 0)
+      .map((s) => ({
+        nights:
+          s.maxNights === null
+            ? `${s.minNights} or more`
+            : s.minNights === s.maxNights
+              ? `${s.minNights}`
+              : `${s.minNights} to ${s.maxNights}`,
+        arrivals: s.arrivals,
+      })),
+    returningGuests: `${r.returningArrivals} of ${r.arrivals} arrivals`,
+    bySource: r.bySource.map((s) => ({
+      source: s.source,
+      roomNights: s.roomNights,
+      averageRate: money(s.adr),
+    })),
+    cancelled: `${Math.round(r.cancellationRate * 100)} in 100 bookings`,
+  };
+}
 
 /** The review's input as the model reads it: weekdays spelled out, occupancy as text. */
 export function reviewData(input: RateReviewInput) {
@@ -40,6 +82,9 @@ export function reviewData(input: RateReviewInput) {
       message: i.message,
       ...(i.checkIn && { read: { checkIn: i.checkIn, checkOut: i.checkOut, adults: i.adults } }),
     })),
+    ...(input.recent && {
+      recentWeeks: recentWeeks(input.recent, input.nights[0]?.roomsTotal ?? 0),
+    }),
   };
 }
 

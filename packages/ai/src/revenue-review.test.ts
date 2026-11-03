@@ -95,6 +95,29 @@ function reviewer(signals: RateSignal[]) {
   return { review, calls, records };
 }
 
+const recent: NonNullable<RateReviewInput['recent']> = {
+  from: '2026-09-05',
+  to: '2026-10-31',
+  occupancy: 0.44,
+  adr: 199,
+  byWeekday: [
+    { weekday: 1, nights: 8, roomNights: 152, occupancy: 0.38, adr: 179, revpar: 68 },
+    { weekday: 6, nights: 8, roomNights: 360, occupancy: 0.9, adr: 239, revpar: 215 },
+  ],
+  arrivals: 40,
+  averageStay: 2.5,
+  stayLengths: [
+    { minNights: 1, maxNights: 1, arrivals: 10 },
+    { minNights: 2, maxNights: 2, arrivals: 0 },
+    { minNights: 3, maxNights: 4, arrivals: 25 },
+    { minNights: 7, maxNights: null, arrivals: 5 },
+  ],
+  returningArrivals: 6,
+  bySource: [{ source: 'ota', roomNights: 91, roomRevenue: 17299, adr: 190 }],
+  cancellationRate: 0.08,
+  currency: 'USD',
+};
+
 describe('reviewData', () => {
   it('spells out weekdays and rooms, and leaves out guest names and percents', () => {
     const data = reviewData(input);
@@ -115,6 +138,32 @@ describe('reviewData', () => {
         message: 'Could we have eight rooms next Friday?',
       },
     ]);
+    expect(JSON.stringify(data)).not.toMatch(/%/);
+    expect(data).not.toHaveProperty('recentWeeks');
+  });
+
+  it('adds how the recent weeks sold, in rooms and the hotel currency', () => {
+    const data = reviewData({ ...input, recent });
+    expect(data.recentWeeks).toEqual({
+      from: '2026-09-05',
+      until: '2026-10-31',
+      soldOnAverage: '22 of 50 rooms',
+      averageRate: '$199',
+      byWeekday: [
+        { weekday: 'Mon', soldOnAverage: '19 of 50 rooms', averageRate: '$179' },
+        { weekday: 'Sat', soldOnAverage: '45 of 50 rooms', averageRate: '$239' },
+      ],
+      arrivals: 40,
+      averageStayNights: 2.5,
+      staysByLength: [
+        { nights: '1', arrivals: 10 },
+        { nights: '3 to 4', arrivals: 25 },
+        { nights: '7 or more', arrivals: 5 },
+      ],
+      returningGuests: '6 of 40 arrivals',
+      bySource: [{ source: 'ota', roomNights: 91, averageRate: '$190' }],
+      cancelled: '8 in 100 bookings',
+    });
     expect(JSON.stringify(data)).not.toMatch(/%/);
   });
 });

@@ -590,7 +590,7 @@ export function createAgentTools({
     }),
     getReport: tool({
       description:
-        'Performance for a period of nights [from, to): occupancy, ADR, RevPAR, room/add-on/extras revenue, city tax, guest nights, arrivals, average stay, cancellations, by booking source and room type, payments by method, departed guests who still owe, and a daily series. Occupancy is a fraction (0.5 = 50%). For "last month" use the first of that month to the first of this month. Compare periods by calling it twice. Repeat figures verbatim.',
+        'Performance for a period of nights [from, to): occupancy, ADR, RevPAR, TRevPAR, room/add-on/extras revenue, city tax, guest nights, arrivals, average stay and stays by length, returning guests and arrivals with children, cancellations and the cancellation rate, by booking source and room type (each with ADR), by weekday (weekday 1 = Monday; occupancy, ADR, RevPAR), payments by method, departed guests who still owe, and a daily series. Occupancy is a fraction (0.5 = 50%). For "last month" use the first of that month to the first of this month. Compare periods by calling it twice. Repeat figures verbatim.',
       inputSchema: reportQuerySchema,
       execute: (query) =>
         safely(async () => ({

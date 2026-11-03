@@ -16,11 +16,14 @@ import type { Repositories } from './repositories';
 import {
   buildOutlook,
   openInquiries,
+  RECENT_NIGHTS,
+  recentPerformance,
   REVIEW_DAYS,
   type RateReviewInput,
   reviewBasis,
   reviewSignals,
 } from './revenue';
+import { buildReport } from './reports';
 import { emptyHotelProfile } from './settings';
 import { assertManager } from './staff';
 
@@ -64,12 +67,27 @@ export function createRevenueService({ repos, defaults, clock, newId }: RevenueD
     };
     const { name, location, country } = profile ?? emptyHotelProfile;
     const end = addDays(today, REVIEW_DAYS);
+    // How the past weeks actually sold, by the same figures as the Reports page.
+    const recent = buildReport(
+      { from: addDays(today, -RECENT_NIGHTS), to: today },
+      {
+        rooms,
+        roomTypes,
+        guests,
+        bookings,
+        charges: [],
+        payments: [],
+        departedFolios: [],
+        pricing,
+      },
+    );
     const input: RateReviewInput = {
       today,
       hotel: { name, location, country },
       nights: buildOutlook({ ...base, days: REVIEW_DAYS }).nights,
       events: events.filter((e) => e.lastNight >= today && e.firstNight < end),
       inquiries: openInquiries(inquiries),
+      ...(recent.roomNightsSold > 0 && { recent: recentPerformance(recent, pricing.currency) }),
     };
     return { base, input };
   }
