@@ -14,13 +14,8 @@ import { cleaningEffort, effortRank } from './cleaning-effort';
 import { arrivalsOn, departuresOn, stayingOver } from './day';
 import { normalizeText } from './text';
 
-/**
- * Staff may set any room status, except straight from out of order to clean or inspected: a
- * repaired room needs cleaning first.
- */
-export function canChangeRoomStatus(from: RoomStatus, to: RoomStatus): boolean {
-  return !(from === 'out_of_order' && (to === 'clean' || to === 'inspected'));
-}
+/** The room-status rule lives in shared, so the web's menus offer only what the domain allows. */
+export { canChangeRoomStatus } from '@orbit/shared';
 
 /**
  * Whether a note's status changes the room. A note saying a room is clean must not undo an

@@ -1,4 +1,9 @@
-import { type HousekeepingRoom, type RoomStatus, roomStatuses } from '@orbit/shared';
+import {
+  canChangeRoomStatus,
+  type HousekeepingRoom,
+  type RoomStatus,
+  roomStatuses,
+} from '@orbit/shared';
 import { CalendarRange, Plus } from 'lucide-react';
 import type { ReactElement, ReactNode } from 'react';
 import { useNavigate } from 'react-router';
@@ -45,7 +50,7 @@ export function RoomContextMenu({
           </>
         )}
         {roomStatuses
-          .filter((s) => s !== room.status)
+          .filter((s) => s !== room.status && canChangeRoomStatus(room.status, s))
           .map((s) => (
             <ContextMenuItem key={s} onSelect={() => onSetStatus(room.id, s)}>
               <StatusDot className={roomStatusColor[s]} />

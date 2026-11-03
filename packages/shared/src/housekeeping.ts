@@ -5,8 +5,17 @@ import {
   housekeepingTaskStatusSchema,
   housekeepingTaskTypeSchema,
   roomStatusSchema,
+  type RoomStatus,
   tradeSchema,
 } from './enums';
+
+/**
+ * Staff may set any room status, except straight from out of order to clean or inspected: a
+ * repaired room needs cleaning first.
+ */
+export function canChangeRoomStatus(from: RoomStatus, to: RoomStatus): boolean {
+  return !(from === 'out_of_order' && (to === 'clean' || to === 'inspected'));
+}
 
 /** What happens in a room today, from the bookings. `turnover` = one guest leaves, another arrives. */
 export const roomOccupancies = ['turnover', 'arriving', 'departing', 'staying', 'vacant'] as const;

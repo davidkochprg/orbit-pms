@@ -1,4 +1,5 @@
 import {
+  canChangeRoomStatus,
   type CleaningEffort,
   type HousekeepingRoom,
   type HousekeepingTask,
@@ -132,7 +133,7 @@ export function HousekeepingRoomCard({
                     (s) =>
                       s !== room.status &&
                       s !== next?.status &&
-                      !(room.status === 'out_of_order' && (s === 'clean' || s === 'inspected')),
+                      canChangeRoomStatus(room.status, s),
                   )
                   .map((s) => (
                     <DropdownMenuItem key={s} onSelect={() => onSetStatus(s)}>

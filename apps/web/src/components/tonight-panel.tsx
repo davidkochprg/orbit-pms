@@ -51,6 +51,7 @@ export function TonightPanel({
             title: `Room ${item.room.name} marked ${roomStatusLabels[status].toLowerCase()}`,
             action: { label: 'Undo', run: () => setStatus.mutate({ roomId, status: from }) },
           }),
+        onError: (err) => toast({ title: err.message }),
       },
     );
   }
