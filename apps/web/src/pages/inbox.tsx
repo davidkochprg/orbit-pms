@@ -39,6 +39,7 @@ import { type ComposerStart, MailComposer } from '@/components/mail-composer';
 import { LabelChips, LabelDialog, LabelDot, LabelMenu } from '@/components/mail-labels';
 import { ShortcutsDialog } from '@/components/mail-shortcuts';
 import { PageHeader } from '@/components/page-header';
+import { Rail, RailHeading, RailItem } from '@/components/rail';
 import { SearchField } from '@/components/search-field';
 import { Button } from '@/components/ui/button';
 import {
@@ -87,7 +88,7 @@ import {
   stripCompose,
 } from '@/lib/mail';
 import { mailKeyAction, typingIn } from '@/lib/mail-keys';
-import { cn, labelCaps } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 const folders: { id: MailFolder; icon: ComponentType<{ className?: string }> }[] = [
   { id: 'inbox', icon: Inbox },
@@ -311,10 +312,7 @@ export function InboxPage() {
         }
       />
       <div className="flex min-h-0 flex-1">
-        <nav
-          aria-label="Folders"
-          className="hidden w-52 shrink-0 flex-col gap-0.5 overflow-y-auto border-r px-3.5 py-3 xl:flex"
-        >
+        <Rail label="Folders">
           {folders.map((f) => (
             <RailItem
               key={f.id}
@@ -327,18 +325,21 @@ export function InboxPage() {
               {folderLabels[f.id]}
             </RailItem>
           ))}
-          <div className={cn(labelCaps, 'mt-4 flex h-7 items-center pr-1 pl-2.5')}>
-            <span className="flex-1">Labels</span>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              aria-label="New label"
-              tooltip="New label"
-              onClick={() => setLabelEditing(null)}
-            >
-              <Plus />
-            </Button>
-          </div>
+          <RailHeading
+            action={
+              <Button
+                variant="ghost"
+                size="icon-xs"
+                aria-label="New label"
+                tooltip="New label"
+                onClick={() => setLabelEditing(null)}
+              >
+                <Plus />
+              </Button>
+            }
+          >
+            Labels
+          </RailHeading>
           {(labels.data ?? []).map((l) => (
             <div key={l.id} className="group/label relative">
               <RailItem
@@ -362,7 +363,7 @@ export function InboxPage() {
           ))}
           {channels.length > 1 && (
             <>
-              <h2 className={cn(labelCaps, 'mt-4 flex h-7 items-center px-2.5')}>Channels</h2>
+              <RailHeading>Channels</RailHeading>
               {[null, ...channels].map((c) => (
                 <RailItem key={c ?? 'all'} active={channel === c} onClick={() => setChannel(c)}>
                   {c ?? 'All channels'}
@@ -370,7 +371,7 @@ export function InboxPage() {
               ))}
             </>
           )}
-        </nav>
+        </Rail>
 
         <aside
           className={cn(
@@ -657,39 +658,6 @@ function matchesDraft(d: MailDraft, all: Inquiry[], query: string): boolean {
     .join(' ')
     .toLowerCase();
   return text.includes(query.trim().toLowerCase());
-}
-
-function RailItem({
-  icon,
-  active,
-  onClick,
-  count = 0,
-  strong,
-  children,
-}: {
-  icon?: ReactNode;
-  active: boolean;
-  onClick: () => void;
-  count?: number;
-  strong?: boolean;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-current={active ? 'page' : undefined}
-      className={cn(
-        'flex h-8 w-full items-center gap-2.5 rounded-lg px-2.5 text-left text-sm text-muted-foreground outline-none transition-colors duration-150 ease-snap hover:bg-accent hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring',
-        active && 'bg-sidebar-accent text-foreground',
-        strong && 'font-medium text-foreground',
-      )}
-    >
-      {icon}
-      <span className="min-w-0 flex-1 truncate">{children}</span>
-      {count > 0 && <span className="text-xs text-muted-foreground tabular-nums">{count}</span>}
-    </button>
-  );
 }
 
 function Chip({
