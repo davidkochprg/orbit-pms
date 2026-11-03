@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMetaProvider } from './provider';
+import { createMetaProvider, fetchWithTimeout } from './provider';
 
 describe('createMetaProvider', () => {
   it('builds models from configuration without calling the network', () => {
@@ -62,5 +62,35 @@ describe('createMetaProvider', () => {
       models: { agent: 'a' },
     });
     expect(provider.vision).toBeNull();
+  });
+});
+
+describe('fetchWithTimeout', () => {
+  /** A request that only ends when it is aborted. */
+  const hanging: typeof fetch = (_input, init) =>
+    new Promise((_resolve, reject) => {
+      const signal = init?.signal;
+      signal?.addEventListener('abort', () => reject(signal.reason as Error));
+    });
+
+  it('gives up on a request that takes too long', async () => {
+    await expect(fetchWithTimeout(10, hanging)('https://example.invalid')).rejects.toMatchObject({
+      name: 'TimeoutError',
+    });
+  });
+
+  it('still stops when the caller aborts', async () => {
+    const caller = new AbortController();
+    const request = fetchWithTimeout(60_000, hanging)('https://example.invalid', {
+      signal: caller.signal,
+    });
+    caller.abort();
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' });
+  });
+
+  it('passes a quick response through', async () => {
+    const ok: typeof fetch = () => Promise.resolve(new Response('ok'));
+    const res = await fetchWithTimeout(1000, ok)('https://example.invalid');
+    expect(await res.text()).toBe('ok');
   });
 });

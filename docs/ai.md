@@ -314,6 +314,8 @@ The Meta Model API is OpenAI-compatible, so `packages/ai/src/provider.ts` wraps 
 
 Muse Spark is a reasoning model: it always reasons before answering (`reasoning_effort: "none"` is rejected), and reasoning tokens are billed as output. `packages/ai/src/reasoning.ts` sets the effort per feature through the AI SDK's `reasoning` option: `minimal` for inbox extraction, drafts, housekeeping notes, stay notes, the rate summary and ID scans, `low` for the agent, which plans multi-step tool use, and `high` for the rate review, which runs only when the outlook changes. Each is the lowest level that keeps quality, measured with `pnpm eval` and live runs.
 
+Every model request has a time limit, so a stuck model ends in an error instead of a spinner: 90 seconds for the Meta Model API (response included, per step of the agent loop), 30 seconds for Muse Spark Open, so the Meta fallback still has time, and 30 seconds for a transcription. A request that runs out of time is not retried.
+
 ### Muse Spark Open on Baseten
 
 Muse Spark Open is Meta's open-weight release of Muse Spark; Orbit uses the dated `meta-models/muse-spark-open-1026` (`BASETEN_MODEL`). With `BASETEN_API_KEY` and `BASETEN_MODEL` set, reply drafts and translations run on it through Baseten's OpenAI-compatible Model API (`BASETEN_BASE_URL`, default `https://inference.baseten.co/v1`); the agent, inbox extraction, housekeeping notes and ID scans stay on the Meta Model API ([ADR 0015](decisions/0015-muse-spark-open-on-baseten.md)).

@@ -42,6 +42,23 @@ export interface MetaProvider {
 }
 
 /**
+ * How long one model request may take, response included. A request still going after this is
+ * cut off and fails, so a stuck model shows an error instead of a spinner that never ends; the
+ * open model's is shorter so the Meta fallback still has time to answer.
+ */
+export const META_REQUEST_TIMEOUT_MS = 90_000;
+export const OPEN_REQUEST_TIMEOUT_MS = 30_000;
+
+/** `fetch` that gives up after `ms`, as well as when the caller aborts. */
+export function fetchWithTimeout(ms: number, base: typeof fetch = fetch): typeof fetch {
+  return (input, init) => {
+    const timeout = AbortSignal.timeout(ms);
+    const signal = init?.signal ? AbortSignal.any([init.signal, timeout]) : timeout;
+    return base(input, { ...init, signal });
+  };
+}
+
+/**
  * The Meta Model API is OpenAI-compatible, so it is reached through the AI SDK's
  * OpenAI-compatible provider. All IDs and the base URL come from configuration.
  */
@@ -51,6 +68,7 @@ export function createMetaProvider(config: MetaModelConfig): MetaProvider {
     apiKey: config.apiKey,
     baseURL: config.baseURL,
     includeUsage: true,
+    fetch: fetchWithTimeout(META_REQUEST_TIMEOUT_MS),
     // Meta supports response_format json_schema, so structured output is constrained server-side.
     supportsStructuredOutputs: true,
   });
@@ -66,6 +84,7 @@ export function createMetaProvider(config: MetaModelConfig): MetaProvider {
       apiKey: config.open.apiKey,
       baseURL: config.open.baseURL,
       includeUsage: true,
+      fetch: fetchWithTimeout(OPEN_REQUEST_TIMEOUT_MS),
     }).chatModel(config.open.model);
   return {
     agent,

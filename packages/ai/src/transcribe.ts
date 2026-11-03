@@ -25,6 +25,9 @@ export class TranscriptionError extends Error {
 const responseSchema = z.object({ transcript: z.string(), audioDurationMs: z.number() });
 const errorSchema = z.object({ error: z.object({ message: z.string() }) });
 
+/** How long a transcription request may take before it fails. */
+const TRANSCRIBE_TIMEOUT_MS = 30_000;
+
 /**
  * Transcribes a recording with Meta's speech-to-text endpoint (`POST /asr/transcribe`). It is
  * not OpenAI-compatible: a multipart body with a JSON `request` part and a WAV `audio` part
@@ -57,7 +60,10 @@ export async function transcribeWav(
     method: 'POST',
     headers: { authorization: `Bearer ${config.apiKey}`, accept: 'application/json' },
     body,
-    ...(signal && { signal }),
+    // A transcription takes seconds; one still going after this is cut off rather than awaited.
+    signal: signal
+      ? AbortSignal.any([signal, AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS)])
+      : AbortSignal.timeout(TRANSCRIBE_TIMEOUT_MS),
   });
   const json: unknown = await res.json().catch(() => null);
   if (!res.ok) {
