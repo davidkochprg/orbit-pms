@@ -188,18 +188,26 @@ describe('reading a bill', () => {
 });
 
 describe('checking and paying', () => {
-  it('moves a checked bill to the bills to pay, then to paid, and shows when it is late', async () => {
+  it('moves a checked bill to the bills to pay, then to paid, keeping what was printed', async () => {
     const { service } = setup();
     const bill = await service.fromReading(
       reading,
       { source: 'upload', file: null, inquiryId: null, senderAddress: null },
       'user',
     );
-    const checked = await service.update(bill.id, { total: 412, checked: true }, 'user');
+    const checked = await service.update(
+      bill.id,
+      { total: 412, dueOn: '2026-05-11', checked: true },
+      'user',
+    );
     expect(checked).toMatchObject({ status: 'unpaid', total: 412, warnings: [] });
-    const late = await service.update(bill.id, { dueOn: '2026-05-11' }, 'user');
-    expect((await service.get(late.id)).overdue).toBe(true);
+    expect((await service.get(bill.id)).overdue).toBe(true);
     expect((await service.due()).overdue).toHaveLength(1);
+    await expect(service.update(bill.id, { total: 500 }, 'user')).rejects.toMatchObject({
+      code: 'invalid_transition',
+    });
+    const linked = await service.update(bill.id, { note: 'Paid from petty cash' }, 'user');
+    expect(linked.note).toBe('Paid from petty cash');
     const paid = await service.pay(bill.id, { method: 'bank_transfer', paidOn: null }, 'user');
     expect(paid).toMatchObject({
       status: 'paid',

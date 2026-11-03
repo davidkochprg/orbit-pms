@@ -1017,7 +1017,7 @@ export function createAgentTools({
     }),
     updateBill: tool({
       description:
-        'Propose correcting a bill (send only what changes), or checked: true to confirm a bill Orbit read so it moves to the bills to pay. The user must confirm.',
+        'Propose correcting a bill Orbit read and nobody checked yet (send only what changes), or checked: true to confirm it so it moves to the bills to pay. Once checked, only its contact, repair and note can change. The user must confirm.',
       inputSchema: supplierInvoicePatchSchema.extend(billIdSchema.shape),
       execute: (input) => propose({ kind: 'update_supplier_invoice', input }),
     }),

@@ -212,6 +212,30 @@ export interface ReadSource {
  * checked it is a bill to pay until marked paid. The file is kept with the mailbox's files. Every
  * change is audited on the bill.
  */
+/** What the supplier printed on a bill: read from the file, then checked, then left alone. */
+const printedFields = [
+  'supplierName',
+  'supplierTaxId',
+  'number',
+  'issuedOn',
+  'dueOn',
+  'total',
+  'tax',
+  'bankAccount',
+  'paymentReference',
+] as const;
+
+/**
+ * The printed fields a patch would change. Once a bill is checked only the hotel's own links,
+ * its contact, repair and note, can change.
+ */
+export function printedChanges(
+  invoice: SupplierInvoice,
+  patch: Partial<Pick<SupplierInvoice, (typeof printedFields)[number]>>,
+): string[] {
+  return printedFields.filter((f) => patch[f] !== undefined && patch[f] !== invoice[f]);
+}
+
 export function createSupplierInvoiceService({
   repos,
   pricing,
@@ -277,6 +301,13 @@ export function createSupplierInvoiceService({
     const invoice = await load(r, id);
     await assertLinks(r, patch);
     const { checked, ...fields } = patch;
+    const printed = printedChanges(invoice, fields);
+    if (invoice.status !== 'to_review' && printed.length > 0) {
+      throw new DomainError(
+        'invalid_transition',
+        `The bill is checked, so what the supplier printed (${printed.join(', ')}) stays as it is. Delete it and add it again to correct it.`,
+      );
+    }
     const updated: SupplierInvoice = {
       ...invoice,
       ...fields,
