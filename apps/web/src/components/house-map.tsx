@@ -7,6 +7,7 @@ import {
   houseStates,
   type TonightStatus,
 } from '@/lib/house-map';
+import { StatusLegend } from '@/components/status-legend';
 import { bookingStatusColor } from '@/lib/status';
 import { cn } from '@/lib/utils';
 import { Tip } from '@/components/ui/tooltip';
@@ -139,14 +140,14 @@ export function HouseMap({
           </div>
         ))}
       </div>
-      <ul className="flex flex-wrap gap-x-4 gap-y-1.5 pl-6 text-xs text-muted-foreground">
-        {houseStates.map((state) => (
-          <li key={state} className="flex items-center gap-1.5">
-            <span aria-hidden className={cn('size-2.5 rounded-[3px]', swatchClass[state])} />
-            {houseStateLabels[state]}
-          </li>
-        ))}
-      </ul>
+      <StatusLegend
+        className="pl-6"
+        items={houseStates.map((state) => ({
+          key: state,
+          label: houseStateLabels[state],
+          swatch: swatchClass[state],
+        }))}
+      />
     </div>
   );
 }

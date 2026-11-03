@@ -33,7 +33,7 @@ import { ErrorNotice } from '@/components/error-notice';
 import { PageHeader } from '@/components/page-header';
 import { RoomStatusDot } from '@/components/room-status-dot';
 import { Segmented } from '@/components/segmented';
-import { StatusDot } from '@/components/status-dot';
+import { StatusLegend } from '@/components/status-legend';
 import { Button } from '@/components/ui/button';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Tip } from '@/components/ui/tooltip';
@@ -320,7 +320,8 @@ function TapeChart({ today }: { today: string }) {
               onChange={(v) => isIsoDate(v) && goTo(v)}
               className="max-sm:hidden"
             />
-            <div className="relative flex items-center rounded-control fill-action shadow-action stroke-lit">
+            {/* A raised group, so its text reads like the outline buttons beside it. */}
+            <div className="relative flex items-center rounded-control fill-action text-foreground shadow-action stroke-lit [&_button]:text-foreground">
               <Button
                 variant="ghost"
                 size="icon-sm"
@@ -874,16 +875,18 @@ const iconKey: { icon: LucideIcon; label: string }[] = [
   { icon: StickyNote, label: 'Has notes' },
 ];
 
+const legendStatuses: VisibleStatus[] = ['hold', 'confirmed', 'checked_in', 'checked_out'];
+
 function Legend() {
-  const items: VisibleStatus[] = ['hold', 'confirmed', 'checked_in', 'checked_out'];
   return (
-    <ul className="ml-auto flex shrink-0 items-center gap-3">
-      {items.map((status) => (
-        <li key={status} className="flex items-center gap-1.5">
-          <StatusDot className={bookingStatusColor[status]} />
-          {statusLabels[status]}
-        </li>
-      ))}
+    <StatusLegend
+      className="ml-auto shrink-0 flex-nowrap"
+      items={legendStatuses.map((status) => ({
+        key: status,
+        label: statusLabels[status],
+        swatch: bookingStatusColor[status],
+      }))}
+    >
       <li>
         <Popover>
           <PopoverTrigger asChild>
@@ -903,6 +906,6 @@ function Legend() {
           </PopoverContent>
         </Popover>
       </li>
-    </ul>
+    </StatusLegend>
   );
 }
