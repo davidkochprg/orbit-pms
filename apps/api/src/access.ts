@@ -64,6 +64,10 @@ export function createDemoAccess({
       if (!code || !token) return c.json(status(c));
       const ip = clientIp(c);
       const cutoff = clock().getTime() - ATTEMPT_WINDOW_MS;
+      // Addresses whose wrong codes are all older than the window are forgotten.
+      for (const [key, times] of failures) {
+        if (times.every((t) => t <= cutoff)) failures.delete(key);
+      }
       const recent = (failures.get(ip) ?? []).filter((t) => t > cutoff);
       if (recent.length >= MAX_FAILED_ATTEMPTS) {
         return c.json(errorBody('rate_limit', 'Too many wrong codes. Try again later.'), 429);
