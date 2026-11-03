@@ -1,4 +1,4 @@
-import type { Report, ReportDay } from '@orbit/shared';
+import type { Report, ReportDay, ReportWeekday } from '@orbit/shared';
 import { ChevronRight } from 'lucide-react';
 import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
@@ -26,6 +26,7 @@ import {
 import {
   type Change,
   comparisonRange,
+  isoWeekdayNames,
   isReportPeriod,
   percent,
   periodRange,
@@ -33,6 +34,7 @@ import {
   type ReportPeriod,
   reportPeriods,
   relativeChange,
+  stayLengthLabel,
 } from '@/lib/reports';
 import { cn } from '@/lib/utils';
 
@@ -188,13 +190,17 @@ function ReportView({
         </dl>
 
         <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-t px-5 py-4 sm:grid-cols-4 xl:grid-cols-7">
+          <Figure
+            label="TRevPAR"
+            hint="Room, add-on and extras revenue per available room night"
+            value={formatMoney(report.trevpar)}
+          />
           <Figure label="Add-ons" value={formatMoney(report.addonRevenue)} />
           <Figure label="Extras" value={formatMoney(report.extrasRevenue)} />
           {showCityTax && <Figure label={cityTaxLabel} value={formatMoney(report.cityTax)} />}
           <Figure label="Guest nights" value={formatCount(report.guestNights)} />
           <Figure label="Arrivals" value={formatCount(report.arrivals)} />
           <Figure label="Average stay" value={`${report.averageStay} nights`} />
-          <Figure label="Cancellations" value={formatCount(report.cancellations)} />
         </dl>
       </Panel>
 
@@ -203,6 +209,10 @@ function ReportView({
       </Panel>
 
       <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Panel title="By weekday">
+          <WeekdayChart weekdays={report.byWeekday} />
+        </Panel>
+        <GuestMix report={report} previous={previous} vs={vs} />
         <Panel title="By room type">
           <ul className="flex flex-col gap-4 p-4">
             {report.byRoomType.map((t) => (
@@ -211,6 +221,7 @@ function ReportView({
                 label={t.roomTypeName}
                 share={t.occupancy}
                 value={`${percent(t.occupancy)}%`}
+                rate={t.roomNights > 0 ? formatMoney(t.adr) : '–'}
                 detail={formatMoney(t.roomRevenue)}
               />
             ))}
@@ -221,15 +232,19 @@ function ReportView({
             <p className="p-3.5 text-sm text-muted-foreground">No stays in this period.</p>
           ) : (
             <ul className="flex flex-col gap-4 p-4">
-              {report.bySource.map((s) => (
-                <BarRow
-                  key={s.source}
-                  label={sourceLabels[s.source]}
-                  share={s.roomNights / Math.max(report.roomNightsSold, 1)}
-                  value={`${formatCount(s.roomNights)} nights`}
-                  detail={formatMoney(s.roomRevenue)}
-                />
-              ))}
+              {report.bySource.map((s) => {
+                const share = s.roomNights / Math.max(report.roomNightsSold, 1);
+                return (
+                  <BarRow
+                    key={s.source}
+                    label={sourceLabels[s.source]}
+                    share={share}
+                    value={`${percent(share)}%`}
+                    rate={formatMoney(s.adr)}
+                    detail={formatMoney(s.roomRevenue)}
+                  />
+                );
+              })}
             </ul>
           )}
         </Panel>
@@ -288,12 +303,132 @@ function Kpi({
   );
 }
 
-function Figure({ label, value }: { label: string; value: string | number }) {
+function Figure({
+  label,
+  hint,
+  value,
+  detail,
+}: {
+  label: string;
+  /** What the label stands for, as a tooltip. */
+  hint?: string;
+  value: string | number;
+  detail?: string;
+}) {
   return (
     <div className="flex flex-col gap-0.5">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dt className="text-xs text-muted-foreground">
+        <Tip label={hint}>
+          <span>{label}</span>
+        </Tip>
+      </dt>
       <dd className="font-mono text-[0.8125rem]">{value}</dd>
+      {detail && <dd className="truncate text-xs text-muted-foreground">{detail}</dd>}
     </div>
+  );
+}
+
+/**
+ * Each weekday of the period side by side: how full it ran, as a bar, and its average rate.
+ * Hover or focus a day for its RevPAR.
+ */
+function WeekdayChart({ weekdays }: { weekdays: ReportWeekday[] }) {
+  return (
+    <figure className="grid grid-cols-7 gap-2 px-4 pt-4 pb-3">
+      {weekdays.map((w) => (
+        <Tooltip key={w.weekday}>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              aria-label={`${isoWeekdayNames[w.weekday]}: ${percent(w.occupancy)}%, ADR ${w.roomNights > 0 ? formatMoney(w.adr) : 'none'}`}
+              className="group flex min-w-0 flex-col items-center gap-1.5 rounded-control outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span className="font-mono text-xs tabular-nums">{percent(w.occupancy)}%</span>
+              <span className="relative h-32 w-full max-w-12 overflow-hidden rounded-[5px] bg-ink/5">
+                <span
+                  className="absolute inset-x-0 bottom-0 rounded-t-[5px] bg-linear-to-b from-primary to-accent-violet/70 opacity-75 shadow-[inset_0_1px_0_rgb(255_255_255/0.25)] transition-opacity duration-150 ease-snap group-hover:opacity-100"
+                  style={{ height: `${Math.min(percent(w.occupancy), 100)}%` }}
+                />
+              </span>
+              <span className="text-xs text-muted-foreground">{isoWeekdayNames[w.weekday]}</span>
+              <span className="font-mono text-[0.6875rem] text-muted-foreground tabular-nums">
+                {w.roomNights > 0 ? formatMoney(w.adr) : '–'}
+              </span>
+            </button>
+          </TooltipTrigger>
+          <TooltipContent side="top" className="flex flex-col gap-0.5">
+            <span className="font-medium">
+              {isoWeekdayNames[w.weekday]} · {w.nights} {w.nights === 1 ? 'night' : 'nights'}
+            </span>
+            <span className="tabular-nums">
+              {percent(w.occupancy)}% · ADR {formatMoney(w.adr)} · RevPAR {formatMoney(w.revpar)}
+            </span>
+          </TooltipContent>
+        </Tooltip>
+      ))}
+    </figure>
+  );
+}
+
+/** Who stayed: returning guests, families, cancellations and how long stays ran. */
+function GuestMix({
+  report,
+  previous,
+  vs,
+}: {
+  report: Report;
+  previous: Report | undefined;
+  vs: string;
+}) {
+  const returning = report.arrivals > 0 ? report.returningArrivals / report.arrivals : 0;
+  const before =
+    previous && previous.arrivals > 0 ? previous.returningArrivals / previous.arrivals : null;
+  return (
+    <Panel title="Guests" contentClassName="p-0">
+      <dl className="grid grid-cols-3 gap-x-6 border-b px-4 py-3">
+        <div className="flex flex-col gap-0.5">
+          <dt className="flex items-center gap-2 text-xs text-muted-foreground">
+            Returning
+            {before !== null && report.arrivals > 0 && (
+              <ChangeBadge change={pointChange(returning, before)} vs={vs} />
+            )}
+          </dt>
+          <dd className="font-mono text-[0.8125rem]">{percent(returning)}%</dd>
+          <dd className="truncate text-xs text-muted-foreground">
+            {formatCount(report.returningArrivals)} of {formatCount(report.arrivals)} arrivals
+          </dd>
+        </div>
+        <Figure
+          label="With children"
+          value={formatCount(report.arrivalsWithChildren)}
+          detail={
+            report.arrivals > 0
+              ? `${percent(report.arrivalsWithChildren / report.arrivals)}% of arrivals`
+              : undefined
+          }
+        />
+        <Figure
+          label="Cancelled"
+          value={`${percent(report.cancellationRate)}%`}
+          detail={`${formatCount(report.cancellations)} ${report.cancellations === 1 ? 'booking' : 'bookings'}`}
+        />
+      </dl>
+      {report.arrivals === 0 ? (
+        <p className="p-3.5 text-sm text-muted-foreground">No arrivals in this period.</p>
+      ) : (
+        <ul aria-label="Stays by length" className="flex flex-col gap-4 p-4">
+          {report.stayLengths.map((s) => (
+            <BarRow
+              key={s.minNights}
+              label={stayLengthLabel(s)}
+              share={s.arrivals / report.arrivals}
+              value={`${percent(s.arrivals / report.arrivals)}%`}
+              detail={`${formatCount(s.arrivals)} ${s.arrivals === 1 ? 'arrival' : 'arrivals'}`}
+            />
+          ))}
+        </ul>
+      )}
+    </Panel>
   );
 }
 
@@ -379,11 +514,14 @@ function BarRow({
   label,
   share,
   value,
+  rate,
   detail,
 }: {
   label: string;
   share: number;
   value: string;
+  /** The slice's ADR. */
+  rate?: string;
   detail: string;
 }) {
   return (
@@ -391,6 +529,13 @@ function BarRow({
       <div className="flex items-baseline gap-3 text-sm">
         <span className="min-w-0 flex-1 truncate">{label}</span>
         <span className="font-medium tabular-nums">{value}</span>
+        {rate !== undefined && (
+          <Tip label="ADR">
+            <span className="w-16 shrink-0 text-right text-muted-foreground tabular-nums">
+              {rate}
+            </span>
+          </Tip>
+        )}
         <span className="w-28 shrink-0 text-right text-muted-foreground tabular-nums">
           {detail}
         </span>

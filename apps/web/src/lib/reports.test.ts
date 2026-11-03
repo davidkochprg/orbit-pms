@@ -6,6 +6,7 @@ import {
   periodRange,
   pointChange,
   relativeChange,
+  stayLengthLabel,
 } from './reports';
 
 describe('periodRange', () => {
@@ -65,5 +66,14 @@ describe('isReportPeriod', () => {
     expect(isReportPeriod('month')).toBe(true);
     expect(isReportPeriod('year')).toBe(false);
     expect(isReportPeriod(null)).toBe(false);
+  });
+});
+
+describe('stayLengthLabel', () => {
+  it('names one length, a range and an open end', () => {
+    expect(stayLengthLabel({ minNights: 1, maxNights: 1 })).toBe('1 night');
+    expect(stayLengthLabel({ minNights: 2, maxNights: 2 })).toBe('2 nights');
+    expect(stayLengthLabel({ minNights: 3, maxNights: 4 })).toBe('3–4 nights');
+    expect(stayLengthLabel({ minNights: 7, maxNights: null })).toBe('7+ nights');
   });
 });

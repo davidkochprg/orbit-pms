@@ -42,6 +42,22 @@ export function comparisonRange({ from, to }: ReportQuery): ReportQuery {
 }
 
 /** Whole percent of a 0–1 fraction. */
+/** "1 night", "3–4 nights", "7+ nights": a stay-length group of the report. */
+export function stayLengthLabel({
+  minNights,
+  maxNights,
+}: {
+  minNights: number;
+  maxNights: number | null;
+}): string {
+  if (maxNights === null) return `${minNights}+ nights`;
+  if (minNights === maxNights) return `${minNights} ${minNights === 1 ? 'night' : 'nights'}`;
+  return `${minNights}–${maxNights} nights`;
+}
+
+/** Short weekday names by ISO number, 1 for Monday. */
+export const isoWeekdayNames = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
+
 export function percent(fraction: number): number {
   return Math.round(fraction * 100);
 }
