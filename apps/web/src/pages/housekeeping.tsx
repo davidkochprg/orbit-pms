@@ -25,6 +25,7 @@ import { TaskDialog } from '@/components/task-dialog';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { canRecord } from '@/hooks/use-voice-question';
 import {
   useHealth,
   useHousekeeping,
@@ -70,7 +71,8 @@ export function HousekeepingPage() {
     names: new Map(contacts.data?.map((c) => [c.id, c.name])),
   };
   const aiOn = health.data?.ai.configured ?? false;
-  const voiceOn = health.data?.ai.voice ?? false;
+  // A plain-HTTP network address can't record, so the note is typed there.
+  const voiceOn = (health.data?.ai.voice ?? false) && canRecord();
   const { mutate: readStays, isPending: readingStays, isError: readStaysFailed } = useReadStays();
   const unreadStays = board.data?.unreadStays ?? 0;
   // Stays whose notes changed are read in the background, a batch at a time; the board re-ranks
