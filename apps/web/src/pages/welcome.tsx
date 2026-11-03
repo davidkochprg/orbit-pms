@@ -40,7 +40,9 @@ export function WelcomePage() {
   const brief = useDailyBrief();
   const day = useDayOverview();
   const manager = demoManager(session.staff);
-  const next = params.get('next')?.startsWith('/') ? params.get('next')! : '/';
+  // Only a path in the app: "//host" would leave it.
+  const asked = params.get('next');
+  const next = asked && /^\/(?![/\\])/.test(asked) ? asked : '/';
   const panel = useRef<HTMLElement>(null);
 
   function enter() {
