@@ -6,9 +6,9 @@ import { czechHotelProfile, usHotelProfile } from './hotel';
 import { czechStaff, usStaff } from './staff';
 
 /**
- * Where the demo hotel is. `us` is the fictional Sierra Nevada lodge the hackathon demo shows
- * (dollars, taxes added on top, per-room rates); `cz` is the Czech guesthouse Orbit was built
- * for (crowns, VAT included, per-person rates). The guests are multinational either way.
+ * Where the demo hotel is. `us` is Orbit Demo Lodge, the fictional Sierra Nevada lodge the demo
+ * shows (dollars, taxes added on top, per-room rates). `cz` is a second preset with per-person
+ * rates and VAT included, kept so the region settings stay tested.
  */
 export const seedRegions = ['us', 'cz'] as const;
 export type SeedRegion = (typeof seedRegions)[number];

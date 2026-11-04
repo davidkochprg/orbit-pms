@@ -20,18 +20,18 @@ To use the AI features, copy `.env.example` to `.env` at the repo root and fill 
 
 Read from `.env` at the repo root by the API and the db scripts, and validated with zod at startup (`apps/api/src/env.ts`). All of them are server-side; the web bundle gets none.
 
-| Variable               | Default                  | Purpose                                                             |
-| ---------------------- | ------------------------ | ------------------------------------------------------------------- |
-| `DATABASE_URL`         | `file:./.data/orbit`     | PGlite path, or a `postgres://` URL                                 |
-| `META_API_KEY`         | –                        | Meta Model API key                                                  |
-| `META_API_BASE_URL`    | `https://api.meta.ai/v1` | OpenAI-compatible base URL                                          |
-| `META_MODEL_AGENT`     | –                        | Model for the agent loop and tool calling                           |
-| `META_MODEL_VOICE`     | –                        | Transcription model for voice notes                                 |
-| `META_MODEL_VISION`    | –                        | Vision model for ID scans and photographed bills                    |
-| `META_MODEL_TRANSLATE` | `META_MODEL_AGENT`       | Model for translating messages and drafts                           |
-| `HOTEL_TIMEZONE`       | `America/Los_Angeles`    | The hotel's IANA time zone; decides "today"                         |
-| `SEED_REGION`          | `us`                     | `pnpm db:seed` preset: `us` (demo lodge) or `cz` (Czech guesthouse) |
-| `PORT`                 | `3001`                   | API port; the web dev server proxies `/api` to it                   |
+| Variable               | Default                  | Purpose                                           |
+| ---------------------- | ------------------------ | ------------------------------------------------- |
+| `DATABASE_URL`         | `file:./.data/orbit`     | PGlite path, or a `postgres://` URL               |
+| `META_API_KEY`         | –                        | Meta Model API key                                |
+| `META_API_BASE_URL`    | `https://api.meta.ai/v1` | OpenAI-compatible base URL                        |
+| `META_MODEL_AGENT`     | –                        | Model for the agent loop and tool calling         |
+| `META_MODEL_VOICE`     | –                        | Transcription model for voice notes               |
+| `META_MODEL_VISION`    | –                        | Vision model for ID scans and photographed bills  |
+| `META_MODEL_TRANSLATE` | `META_MODEL_AGENT`       | Model for translating messages and drafts         |
+| `HOTEL_TIMEZONE`       | `America/Los_Angeles`    | The hotel's IANA time zone; decides "today"       |
+| `SEED_REGION`          | `us`                     | `pnpm db:seed` preset: `us` (Orbit Demo Lodge)    |
+| `PORT`                 | `3001`                   | API port; the web dev server proxies `/api` to it |
 
 ## Scripts
 
@@ -69,22 +69,22 @@ A PGlite directory can only be open in one process at a time; two processes writ
 
 ## Seeding
 
-`pnpm db:seed` replaces all data with a synthetic demo set built by `buildSeed(today, now, region)`. `SEED_REGION` picks the hotel ([ADR 0013](decisions/0013-configurable-region-us-demo.md)): `us` (default) is the fictional Orbit Demo Lodge in the Sierra Nevada, California, with an English-speaking team, per-room rates in dollars and occupancy and sales tax added on the bill; `cz` is the Czech guesthouse, in crowns per person with VAT included. For `cz` also set `HOTEL_TIMEZONE=Europe/Prague`. Every date is relative to today in the hotel's time zone, so the demo looks the same whenever it runs:
+`pnpm db:seed` replaces all data with a synthetic demo set built by `buildSeed(today, now, region)`. `SEED_REGION` picks the hotel ([ADR 0013](decisions/0013-configurable-region-us-demo.md)): `us` (default) is the fictional Orbit Demo Lodge in the Sierra Nevada, California, with an English-speaking team, per-room rates in dollars and occupancy and sales tax added on the bill. A second, per-person-pricing preset exists in code for tests; the demo uses `us`. Every date is relative to today in the hotel's time zone, so the demo looks the same whenever it runs:
 
 - 50 rooms of six types: double, family, single, superior double and junior suite rooms on floors 1–4 (101–111, 201–211, 301–311, 401–411), and apartments A1–A6 on the ground floor.
-- 240 synthetic guests in Czech, German, Polish and English: a few hand-picked names plus first name and surname combinations. Emails use `example.com`. No guest has two stays at once.
+- About 240 synthetic guests, mostly US and UK with some German visitors: a few hand-picked names plus first name and surname combinations. Emails use `example.com`. No guest has two stays at once.
 - About 950 bookings from two months ago to ten weeks ahead, so the 60-night rate outlook has stays on every night and a report and the period before it both have stays to compare, filling about half the hotel on a typical night, priced with `quote()`. There are always arrivals and departures today, at least one family arrival, and some open holds.
 - 14 open guest messages in mixed languages (from `packages/ai/src/evals/inquiries.ts`), unread. The seed makes sure each booking request has at least one free room. Booking.com messages about a reservation belong to an upcoming OTA booking of their sender, so the inbox opens it.
 - Three conversations with history (`packages/db/src/seed/conversations.ts`): a Booking.com exchange about a late arrival, linked to its booking; an archived thank-you about a lost charger; and a welcome email the hotel wrote first.
-- The team reads English (Czech for `cz`), so drafts and guest messages translate into it; change it per person in Settings › Team. Guests stay multinational either way.
+- The team reads English, so drafts and guest messages translate into it; change it per person in Settings › Team. Guest messages in other languages are translated too.
 - Bills: extras on past and current stays, deposits by bank transfer on some bookings, and settled bills for guests who left. Guests leaving today still owe something. Extra prices are placeholders.
 - Supplier bills: one Orbit read and nobody checked, one due this week, one overdue and one paid, each with the PDF it was read from, plus the bakery's bill on an email still to read.
 - Guest-book registrations for every stay that has started, with synthetic `DEMO-` document numbers and placeholder addresses. Today's arrivals are not registered yet; returning guests prefill from an earlier stay.
 - Housekeeping tasks: turnovers for today's departures, stayovers for in-house guests, one maintenance task.
 - Two departures today that clean very differently: a one-guest work trip in 102, and a family with a dog and muddy boots in A4. Today's family arrival in A2 asks for a cot. The board reads these notes on first open, so seeded stays have no stored readings.
 - A day and a half of activity (`packages/db/src/seed/activity.ts`): yesterday's check-ins, check-outs, payments and cleaning by staff, and a hold, a maintenance task and this morning's inspections by Orbit.
-- The hotel profile of the fictional "Orbit Demo Lodge" or "Orbit Demo Penzion" (`packages/db/src/seed/hotel.ts`): sixteen notes in Knowledge, filed in folders with tags and a few links between them, without prices. Seeding replaces any profile edited in Settings or Knowledge.
-- The rates from `packages/domain/src/pricing/config.ts`: `usDemoPricing` (illustrative) or the Czech placeholders. Seeding replaces any rates, room types and rooms edited in Settings.
+- The hotel profile of the fictional "Orbit Demo Lodge" (`packages/db/src/seed/hotel.ts`): sixteen notes in Knowledge, filed in folders with tags and a few links between them, without prices. Seeding replaces any profile edited in Settings or Knowledge.
+- The rates from `packages/domain/src/pricing/config.ts`: `usDemoPricing` (illustrative). Seeding replaces any rates, room types and rooms edited in Settings.
 
 The generator is deterministic (fixed PRNG seed), and its invariants are tested in `packages/db/src/seed/build.test.ts`.
 

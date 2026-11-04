@@ -8,9 +8,9 @@ An AI-native property management system for small hotels: anything you can click
 
 ## Why
 
-I'm the assistant manager at a small wellness guesthouse in the Jizera Mountains in Czechia. A day at the front desk of a place like ours means guest emails in Czech, German, Polish and English, Booking.com messages, per-person prices with child discounts and wellness add-ons, and housekeeping updates passed along by phone or in the corridor. Most hotel software leaves all of that to the person at the desk, and where AI shows up, it's usually a chat window on the side.
+I work the front desk at a small independent lodge. A day there means guest emails, Booking.com messages, room rates with child discounts and spa add-ons, and housekeeping updates passed along by phone or in the corridor, some of them from guests who don't write in English. Most hotel software leaves all of that to the person at the desk, and where AI shows up, it's usually a chat window on the side.
 
-The demo runs as a fictional US mountain lodge on Pacific time: room rates in dollars, occupancy and sales tax added on the bill, US dates and an English-speaking team, with guests writing in from all over. The same app runs a Czech guesthouse in crowns, per person, with VAT included: currency, taxes, guest-book rules and time zone are settings ([ADR 0013](docs/decisions/0013-configurable-region-us-demo.md)).
+The demo runs as Orbit Demo Lodge, a fictional mountain lodge on Pacific time: room rates in dollars, occupancy and sales tax added on the bill, US dates and an English-speaking team. Currency, taxes, guest-book rules and time zone are settings, not code ([ADR 0013](docs/decisions/0013-configurable-region-us-demo.md)).
 
 Orbit is built the other way round. One set of hotel rules (availability, pricing, the booking lifecycle, housekeeping) runs everything. The screens call those rules, and so does an agent running on Meta's models, so the agent can do anything the UI can and never invents a price.
 
@@ -102,20 +102,20 @@ More in [docs/ai.md](docs/ai.md).
 
 `pnpm eval` runs the real models against synthetic fixtures and prints a pass rate, cost and latency per item.
 
-| Suite               | Fixtures                                                                                                                       | Pass rate    |
-| ------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------ |
-| Inbox extraction    | 15 messages in Czech, German, English and Polish, including Booking.com questions about a stay and a team asking for six rooms | 15/15 (100%) |
-| Housekeeping notes  | 10 notes in four languages, including spelled-out room numbers, an unknown room and a vague note                               | 10/10 (100%) |
-| Stay notes          | 12 stays in five languages: dogs, a cot, an allergy, muddy bikes, and notes that aren't for cleaning                           | 12/12 (100%) |
-| ID scans            | 3 synthetic specimen documents: a Czech-style ID card, a German-style passport and a receipt                                   | 3/3 (100%)   |
-| Supplier bills      | 4 bills as PDF text: US net terms, a Czech decimal comma, German VAT, and a quote that is not a bill                           | 4/4 (100%)   |
-| Agent tools         | 29 staff requests run through the real agent and tools, checked by their effect                                                | 29/29 (100%) |
-| Reply drafts        | 18 replies with real quotes (one a block of rooms for a group), checked by the price guard                                     | 18/18 (100%) |
-| Translations        | 4 drafts and guest messages between Czech, German, English and Polish, amounts kept                                            | 4/4 (100%)   |
-| Contractor replies  | 4 answers about a repair: a time that works, one while a guest is in the room, in Czech, and a price to agree to               | 4/4 (100%)   |
-| Notes before a stay | 5 guests in four languages: snow and a spa, a dog, a family in the rain, a regular, no forecast                                | 5/5 (100%)   |
-| Guest memory        | 4 histories: a regular, pure logistics, a sensitive complaint to leave out, repeats to merge                                   | 4/4 (100%)   |
-| Rate review         | 3 outlooks: a block of rooms (and a single request to ignore), Thanksgiving, an ordinary fortnight                             | 3/3 (100%)   |
+| Suite               | Fixtures                                                                                                                   | Pass rate    |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Inbox extraction    | 15 messages in four languages, including Booking.com questions about a stay and a team asking for six rooms                | 15/15 (100%) |
+| Housekeeping notes  | 10 notes in four languages, including spelled-out room numbers, an unknown room and a vague note                           | 10/10 (100%) |
+| Stay notes          | 12 stays in five languages: dogs, a cot, an allergy, muddy bikes, and notes that aren't for cleaning                       | 12/12 (100%) |
+| ID scans            | 3 synthetic specimen documents: a national ID card, a passport and a receipt                                               | 3/3 (100%)   |
+| Supplier bills      | 4 bills as PDF text: US net terms, a European decimal comma, German VAT, and a quote that is not a bill                    | 4/4 (100%)   |
+| Agent tools         | 29 staff requests run through the real agent and tools, checked by their effect                                            | 29/29 (100%) |
+| Reply drafts        | 18 replies with real quotes (one a block of rooms for a group), checked by the price guard                                 | 18/18 (100%) |
+| Translations        | 4 drafts and guest messages between four languages, amounts kept                                                           | 4/4 (100%)   |
+| Contractor replies  | 4 answers about a repair: a time that works, one while a guest is in the room, one not in English, and a price to agree to | 4/4 (100%)   |
+| Notes before a stay | 5 guests in four languages: snow and a spa, a dog, a family in the rain, a regular, no forecast                            | 5/5 (100%)   |
+| Guest memory        | 4 histories: a regular, pure logistics, a sensitive complaint to leave out, repeats to merge                               | 4/4 (100%)   |
+| Rate review         | 3 outlooks: a block of rooms (and a single request to ignore), Thanksgiving, an ordinary fortnight                         | 3/3 (100%)   |
 
 Measured on 2026-10-30 and 2026-10-31 with `muse-spark-1.3`, and Muse Spark Open on Baseten for drafts and translations, at `minimal` reasoning effort except the agent (`low`) and the rate review (`high`, measured 2026-10-31: about 6 s and $0.008 a case). An empty answer from Baseten goes to Muse Spark on the Meta API instead. An inbox message takes about 2 s to read; the whole suite costs about $1.80, most of it the agent.
 
@@ -172,7 +172,16 @@ The commands below work the same in macOS and Linux terminals and in Windows Pow
 
 2. Open `.env` in any editor and paste your key after `META_API_KEY=`, with no quotes or spaces. If you have a Baseten key, paste it after `BASETEN_API_KEY=`. Nothing else in the file needs changing.
 
-3. Install, create the database, fill it with the demo hotel and start the app:
+3. The fastest path from here is `pnpm demo`:
+
+   ```bash
+   pnpm install
+   pnpm demo
+   ```
+
+   `pnpm demo` checks first that you're on Node 24 and that `META_API_KEY` is set, and stops with a one-line message if not. It resets and seeds the demo data, then starts the API and the web app. It wipes `.data/`, so use it for a fresh demo, not on data you want to keep.
+
+   Step by step instead:
 
    ```bash
    pnpm install
