@@ -154,20 +154,36 @@ Everything runs on your machine: no database, Docker or cloud account to set up.
 
 - **Node.js 22.12 or newer** (24 recommended; `node -v` to check).
 - **pnpm.** Any version from 9 on switches itself to the one this repo pins. Without pnpm: `corepack enable pnpm`, or `npm install -g pnpm`.
-- **A Meta Model API key** for the AI features. A Baseten key is optional (see below).
+- **A Meta Model API key** for the AI features ([Meta Model API docs](https://dev.meta.ai/docs/overview)). A Baseten key is optional (see below).
+
+The commands below work the same in macOS and Linux terminals and in Windows PowerShell.
 
 ### Start it
 
-```bash
-git clone https://github.com/davidkochprg/orbit-pms.git && cd orbit-pms
-cp .env.example .env     # then open .env and paste your key after META_API_KEY=
-pnpm install
-pnpm db:migrate          # creates the embedded database in .data/
-pnpm db:seed             # a fictional 50-room lodge, synthetic guests, dates around today
-pnpm dev                 # the API on :3001 and the web app on :5173
-```
+1. Get the code and create your `.env`:
 
-Open **http://localhost:5173** and click **Enter demo**. The API's first log line says `ai: on` when the key was picked up; http://localhost:5173/health lists which AI features are configured.
+   ```bash
+   git clone https://github.com/davidkochprg/orbit-pms.git
+   cd orbit-pms
+   cp .env.example .env
+   ```
+
+   In the Windows Command Prompt, use `copy .env.example .env` instead of `cp`.
+
+2. Open `.env` in any editor and paste your key after `META_API_KEY=`, with no quotes or spaces. If you have a Baseten key, paste it after `BASETEN_API_KEY=`. Nothing else in the file needs changing.
+
+3. Install, create the database, fill it with the demo hotel and start the app:
+
+   ```bash
+   pnpm install
+   pnpm db:migrate
+   pnpm db:seed
+   pnpm dev
+   ```
+
+   `pnpm db:migrate` creates the embedded database in `.data/`. `pnpm db:seed` fills it with a fictional 50-room lodge and synthetic guests, dated around today. `pnpm dev` starts the API on port 3001 and the web app on port 5173; stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd>. Next time, `pnpm dev` alone is enough.
+
+Open **http://localhost:5173** and click **Enter demo**. The API's first log line ends in `ai: on` when the key was picked up; http://localhost:5173/health lists which AI features are configured.
 
 ### A five-minute tour
 
@@ -192,6 +208,7 @@ The other values in `.env.example` work as they are. The API never sends the key
 ### If something goes wrong
 
 - **"Agent not configured" or `ai: off`**: `.env` must be at the repo root, next to `package.json`, with the key after `META_API_KEY=`. Restart `pnpm dev` after editing it.
+- **"The local database is in use by process …"**: `pnpm dev` is still running. Stop it with <kbd>Ctrl</kbd>+<kbd>C</kbd> before `pnpm db:migrate`, `pnpm db:seed` or `pnpm db:reset`.
 - **A port is in use**: set `PORT` in `.env` for the API (the web app follows it). If 5173 is taken, the web app picks the next free port and prints it.
 - **Start over with fresh data**: stop `pnpm dev`, then `pnpm db:reset`. The demo is dated around the day you seed it.
 - **Scanning with a real phone**: start with `pnpm dev:lan` and open Orbit by the `https://` network address it prints, so a phone on the same Wi-Fi can open the scan link; the certificate is self-signed, so accept the browser's warning once on each device. HTTPS keeps voice notes working at that address too. On Windows, set the computer's network profile to Private (Settings → Network & internet), or the firewall keeps the phone out and the page stays blank.
