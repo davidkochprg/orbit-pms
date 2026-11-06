@@ -38,6 +38,7 @@ import { buildContacts } from './contacts';
 import { buildConversations } from './conversations';
 import { buildEvents } from './events';
 import { buildMail, repairThread, type SeedFile } from './mail';
+import { inEnglish } from './inquiries-en';
 import { regionSeeds, type SeedRegion } from './regions';
 import { rememberRegulars } from './regulars';
 import { buildStayGuests } from './registrations';
@@ -194,7 +195,9 @@ export function buildSeed(today: IsoDate, now: Date, region: SeedRegion = 'us'):
     }
   }
 
-  const inquiryFixtures = buildInquiryFixtures(today);
+  // The US demo inbox is all English; other regions keep the multilingual eval messages.
+  const fixtures = buildInquiryFixtures(today);
+  const inquiryFixtures = region === 'us' ? inEnglish(fixtures) : fixtures;
   const bookings: Booking[] = [];
   const sorted = drafts.sort(
     (a, b) => a.checkIn.localeCompare(b.checkIn) || a.roomId.localeCompare(b.roomId),

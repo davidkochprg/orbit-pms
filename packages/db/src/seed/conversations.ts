@@ -87,6 +87,10 @@ export function buildConversations(
   now: Date,
 ): Inquiry[] {
   const guest = (b: Booking) => guests.find((g) => g.id === b.guestId)!;
+  // The UK guests and the OTA senders: the same stays get these threads as before the US guests
+  // switched to English.
+  const fromUk = (b: Booking) =>
+    guest(b).id.startsWith('gst_en_') || guest(b).id.startsWith('gst_inq_');
   const desk = team.filter((s) => s.active && s.role === 'receptionist').map((s) => s.name);
   const manager = team.find((s) => s.active && s.role === 'manager')?.name;
   // "15:00" as a US guest reads it ("3 PM"), as written elsewhere.
@@ -102,7 +106,8 @@ export function buildConversations(
       b.source === 'ota' &&
       b.status === 'confirmed' &&
       b.checkIn > today &&
-      guest(b).language === 'de',
+      // A guest from abroad or one who wrote in through the OTA, as before the inbox went English.
+      (guest(b).language === 'de' || guest(b).id.startsWith('gst_inq_')),
   );
   if (otaStay) {
     const g = guest(otaStay);
@@ -114,37 +119,24 @@ export function buildConversations(
           {
             direction: 'in',
             hoursAgo: 30,
-            body: `Guten Tag,\nwir kommen erst gegen 22 Uhr an. Ist das ein Problem? Gibt es eine Möglichkeit, den Schlüssel später abzuholen?\nViele Grüße\n${g.name}`,
-            translation: {
-              language: 'en',
-              text: `Hello,\nwe won't arrive until around 10 PM. Is that a problem? Is there a way to pick up the key later?\nBest regards\n${g.name}`,
-            },
+            body: `Hello,\nwe won't arrive until around 10 PM. Is that a problem? Is there a way to pick up the key later?\nBest regards\n${g.name}`,
           },
           {
             direction: 'out',
             hoursAgo: 28,
             ...(desk[0] && { author: desk[0] }),
-            body: `Guten Tag,\n\nkein Problem: Die Rezeption ist bis 22:30 besetzt. Sollten Sie später kommen, hinterlegen wir Ihren Schlüssel in der Schlüsselbox neben dem Eingang und schicken Ihnen den Code am Anreisetag.\n\nMit freundlichen Grüßen\nIhre Rezeption`,
-            // Written in English at the desk and sent in German.
-            translation: {
-              language: 'en',
-              text: `Hello,\n\nno problem: reception is staffed until 10:30 PM. If you arrive later, we'll leave your key in the key box next to the entrance and send you the code on the day of arrival.\n\nKind regards\nReception`,
-            },
+            body: `Hello,\n\nno problem: reception is staffed until 10:30 PM. If you arrive later, we'll leave your key in the key box next to the entrance and send you the code on the day of arrival.\n\nKind regards\nReception`,
           },
           {
             direction: 'in',
             hoursAgo: 26,
-            body: 'Vielen Dank, das ist sehr hilfreich! Bis bald.',
-            translation: {
-              language: 'en',
-              text: 'Thank you very much, that is very helpful! See you soon.',
-            },
+            body: 'Thank you very much, that is very helpful! See you soon.',
           },
         ],
         {
           channel: 'ota',
           partner: 'Booking.com',
-          subject: 'Späte Anreise',
+          subject: 'Late arrival',
           senderName: g.name,
           senderAddress: null,
           bookingId: otaStay.id,
@@ -154,7 +146,7 @@ export function buildConversations(
   }
 
   const pastStay = bookings
-    .filter((b) => b.status === 'checked_out' && guest(b).language === 'en' && guest(b).email)
+    .filter((b) => b.status === 'checked_out' && fromUk(b) && guest(b).email)
     .at(-1);
   if (pastStay) {
     const g = guest(pastStay);
@@ -191,7 +183,7 @@ export function buildConversations(
     (b) =>
       b.status === 'confirmed' &&
       b.checkIn > today &&
-      guest(b).language === 'en' &&
+      fromUk(b) &&
       guest(b).email &&
       b.id !== otaStay?.id,
   );

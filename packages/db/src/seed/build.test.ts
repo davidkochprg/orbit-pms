@@ -349,7 +349,11 @@ describe('buildSeed for the US demo lodge', () => {
   it('is an English-speaking US lodge with multinational guests', () => {
     expect(us.hotelProfile).toMatchObject({ country: 'US', language: 'en' });
     expect(us.staff.every((s) => s.language === 'en')).toBe(true);
-    expect(new Set(us.guests.map((g) => g.language))).toEqual(new Set(['cs', 'de', 'en', 'pl']));
+    expect(new Set(us.guests.map((g) => g.language))).toEqual(new Set(['de', 'en']));
+    // The US inbox reads in English, with no Czech names, crowns or places left over.
+    const inbox = JSON.stringify(us.inquiries.map((i) => [i.subject, i.senderName, i.messages]));
+    expect(inbox).not.toMatch(/Dobrý|Dzień|Guten|Czech|CZK|Praha|Prague/);
+    expect(JSON.stringify(us.guests)).not.toMatch(/[ěščřžůňťď]|\+420|\+48/);
     const authors = us.inquiries.flatMap((i) => i.messages.map((m) => m.author)).filter(Boolean);
     expect(authors.every((a) => us.staff.some((s) => s.name === a))).toBe(true);
     expect(JSON.stringify(us.hotelProfile)).not.toMatch(/CZK|Prague|Czech/);
