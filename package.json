@@ -8,6 +8,7 @@
     "node": ">=22.12"
   },
   "scripts": {
+    "demo": "node scripts/demo.mjs",
     "dev": "pnpm --parallel --filter @orbit/api --filter @orbit/web dev",
     "dev:lan": "pnpm --parallel --filter @orbit/api --filter @orbit/web dev:lan",
     "build": "pnpm -r --if-present build",

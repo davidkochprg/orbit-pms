@@ -13,7 +13,7 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: {
-          allowDefaultProject: ['*.js', '*.cjs', '*.ts'],
+          allowDefaultProject: ['*.js', '*.cjs', '*.ts', 'scripts/*.mjs'],
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -28,7 +28,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['*.js', '*.cjs'],
+    files: ['*.js', '*.cjs', 'scripts/*.mjs'],
     ...tseslint.configs.disableTypeChecked,
     languageOptions: { globals: globals.node },
   },
